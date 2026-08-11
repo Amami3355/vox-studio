@@ -101,6 +101,7 @@ scene library. If the manifest is insufficient, fix the manifest, not the prompt
 
 ```
 packages/video/           the scene library — everything Remotion renders
+  src/assets/             minimal Asset Resolver: identity cache, local library, placeholder
   src/design/             L0 tokens: theme, motion profiles, fonts
   src/primitives/         L1, not exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability
@@ -112,6 +113,7 @@ services/agents/          reserved for the Python ADK orchestration; not initial
 
 ## Not yet built
 
-Beat compiler, `packages/voice` and its TTS timepoints, Section runtime, Asset Resolver,
-the remaining capabilities, the agents, the product Studio UI. See the build order in
+Beat compiler, `packages/voice` and its TTS timepoints, Section runtime, the Asset
+Resolver beyond identity cache/local library/placeholder, the remaining capabilities,
+the agents, and the product Studio UI. See the build order in
 `vox-studio-architecture-figee.md` §13, and ADR-0002 for the time pipeline.

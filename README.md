@@ -16,8 +16,9 @@ Built for [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.dev
 
 ## Status
 
-Early. What exists today is the foundation of the scene library — steps 1–4 of the build
-order in `vox-studio-architecture-figee.md` §13:
+Early. What exists today is the foundation of the scene library — steps 1–5 of the build
+order in `vox-studio-architecture-figee.md` §13, with step 5 deliberately cut to the
+smallest continuity-testable scope:
 
 - **L0 design system** — one theme (`editorial-cold`), six motion profiles, type and
   spacing scales, fonts.
@@ -25,12 +26,16 @@ order in `vox-studio-architecture-figee.md` §13:
   `EmptyState`, `Backdrop`. Not exposed to the agent.
 - **L2 — `BarChartScene`**, the pattern every other capability will copy: hard schema,
   soft constraints, closed action vocabulary, three layouts, five examples.
+- **L2 — `ImageContextScene`**, one `splitLeft` layout and three examples, with semantic
+  asset requirements and deterministic ready/placeholder/failed rendering.
+- **Minimal Asset Resolver** — identity cache, injectable local library and immediate
+  placeholder fallback. No network or cloud dependency.
 - **Catalog + the four tools** — generated manifest, `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** — grid, six-frame filmstrip and layout × motion-profile matrix.
 
-Not built yet: beat compiler, TTS timepoints, Section runtime, Asset Resolver, the
-remaining capabilities, the agents, the product Studio UI.
+Not built yet: beat compiler, TTS timepoints, Section runtime, the wider Asset Resolver,
+the remaining capabilities, the agents, and the product Studio UI.
 
 ## Getting started
 
@@ -63,6 +68,7 @@ pnpm still bar-chart--example-rent-burden out/frame.png --frame=190
 
 ```
 packages/video/           the scene library — everything Remotion renders
+  src/assets/             minimal Asset Resolver
   src/design/             L0 tokens
   src/primitives/         L1, never exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability

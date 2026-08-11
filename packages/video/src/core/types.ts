@@ -9,6 +9,9 @@
  */
 import type { z } from 'zod';
 import type { MotionProfileId, Pace } from '../design/motion';
+import type { AssetRef, AssetRequirement, ResolvedAssets, ResolvedSceneAssets } from './assets';
+
+export type { AssetRef, AssetRequirement, ResolvedAssets, ResolvedSceneAssets } from './assets';
 
 /* ------------------------------------------------------------------ layout */
 
@@ -60,21 +63,6 @@ export type Beat = { id: string; text: string };
  * system — seconds to ms at the edge of `packages/voice`, ms to frames in the compiler.
  */
 export type TimedBeat = Beat & { fromMs: number; toMs: number };
-
-/* ------------------------------------------------------------------ assets */
-
-export type AssetRef =
-  | { status: 'ready'; uri: string }
-  | { status: 'placeholder'; uri: string; pendingRequirementId: string }
-  | { status: 'failed'; uri: string; requirementId: string; reason: string };
-
-export type AssetRequirement = {
-  type: 'image' | 'character' | 'map' | 'document';
-  subject: string;
-  treatment: 'photo' | 'cutout' | 'illustration' | 'duotone';
-  orientation: 'landscape' | 'portrait' | 'square';
-  identityKey?: string;
-};
 
 /* ------------------------------------------------------------------ events */
 
@@ -203,6 +191,8 @@ export type SceneExample = SceneInstance & {
 
 export type SceneProps<P> = {
   props: P;
+  /** Resolver output keyed by the semantic requirement field. Never authored by an agent. */
+  assets: ResolvedSceneAssets;
   /** Layout id, resolved from the instance. Never part of `props`. */
   layout: string;
   events: TimedEvent[];

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useVideoConfig } from 'remotion';
+import { NO_RESOLVED_ASSETS, NO_RESOLVED_SCENE_ASSETS, type ResolvedAssets } from '../core/assets';
 import type { SafeArea, TimedEvent } from '../core/types';
 import { NO_SAFE_AREA } from '../core/types';
 import { type MotionProfileId, getMotionProfile } from '../design/motion';
@@ -15,7 +16,9 @@ import { requireCapability } from '../scenes/registry';
  */
 export const SceneRenderer: React.FC<{
   capabilityId: string;
+  sceneId: string;
   props: Record<string, unknown>;
+  resolvedAssets?: ResolvedAssets;
   events?: TimedEvent[];
   layout?: string;
   motionProfile?: MotionProfileId;
@@ -23,7 +26,9 @@ export const SceneRenderer: React.FC<{
   theme?: Theme;
 }> = ({
   capabilityId,
+  sceneId,
   props,
+  resolvedAssets = NO_RESOLVED_ASSETS,
   events = [],
   layout,
   motionProfile = 'subtleDrift',
@@ -43,11 +48,13 @@ export const SceneRenderer: React.FC<{
 
   const parsed = capability.schema.parse(props);
   const Component = capability.component;
+  const assets = resolvedAssets[sceneId] ?? NO_RESOLVED_SCENE_ASSETS;
 
   return (
     <ThemeProvider theme={theme}>
       <Component
         props={parsed as never}
+        assets={assets}
         layout={layoutId}
         events={events}
         safeArea={safeArea}

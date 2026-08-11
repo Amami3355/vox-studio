@@ -1,4 +1,4 @@
-# Handoff — 2026-08-11 (grilling session)
+# Handoff — 2026-08-12 (ImageContextScene increment)
 
 State of play at the end of the design session that followed the scaffolding session.
 Replace this file when it goes stale; it describes a moment, not the project.
@@ -11,8 +11,10 @@ Do not reopen it.** The remaining open questions are at the bottom, ranked. Read
 
 ## Where we are
 
-Steps 1–4 of the build order in `vox-studio-architecture-figee.md` §13. The scene library
-renders, the catalog generates, the four tools work, and the evaluation harness exists.
+Steps 1–5 of the build order in `vox-studio-architecture-figee.md` §13. The scene library
+now has two materially different SceneCapabilities, the minimal offline Asset Resolver
+path exists, the catalog generates, the four tools work, and the evaluation harness
+builds. The next move is step 6: the generic Section runtime and minimal compiler.
 
 ADR-0002 has since been **applied to the existing code**: `Beat`/`TimedBeat` exist,
 `spansBeats` is required at both levels, the beat partition is checked over scenes and
@@ -24,9 +26,10 @@ Deadline: **7 September 2026, 14:00 PDT**. Roughly four weeks.
 
 ### Verified, not assumed
 
-`pnpm typecheck` clean · 81 tests pass · Biome clean on 58 files · `catalog:check` in
-sync · `apps/component-studio` builds · stills render through headless Remotion, and the
-frame-150 render is byte-identical before and after the ADR-0002 change.
+`pnpm typecheck` clean · 128 tests pass · Biome clean on 73 files · `catalog:check` in
+sync · `apps/component-studio` builds · stills render through headless Remotion.
+`ImageContextScene` key frames are hash-locked for ready, placeholder, failed, empty and
+long-copy inputs; placeholder and failed deliberately share the same rendered hash.
 
 ```bash
 pnpm install
@@ -43,6 +46,11 @@ pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
   `EmptyState`, `Backdrop`.
 - **L2** `BarChartScene` — the pattern every other capability copies. Eight contract
   files, three layouts, five examples including the 20-entry, empty and negative cases.
+- **L2** `ImageContextScene` — one `splitLeft` layout, three examples, strict semantic
+  `AssetRequirement`, and deterministic ready/placeholder/failed rendering.
+- **Minimal Asset Resolver** — explicit project-scoped identity cache, injectable and
+  verified local library, deterministic placeholder fallback, and resolved assets keyed
+  by SceneInstance id plus requirement field rather than written into semantic props.
 - **Catalog** `catalog.json` generated and committed; `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** grid · six-frame filmstrip · layout × motion-profile matrix.
@@ -52,9 +60,9 @@ pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
 
 ### Not built
 
-Beat compiler · `packages/voice` · Section runtime · Asset Resolver · the other 7–11
-capabilities · the agents · the product Studio UI. `services/agents/` is a reserved
-empty directory.
+Beat compiler · `packages/voice` · Section runtime · compiler · the Asset Resolver beyond
+identity cache/local library/placeholder · the other 6–10 capabilities · the agents ·
+the product Studio UI. `services/agents/` is a reserved empty directory.
 
 ---
 
@@ -78,10 +86,9 @@ and total at both levels · compiler in `packages/video/src/compile/`, TTS in
 
 **Scope and sequencing**, decided in the same session but too reversible to earn an ADR:
 
-- Keep §13's order, but cut ImageContextScene's polish budget hard — one layout, one
-  placeholder asset — then Section runtime, then the continuity test, then come back.
-  Two `BarChartScene`s would reach the continuity test sooner but cannot surface slot
-  collisions, since two instances of one capability occupy the same regions.
+- ImageContextScene's deliberately narrow increment is complete: one layout, one
+  placeholder treatment, no event vocabulary. Build the Section runtime and minimal
+  compiler now, then run the continuity test before adding another layout or capability.
 - Vertical slice: §12's own example, housing/rent, **in English**.
 - Asset Resolver ships with §5.4 links 1 and 3 only — identity cache and local library —
   plus the placeholder path. No Gemini generation, no licensed search, no cutout or
@@ -106,10 +113,10 @@ confirm empirically: **does a trailing `<mark>` at the end of the SSML reliably 
 timepoint at the end of speech?** The whole `toMs` of the last beat rests on it, and the
 fallback (decoding `audioContent` for a duration) is uglier.
 
-**Polishing BarChartScene further is a trap.** §9.3 says most real problems only appear
-at the second scene — slot collisions, brutal transitions, a character that jumps,
-rhythmic uniformity. Reaching the continuity test matters more than a fourth chart
-layout. This is now the largest single risk to the deadline.
+**Polishing either isolated capability further is a trap.** The second capability now
+exists. §9.3 says the remaining real problems appear only in sequence — slot collisions,
+brutal transitions, a character that jumps, rhythmic uniformity. Reaching the continuity
+test is now the largest single risk to the deadline.
 
 **`@google/adk` on npm (1.6.0) is unverified.** The ADK Python path is the documented
 one. Confirm before betting the orchestration on the JS package. Lower stakes than it

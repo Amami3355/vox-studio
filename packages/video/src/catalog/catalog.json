@@ -478,6 +478,196 @@
           ]
         }
       ]
+    },
+    {
+      "id": "image_context",
+      "name": "ImageContextScene",
+      "family": "context",
+      "summary": "Editorial image paired with concise context copy for openings and transitions.",
+      "useWhen": [
+        "establishing a documentary subject with one strong image",
+        "providing visual context before or after a data scene",
+        "pairing a photo or illustration with a concise editorial claim"
+      ],
+      "avoidWhen": [
+        "comparing numeric categories → bar_chart",
+        "locating a place or route → map",
+        "presenting a typography-only statement → typographic_statement",
+        "making a character carry the explanation → character_explainer"
+      ],
+      "supportsEvents": false,
+      "requiresAssets": true,
+      "occupiesRegions": [
+        "full"
+      ],
+      "supportedCompositions": [
+        "full"
+      ],
+      "minDurationFrames": 90,
+      "recommendedDurationFrames": 180,
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Editorial headline paired with the image. Best under 40 characters; longer copy reduces the type scale."
+          },
+          "caption": {
+            "default": "",
+            "description": "Optional supporting context. Best under 120 characters.",
+            "type": "string",
+            "maxLength": 240
+          },
+          "assetRequirement": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "character",
+                  "map",
+                  "document"
+                ],
+                "description": "Semantic kind of visual material required by the scene."
+              },
+              "subject": {
+                "type": "string",
+                "maxLength": 80,
+                "description": "Visual subject in natural language. Never a path or URI."
+              },
+              "treatment": {
+                "default": "photo",
+                "description": "Editorial treatment requested from the Asset Resolver.",
+                "type": "string",
+                "enum": [
+                  "photo",
+                  "cutout",
+                  "illustration",
+                  "duotone"
+                ]
+              },
+              "orientation": {
+                "default": "landscape",
+                "description": "Composition the resolved asset should support.",
+                "type": "string",
+                "enum": [
+                  "landscape",
+                  "portrait",
+                  "square"
+                ]
+              },
+              "identityKey": {
+                "description": "Stable identity shared by requirements that must resolve to the same asset.",
+                "type": "string",
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "type",
+              "subject"
+            ],
+            "additionalProperties": false,
+            "description": "Semantic visual request resolved before compilation. Never provide a path or URI."
+          }
+        },
+        "required": [
+          "headline",
+          "assetRequirement"
+        ],
+        "additionalProperties": false
+      },
+      "softConstraints": {
+        "headline": {
+          "recommendedMin": 1,
+          "recommendedMax": 40,
+          "onEmpty": "The asset subject becomes the only visible context label.",
+          "onExceed": "The headline drops one step of the type scale."
+        },
+        "caption": {
+          "recommendedMax": 120,
+          "onExceed": "Shorten the caption to preserve an image-led composition."
+        }
+      },
+      "layouts": [
+        {
+          "id": "splitLeft",
+          "description": "Editorial image on the left with a concise headline and optional caption on the right.",
+          "slots": [
+            "image",
+            "headline",
+            "caption"
+          ]
+        }
+      ],
+      "actions": [],
+      "examples": [
+        {
+          "id": "example-housing-context",
+          "title": "Housing context opener",
+          "note": "Canonical image-led opening for the housing and rent vertical slice.",
+          "component": "image_context",
+          "layout": "splitLeft",
+          "motionProfile": "cinematic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "headline": "The rent squeeze is reshaping city life",
+            "caption": "A growing share of income now disappears before the month begins.",
+            "assetRequirement": {
+              "type": "image",
+              "subject": "Dense apartment buildings in a European city at dusk",
+              "treatment": "photo",
+              "orientation": "landscape",
+              "identityKey": "housing-city-context"
+            }
+          }
+        },
+        {
+          "id": "example-long-context",
+          "title": "Edge case — long editorial copy",
+          "note": "Edge case for headline density, caption length, and a portrait-oriented request.",
+          "component": "image_context",
+          "layout": "splitLeft",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "headline": "For first-time buyers, the distance between wages and housing costs keeps widening",
+            "caption": "Even households that save consistently are watching deposits and monthly payments move further out of reach in the largest cities.",
+            "assetRequirement": {
+              "type": "image",
+              "subject": "Young renter looking through an apartment window above a crowded city street",
+              "treatment": "illustration",
+              "orientation": "portrait"
+            }
+          }
+        },
+        {
+          "id": "example-empty-context",
+          "title": "Empty case — unresolved image and copy",
+          "note": "Empty copy remains renderable while the subject-labelled asset placeholder carries context.",
+          "component": "image_context",
+          "layout": "splitLeft",
+          "motionProfile": "editorialStatic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "headline": "",
+            "caption": "",
+            "assetRequirement": {
+              "type": "image",
+              "subject": "Housing context image pending",
+              "treatment": "duotone",
+              "orientation": "landscape"
+            }
+          }
+        }
+      ]
     }
   ]
 }

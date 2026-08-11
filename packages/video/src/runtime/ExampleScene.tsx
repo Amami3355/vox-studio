@@ -1,6 +1,8 @@
 import type React from 'react';
 import { useVideoConfig } from 'remotion';
+import { createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { resolveEventTimings, syntheticBeats } from '../core/anchors';
+import type { ResolvedAssets } from '../core/assets';
 import type { MotionProfileId } from '../design/motion';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
@@ -11,6 +13,8 @@ export type ExampleSceneProps = {
   /** Overrides so layout and motion profile stay editable in the Remotion props panel. */
   layout?: string | null;
   motionProfile?: MotionProfileId | null;
+  /** Runtime/test override. Never published in the agent-facing catalog examples. */
+  resolvedAssets?: ResolvedAssets;
 };
 
 /**
@@ -25,6 +29,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   exampleId,
   layout,
   motionProfile,
+  resolvedAssets,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const capability = requireCapability(capabilityId);
@@ -42,11 +47,14 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
     from: 0,
     to: durationInFrames,
   });
+  const assets = resolvedAssets ?? resolveSceneAssets(example, createAssetResolver());
 
   return (
     <SceneRenderer
       capabilityId={capabilityId}
+      sceneId={example.id}
       props={example.props}
+      resolvedAssets={assets}
       events={events}
       layout={layout ?? example.layout}
       motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}
