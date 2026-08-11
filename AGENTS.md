@@ -1,5 +1,10 @@
 # Vox Studio
 
+## Start here
+
+`docs/handoff.md` — state of play, settled decisions not to reopen, and the ranked open
+questions. Then `CONTEXT.md` for the vocabulary.
+
 ## Agent skills
 
 ### Issue tracker
