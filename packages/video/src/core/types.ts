@@ -1,0 +1,222 @@
+/**
+ * Core contracts shared by every layer.
+ *
+ * The single most important distinction in this file is SceneCapability vs
+ * SceneInstance. A capability is what exists in the catalog (8-12 of them, defined by
+ * code, immutable at runtime). An instance is what exists in one video (dozens per
+ * project, authored by the agent, edited by the user, serialised into the document).
+ * No code may blur that boundary.
+ */
+import type { z } from 'zod';
+import type { MotionProfileId, Pace } from '../design/motion';
+
+/* ------------------------------------------------------------------ layout */
+
+export type Slot =
+  | 'full'
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'center'
+  | 'cornerTL'
+  | 'cornerTR'
+  | 'cornerBL'
+  | 'cornerBR';
+
+export const ALL_SLOTS: Slot[] = [
+  'full',
+  'left',
+  'right',
+  'top',
+  'bottom',
+  'center',
+  'cornerTL',
+  'cornerTR',
+  'cornerBL',
+  'cornerBR',
+];
+
+/** Percentages of the canvas that a scene must keep clear. Computed, never authored. */
+export type SafeArea = { top: number; right: number; bottom: number; left: number };
+
+export const NO_SAFE_AREA: SafeArea = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/* ------------------------------------------------------------------ assets */
+
+export type AssetRef =
+  | { status: 'ready'; uri: string }
+  | { status: 'placeholder'; uri: string; pendingRequirementId: string }
+  | { status: 'failed'; uri: string; requirementId: string; reason: string };
+
+export type AssetRequirement = {
+  type: 'image' | 'character' | 'map' | 'document';
+  subject: string;
+  treatment: 'photo' | 'cutout' | 'illustration' | 'duotone';
+  orientation: 'landscape' | 'portrait' | 'square';
+  identityKey?: string;
+};
+
+/* ------------------------------------------------------------------ events */
+
+/** What the agent writes: a symbolic anchor plus a closed-vocabulary action. */
+export type SemanticEvent = {
+  at: string;
+  action: string;
+  payload?: Record<string, unknown>;
+};
+
+/** What the compiler produces: the same event, resolved onto an absolute frame. */
+export type TimedEvent = {
+  frame: number;
+  action: string;
+  payload?: Record<string, unknown>;
+};
+
+export type ActionDef = {
+  description: string;
+  payload: z.ZodType | null;
+};
+
+/* ------------------------------------------------------------------ layouts */
+
+export type LayoutDef = {
+  /** Typed internal slots. These accept primitives, never other scenes. */
+  slots: string[];
+  description: string;
+};
+
+/* -------------------------------------------------------------- constraints */
+
+export type FieldConstraint = {
+  recommendedMin?: number;
+  recommendedMax?: number;
+  absoluteMax?: number;
+  onExceed?: string;
+  onEmpty?: string;
+};
+
+export type SoftConstraints = Record<string, FieldConstraint>;
+
+/* -------------------------------------------------------------- capability */
+
+export type SceneFamily = 'data' | 'context' | 'character' | 'typography' | 'geo' | 'diagram';
+
+export type SceneMeta = {
+  id: string;
+  name: string;
+  family: SceneFamily;
+  summary: string;
+  useWhen: string[];
+  avoidWhen: string[];
+  supportsEvents: boolean;
+  requiresAssets: boolean;
+  occupiesRegions: Slot[];
+  supportedCompositions: Slot[];
+  minDurationFrames: number;
+  recommendedDurationFrames: number;
+};
+
+/** One entry of the catalog. Defined by code, generated at build, immutable at runtime. */
+export type SceneCapability = {
+  meta: SceneMeta;
+  schema: z.ZodType;
+  constraints: SoftConstraints;
+  actions: Record<string, ActionDef>;
+  layouts: Record<string, LayoutDef>;
+  examples: SceneExample[];
+  component: React.ComponentType<SceneProps<never>>;
+  /**
+   * Referential checks the generic validator cannot express — a `highlight` naming a
+   * label that is not in `data`, for instance. Optional, but this is where the
+   * "renders fine, animates nothing" class of bug gets caught.
+   */
+  checks?: (instance: SceneInstance) => {
+    errors: CompilerError[];
+    warnings: CompilerWarning[];
+  };
+};
+
+/** One use of a capability inside one video. */
+export type SceneInstance = {
+  id: string;
+  component: string;
+  props: Record<string, unknown>;
+  layout?: string;
+  motionProfile?: MotionProfileId;
+  events?: SemanticEvent[];
+  spansBeats?: string[];
+  pace?: Pace;
+};
+
+/**
+ * An example is a SceneInstance plus the bit of framing a human needs to read the
+ * grid. Examples are normative: the agent imitates them far more faithfully than it
+ * follows a description, so they carry semantic anchors, never frames.
+ */
+export type SceneExample = SceneInstance & {
+  title: string;
+  note: string;
+};
+
+/* ------------------------------------------------------------ scene runtime */
+
+export type SceneProps<P> = {
+  props: P;
+  /** Layout id, resolved from the instance. Never part of `props`. */
+  layout: string;
+  events: TimedEvent[];
+  safeArea: SafeArea;
+  theme: import('../design/theme').Theme;
+  profile: import('../design/motion').MotionProfile;
+  /** Length of this scene, so components can time a closing hold. */
+  durationInFrames: number;
+};
+
+/* ---------------------------------------------------------------- reporting */
+
+export type CompilerErrorCode =
+  | 'UNKNOWN_CAPABILITY'
+  | 'INVALID_PROPS'
+  | 'UNKNOWN_ACTION'
+  | 'UNKNOWN_LAYOUT'
+  | 'INVALID_PAYLOAD'
+  | 'UNKNOWN_ANCHOR'
+  | 'BELOW_MIN_DURATION'
+  | 'MISSING_ASSET_REFERENCE';
+
+export type CompilerError = {
+  code: CompilerErrorCode;
+  sceneId?: string;
+  field?: string;
+  message: string;
+  /** Valid alternatives, when the failure is a bad identifier. */
+  expected?: string[];
+};
+
+export type CompilerWarningCode =
+  | 'SOFT_LIMIT_EXCEEDED'
+  | 'SLOT_RELOCATED'
+  | 'PERSISTENT_ELEMENT_HIDDEN'
+  | 'ASSET_PLACEHOLDER'
+  | 'MOTION_PROFILE_REPETITION'
+  | 'TITLE_DENSITY'
+  | 'SCENE_BELOW_RECOMMENDED_DURATION';
+
+export type CompilerWarning = {
+  code: CompilerWarningCode;
+  severity: 'info' | 'quality' | 'important';
+  sceneId?: string;
+  sectionId?: string;
+  field?: string;
+  message: string;
+  suggestion?: string;
+};
+
+export type CompileReport = {
+  ok: boolean;
+  errors: CompilerError[];
+  warnings: CompilerWarning[];
+};
+
+export const emptyReport = (): CompileReport => ({ ok: true, errors: [], warnings: [] });

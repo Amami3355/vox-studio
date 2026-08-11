@@ -1,0 +1,36 @@
+{
+  "name": "@vox/video",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fonts": "./src/design/fonts.ts",
+    "./catalog.json": "./src/catalog/catalog.json"
+  },
+  "scripts": {
+    "studio": "remotion studio src/remotion-entry.ts",
+    "render": "remotion render src/remotion-entry.ts",
+    "still": "remotion still src/remotion-entry.ts",
+    "catalog": "tsx scripts/build-catalog.ts",
+    "catalog:check": "tsx scripts/build-catalog.ts --check",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.508",
+    "@remotion/google-fonts": "4.0.508",
+    "@remotion/player": "4.0.508",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "4.0.508",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

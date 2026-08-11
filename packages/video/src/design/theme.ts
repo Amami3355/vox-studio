@@ -1,0 +1,153 @@
+/**
+ * L0 — Design system tokens.
+ *
+ * No JSX lives here. Only constants. Every colour, size, spacing and radius used
+ * anywhere in the scene library must resolve to a value defined in this file.
+ */
+
+export type Theme = {
+  id: string;
+  name: string;
+  color: {
+    bg: string;
+    surface: string;
+    ink: string;
+    inkMuted: string;
+    accent: string;
+    accentAlt: string;
+    positive: string;
+    negative: string;
+    /** Ordered ramp, warm (emphasis) to cold (recessive). At least 6 entries. */
+    dataSeries: string[];
+  };
+  type: {
+    display: string;
+    body: string;
+    mono: string;
+    /** Typographic scale in px, ascending. */
+    scale: number[];
+    tracking: { tight: number; normal: number; wide: number };
+    weight: { regular: number; medium: number; bold: number };
+  };
+  /** Spacing scale in px, ascending. */
+  space: number[];
+  grid: { columns: number; margin: number; gutter: number };
+  radius: number[];
+};
+
+/** Semantic role an agent may pick per scene. Never a raw colour. */
+export type EmphasisRole = 'neutral' | 'positive' | 'negative';
+
+export const FPS = 30;
+export const WIDTH = 1920;
+export const HEIGHT = 1080;
+
+/**
+ * `editorial-cold` — Ember on Slate.
+ *
+ * A single saturated warm accent on a cold near-black. The warm/cold split is what
+ * produces an instantly identifiable dominant element, which is the first line of
+ * the quality grid.
+ */
+export const editorialCold: Theme = {
+  id: 'editorial-cold',
+  name: 'Editorial Cold',
+  color: {
+    bg: '#0B0E13',
+    surface: '#141922',
+    ink: '#F2EFE9',
+    inkMuted: '#8A94A6',
+    accent: '#FF5A1F',
+    accentAlt: '#FFB800',
+    positive: '#3DD68C',
+    negative: '#FF4D4D',
+    dataSeries: ['#FF5A1F', '#F2873C', '#E0A75B', '#A8A08F', '#7A8394', '#5A6475'],
+  },
+  type: {
+    // Populated by design/fonts.ts at module load; these are the fallback stacks.
+    display: 'Archivo, system-ui, sans-serif',
+    body: 'Inter, system-ui, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
+    scale: [28, 36, 48, 64, 88, 120, 168],
+    tracking: { tight: -0.02, normal: 0, wide: 0.08 },
+    weight: { regular: 400, medium: 600, bold: 800 },
+  },
+  space: [0, 8, 16, 24, 40, 64, 96, 144],
+  grid: { columns: 12, margin: 96, gutter: 24 },
+  radius: [0, 4, 8, 16, 999],
+};
+
+export const themes = {
+  'editorial-cold': editorialCold,
+} as const;
+
+export type ThemeId = keyof typeof themes;
+
+export const defaultTheme = editorialCold;
+
+/** Resolve a semantic emphasis role to a concrete colour from the theme. */
+export const emphasisColor = (theme: Theme, role: EmphasisRole): string => {
+  switch (role) {
+    case 'positive':
+      return theme.color.positive;
+    case 'negative':
+      return theme.color.negative;
+    default:
+      return theme.color.accent;
+  }
+};
+
+/**
+ * Mix two hex colours. Used to recede non-highlighted elements toward the
+ * background rather than reaching for an undocumented grey.
+ */
+export const mix = (a: string, b: string, amount: number): string => {
+  const pa = hexToRgb(a);
+  const pb = hexToRgb(b);
+  const t = Math.min(1, Math.max(0, amount));
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return rgbToHex(c(pa[0], pb[0]), c(pa[1], pb[1]), c(pa[2], pb[2]));
+};
+
+const hexToRgb = (hex: string): [number, number, number] => {
+  const h = hex.replace('#', '');
+  const full =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
+  return [
+    Number.parseInt(full.slice(0, 2), 16),
+    Number.parseInt(full.slice(2, 4), 16),
+    Number.parseInt(full.slice(4, 6), 16),
+  ];
+};
+
+const rgbToHex = (r: number, g: number, b: number): string =>
+  `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+
+/**
+ * Colour for item `index` of `count`, sampled along the data ramp.
+ *
+ * Sampled, not indexed: `dataSeries` is an ordered warm-to-cold ramp, and cycling it
+ * with a modulo makes the seventh bar identical to the first — which reads as an
+ * emphasis nobody asked for. Interpolating spreads the ramp across however many items
+ * there are.
+ */
+export const rampColor = (ramp: string[], index: number, count: number): string => {
+  const first = ramp[0];
+  if (!first) return '#888888';
+  if (count <= 1 || ramp.length === 1) return first;
+  const t = (Math.min(index, count - 1) / (count - 1)) * (ramp.length - 1);
+  const lo = Math.floor(t);
+  const hi = Math.min(ramp.length - 1, lo + 1);
+  return mix(ramp[lo] as string, ramp[hi] as string, t - lo);
+};
+
+/** Read a scale entry, clamped to the ends of the scale. */
+export const scaleStep = (scale: number[], index: number): number => {
+  const i = Math.min(scale.length - 1, Math.max(0, index));
+  return scale[i] as number;
+};

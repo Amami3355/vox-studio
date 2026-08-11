@@ -1,0 +1,28 @@
+{
+  "name": "vox-studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "studio": "pnpm --filter @vox/video studio",
+    "grid": "pnpm --filter @vox/component-studio dev",
+    "catalog": "pnpm --filter @vox/video catalog",
+    "catalog:check": "pnpm --filter @vox/video catalog:check",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check .",
+    "fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

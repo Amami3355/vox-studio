@@ -1,0 +1,483 @@
+{
+  "manifestVersion": 1,
+  "capabilities": [
+    {
+      "id": "bar_chart",
+      "name": "BarChartScene",
+      "family": "data",
+      "summary": "Comparison of discrete values across named categories.",
+      "useWhen": [
+        "comparing quantities between named categories",
+        "showing a ranking",
+        "contrasting two to eight values",
+        "making one value in a set stand out"
+      ],
+      "avoidWhen": [
+        "continuous change over time → line_chart",
+        "share of a whole → stat_donut",
+        "a single value → stat_counter",
+        "a sequence of dated events → timeline"
+      ],
+      "supportsEvents": true,
+      "requiresAssets": false,
+      "occupiesRegions": [
+        "bottom",
+        "left"
+      ],
+      "supportedCompositions": [
+        "full",
+        "left",
+        "right"
+      ],
+      "minDurationFrames": 90,
+      "recommendedDurationFrames": 210,
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Headline shown above the chart. Best under 40 characters; beyond that the type scale drops a step automatically."
+          },
+          "data": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 40,
+                  "description": "Category name shown under the bar."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Plotted value. Negative values recompute the axis."
+                }
+              },
+              "required": [
+                "label",
+                "value"
+              ]
+            },
+            "description": "Series to compare. Best between 2 and 8 entries. From 9 to 20 the weakest are collapsed into a single 'Others' bar. An empty array renders a typographic empty state rather than a blank frame."
+          },
+          "unit": {
+            "default": "",
+            "description": "Suffix appended to every value, e.g. '%' or '€'. Empty for bare numbers.",
+            "type": "string",
+            "maxLength": 8
+          },
+          "highlight": {
+            "description": "The `label` of the bar to bring forward. Every other bar recedes toward the background. Must match a label present in `data`.",
+            "type": "string"
+          },
+          "emphasis": {
+            "default": "neutral",
+            "description": "Semantic reading of the highlighted value. Selects the accent role from the theme; never a raw colour.",
+            "type": "string",
+            "enum": [
+              "neutral",
+              "positive",
+              "negative"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "data"
+        ]
+      },
+      "softConstraints": {
+        "data": {
+          "recommendedMin": 2,
+          "recommendedMax": 8,
+          "absoluteMax": 20,
+          "onExceed": "Values ranked below the top 8 are collapsed into a single 'Others' bar.",
+          "onEmpty": "Typographic empty state showing the title alone."
+        },
+        "title": {
+          "recommendedMax": 40,
+          "onExceed": "Title drops one step of the type scale."
+        }
+      },
+      "layouts": [
+        {
+          "id": "standard",
+          "description": "Vertical columns under a headline. The default reading order.",
+          "slots": [
+            "title",
+            "chart"
+          ]
+        },
+        {
+          "id": "horizontal",
+          "description": "Horizontal bars with labels on the left. Use for long category names or for a ranking.",
+          "slots": [
+            "title",
+            "chart"
+          ]
+        },
+        {
+          "id": "withCallout",
+          "description": "Chart on the left, a reserved annotation column on the right. Use when the scene carries an `annotate` event.",
+          "slots": [
+            "title",
+            "chart",
+            "annotation"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "showBaseline",
+          "description": "Reveal the first bar alone, as a reference point.",
+          "payloadSchema": null
+        },
+        {
+          "id": "revealAll",
+          "description": "Reveal the remaining bars in a staggered cascade.",
+          "payloadSchema": null
+        },
+        {
+          "id": "highlightBar",
+          "description": "Bring one bar forward and recede all the others.",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Must match a `label` present in `data`."
+              }
+            },
+            "required": [
+              "label"
+            ]
+          }
+        },
+        {
+          "id": "annotate",
+          "description": "Show a short annotation pointing at one bar.",
+          "payloadSchema": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Must match a `label` present in `data`."
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 50,
+                "description": "Annotation copy. Keep it under 50 characters."
+              }
+            },
+            "required": [
+              "label",
+              "text"
+            ]
+          }
+        }
+      ],
+      "examples": [
+        {
+          "id": "example-rent-burden",
+          "title": "Ranking with a late highlight",
+          "note": "The canonical shape: baseline, cascade, then one value pulled forward.",
+          "component": "bar_chart",
+          "layout": "standard",
+          "motionProfile": "energetic",
+          "spansBeats": [
+            "b1",
+            "b2",
+            "b3"
+          ],
+          "pace": "measured",
+          "props": {
+            "title": "Share of income spent on rent",
+            "unit": "%",
+            "emphasis": "negative",
+            "data": [
+              {
+                "label": "Berlin",
+                "value": 27
+              },
+              {
+                "label": "Paris",
+                "value": 33
+              },
+              {
+                "label": "Amsterdam",
+                "value": 38
+              },
+              {
+                "label": "Dublin",
+                "value": 42
+              },
+              {
+                "label": "London",
+                "value": 47
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b1.start",
+              "action": "showBaseline"
+            },
+            {
+              "at": "b2.start",
+              "action": "revealAll"
+            },
+            {
+              "at": "b3.start",
+              "action": "highlightBar",
+              "payload": {
+                "label": "London"
+              }
+            }
+          ]
+        },
+        {
+          "id": "example-annotated-comparison",
+          "title": "Annotated comparison",
+          "note": "Uses the withCallout layout so the annotation has a reserved column.",
+          "component": "bar_chart",
+          "layout": "withCallout",
+          "motionProfile": "pushIn",
+          "spansBeats": [
+            "b1",
+            "b2",
+            "b3",
+            "b4"
+          ],
+          "pace": "slow",
+          "props": {
+            "title": "Median deposit needed for a first home",
+            "unit": "k",
+            "emphasis": "neutral",
+            "highlight": "2025",
+            "data": [
+              {
+                "label": "2005",
+                "value": 18
+              },
+              {
+                "label": "2010",
+                "value": 24
+              },
+              {
+                "label": "2015",
+                "value": 39
+              },
+              {
+                "label": "2020",
+                "value": 52
+              },
+              {
+                "label": "2025",
+                "value": 71
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b1.start",
+              "action": "showBaseline"
+            },
+            {
+              "at": "b2.start",
+              "action": "revealAll"
+            },
+            {
+              "at": "b3.start",
+              "action": "highlightBar",
+              "payload": {
+                "label": "2025"
+              }
+            },
+            {
+              "at": "b4.start",
+              "action": "annotate",
+              "payload": {
+                "label": "2025",
+                "text": "Four times the 2005 figure"
+              }
+            }
+          ]
+        },
+        {
+          "id": "example-long-ranking",
+          "title": "Edge case — 20 entries, long title",
+          "note": "Soft limits both breached: the weakest values collapse into 'Others' and the title drops a type step.",
+          "component": "bar_chart",
+          "layout": "horizontal",
+          "motionProfile": "impact",
+          "spansBeats": [
+            "b1"
+          ],
+          "pace": "quick",
+          "props": {
+            "title": "New homes completed last year across every metropolitan area surveyed",
+            "unit": "k",
+            "emphasis": "neutral",
+            "data": [
+              {
+                "label": "Lisbon",
+                "value": 19
+              },
+              {
+                "label": "Athens",
+                "value": 17
+              },
+              {
+                "label": "Madrid",
+                "value": 16
+              },
+              {
+                "label": "Milan",
+                "value": 15
+              },
+              {
+                "label": "Warsaw",
+                "value": 14
+              },
+              {
+                "label": "Prague",
+                "value": 13
+              },
+              {
+                "label": "Vienna",
+                "value": 12
+              },
+              {
+                "label": "Lyon",
+                "value": 11
+              },
+              {
+                "label": "Rotterdam",
+                "value": 9
+              },
+              {
+                "label": "Hamburg",
+                "value": 8
+              },
+              {
+                "label": "Gothenburg",
+                "value": 8
+              },
+              {
+                "label": "Antwerp",
+                "value": 7
+              },
+              {
+                "label": "Bologna",
+                "value": 7
+              },
+              {
+                "label": "Malmo",
+                "value": 6
+              },
+              {
+                "label": "Bilbao",
+                "value": 6
+              },
+              {
+                "label": "Aarhus",
+                "value": 5
+              },
+              {
+                "label": "Leipzig",
+                "value": 5
+              },
+              {
+                "label": "Porto",
+                "value": 4
+              },
+              {
+                "label": "Tampere",
+                "value": 3
+              },
+              {
+                "label": "Graz",
+                "value": 2
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b1.start",
+              "action": "revealAll"
+            }
+          ]
+        },
+        {
+          "id": "example-empty",
+          "title": "Empty case — no data",
+          "note": "A missing series is a legitimate state. Renders a typographic frame, not a black screen.",
+          "component": "bar_chart",
+          "layout": "standard",
+          "motionProfile": "editorialStatic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "title": "No comparable figures were published",
+            "unit": "",
+            "emphasis": "neutral",
+            "data": []
+          },
+          "events": []
+        },
+        {
+          "id": "example-negative-swing",
+          "title": "Edge case — negative values",
+          "note": "A negative value recomputes the axis around a zero line instead of drawing off-frame.",
+          "component": "bar_chart",
+          "layout": "standard",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1",
+            "b2"
+          ],
+          "props": {
+            "title": "Change in housing starts",
+            "unit": "%",
+            "emphasis": "positive",
+            "highlight": "Spain",
+            "data": [
+              {
+                "label": "Spain",
+                "value": 12
+              },
+              {
+                "label": "France",
+                "value": 4
+              },
+              {
+                "label": "Germany",
+                "value": -6
+              },
+              {
+                "label": "Sweden",
+                "value": -14
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b1.start",
+              "action": "revealAll"
+            },
+            {
+              "at": "b2.mid",
+              "action": "highlightBar",
+              "payload": {
+                "label": "Spain"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
