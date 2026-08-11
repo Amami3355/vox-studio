@@ -28,9 +28,7 @@ Sélection et vérification des sources
   ↓
 Construction de l'angle narratif
   ↓
-Script
-  ↓
-Beat plan
+Beat plan (chaque beat porte son texte)
   ↓
 Visual planning
   ↓
@@ -115,7 +113,7 @@ Sources + evidence
     ↓
 Narrative Agent
     ↓
-Script
+Beat plan
 ```
 
 La recherche sourcée constitue donc une caractéristique fondamentale du produit.
@@ -578,11 +576,11 @@ Le timing réel provient du voice-over.
 Pipeline :
 
 ```text
-Script
+Beats (chacun porte son texte)
  ↓
-TTS
+TTS, un mark SSML par frontière de beat
  ↓
-Word alignment / timestamps
+Timepoints
  ↓
 Beats timestampés
  ↓
@@ -591,12 +589,22 @@ Scene Compiler
 Frames
 ```
 
+Il n'y a pas d'aligneur forcé : les marks donnent les frontières exactement, là où un
+aligneur les estimerait. Voir ADR-0002.
+
 Ainsi :
 
-- une animation peut commencer exactement sur un mot ;
+- une animation peut commencer exactement sur une frontière de beat, donc sur un mot
+  choisi par l'agent rédacteur en découpant ses beats à cet endroit ;
 - une statistique peut apparaître au moment où elle est prononcée ;
 - une annotation peut apparaître après la révélation verbale ;
-- une scène ne coupe pas une phrase au milieu.
+- une scène ne coupe pas une phrase au milieu, parce que le dernier beat de chaque scène
+  doit terminer une phrase.
+
+Nuance à ne pas perdre : une ancre `.mid` ou décalée (`b4.start+short`) se résout
+arithmétiquement et ne tombe sur aucun mot particulier. La précision au mot s'achète en
+découpant les beats, pas en décalant les ancres — tant que la règle d'aimantation sur
+l'attaque de mot n'est pas tranchée.
 
 ---
 
@@ -658,8 +666,11 @@ Produit :
 - angle ;
 - hook ;
 - structure ;
-- script voice-over ;
-- beats narratifs.
+- beats narratifs, chacun portant son texte de voice-over verbatim.
+
+Il ne produit **pas** de script séparé : le script parlé est la concaténation ordonnée
+des textes de beats. Écrire les deux les laisserait diverger sans qu'aucun mécanisme ne
+le détecte. Voir ADR-0002.
 
 Il ne choisit pas encore les composants Remotion.
 
@@ -816,7 +827,7 @@ Exemple :
 ✓ Researching the topic
 ✓ 18 sources analyzed
 ✓ Narrative angle selected
-✓ Script created
+✓ Narrative beats written
 ● Designing visual story
 ○ Generating assets
 ○ Rendering preview
@@ -1228,33 +1239,31 @@ validateVideoPlan
         ↓
 5. Narrative Agent creates angle
         ↓
-6. Script generated
+6. Beat plan generated, each beat carrying its voice-over text
         ↓
-7. Beat plan generated
+7. Voice-over synthesised, one SSML mark per beat boundary
         ↓
-8. Voice-over generated
+8. Timepoints folded into TimedBeats
         ↓
-9. Forced alignment
+9. Visual Planner selects capabilities
         ↓
-10. Visual Planner selects capabilities
+10. SceneInstances generated
         ↓
-11. SceneInstances generated
+11. Asset Resolver resolves assets
         ↓
-12. Asset Resolver resolves assets
+12. Compiler validates plan
         ↓
-13. Compiler validates plan
+13. Repair if needed
         ↓
-14. Repair if needed
+14. Remotion preview rendered
         ↓
-15. Remotion preview rendered
+15. User opens Studio
         ↓
-16. User opens Studio
+16. User edits one scene by prompt
         ↓
-17. User edits one scene by prompt
+17. Scene recompiles
         ↓
-18. Scene recompiles
-        ↓
-19. User exports video
+18. User exports video
 ```
 
 ---
@@ -1656,8 +1665,7 @@ Google/Gemini TTS ou infrastructure Google appropriée retenue pour la V1.
 Project
  ├── ResearchDossier
  ├── NarrativePlan
- ├── Script
- ├── Beats[]
+ ├── Beats[]           ← chaque Beat porte son texte ; le script en est la projection
  ├── Sections[]
  │    ├── PersistentElements[]
  │    └── SceneInstances[]
@@ -1813,8 +1821,7 @@ Vox Studio V1 est considéré comme prêt lorsque :
 - [ ] un workflow agentique démarre ;
 - [ ] Parallel est appelé réellement ;
 - [ ] un dossier de recherche sourcé est créé ;
-- [ ] un script est produit ;
-- [ ] des beats sont produits ;
+- [ ] des beats portant leur texte de voice-over sont produits ;
 - [ ] un Visual Planner produit des SceneInstances ;
 - [ ] les scènes sont choisies via le catalogue ;
 - [ ] les assets nécessaires sont résolus ;

@@ -42,6 +42,22 @@ with a dangling label reference fails exactly the same way and was not covered.
 
 ---
 
+## §7.2 "alignement forcé" becomes "TTS + timepoints"
+
+**Frozen doc:** §7.2 puts `TTS + alignement forcé` between the beat plan and the timed
+beats, and §12 makes it an imperative constraint of the vertical slice.
+**Decision:** Google Cloud TTS `v1beta1` with one SSML `<mark>` per beat boundary.
+
+The anchor grammar the agent can write is entirely beat-relative (`ANCHOR_RE` in
+`catalog/validate.ts`), so the compiler consumes beat boundaries, never word timings.
+Marks give those boundaries exactly; an aligner would give them approximately. See
+ADR-0002 — a real aligner remains the documented fallback and composes on top.
+
+## §7.2 and §10 name the same output differently
+
+`SectionTimeline` in §7.2, `layoutStates` in §10. `CONTEXT.md` adopts `layoutStates`,
+the name that survives into the compiled artifact.
+
 ## Aggregation past the soft limit produces 9 bars, not 8
 
 §4.1 says values beyond rank 8 are aggregated into an "Others" bar, which yields

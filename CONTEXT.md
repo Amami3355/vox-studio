@@ -22,14 +22,28 @@ primitive, never a section.
 **Primitive** — A level 1 visual building block (`AnimatedText`, `Bar`, `Callout`,
 `CameraRig`, `SlotFrame`). Not exposed to the agent, ever.
 
-**Section** — Level 3. A generic runtime that consumes a compiled plan: orchestration,
-persistent elements, transitions. There is no hand-written section component per video.
+**Section** — Level 3. The scope of a persistent element: a contiguous run of beats over
+which the same persistent elements survive. Authored by the agent, played by a generic
+runtime — there is no hand-written section component per video. Every beat of a section
+belongs to exactly one of its scenes.
 
 **Persistent element** — Something (usually a character cutout) that survives across
-scene boundaries inside a section. Owned by the Section runtime, never by scene nesting.
+scene boundaries inside a section. Declared on the section, never by scene nesting.
 
-**Beat** — The narrative unit the agents work in. Beats get real timings from voice-over
-forced alignment; scenes derive their durations from the beats they span.
+**Placement** — A persistent element's slot at an anchor. Placements are to persistent
+elements what events are to scenes: the agent writes them symbolically, the compiler
+folds them into `layoutStates` with absolute frames. Avoid: "SectionTimeline", which
+§7.2 of the frozen doc uses for the same generated output that §10 calls `layoutStates`.
+
+**Beat** — The narrative unit the agents work in. A beat carries its own voice-over text
+verbatim, so the spoken script is the ordered concatenation of beat texts and never
+exists as a separate artifact. Beats get real timings from the voice-over; scenes derive
+their durations from the beats they span. Avoid: "script" as something written alongside
+beats, or a beat that merely points at a range of one.
+
+**Timed beat** — A Beat plus its real start and end, in milliseconds, as spoken. The
+agent produces Beats and never TimedBeats. Milliseconds are the audio domain and frames
+are the Remotion domain; the compiler is the one place they meet.
 
 **Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`. The agent
 writes anchors. The compiler writes frames. An agent that writes a frame is a bug.

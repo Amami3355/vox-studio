@@ -1,10 +1,11 @@
-# Handoff — 2026-08-11
+# Handoff — 2026-08-11 (grilling session)
 
-State of play at the end of the scaffolding session. Replace this file when it goes
-stale; it describes a moment, not the project.
+State of play at the end of the design session that followed the scaffolding session.
+Replace this file when it goes stale; it describes a moment, not the project.
 
-**Next session opens with `/grill-with-docs`.** The open questions are at the bottom,
-ranked. Read `CONTEXT.md` first for the vocabulary.
+**The time pipeline is decided and written down in `docs/adr/0002-the-time-pipeline.md`.
+Do not reopen it.** The remaining open questions are at the bottom, ranked. Read
+`CONTEXT.md` first for the vocabulary.
 
 ---
 
@@ -12,7 +13,8 @@ ranked. Read `CONTEXT.md` first for the vocabulary.
 
 Commit `716f1c6` — steps 1–4 of the build order in `vox-studio-architecture-figee.md`
 §13. The scene library renders, the catalog generates, the four tools work, and the
-evaluation harness exists.
+evaluation harness exists. **No code has been written since.** This session decided
+things; it did not build them.
 
 Deadline: **7 September 2026, 14:00 PDT**. Roughly four weeks.
 
@@ -42,7 +44,7 @@ pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
 
 ### Not built
 
-Beat compiler with forced alignment · Section runtime · Asset Resolver · the other 7–11
+Beat compiler · `packages/voice` · Section runtime · Asset Resolver · the other 7–11
 capabilities · the agents · the product Studio UI. `services/agents/` is a reserved
 empty directory.
 
@@ -50,64 +52,93 @@ empty directory.
 
 ## Do not redo these
 
-Settled deliberately, recorded in `docs/adr/0001-scaffold-decisions.md`. Reopen only
-with a reason:
+Settled deliberately. Reopen only with a reason.
 
-pnpm monorepo consumed as source, no build step · Python/ADK boundary reserved, JSON
-interface only · Zod 4 with native `toJSONSchema` targeting `openapi-3.0` · manifest
-committed, CI fails on drift · `searchScenes` returns the whole index, no filtering ·
-events fold to value **plus change frame** · one Remotion composition per example ·
-Biome · MIT · Vitest on the deterministic core only, no image snapshots yet.
+**Scaffold** (`docs/adr/0001-scaffold-decisions.md`): pnpm monorepo consumed as source,
+no build step · Python/ADK boundary reserved, JSON interface only · Zod 4 with native
+`toJSONSchema` targeting `openapi-3.0` · manifest committed, CI fails on drift ·
+`searchScenes` returns the whole index, no filtering · events fold to value **plus change
+frame** · one Remotion composition per example · Biome · MIT · Vitest on the
+deterministic core only, no image snapshots yet.
+
+**The time pipeline** (`docs/adr/0002-the-time-pipeline.md`): SSML marks, no forced
+aligner · a beat carries its voice-over text verbatim, and there is no separate script ·
+`Beat` and `TimedBeat` are distinct types, seam in milliseconds · sections are authored
+and persistent elements declare placements · `spansBeats` required, contiguous, exclusive
+and total at both levels · compiler in `packages/video/src/compile/`, TTS in
+`packages/voice`, which returns the audio as well as the timings.
+
+**Scope and sequencing**, decided in the same session but too reversible to earn an ADR:
+
+- Keep §13's order, but cut ImageContextScene's polish budget hard — one layout, one
+  placeholder asset — then Section runtime, then the continuity test, then come back.
+  Two `BarChartScene`s would reach the continuity test sooner but cannot surface slot
+  collisions, since two instances of one capability occupy the same regions.
+- Vertical slice: §12's own example, housing/rent, **in English**.
+- Asset Resolver ships with §5.4 links 1 and 3 only — identity cache and local library —
+  plus the placeholder path. No Gemini generation, no licensed search, no cutout or
+  duotone processing. `identityKey` is what the slice must demonstrate, and a local
+  folder demonstrates it as well as a generator.
+- Hosting: Cloud Run for the app, `@remotion/player` for the live demo, hero MP4
+  pre-rendered offline. No server-side render, no Remotion Lambda, no second cloud.
 
 Deviations from the frozen architecture live in
 `docs/proposals/architecture-evolutions.md`. The frozen doc itself has not been edited.
+The PRD **has** been edited: eight places where it modelled a separate `Script`, plus the
+workflow step that named forced alignment.
 
 ---
 
 ## Known risks
 
-**TTS with forced alignment is the biggest unknown in the whole chain.** §12 of the
-frozen doc makes it an imperative constraint of the vertical slice, and nothing built so
-far de-risks it. Google TTS does not return word-level timestamps in every configuration,
-so a separate aligner is probably needed. This is the thing most likely to be discovered
-too late.
+**TTS is no longer the top risk.** ADR-0002 replaced forced alignment with SSML
+timepoints, which removed the research problem. What remains is an API call and a fold —
+but it is still unwritten and still unverified against the real API. The first thing to
+confirm empirically: **does a trailing `<mark>` at the end of the SSML reliably return a
+timepoint at the end of speech?** The whole `toMs` of the last beat rests on it, and the
+fallback (decoding `audioContent` for a duration) is uglier.
 
 **Polishing BarChartScene further is a trap.** §9.3 says most real problems only appear
 at the second scene — slot collisions, brutal transitions, a character that jumps,
 rhythmic uniformity. Reaching the continuity test matters more than a fourth chart
-layout.
+layout. This is now the largest single risk to the deadline.
 
 **`@google/adk` on npm (1.6.0) is unverified.** The ADK Python path is the documented
-one. Confirm before betting the orchestration on the JS package.
+one. Confirm before betting the orchestration on the JS package. Lower stakes than it
+was: ADR-0002 keeps the compiler and the TTS in TypeScript, so ADK is only needed at
+step 10.
 
 **Remotion licence** — confirmed in the free tier (individual / under four people).
 
 ---
 
-## Open questions for the next grilling, ranked
+## Open questions, ranked
 
-1. **TTS + forced alignment stack.** Which provider, which aligner, and does the beat
-   compiler consume word timings or phrase timings? Everything about the compiler's
-   input shape depends on this answer, and it is the riskiest brick.
-2. **ImageContextScene, or the Section runtime first?** §13 orders capability then
-   runtime; §9.3 argues for reaching two-scene continuity as early as possible. These
-   pull in opposite directions and the doc does not resolve it.
-3. **The beat plan contract.** Who produces beats, in what JSON shape, and how do they
-   acquire timings? `VideoPlan` in `src/catalog/validate.ts` is currently a placeholder
-   with just `beats[]` and `sections[]`.
-4. **Persistent elements.** The `SectionTimeline` is a generated output — generated from
-   what input, by what rule? Slot conflict resolution (`SLOT_RELOCATED`,
-   `PERSISTENT_ELEMENT_HIDDEN`) is specified as behaviour but not as an algorithm.
-5. **Asset Resolver minimum for the demo.** Placeholders unblock the preview; what is the
-   smallest real resolution chain worth building before 7 September?
-6. **The vertical slice script.** 20–30 seconds of actual content — which subject, which
-   four beats, what does the voice-over say? This is a content decision, and the slice
-   cannot be built without it.
-7. **Aggregation for rate units.** Summing percentages into "Others" is meaningless; the
-   frozen doc's rule assumes counts. See the proposals file.
-8. **Second theme, and when.** The `Theme` type supports it; only one exists. Adding it
+1. **Does the compiler snap arithmetic anchors to the nearest word onset?** `b4.mid` and
+   `b4.start+short` resolve arithmetically and land on no particular word. A forced
+   aligner would not fix this — `.mid` names a midpoint, not a word — so the only fix is
+   a snapping rule in the compiler, fed by one mark per word. Marks make word timings
+   cheap and exact, so the option is open; the rule is not written anywhere. Until it is
+   decided, precision at the word is bought by **splitting beats**, not by moving anchors.
+2. **Slot conflict resolution.** `SLOT_RELOCATED` and `PERSISTENT_ELEMENT_HIDDEN` are
+   specified as behaviour, never as an algorithm. Now answerable, since ADR-0002 fixed
+   placements as the input: when a persistent element sits in `cornerBR` and a scene
+   occupies `cornerBR`, which one yields, and by what rule?
+3. **The four beat texts of the slice.** ~75 words in English, four beats, housing/rent
+   per §12. A content decision; the slice cannot be built without it. Note that beat
+   granularity is now also a *timing* decision, per open question 1.
+4. **Aggregation for rate units.** Summing percentages into "Others" is meaningless; the
+   frozen doc's rule assumes counts. See the proposals file. Blocked on a fact, not a
+   decision — render both variants and look.
+5. **Second theme, and when.** The `Theme` type supports it; only one exists. Adding it
    before the second capability means arguing about colour instead of composition.
-9. **Hosting.** The submission requires a public deployed URL. Cloud Run? Where does the
-   render happen — Lambda, a worker, or client-side preview only?
-10. **Prop migration on `replaceComponent`.** Native to the architecture, real to
-    implement. Not needed until the Studio UI exists.
+6. **Prop migration on `replaceComponent`.** Native to the architecture, real to
+   implement. Not needed until the Studio UI exists.
+
+## What this session got wrong, so it is not repeated
+
+The grilling ran two rounds against the frozen architecture, the previous handoff,
+ADR-0001 and the code — and never opened `Vox Studio — Product Requirements Document.md`,
+which is 1978 lines and contradicted a decision the session had already recorded. A
+review caught it. **The PRD and `AGENTS.md` are at the repository root, not under
+`docs/`.** Glob the root before assuming you have read the design documents.
