@@ -73,6 +73,10 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
       it('names a layout that exists', () => {
         expect(Object.keys(capability.layouts)).toContain(example.layout);
       });
+
+      it('declares the beats it spans, since duration is the sum of them', () => {
+        expect(example.spansBeats.length).toBeGreaterThan(0);
+      });
     },
   );
 });

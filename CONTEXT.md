@@ -45,6 +45,10 @@ beats, or a beat that merely points at a range of one.
 agent produces Beats and never TimedBeats. Milliseconds are the audio domain and frames
 are the Remotion domain; the compiler is the one place they meet.
 
+**Frame beat** — A beat's window in frames, `{ id, from, to }`. The third and last domain
+a beat travels through: `Beat` narrative → `TimedBeat` audio → `FrameBeat` Remotion. Only
+the compiler crosses the second seam. Avoid: calling any of the three just "beat" in code.
+
 **Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`. The agent
 writes anchors. The compiler writes frames. An agent that writes a frame is a bug.
 
@@ -108,6 +112,6 @@ services/agents/          reserved for the Python ADK orchestration; not initial
 
 ## Not yet built
 
-Beat compiler with forced alignment, Section runtime, Asset Resolver, the remaining
-capabilities, the agents, the product Studio UI. See the build order in
-`vox-studio-architecture-figee.md` §13.
+Beat compiler, `packages/voice` and its TTS timepoints, Section runtime, Asset Resolver,
+the remaining capabilities, the agents, the product Studio UI. See the build order in
+`vox-studio-architecture-figee.md` §13, and ADR-0002 for the time pipeline.

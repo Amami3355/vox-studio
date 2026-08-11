@@ -11,17 +11,22 @@ Do not reopen it.** The remaining open questions are at the bottom, ranked. Read
 
 ## Where we are
 
-Commit `716f1c6` — steps 1–4 of the build order in `vox-studio-architecture-figee.md`
-§13. The scene library renders, the catalog generates, the four tools work, and the
-evaluation harness exists. **No code has been written since.** This session decided
-things; it did not build them.
+Steps 1–4 of the build order in `vox-studio-architecture-figee.md` §13. The scene library
+renders, the catalog generates, the four tools work, and the evaluation harness exists.
+
+ADR-0002 has since been **applied to the existing code**: `Beat`/`TimedBeat` exist,
+`spansBeats` is required at both levels, the beat partition is checked over scenes and
+over sections, and a scene may no longer end mid-sentence. What ADR-0002 decided but
+nothing has yet built is the part that needs new packages — `packages/voice` and
+`packages/video/src/compile/`.
 
 Deadline: **7 September 2026, 14:00 PDT**. Roughly four weeks.
 
 ### Verified, not assumed
 
-`pnpm typecheck` clean · 60 tests pass · Biome clean on 58 files · `catalog:check` in
-sync · `apps/component-studio` builds · five stills rendered through headless Remotion.
+`pnpm typecheck` clean · 81 tests pass · Biome clean on 58 files · `catalog:check` in
+sync · `apps/component-studio` builds · stills render through headless Remotion, and the
+frame-150 render is byte-identical before and after the ADR-0002 change.
 
 ```bash
 pnpm install
@@ -41,6 +46,9 @@ pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
 - **Catalog** `catalog.json` generated and committed; `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** grid · six-frame filmstrip · layout × motion-profile matrix.
+- **The beat contract** of ADR-0002: `Beat`/`TimedBeat`/`FrameBeat`, required
+  `spansBeats`, the partition checked over scenes and sections, the sentence rule,
+  and placement validation for persistent elements.
 
 ### Not built
 

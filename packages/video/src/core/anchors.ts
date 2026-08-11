@@ -4,16 +4,21 @@
  * The agent expresses time symbolically — `b4.start`, `b5.mid`, `b6.end-short` — and
  * never in frames. This module turns anchors into frames.
  *
- * STUB NOTICE: the real beat timings come from TTS forced alignment (step 7 of the
- * build order). Until that exists, `syntheticBeats` splits a scene's duration evenly
- * across the beats it spans, so examples can carry real anchors today. When the beat
- * compiler lands, it replaces `syntheticBeats` only — `resolveAnchor` and every
+ * STUB NOTICE: the real beat timings come from the TTS timepoints of ADR-0002 (step 7
+ * of the build order). Until that exists, `syntheticBeats` splits a scene's duration
+ * evenly across the beats it spans, so examples can carry real anchors today. When the
+ * beat compiler lands, it replaces `syntheticBeats` only — `resolveAnchor` and every
  * `examples.ts` in the library stay untouched.
  */
 import { motion } from '../design/motion';
 import type { SemanticEvent, TimedEvent } from './types';
 
-export type Beat = {
+/**
+ * A beat's window in frames — the third and last domain a beat travels through.
+ * `Beat` is narrative, `TimedBeat` is audio in milliseconds, `FrameBeat` is Remotion.
+ * Only the compiler crosses from the second to the third.
+ */
+export type FrameBeat = {
   id: string;
   /** Absolute frame, inclusive. */
   from: number;
@@ -51,7 +56,7 @@ export class UnknownAnchorError extends Error {
  */
 export const resolveAnchor = (
   anchor: string,
-  beats: Beat[],
+  beats: FrameBeat[],
   sceneBounds: { from: number; to: number },
 ): number => {
   const match = ANCHOR_RE.exec(anchor.trim());
@@ -91,7 +96,7 @@ export const resolveAnchor = (
 /** Resolve a whole event list, relative to the start of the scene. */
 export const resolveEventTimings = (
   events: SemanticEvent[],
-  beats: Beat[],
+  beats: FrameBeat[],
   sceneBounds: { from: number; to: number },
 ): TimedEvent[] =>
   events.map((event) => {
@@ -103,10 +108,13 @@ export const resolveEventTimings = (
 
 /**
  * STUB. Split `durationInFrames` evenly across `beatIds`, so an example can be played
- * before any voice-over exists. Replaced wholesale by the aligned beat compiler.
+ * before any voice-over exists. Replaced wholesale by the beat compiler.
+ *
+ * An empty list yields an empty table rather than a fabricated `b1`. Inventing a beat
+ * here would relocate exactly the silent fallback ADR-0002 removed from the caller; an
+ * empty table instead makes `resolveAnchor` throw, which is the loud half of rule 5.
  */
-export const syntheticBeats = (beatIds: string[], durationInFrames: number): Beat[] => {
-  if (beatIds.length === 0) return [{ id: 'b1', from: 0, to: durationInFrames }];
+export const syntheticBeats = (beatIds: string[], durationInFrames: number): FrameBeat[] => {
   const slice = durationInFrames / beatIds.length;
   return beatIds.map((id, i) => ({
     id,

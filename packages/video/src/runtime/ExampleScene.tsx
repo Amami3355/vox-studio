@@ -17,8 +17,8 @@ export type ExampleSceneProps = {
  * Plays one catalog example.
  *
  * The example carries semantic anchors; there is no beat compiler yet, so beats are
- * synthesised by splitting the composition evenly across `spansBeats`. When forced
- * alignment lands, only that call changes.
+ * synthesised by splitting the composition evenly across `spansBeats`. When the TTS
+ * timepoints of ADR-0002 land, only that call changes.
  */
 export const ExampleScene: React.FC<ExampleSceneProps> = ({
   capabilityId,
@@ -37,7 +37,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
     );
   }
 
-  const beats = syntheticBeats(example.spansBeats ?? ['b1'], durationInFrames);
+  const beats = syntheticBeats(example.spansBeats, durationInFrames);
   const events = resolveEventTimings(example.events ?? [], beats, {
     from: 0,
     to: durationInFrames,

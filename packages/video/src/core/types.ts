@@ -42,6 +42,25 @@ export type SafeArea = { top: number; right: number; bottom: number; left: numbe
 
 export const NO_SAFE_AREA: SafeArea = { top: 0, right: 0, bottom: 0, left: 0 };
 
+/* ------------------------------------------------------------------- beats */
+
+/**
+ * The narrative unit. A beat carries its voice-over text verbatim, which is why no
+ * separate script artifact exists: the spoken script is the ordered concatenation of
+ * beat texts, and two artifacts holding the same words would drift with nothing able to
+ * detect it. See ADR-0002.
+ */
+export type Beat = { id: string; text: string };
+
+/**
+ * A beat plus its real bounds, as spoken. Produced by `packages/voice` from the TTS
+ * timepoints; the agent produces `Beat` and never this.
+ *
+ * Milliseconds, not seconds and not frames. There are exactly two conversions in the
+ * system — seconds to ms at the edge of `packages/voice`, ms to frames in the compiler.
+ */
+export type TimedBeat = Beat & { fromMs: number; toMs: number };
+
 /* ------------------------------------------------------------------ assets */
 
 export type AssetRef =
@@ -145,8 +164,29 @@ export type SceneInstance = {
   layout?: string;
   motionProfile?: MotionProfileId;
   events?: SemanticEvent[];
-  spansBeats?: string[];
+  /**
+   * Required and non-empty. A scene's duration is the sum of the beats it spans, so a
+   * scene that spans nothing has no duration — the optional form let that be expressed.
+   */
+  spansBeats: string[];
   pace?: Pace;
+};
+
+/* ------------------------------------------------------ persistent elements */
+
+/**
+ * A persistent element's slot at an anchor. Placements are to persistent elements what
+ * events are to scenes: the agent writes them symbolically, the compiler folds them into
+ * the `layoutStates` of the compiled document.
+ */
+export type Placement = { at: string; slot: Slot };
+
+/** Declared on the section, never by scene nesting. */
+export type PersistentElement = {
+  id: string;
+  element: 'character' | 'image' | 'label';
+  asset?: AssetRef;
+  placements: Placement[];
 };
 
 /**
@@ -182,12 +222,23 @@ export type CompilerErrorCode =
   | 'UNKNOWN_LAYOUT'
   | 'INVALID_PAYLOAD'
   | 'UNKNOWN_ANCHOR'
+  | 'UNKNOWN_SLOT'
   | 'BELOW_MIN_DURATION'
-  | 'MISSING_ASSET_REFERENCE';
+  | 'MISSING_ASSET_REFERENCE'
+  /* The beat partition. Three codes rather than one, because they are three different
+   * corrections to feed back to the agent. Each carries `sectionId` when it fires over
+   * the scenes of a section and omits it when it fires over the sections of a plan,
+   * which is how the report says which of the two partitions broke. */
+  | 'BEAT_NOT_CONTIGUOUS'
+  | 'BEAT_DOUBLE_BOOKED'
+  | 'BEAT_UNCOVERED'
+  | 'EMPTY_BEAT_SPAN'
+  | 'SCENE_CUTS_MID_SENTENCE';
 
 export type CompilerError = {
   code: CompilerErrorCode;
   sceneId?: string;
+  sectionId?: string;
   field?: string;
   message: string;
   /** Valid alternatives, when the failure is a bad identifier. */

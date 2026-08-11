@@ -29,7 +29,7 @@ order in `vox-studio-architecture-figee.md` §13:
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** — grid, six-frame filmstrip and layout × motion-profile matrix.
 
-Not built yet: beat compiler with forced alignment, Section runtime, Asset Resolver, the
+Not built yet: beat compiler, TTS timepoints, Section runtime, Asset Resolver, the
 remaining capabilities, the agents, the product Studio UI.
 
 ## Getting started

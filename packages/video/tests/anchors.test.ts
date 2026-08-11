@@ -18,8 +18,11 @@ describe('syntheticBeats', () => {
     ]);
   });
 
-  it('falls back to a single beat when none are declared', () => {
-    expect(syntheticBeats([], 120)).toEqual([{ id: 'b1', from: 0, to: 120 }]);
+  it('fabricates no beat when none are declared, so anchors fail loudly instead', () => {
+    expect(syntheticBeats([], 120)).toEqual([]);
+    expect(() => resolveAnchor('b1.start', syntheticBeats([], 120), { from: 0, to: 120 })).toThrow(
+      UnknownAnchorError,
+    );
   });
 });
 
