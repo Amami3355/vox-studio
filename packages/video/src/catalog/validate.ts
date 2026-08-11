@@ -17,6 +17,7 @@ import {
 } from '../core/types';
 import { motionProfileIds } from '../design/motion';
 import { capabilityIds, findCapability } from '../scenes/registry';
+import { checkPlanShape } from './plan-shape';
 
 export type VideoPlanSection = {
   id: string;
@@ -71,6 +72,10 @@ export const validateScene = (instance: SceneInstance): CompileReport => {
 /**
  * A scene's duration is the sum of the beats it spans, so an empty span is a scene of
  * no duration. TypeScript makes it unrepresentable; a JSON plan from an agent does not.
+ *
+ * `validateScene` keeps its own guards rather than leaning on `checkPlanShape`, because
+ * it is a tool in its own right: an agent calls it on a single instance it is drafting,
+ * long before there is a plan to gate.
  */
 const validateSpan = (instance: SceneInstance, errors: CompilerError[]): void => {
   if (instance.spansBeats?.length) return;
@@ -265,14 +270,20 @@ const checkPartition = (
   const at = sectionId === undefined ? {} : { sectionId };
   const named = (claimant: Claimant) => (subject === 'Scene' ? { sceneId: claimant.id } : {});
 
-  const claimedBy = new Map<string, string[]>();
+  /**
+   * Owners are keyed by position, not by id. Keying by id would dedupe two *different*
+   * claimants that happen to share one — hiding the very conflict this map exists to
+   * find — while position still dedupes the case it was introduced for, a single
+   * claimant naming the same beat twice.
+   */
+  const claimedBy = new Map<string, number[]>();
   /** First index of the previous claimant, so the run of claimants must also advance. */
   let previousStart: number | undefined;
 
-  for (const claimant of claimants) {
+  for (const [position, claimant] of claimants.entries()) {
     const indices: number[] = [];
 
-    for (const beatId of claimant.spansBeats ?? []) {
+    for (const beatId of claimant.spansBeats) {
       const index = domain.indexOf(beatId);
       if (index === -1) {
         errors.push({
@@ -289,10 +300,7 @@ const checkPartition = (
       }
       indices.push(index);
       const owners = claimedBy.get(beatId) ?? [];
-      // By claimant, not by occurrence: one claimant naming a beat twice is its own
-      // (contiguity) error, and must not be reported as a conflict with a second
-      // claimant that does not exist.
-      if (!owners.includes(claimant.id)) claimedBy.set(beatId, [...owners, claimant.id]);
+      if (!owners.includes(position)) claimedBy.set(beatId, [...owners, position]);
     }
 
     const contiguous = indices.every((v, i) => i === 0 || v === (indices[i - 1] as number) + 1);
@@ -332,11 +340,12 @@ const checkPartition = (
 
   for (const [beatId, owners] of claimedBy) {
     if (owners.length < 2) continue;
+    const names = owners.map((position) => (claimants[position] as Claimant).id);
     errors.push({
       code: 'BEAT_DOUBLE_BOOKED',
       ...at,
       field: 'spansBeats',
-      message: `Beat "${beatId}" is claimed by ${format(owners)}. A beat belongs to exactly one ${subject.toLowerCase()}.`,
+      message: `Beat "${beatId}" is claimed by ${format(names)}. A beat belongs to exactly one ${subject.toLowerCase()}.`,
     });
   }
 
@@ -367,7 +376,7 @@ const checkSentenceBoundaries = (
   const errors: CompilerError[] = [];
 
   for (const scene of section.scenes) {
-    const lastBeat = scene.spansBeats?.at(-1);
+    const lastBeat = scene.spansBeats.at(-1);
     if (lastBeat === undefined) continue;
     const text = textOf.get(lastBeat);
     if (text === undefined) continue;
@@ -388,6 +397,14 @@ const checkSentenceBoundaries = (
 };
 
 export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
+  /**
+   * Structure before meaning, and no further if the structure is wrong. Every check
+   * below reads fields the type promises but JSON does not deliver, so running them
+   * over a malformed plan trades a report for a crash — and §8.1 needs the report.
+   */
+  const malformed = checkPlanShape(plan);
+  if (malformed.length > 0) return { ok: false, errors: malformed, warnings: [] };
+
   const errors: CompilerError[] = [];
   const warnings: CompilerWarning[] = [];
   const planBeats = plan.beats.map((b) => b.id);
@@ -403,7 +420,7 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
      * anchor onto it would validate, and the sentence rule would skip that scene in
      * silence for want of a text.
      */
-    const domain = (section.spansBeats ?? []).filter((id) => planBeats.includes(id));
+    const domain = section.spansBeats.filter((id) => planBeats.includes(id));
 
     errors.push(...checkPartition(section.scenes, domain, 'Scene', section.id));
     errors.push(...checkSentenceBoundaries(section, textOf));
@@ -451,7 +468,7 @@ const checkPlacements = (section: VideoPlanSection, scope: string[]): CompilerEr
     // Guarded like every other required field reached from a plan: TypeScript makes an
     // absent list unrepresentable, a JSON plan from an agent does not, and a TypeError
     // here would replace the whole CompileReport with a crash.
-    for (const [index, placement] of (element.placements ?? []).entries()) {
+    for (const [index, placement] of element.placements.entries()) {
       const field = `persistent[${element.id}].placements[${index}]`;
 
       if (!(ALL_SLOTS as string[]).includes(placement.slot)) {

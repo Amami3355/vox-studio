@@ -225,6 +225,10 @@ export type CompilerErrorCode =
   | 'UNKNOWN_SLOT'
   | 'BELOW_MIN_DURATION'
   | 'MISSING_ASSET_REFERENCE'
+  /* The structural gate. A plan arriving as JSON has none of the guarantees its
+   * TypeScript type makes, and every semantic check downstream assumes them. */
+  | 'MALFORMED_PLAN'
+  | 'DUPLICATE_ID'
   /* The beat partition. Three codes rather than one, because they are three different
    * corrections to feed back to the agent. Each carries `sectionId` when it fires over
    * the scenes of a section and omits it when it fires over the sections of a plan,

@@ -412,7 +412,127 @@ describe('validateVideoPlan — placements of persistent elements', () => {
     // Only TypeScript stops an agent's JSON from arriving in this shape.
     const [section] = plan.sections;
     if (section) section.persistent = [{ id: 'char1', element: 'character' } as PersistentElement];
-    expect(() => validateVideoPlan(plan)).not.toThrow();
+    const report = validateVideoPlan(plan);
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+});
+
+/**
+ * The structural gate. Every case here is JSON an agent can emit and TypeScript cannot
+ * stop, so each one is written as the malformed value it really is and cast at the edge.
+ */
+describe('validateVideoPlan — the structural gate', () => {
+  const malformed = (plan: unknown) => validateVideoPlan(plan as VideoPlan);
+  const sound = (id: string, beats: string[]) => base({ id, spansBeats: beats, events: [] });
+
+  it('reports rather than crashes when a beat text is null', () => {
+    const report = malformed({
+      beats: [{ id: 'b1', text: null }],
+      sections: [{ id: 'sec1', spansBeats: ['b1'], scenes: [sound('s1', ['b1'])] }],
+    });
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+
+  it('refuses a beat with no text rather than skipping the sentence rule in silence', () => {
+    const report = malformed({
+      beats: [{ id: 'b1' }],
+      sections: [{ id: 'sec1', spansBeats: ['b1'], scenes: [sound('s1', ['b1'])] }],
+    });
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+
+  it('refuses an empty beat text, which would carry no voice-over', () => {
+    const report = malformed({
+      beats: [{ id: 'b1', text: '' }],
+      sections: [{ id: 'sec1', spansBeats: ['b1'], scenes: [sound('s1', ['b1'])] }],
+    });
+    expect(report.errors.some((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+
+  it('refuses duplicate beat ids, which would collapse two beats into one unit of time', () => {
+    const report = malformed({
+      beats: [
+        { id: 'b1', text: 'First half' },
+        { id: 'b1', text: 'second half.' },
+      ],
+      sections: [{ id: 'sec1', spansBeats: ['b1'], scenes: [sound('s1', ['b1'])] }],
+    });
+    const error = report.errors.find((e) => e.code === 'DUPLICATE_ID');
+    expect(error?.message).toContain('b1');
+  });
+
+  it('refuses two scenes sharing an id, which would hide a double-booked beat', () => {
+    const report = malformed({
+      beats: [
+        { id: 'b1', text: 'One.' },
+        { id: 'b2', text: 'Two.' },
+      ],
+      sections: [
+        {
+          id: 'sec1',
+          spansBeats: ['b1', 'b2'],
+          scenes: [sound('dup', ['b1']), sound('dup', ['b1', 'b2'])],
+        },
+      ],
+    });
+    expect(report.errors.some((e) => e.code === 'DUPLICATE_ID')).toBe(true);
+  });
+
+  it('refuses two sections sharing an id', () => {
+    const report = malformed({
+      beats: [
+        { id: 'b1', text: 'One.' },
+        { id: 'b2', text: 'Two.' },
+      ],
+      sections: [
+        { id: 'dup', spansBeats: ['b1'], scenes: [sound('s1', ['b1'])] },
+        { id: 'dup', spansBeats: ['b2'], scenes: [sound('s2', ['b2'])] },
+      ],
+    });
+    expect(report.errors.some((e) => e.code === 'DUPLICATE_ID')).toBe(true);
+  });
+
+  it('refuses two persistent elements sharing an id inside one section', () => {
+    const report = malformed({
+      beats: [{ id: 'b1', text: 'One.' }],
+      sections: [
+        {
+          id: 'sec1',
+          spansBeats: ['b1'],
+          persistent: [
+            { id: 'char1', element: 'character', placements: [{ at: 'b1.start', slot: 'left' }] },
+            { id: 'char1', element: 'character', placements: [{ at: 'b1.end', slot: 'right' }] },
+          ],
+          scenes: [sound('s1', ['b1'])],
+        },
+      ],
+    });
+    expect(report.errors.some((e) => e.code === 'DUPLICATE_ID')).toBe(true);
+  });
+
+  it('refuses a beat named "scene", which the anchor grammar reserves', () => {
+    const report = malformed({
+      beats: [{ id: 'scene', text: 'One.' }],
+      sections: [{ id: 'sec1', spansBeats: ['scene'], scenes: [sound('s1', ['scene'])] }],
+    });
+    expect(report.errors.some((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+
+  it('stops at the gate instead of running semantic checks over a malformed plan', () => {
+    const report = malformed({
+      beats: [{ id: 'b1', text: null }],
+      sections: [{ id: 'sec1', spansBeats: ['b1'], scenes: [sound('s1', ['b9'])] }],
+    });
+    expect(report.errors.every((e) => e.code === 'MALFORMED_PLAN')).toBe(true);
+  });
+
+  it('still lets a well-formed plan through untouched', () => {
+    expect(validateVideoPlan(withScenes([sound('s1', ['b1', 'b2']), sound('s2', ['b3'])])).ok).toBe(
+      true,
+    );
   });
 });
 
