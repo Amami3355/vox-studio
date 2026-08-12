@@ -288,6 +288,62 @@ describe('compile', () => {
     });
   });
 
+  /**
+   * A compile that quietly fell back to placeholders used to look exactly like one that
+   * resolved everything, which is the difference between a preview and a deliverable.
+   */
+  it('says when a scene is rendering a placeholder rather than the picture it asked for', () => {
+    const result = compile({
+      plan: continuityPlan,
+      beats: timedBeats,
+      resolver: createAssetResolver(),
+    });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    expect(result.report.warnings).toContainEqual(
+      expect.objectContaining({
+        code: 'ASSET_PLACEHOLDER',
+        sceneId: 'context',
+        field: 'props.assetRequirement',
+        severity: 'quality',
+      }),
+    );
+  });
+
+  it('raises a failed asset above a pending one, because one of them is not going to arrive', () => {
+    const result = compile({
+      plan: continuityPlan,
+      beats: timedBeats,
+      resolver: {
+        resolve: () => ({
+          status: 'failed',
+          uri: 'asset://placeholder/image',
+          requirementId: 'req_deadbeef',
+          reason: 'The local file could not be decoded.',
+        }),
+      },
+    });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    expect(result.report.warnings).toContainEqual(
+      expect.objectContaining({
+        code: 'ASSET_PLACEHOLDER',
+        sceneId: 'context',
+        severity: 'important',
+      }),
+    );
+    // The reason the resolver gave has to survive into the report, or it is lost.
+    expect(
+      result.report.warnings.find((warning) => warning.code === 'ASSET_PLACEHOLDER')?.message,
+    ).toContain('could not be decoded');
+  });
+
+  it('says nothing about a scene whose asset resolved', () => {
+    const result = compile({ plan: continuityPlan, beats: timedBeats });
+
+    expect(result.report.warnings.filter((w) => w.code === 'ASSET_PLACEHOLDER')).toEqual([]);
+  });
+
   it('carries what a persistent element looks like, so the runtime never reads the plan', () => {
     const result = compile({ plan: continuityPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);

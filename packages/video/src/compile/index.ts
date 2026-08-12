@@ -9,11 +9,13 @@ import { repositoryAssetLibrary } from '../assets/library';
 import { type AssetResolver, createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
 import { type FrameBeat, resolveEventTimings } from '../core/anchors';
+import { ASSET_REQUIREMENT_FIELD } from '../core/assets';
 import {
   type CompileReport,
   type CompilerError,
   type CompilerWarning,
   NO_SAFE_AREA,
+  type ResolvedSceneAssets,
   type SceneCapability,
   type TimedBeat,
 } from '../core/types';
@@ -82,6 +84,9 @@ export const compile = ({
       const capability = requireCapability(scene.component);
       checkDuration(capability, scene.id, section.id, sceneBounds, errors, warnings);
 
+      const assets = resolveSceneAssets(scene, resolver);
+      reportDegradedAssets(assets, scene.id, section.id, warnings);
+
       return {
         id: scene.id,
         capabilityId: scene.component,
@@ -93,7 +98,7 @@ export const compile = ({
          */
         layout: scene.layout ?? (Object.keys(capability.layouts)[0] as string),
         motionProfile: scene.motionProfile ?? 'subtleDrift',
-        assets: resolveSceneAssets(scene, resolver),
+        assets,
         ...sceneBounds,
         events: resolveEventTimings(scene.events ?? [], frameBeats, sceneBounds),
         safeArea: NO_SAFE_AREA,
@@ -137,6 +142,57 @@ export const compile = ({
     },
     report: { ...report, warnings },
   };
+};
+
+/**
+ * A degraded asset, said out loud.
+ *
+ * Both states render the same theme plate, and until now both compiled in silence — so a
+ * project that had never run the asset pipeline produced a report identical to one where
+ * every picture resolved. The report is a deliverable; a plate standing in for a
+ * photograph is exactly the kind of thing it exists to say.
+ *
+ * The two states differ in who has to act. `placeholder` is work not done yet, and the
+ * generation pass that fills the identity cache will clear it. `failed` is work that was
+ * done and did not survive, so nothing downstream will clear it on its own — §5.2 gives
+ * that one `important`, and the resolver's reason travels into the message because it is
+ * the only place that reason exists.
+ */
+const reportDegradedAssets = (
+  assets: ResolvedSceneAssets,
+  sceneId: string,
+  sectionId: string,
+  warnings: CompilerWarning[],
+): void => {
+  const ref = assets[ASSET_REQUIREMENT_FIELD];
+  if (ref === undefined || ref.status === 'ready') return;
+
+  const field = `props.${ASSET_REQUIREMENT_FIELD}`;
+
+  if (ref.status === 'placeholder') {
+    warnings.push({
+      code: 'ASSET_PLACEHOLDER',
+      severity: 'quality',
+      sceneId,
+      sectionId,
+      field,
+      message: `"${sceneId}" renders a placeholder plate: nothing has resolved requirement ${ref.pendingRequirementId} yet.`,
+      suggestion:
+        'Add a matching entry to the local asset library, or run the generation pass that fills the resolver cache before compiling.',
+    });
+    return;
+  }
+
+  warnings.push({
+    code: 'ASSET_PLACEHOLDER',
+    severity: 'important',
+    sceneId,
+    sectionId,
+    field,
+    message: `"${sceneId}" renders a placeholder plate because requirement ${ref.requirementId} failed to resolve: ${ref.reason}`,
+    suggestion:
+      'Fix or replace the asset this requirement points at. Unlike a pending placeholder, nothing downstream will resolve it later.',
+  });
 };
 
 /**
