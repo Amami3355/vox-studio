@@ -204,37 +204,53 @@ describe('compile', () => {
     ]);
   });
 
-  it('holds a persistent element over the scene that can yield, and drops it over the one that cannot', () => {
+  /**
+   * One state for the whole section, and that is the point: every scene the narrator
+   * crosses now has a composition that clears the corner, so it neither moves nor is
+   * dropped. `image_context` declaring only `full` is what used to end this run at b2.
+   */
+  it('holds a persistent element across a section whose scenes can all yield', () => {
     const result = compile({ plan: continuityPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
 
-    // Visible for b1 (frames 0–90) and absent for b2: absence *is* hiddenness.
     expect(result.document.sections[0]?.layoutStates).toEqual([
-      { elementId: 'narrator', from: 0, to: 90, rect: { top: 70, right: 0, bottom: 0, left: 70 } },
+      { elementId: 'narrator', from: 0, to: 240, rect: { top: 70, right: 0, bottom: 0, left: 70 } },
     ]);
   });
 
-  it('makes the yielding scene render into the composition it declared', () => {
+  it('makes each yielding scene render into the composition it declared', () => {
     const result = compile({ plan: continuityPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
 
     const [chart, context] = result.document.sections[0]?.scenes ?? [];
 
-    // `bar_chart` supports `left`, which clears the narrator's corner.
+    // Both capabilities declare `left`, and `left` is the first entry that clears
+    // `cornerBR` for either of them.
     expect(chart?.safeArea).toEqual({ top: 0, right: 50, bottom: 0, left: 0 });
-    // `image_context` supports only `full`, so it never shrinks; the narrator went instead.
-    expect(context?.safeArea).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    expect(context?.safeArea).toEqual({ top: 0, right: 50, bottom: 0, left: 0 });
   });
 
-  it('reports both repairs, so neither is silent', () => {
-    const result = compile({ plan: continuityPlan, beats: timedBeats });
+  /**
+   * `SLOT_RELOCATED` covers two different repairs, and the report is a deliverable rather
+   * than a log, so the message has to say which one happened. Asserted over two plans
+   * because one plan can only demonstrate one of them per scene.
+   */
+  it('names which repair it made, since one code covers two of them', () => {
+    const relocations = (plan: VideoPlan): string[] => {
+      const result = compile({ plan, beats: timedBeats });
+      return result.report.warnings
+        .filter((warning) => warning.code === 'SLOT_RELOCATED')
+        .map((warning) => warning.message);
+    };
 
-    expect(result.report.warnings).toContainEqual(
-      expect.objectContaining({ code: 'SLOT_RELOCATED', sceneId: 'chart' }),
-    );
-    expect(result.report.warnings).toContainEqual(
-      expect.objectContaining({ code: 'PERSISTENT_ELEMENT_HIDDEN', sceneId: 'context' }),
-    );
+    expect(relocations(continuityPlan)).toEqual([
+      '"narrator" contends with "chart", so the scene yields into "left".',
+      '"narrator" contends with "context", so the scene yields into "left".',
+    ]);
+    expect(relocations(movingElementPlan)).toEqual([
+      '"narrator" contends with "chart", so the element moves to "cornerTR", which it also uses in this section.',
+      '"narrator" contends with "context", so the scene yields into "left".',
+    ]);
   });
 
   it('resolves layout and motion profile, so the runtime never has to choose one', () => {
@@ -371,9 +387,10 @@ describe('compile', () => {
 
     // No composition clears both corners, so the scene keeps the one it declared…
     expect(chart?.safeArea).toEqual(NO_SAFE_AREA);
-    // …and the element spends the whole scene in the one slot that clears it.
+    // …and the element spends the whole scene in the one slot that clears it, which the
+    // next scene then yields around rather than moving it a second time.
     expect(result.document.sections[0]?.layoutStates).toEqual([
-      { elementId: 'narrator', from: 0, to: 90, rect: { top: 0, right: 0, bottom: 70, left: 70 } },
+      { elementId: 'narrator', from: 0, to: 240, rect: { top: 0, right: 0, bottom: 70, left: 70 } },
     ]);
   });
 

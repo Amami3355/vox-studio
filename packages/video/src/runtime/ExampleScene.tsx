@@ -5,6 +5,7 @@ import { repositoryAssetLibrary } from '../assets/library';
 import { createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { resolveEventTimings, syntheticBeats } from '../core/anchors';
 import type { ResolvedSceneAssets } from '../core/assets';
+import type { SafeArea } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
@@ -17,6 +18,16 @@ export type ExampleSceneProps = {
   motionProfile?: MotionProfileId | null;
   /** Runtime/test override. Never published in the agent-facing catalog examples. */
   assets?: ResolvedSceneAssets;
+  /**
+   * The composition the compiler would have chosen, as the rectangle the component sees.
+   *
+   * An example plays outside any section, so nothing ever contends with it and the honest
+   * default is the whole canvas. This override exists so a declared composition can be
+   * looked at — in the studio, or by the contract test — without inventing a plan and a
+   * persistent element to provoke it. Like `assets`, it is runtime-only: an example that
+   * carried a safe area would be publishing percentages to an agent that speaks slots.
+   */
+  safeArea?: SafeArea;
 };
 
 /**
@@ -32,6 +43,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   layout,
   motionProfile,
   assets,
+  safeArea,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const capability = requireCapability(capabilityId);
@@ -69,6 +81,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
       events={events}
       layout={layout ?? example.layout}
       motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}
+      {...(safeArea ? { safeArea } : {})}
     />
   );
 };

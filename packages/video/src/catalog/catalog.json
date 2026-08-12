@@ -502,7 +502,9 @@
         "full"
       ],
       "supportedCompositions": [
-        "full"
+        "full",
+        "left",
+        "right"
       ],
       "minDurationFrames": 90,
       "recommendedDurationFrames": 180,
@@ -597,7 +599,7 @@
       "layouts": [
         {
           "id": "splitLeft",
-          "description": "Editorial image on the left with a concise headline and optional caption on the right.",
+          "description": "Editorial image on the left with a concise headline and optional caption on the right. Composed into half a frame, the same three slots stack: plate above, copy below.",
           "slots": [
             "image",
             "headline",

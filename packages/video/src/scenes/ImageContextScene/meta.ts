@@ -8,15 +8,22 @@
  * On `occupiesRegions: ['full']` — it is the honest declaration, not a placeholder for a
  * finer one. `splitLeft` is a 7/5 division *of the whole frame*: there is no quadrant it
  * leaves empty, so claiming `left` or `right` would tell the compiler a corner is free
- * when a headline is sitting in it. `supportedCompositions: ['full']` follows: with one
- * layout, being composed *into* a half is a capability this scene does not yet have.
+ * when a headline is sitting in it. What the scene *takes* when nobody contends and what
+ * it can be *composed into* when somebody does are two different declarations, and only
+ * the second one moved.
  *
- * Under ADR-0003 those two declarations decide the outcome: a persistent element that
- * overlaps this scene is **hidden for its duration**, with a `PERSISTENT_ELEMENT_HIDDEN`
- * warning, because there is no declared composition to yield into and the compiler does
- * not carve a frame nobody designed. To make a character survive this scene, add a layout
- * it can be composed into and declare that composition here. Do not soften
- * `occupiesRegions` to buy the same thing — the declaration is the input, not the problem.
+ * On `supportedCompositions` — the halves are here because `splitLeft` has a composed
+ * form. A half frame is portrait, and a 7/5 column split of a portrait box gives a copy
+ * column narrower than its own type, so the layout stacks the plate over the copy instead;
+ * see `layouts.ts`. That is a designed frame, which is the whole of ADR-0003 decision 1:
+ * the compiler picks among alternatives someone drew, and a composition declared here is a
+ * claim that one exists. `tests/render/safe-area.test.ts` is what stops it being only a
+ * claim.
+ *
+ * Under ADR-0003 the pair decides the outcome. A persistent element in a corner this scene
+ * can clear now keeps its place while the scene yields into a half — the rung ADR-0003
+ * calls "recompose", which no `image_context` scene could reach while this list read
+ * `['full']`. An element the halves cannot clear either is still hidden, and still warns.
  */
 import type { SceneMeta } from '../../core/types';
 
@@ -39,7 +46,7 @@ export const imageContextMeta: SceneMeta = {
   supportsEvents: false,
   requiresAssets: true,
   occupiesRegions: ['full'],
-  supportedCompositions: ['full'],
+  supportedCompositions: ['full', 'left', 'right'],
   minDurationFrames: 90,
   recommendedDurationFrames: 180,
 };

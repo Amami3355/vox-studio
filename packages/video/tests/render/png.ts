@@ -1,0 +1,185 @@
+/**
+ * Just enough PNG to address a pixel.
+ *
+ * The other render suites hash a whole still, which answers "did this frame change" and
+ * nothing else. A safe area is a statement about a *region* — content inside it, backdrop
+ * outside it — and no hash of the whole frame can tell those two apart. So the still has
+ * to be decoded.
+ *
+ * `node:zlib` does the compression half; what is left is the container and the five
+ * scanline filters, which is small, fixed by the spec, and worth more than a dependency
+ * added so one test can read a rectangle. Deliberately narrow: 8-bit, non-interlaced,
+ * which is what a Chrome screenshot is. Anything else throws rather than guessing.
+ */
+import { createHash } from 'node:crypto';
+import { inflateSync } from 'node:zlib';
+
+export type Bitmap = {
+  width: number;
+  height: number;
+  /** Bytes per pixel: 3 for RGB, 4 for RGBA. */
+  channels: number;
+  /** Row-major, unfiltered, `channels` bytes per pixel. */
+  pixels: Buffer;
+};
+
+/** A rectangle in pixels, from the top-left of the canvas. */
+export type Region = { x: number; y: number; width: number; height: number };
+
+const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Colour type → samples per pixel. 4 is grey+alpha, 6 is RGBA. */
+const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 4: 2, 6: 4 };
+
+export const decodePng = (buffer: Buffer): Bitmap => {
+  if (!buffer.subarray(0, 8).equals(SIGNATURE)) throw new Error('Not a PNG.');
+
+  let width = 0;
+  let height = 0;
+  let channels = 0;
+  const deflated: Buffer[] = [];
+
+  let offset = 8;
+  while (offset + 8 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length; // length + type + data + CRC
+
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      const depth = data.readUInt8(8);
+      const colourType = data.readUInt8(9);
+      const interlace = data.readUInt8(12);
+      channels = CHANNELS[colourType] ?? 0;
+
+      if (depth !== 8 || channels === 0 || interlace !== 0) {
+        throw new Error(
+          `Unsupported PNG: bit depth ${depth}, colour type ${colourType}, interlace ${interlace}.`,
+        );
+      }
+    } else if (type === 'IDAT') {
+      deflated.push(Buffer.from(data));
+    } else if (type === 'IEND') {
+      break;
+    }
+  }
+
+  if (width === 0 || height === 0) throw new Error('PNG carried no IHDR.');
+
+  return {
+    width,
+    height,
+    channels,
+    pixels: unfilter(inflateSync(Buffer.concat(deflated)), width, height, channels),
+  };
+};
+
+/**
+ * Undo the per-scanline filters.
+ *
+ * Every filter predicts a byte from its left neighbour (`a`), the byte above (`b`) and the
+ * one above-left (`c`), and stores the difference. The prediction reads *already
+ * reconstructed* bytes, which is why this writes into the output as it goes rather than
+ * transforming the raw buffer in place.
+ */
+const unfilter = (raw: Buffer, width: number, height: number, bpp: number): Buffer => {
+  const stride = width * bpp;
+  const pixels = Buffer.alloc(stride * height);
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[y * (stride + 1)] as number;
+    const source = y * (stride + 1) + 1;
+    const row = y * stride;
+    const above = row - stride;
+
+    for (let i = 0; i < stride; i += 1) {
+      const x = raw[source + i] as number;
+      const a = i >= bpp ? (pixels[row + i - bpp] as number) : 0;
+      const b = y > 0 ? (pixels[above + i] as number) : 0;
+      const c = i >= bpp && y > 0 ? (pixels[above + i - bpp] as number) : 0;
+
+      let value: number;
+      switch (filter) {
+        case 0:
+          value = x;
+          break;
+        case 1:
+          value = x + a;
+          break;
+        case 2:
+          value = x + b;
+          break;
+        case 3:
+          value = x + ((a + b) >> 1);
+          break;
+        case 4:
+          value = x + paeth(a, b, c);
+          break;
+        default:
+          throw new Error(`Unknown PNG filter ${filter} on row ${y}.`);
+      }
+
+      pixels[row + i] = value & 0xff;
+    }
+  }
+
+  return pixels;
+};
+
+/** The spec's predictor: whichever of left, above, above-left is closest to a + b − c. */
+const paeth = (a: number, b: number, c: number): number => {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+};
+
+/** One pixel as `#rrggbb`, alpha ignored — a still is composited over an opaque backdrop. */
+export const pixelAt = (bitmap: Bitmap, x: number, y: number): string => {
+  const at = (y * bitmap.width + x) * bitmap.channels;
+  const hex = (index: number) =>
+    (bitmap.pixels[at + index] as number).toString(16).padStart(2, '0');
+  return bitmap.channels >= 3 ? `#${hex(0)}${hex(1)}${hex(2)}` : `#${hex(0)}${hex(0)}${hex(0)}`;
+};
+
+/**
+ * A digest of some rectangles of one bitmap, so two renders can be compared over exactly
+ * the area under test. Regions are hashed in the order given; an empty list is refused
+ * rather than hashed to a constant, since a region list that silently came out empty would
+ * make every comparison pass.
+ */
+export const hashRegions = (bitmap: Bitmap, regions: Region[]): string => {
+  if (regions.length === 0) throw new Error('Refusing to hash an empty region list.');
+
+  const digest = createHash('md5');
+  for (const region of regions) {
+    for (let y = region.y; y < region.y + region.height; y += 1) {
+      const from = (y * bitmap.width + region.x) * bitmap.channels;
+      digest.update(bitmap.pixels.subarray(from, from + region.width * bitmap.channels));
+    }
+  }
+
+  return digest.digest('hex');
+};
+
+/**
+ * The rectangles covering everything a safe area excludes: the bands above, below, left
+ * and right of the rectangle the scene was given. Expressed as bands rather than as one
+ * subtraction because the complement of a rectangle is not a rectangle, and four bands
+ * that meet only at the corners are the cheapest exact cover of it.
+ */
+export const bandsOutside = (inside: Region, width: number, height: number): Region[] =>
+  [
+    { x: 0, y: 0, width, height: inside.y },
+    { x: 0, y: inside.y + inside.height, width, height: height - inside.y - inside.height },
+    { x: 0, y: inside.y, width: inside.x, height: inside.height },
+    {
+      x: inside.x + inside.width,
+      y: inside.y,
+      width: width - inside.x - inside.width,
+      height: inside.height,
+    },
+  ].filter((band) => band.width > 0 && band.height > 0);

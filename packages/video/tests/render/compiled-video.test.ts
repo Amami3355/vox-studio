@@ -3,13 +3,19 @@
  *
  * The compiler's decisions are asserted as data in `tests/compile.test.ts`. What only a
  * browser can answer is whether the document *plays* — so this suite states the ADR-0003
- * outcome as a relation between two renders of the same plan, one carrying a persistent
+ * outcomes as relations between two renders of the same plan, one carrying a persistent
  * element and one not:
  *
- * - over the scene that can yield, the two frames differ (the narrator is drawn)
- * - over the scene that occupies the whole frame, they are identical (it is hidden)
+ * - over a scene that yields, the two frames differ (the narrator is drawn)
+ * - over a scene nothing can clear, they are identical (it is hidden)
  *
- * Neither assertion depends on a font, a hash baseline or this machine.
+ * Which scene falls where is a property of the declarations, so the *slot* is the fixture's
+ * variable rather than the scene. From a corner both capabilities can clear, the narrator
+ * now survives the whole section — the continuity §9.3 is about, and something no plan
+ * could demonstrate while `image_context` declared only `full`. From the centre, nothing
+ * clears it anywhere and it is dropped throughout.
+ *
+ * No assertion depends on a font, a hash baseline or this machine.
  */
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -27,7 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { VideoPlan } from '../../src/catalog/validate';
 import { compile } from '../../src/compile';
 import type { CompiledDocument } from '../../src/compile/document';
-import type { TimedBeat } from '../../src/core/types';
+import type { Slot, TimedBeat } from '../../src/core/types';
 
 const NARRATOR_URI =
   'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22150%22%20r=%22140%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E';
@@ -73,20 +79,21 @@ const scenes = [
   },
 ];
 
-const planWith = (narrator: boolean): VideoPlan => ({
+/** `null` is the same plan with no persistent layer at all — the control render. */
+const planWith = (slot: Slot | null): VideoPlan => ({
   beats: timedBeats.map(({ id, text }) => ({ id, text })),
   sections: [
     {
       id: 'sec1',
       spansBeats: ['b1', 'b2'],
-      ...(narrator
+      ...(slot
         ? {
             persistent: [
               {
                 id: 'narrator',
                 element: 'character' as const,
                 asset: { status: 'ready' as const, uri: NARRATOR_URI },
-                placements: [{ at: 'b1.start', slot: 'cornerBR' as const }],
+                placements: [{ at: 'b1.start', slot }],
               },
             ],
           }
@@ -96,11 +103,15 @@ const planWith = (narrator: boolean): VideoPlan => ({
   ],
 });
 
-const documentFor = (narrator: boolean): CompiledDocument => {
-  const result = compile({ plan: planWith(narrator), beats: timedBeats });
+const documentFor = (slot: Slot | null): CompiledDocument => {
+  const result = compile({ plan: planWith(slot), beats: timedBeats });
   if (!result.ok) throw new Error(`fixture plan did not compile: ${JSON.stringify(result.report)}`);
   return result.document;
 };
+
+/** Frames inside each scene: the chart runs 0–90, the context scene 90–240. */
+const OVER_CHART = 30;
+const OVER_CONTEXT = 150;
 
 let bundleDirectory = '';
 let serveUrl = '';
@@ -146,7 +157,7 @@ const renderHash = async (document: CompiledDocument, frame: number): Promise<st
 
 describe('the Section runtime', () => {
   it('plays a compiled document as one video, section and scene windows included', async () => {
-    const document = documentFor(true);
+    const document = documentFor('cornerBR');
 
     // 8000ms of speech at 30fps, with the cut where b2 begins.
     expect(document.durationInFrames).toBe(240);
@@ -156,28 +167,44 @@ describe('the Section runtime', () => {
     ]);
 
     const [chartFrame, contextFrame] = await Promise.all([
-      renderHash(document, 30),
-      renderHash(document, 150),
+      renderHash(document, OVER_CHART),
+      renderHash(document, OVER_CONTEXT),
     ]);
 
     expect(chartFrame).not.toBe(contextFrame);
   }, 120_000);
 
-  it('draws the persistent element over the scene that yielded to it', async () => {
-    const [withNarrator, without] = await Promise.all([
-      renderHash(documentFor(true), 30),
-      renderHash(documentFor(false), 30),
+  /**
+   * Both scenes yield into `left`, so the narrator holds one corner across the cut. The
+   * assertion is per scene rather than over the whole video because "still drawn after the
+   * cut" is the claim, and a single render cannot make it.
+   */
+  it('keeps a persistent element in frame across a cut both scenes yielded for', async () => {
+    const [overChart, overContext, chartAlone, contextAlone] = await Promise.all([
+      renderHash(documentFor('cornerBR'), OVER_CHART),
+      renderHash(documentFor('cornerBR'), OVER_CONTEXT),
+      renderHash(documentFor(null), OVER_CHART),
+      renderHash(documentFor(null), OVER_CONTEXT),
     ]);
 
-    expect(withNarrator).not.toBe(without);
+    expect(overChart).not.toBe(chartAlone);
+    expect(overContext).not.toBe(contextAlone);
   }, 120_000);
 
-  it('hides it over the scene that occupies the whole frame, changing nothing else', async () => {
-    const [withNarrator, without] = await Promise.all([
-      renderHash(documentFor(true), 150),
-      renderHash(documentFor(false), 150),
+  /**
+   * The centre is the slot nothing rescues: it overlaps both halves, so no composition
+   * either capability declares can clear it, and one placement leaves nowhere to relocate
+   * to. Rung d, playing.
+   */
+  it('drops one no composition can clear, changing nothing else about the frame', async () => {
+    const [overChart, overContext, chartAlone, contextAlone] = await Promise.all([
+      renderHash(documentFor('center'), OVER_CHART),
+      renderHash(documentFor('center'), OVER_CONTEXT),
+      renderHash(documentFor(null), OVER_CHART),
+      renderHash(documentFor(null), OVER_CONTEXT),
     ]);
 
-    expect(withNarrator).toBe(without);
+    expect(overChart).toBe(chartAlone);
+    expect(overContext).toBe(contextAlone);
   }, 120_000);
 });

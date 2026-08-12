@@ -165,6 +165,35 @@ Both recorded in `docs/proposals/architecture-evolutions.md`.
 
 ## Amendments
 
+**2026-08-12 — the render-level contract test exists, and decision 6 has been carried
+out.** The consequence *"a declared composition is trusted, and nothing yet checks that it
+renders"* is discharged. `packages/video/tests/render/safe-area.test.ts` is generated from
+`supportedCompositions` itself — every capability × every composition it claims — so
+declaring one adds its own gate rather than relying on a reviewer's eye.
+
+It states containment as a relation, never a hash baseline: two renders of the same
+composition carrying different content must be **byte-identical outside** the reserved
+rectangle, because that region is backdrop and backdrop does not know what the scene says,
+and must **differ inside** it, which is what stops the first assertion passing over a
+rectangle the probe read wrong or a frame that drew nothing. Both survive a change of
+machine and of font.
+
+`image_context` now declares `full`, `left` and `right`, which is decision 6 applied to the
+capability that forced this ADR: a persistent element in a corner either half clears is
+kept, and the scene stacks its plate over its copy instead of splitting into two columns
+too narrow for their own words. `ImageContextScene` is no longer the worked example of rung
+d — an element in `center`, which no half clears, is.
+
+**What the gate does not do, and this is worth knowing before the next capability declares
+a composition.** It ran green against the *unfixed* layout. A 7/5 column split inside 960px
+put a 39-character headline through `AnimatedText`'s `overflow: hidden` and clipped it
+mid-word — "The rent squeez / is / reshap" — which is unreadable and entirely legal:
+nothing was drawn outside the rectangle, so nothing the test can see went wrong. The gate
+answers *"did this scene stay inside the frame it was given"*, and the failure mode ADR-0003
+actually named — a capability "squeezed, silently and legally" — is only half caught by it.
+The other half was found by rendering the frame and looking at it. A composition is not
+paid off by adding it to `meta.ts` and watching the suite pass.
+
 **2026-08-12 — decisions 2, 3 and 7, after an adversarial review of the implementation.**
 The original text already made the scene the unit, but only for one element at a time, and
 the first implementation followed it literally: outcomes were computed per placement

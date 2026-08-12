@@ -58,16 +58,32 @@ describe('slot conflict resolution', () => {
   });
 
   /**
-   * The case that forced ADR-0003, read from the real declarations rather than a fixture:
-   * if `image_context` ever softens `occupiesRegions` or gains a composition it can be
-   * squeezed into, this is the test that says the rule's outcome moved with it.
+   * The case that forced ADR-0003, read from the real declarations rather than a fixture.
+   * It hid the element until `image_context` gained a half-frame layout: the scene takes
+   * the whole canvas, so the corner is only free if the scene itself gives it up.
+   *
+   * Note which repair wins. The element declares `cornerTL` elsewhere and would have been
+   * relocatable, but the scene yields first — a composition somebody designed, against a
+   * character that jumps. If this ever reads `relocate`, rung b and rung c have swapped.
    */
-  it('hides a persistent element over a scene that occupies the whole frame', () => {
+  it('makes the scene that occupies the whole frame yield rather than move the element', () => {
     const { meta } = requireCapability('image_context');
 
     const resolution = resolveSceneConflicts(
       { occupies: meta.occupiesRegions, supportedCompositions: meta.supportedCompositions },
       [{ wanted: ['cornerBR'], declaredElsewhere: ['cornerTL', 'left', 'center'] }],
+    );
+
+    expect(resolution).toEqual({ composition: 'left', outcomes: [{ kind: 'sceneYielded' }] });
+  });
+
+  /** And when the halves cannot clear it either, the element still goes. */
+  it('still hides an element no declared composition of that scene can clear', () => {
+    const { meta } = requireCapability('image_context');
+
+    const resolution = resolveSceneConflicts(
+      { occupies: meta.occupiesRegions, supportedCompositions: meta.supportedCompositions },
+      [{ wanted: ['center'], declaredElsewhere: [] }],
     );
 
     expect(resolution).toEqual({ composition: null, outcomes: [{ kind: 'hide' }] });
