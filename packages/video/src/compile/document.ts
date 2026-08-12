@@ -12,7 +12,8 @@
  */
 import type { FrameBeat } from '../core/anchors';
 import type { Rect } from '../core/slots';
-import type { SafeArea, TimedEvent } from '../core/types';
+import type { ResolvedSceneAssets, SafeArea, TimedEvent } from '../core/types';
+import type { MotionProfileId } from '../design/motion';
 
 /**
  * Where one persistent element sits, over one run of frames.
@@ -31,6 +32,20 @@ export type LayoutState = {
 export type CompiledScene = {
   id: string;
   capabilityId: string;
+  /**
+   * Still the authored props, unparsed. The renderer parses them through the capability
+   * schema, which is the one source of truth for defaults — a second parse here would
+   * bake today's defaults into a document that outlives them.
+   */
+  props: Record<string, unknown>;
+  /** Resolved, never optional. A runtime that picks a layout is a runtime deciding. */
+  layout: string;
+  motionProfile: MotionProfileId;
+  /**
+   * The resolver's output, on its own channel. It never travels inside `props`, so an
+   * `AssetRef` stays unreachable from anything an agent authors against.
+   */
+  assets: ResolvedSceneAssets;
   /** Absolute frame, inclusive. */
   from: number;
   /** Absolute frame, exclusive. */

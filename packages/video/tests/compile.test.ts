@@ -6,7 +6,8 @@
  * of the document being JSON.
  */
 import { describe, expect, it } from 'vitest';
-import type { VideoPlan } from '../src/catalog/validate';
+import { createAssetResolver } from '../src/assets/resolver';
+import type { VideoPlan, VideoPlanSection } from '../src/catalog/validate';
 import { compile } from '../src/compile';
 import type { CompileReport, TimedBeat } from '../src/core/types';
 
@@ -159,6 +160,57 @@ describe('compile', () => {
     expect(result.report.warnings).toContainEqual(
       expect.objectContaining({ code: 'PERSISTENT_ELEMENT_HIDDEN', sceneId: 'context' }),
     );
+  });
+
+  it('resolves layout and motion profile, so the runtime never has to choose one', () => {
+    const bare: VideoPlan = {
+      ...onePlan,
+      sections: [
+        {
+          ...(onePlan.sections[0] as VideoPlanSection),
+          scenes: [
+            {
+              id: 'scene1',
+              component: 'bar_chart',
+              spansBeats: ['b1', 'b2'],
+              props: barChartProps,
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = compile({ plan: bare, beats: timedBeats });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    expect(result.document.sections[0]?.scenes[0]).toMatchObject({
+      layout: 'standard',
+      motionProfile: 'subtleDrift',
+      props: barChartProps,
+    });
+  });
+
+  it('resolves each scene’s assets onto the runtime channel, never into its props', () => {
+    const result = compile({ plan: continuityPlan, beats: timedBeats });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    const context = result.document.sections[0]?.scenes[1];
+
+    expect(context?.assets.assetRequirement).toMatchObject({ status: 'ready' });
+    expect(context?.props).not.toHaveProperty('assetRequirement.status');
+  });
+
+  it('falls back to a placeholder when the library answers nothing', () => {
+    const result = compile({
+      plan: continuityPlan,
+      beats: timedBeats,
+      resolver: createAssetResolver(),
+    });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    expect(result.document.sections[0]?.scenes[1]?.assets.assetRequirement).toMatchObject({
+      status: 'placeholder',
+    });
   });
 
   it('refuses a plan whose beats were never spoken', () => {

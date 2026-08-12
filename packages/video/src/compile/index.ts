@@ -5,6 +5,8 @@
  * the one place milliseconds become frames, and the one place a plan becomes something
  * Remotion can play.
  */
+import { repositoryAssetLibrary } from '../assets/library';
+import { type AssetResolver, createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
 import { type FrameBeat, resolveEventTimings } from '../core/anchors';
 import {
@@ -13,7 +15,9 @@ import {
   NO_SAFE_AREA,
   type TimedBeat,
 } from '../core/types';
+import type { MotionProfileId } from '../design/motion';
 import { FPS } from '../design/theme';
+import { requireCapability } from '../scenes/registry';
 import type { CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { resolvePersistentLayer, safeAreaFor } from './persistent';
 
@@ -23,6 +27,13 @@ export type CompileInput = {
   plan: VideoPlan;
   /** From `packages/voice`, or a fixture. The compiler never calls TTS itself. */
   beats: TimedBeat[];
+  /**
+   * Accepted, not constructed, so the identity cache is scoped to one compilation rather
+   * than to the process. Synchronous by design: when generation and licensed search land,
+   * the async work fills that cache *before* compiling, and resolution here stays a
+   * lookup — which is what keeps the compiler a pure function.
+   */
+  resolver?: AssetResolver;
   fps?: number;
 };
 
@@ -34,7 +45,12 @@ export type CompileResult =
   | { ok: true; document: CompiledDocument; report: CompileReport }
   | { ok: false; document: null; report: CompileReport };
 
-export const compile = ({ plan, beats, fps = FPS }: CompileInput): CompileResult => {
+export const compile = ({
+  plan,
+  beats,
+  resolver = createAssetResolver({ library: repositoryAssetLibrary }),
+  fps = FPS,
+}: CompileInput): CompileResult => {
   const report = validateVideoPlan(plan);
   if (!report.ok) return { ok: false, document: null, report };
 
@@ -54,9 +70,20 @@ export const compile = ({ plan, beats, fps = FPS }: CompileInput): CompileResult
     const scenes: CompiledScene[] = section.scenes.map((scene) => {
       const sceneBounds = windowOf(scene.spansBeats);
 
+      const capability = requireCapability(scene.component);
+
       return {
         id: scene.id,
         capabilityId: scene.component,
+        props: scene.props,
+        /**
+         * Resolved here rather than defaulted in the renderer. A default that lives in
+         * the runtime is a decision taken after the document was written, which is
+         * exactly the kind of drift a compiled artifact exists to prevent.
+         */
+        layout: scene.layout ?? (Object.keys(capability.layouts)[0] as string),
+        motionProfile: scene.motionProfile ?? 'subtleDrift',
+        assets: resolveSceneAssets(scene, resolver),
         ...sceneBounds,
         events: resolveEventTimings(scene.events ?? [], frameBeats, sceneBounds),
         safeArea: NO_SAFE_AREA,
