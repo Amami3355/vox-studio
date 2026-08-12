@@ -8,7 +8,7 @@
 import { repositoryAssetLibrary } from '../assets/library';
 import { type AssetResolver, createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
-import { type FrameBeat, resolveEventTimings } from '../core/anchors';
+import { resolveEventTimings } from '../core/anchors';
 import { ASSET_REQUIREMENT_FIELD } from '../core/assets';
 import {
   type CompileReport,
@@ -24,6 +24,7 @@ import { FPS } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
 import type { CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { resolvePersistentLayer, safeAreaFor } from './persistent';
+import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
 export type { CompiledDocument, CompiledScene, CompiledSection } from './document';
 
@@ -58,7 +59,7 @@ export const compile = ({
   const report = validateVideoPlan(plan);
   if (!report.ok) return { ok: false, document: null, report };
 
-  const untimed = missingTimings(plan, beats);
+  const untimed = checkTimings(plan, beats, fps);
   if (untimed.length > 0) {
     return { ok: false, document: null, report: { ...report, ok: false, errors: untimed } };
   }
@@ -242,47 +243,4 @@ const checkDuration = (
         'of what it says into the scene next to it.',
     });
   }
-};
-
-/**
- * A plan beat the voice-over never spoke.
- *
- * Checked before any arithmetic, because the alternative is a `NaN` propagating into
- * every window derived from that beat — a scene that starts at frame `NaN` renders
- * nothing and reports nothing, which is the exact failure §8.1 exists to prevent.
- */
-const missingTimings = (plan: VideoPlan, beats: TimedBeat[]): CompilerError[] => {
-  const spoken = new Set(beats.map((beat) => beat.id));
-  return plan.beats
-    .filter((beat) => !spoken.has(beat.id))
-    .map((beat) => ({
-      code: 'MISSING_BEAT_TIMING' as const,
-      field: `beats.${beat.id}`,
-      message: `Beat "${beat.id}" has no timing. Every beat in the plan must be spoken, because a scene's duration is the sum of the beats it spans.`,
-      expected: beats.map((b) => b.id),
-    }));
-};
-
-/**
- * Convert *boundaries*, never durations.
- *
- * Rounding each beat's length independently and summing accumulates the error into gaps
- * and overlaps between scenes — a one-frame black flash that no test would name and
- * everyone would see. Converting each millisecond boundary with one function makes
- * contiguity a property of the arithmetic instead of something to check afterwards.
- */
-const toFrameBeats = (plan: VideoPlan, beats: TimedBeat[], fps: number): FrameBeat[] => {
-  const timingOf = new Map(beats.map((beat) => [beat.id, beat]));
-  const toFrame = (ms: number) => Math.round((ms * fps) / 1000);
-
-  return plan.beats.map((beat) => {
-    const timing = timingOf.get(beat.id) as TimedBeat;
-    return { id: beat.id, from: toFrame(timing.fromMs), to: toFrame(timing.toMs) };
-  });
-};
-
-/** The window of a contiguous run of beats. The partition is already validated. */
-const spanWindow = (spansBeats: string[], frameBeats: FrameBeat[]) => {
-  const covered = frameBeats.filter((beat) => spansBeats.includes(beat.id));
-  return { from: covered[0]?.from ?? 0, to: covered.at(-1)?.to ?? 0 };
 };

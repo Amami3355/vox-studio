@@ -444,4 +444,47 @@ describe('compile', () => {
       expect.objectContaining({ code: 'MISSING_BEAT_TIMING', field: 'beats.b2' }),
     );
   });
+
+  /**
+   * The timings are the one input the compiler cannot derive and cannot check against
+   * anything but the plan. Every case here produced a document before: a `NaN` window, a
+   * scene playing backwards, a black gap between two scenes, or pictures cut against
+   * words the voice no longer says.
+   */
+  describe('refuses timings that are not a projection of the plan', () => {
+    const spoken = (overrides: Partial<TimedBeat>[]): TimedBeat[] =>
+      timedBeats.map((beat, index) => ({ ...beat, ...overrides[index] }));
+
+    it.each([
+      ['a window that runs backwards', spoken([{ fromMs: 3000, toMs: 0 }])],
+      ['a window of no length at all', spoken([{ toMs: 0 }])],
+      ['a boundary that is not a number', spoken([{ toMs: Number.NaN }])],
+      ['a beat that starts before zero', spoken([{ fromMs: -100 }])],
+      ['a gap the video would play as black', spoken([{}, { fromMs: 3500 }])],
+      ['an overlap', spoken([{}, { fromMs: 2500 }])],
+      ['text the voice no longer says', spoken([{ text: 'Rents have fallen for a decade.' }])],
+      ['beats in an order the plan does not have', [...timedBeats].reverse()],
+      [
+        'a timing for a beat the plan does not define',
+        [...timedBeats, { id: 'b3', text: 'And then?', fromMs: 8000, toMs: 9000 }],
+      ],
+    ])('%s', (_, beats) => {
+      const result = compile({ plan: onePlan, beats });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT' }),
+      );
+    });
+
+    it('refuses an fps that cannot produce a frame', () => {
+      const result = compile({ plan: onePlan, beats: timedBeats, fps: 0 });
+
+      expect(result.ok).toBe(false);
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'fps' }),
+      );
+    });
+  });
 });

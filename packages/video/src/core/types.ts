@@ -237,7 +237,13 @@ export type CompilerErrorCode =
   | 'SCENE_CUTS_MID_SENTENCE'
   /* A plan beat the voice-over never spoke. The compiler has no duration for it, and
    * every window derived from it would be silently wrong rather than absent. */
-  | 'MISSING_BEAT_TIMING';
+  | 'MISSING_BEAT_TIMING'
+  /* Timings that are not a projection of the plan: out of order, non-finite, reversed,
+   * gapped, or spoken from text the plan no longer contains. One code rather than the
+   * beat partition's three, because these are not three corrections an agent can make —
+   * rule 3 forbids an agent from writing a timing, so the only repair is to synthesise
+   * again and the message carries which property broke. */
+  | 'INVALID_TIMING_INPUT';
 
 export type CompilerError = {
   code: CompilerErrorCode;

@@ -170,3 +170,48 @@ artifact.
   rule is decided. Until then, an event that must land on a specific word belongs on a
   beat boundary — which means the writing agent's beat granularity, not the anchor, is
   what buys precision. Worth saying out loud when the beat texts for the slice are written.
+
+## Amendments
+
+**2026-08-12 — the timed take is checked as a projection of the plan.** This ADR gave
+`TimedBeat` its shape and said where it comes from, but never said what the compiler does
+when it is handed one that is wrong. The compiler checked that each plan beat id appeared
+somewhere in the take, and nothing else: a reversed window, a `NaN` boundary, two beats
+out of order, a gap between them, or text the plan no longer contains all compiled into a
+document.
+
+The decision is the one `checkPlanShape` already took one layer up, applied to the other
+input. A take arriving as JSON — from `packages/voice`, from a fixture, from a file
+written before the plan was last edited — has none of the guarantees its TypeScript type
+makes, and every window derived from it assumes all of them. A `TimedBeat[]` is therefore
+required to be an **exact, ordered, contiguous projection of the plan's beats**: same ids
+in the same positions, the same text, every boundary finite and forward, and each beat
+starting where the previous one ended.
+
+Two of those are worth their own sentence.
+
+**Contiguity is an invariant, not a policy.** Nothing above decides that a voice-over may
+not pause. It is that this ADR synthesises n beats from n+1 marks, so mark *i* is both the
+end of one beat and the start of the next — a take built the way this document describes
+cannot have a gap, and one that does was not built that way. The compiler cares because
+scene and section windows are derived from beat boundaries: 200ms nobody owns is a black
+flash between two scenes, not silence under a picture.
+
+**Text equality is the stale-audio detector this ADR promised and never built.** A beat
+carries its voice-over verbatim so that a script and the beats pointing into it cannot
+drift "with nothing able to detect it mechanically". Something now detects it. Editing a
+plan after synthesis is the ordinary way the two come apart, and it is invisible in the
+render — the pictures are cut against words that are no longer spoken.
+
+One error code, `INVALID_TIMING_INPUT`, where the beat partition earns three. Those three
+are three different corrections an agent can make. This is one correction no agent may
+make: rule 3 forbids an agent from writing a timing at all, so the only repair is to
+synthesise again, and the distinction that matters goes in the message rather than in the
+code. `MISSING_BEAT_TIMING` survives as its own code and is reported alone — with holes in
+the take, every ordering and contiguity check fires too, and a report naming ten problems
+that are one problem is worse than useless to whoever has to fix it.
+
+The check has no cost today, because every timing the compiler has ever seen came from a
+fixture the same file constructed. It is written now because that stops being true the
+moment `packages/voice` lands, and a stale take is not a failure anyone notices by
+watching the video — it is a video that plays.
