@@ -16,5 +16,20 @@ export default defineConfig({
     testTimeout: 180_000,
     hookTimeout: 180_000,
     reporters: 'default',
+    /**
+     * One file at a time.
+     *
+     * Every file here bundles the project and opens its own headless Chrome, so running
+     * them in parallel threads means three bundlers and three browsers competing for the
+     * machine. That is the whole of this suite's long-standing flakiness: it fails with
+     * `net::ERR_SOCKET_NOT_CONNECTED` on a *different* test each run, and every failing
+     * file passes when run alone. A gate nobody trusts is not a gate, and the habit of
+     * re-running until green is exactly how a real failure gets waved through.
+     *
+     * The cost is wall-clock, which this suite already spends in minutes. Parallelism
+     * inside a file is untouched — the stills of one case still render together on the
+     * one browser that file opened.
+     */
+    fileParallelism: false,
   },
 });

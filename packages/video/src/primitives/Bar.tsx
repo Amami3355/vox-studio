@@ -102,7 +102,17 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   if (orientation === 'horizontal') {
     return (
       <div
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap, justifyContent: 'center' }}
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap,
+          justifyContent: 'center',
+          // The vertical branch below has always had this; the horizontal one had not, so
+          // its rows sized the container instead of the other way round and a ranking too
+          // tall for its box grew past the frame rather than being cut down to fit.
+          minHeight: 0,
+        }}
       >
         {data.map((d, i) => {
           const p = progressFor(i);

@@ -246,3 +246,54 @@ The cost was accepted deliberately: under `pushIn` a half-frame scene now loses 
 side horizontally, so the shot is visibly tighter. That is the trade `CameraRig`'s header
 already committed to — *"the cost of a big push-in is visible as a tighter frame rather than
 as a crop"* — and it had simply never been paid by the one scene that opted out.
+
+**2026-08-12 — an absolute control, and `bar_chart`'s half frame is now drawn rather than
+claimed.** An adversarial review of the two amendments above argued that the gate had
+false-negative paths. Three were real, and closing them found a defect older than either
+amendment.
+
+The gate now measures against a **control** — one still of `Backdrop` with nothing standing
+on it (`src/runtime/BackdropControl.tsx`). The previous form asked its questions as a
+relation between two examples of the same capability, which is blind by construction to
+anything a capability draws identically every time: the `Visual context` eyebrow is
+byte-identical in every `image_context` render, so had *it* overflowed, both frames would
+have matched and the suite would have passed. An absolute reference has no such blind spot,
+and it makes each render checkable on its own — so the suite no longer pairs examples up
+and asks every example in the catalog rather than the first two. Each case also runs under
+**two camera profiles**, because containment's worst case is the largest *translation*
+(`cinematic`) while the quiet border's is the largest *inset* (`pushIn` — which the shipped
+slice's own closing scene uses, and which the suite had never rendered); and the quiet
+border is now asked of `full`, which the containment-only filter had excluded.
+
+What that found: **`bar_chart` had declared `['full', 'left', 'right']` since the first
+scaffold commit, with no half-frame layout ever drawn for it.** `example-long-ranking`
+composed into a half put a 68-character title through five lines of display type, and ran
+its ranking off the bottom of the canvas. This is exactly the consequence recorded above —
+"a capability that declares `left` without a layout designed for a half-frame gets squeezed,
+silently and legally" — surviving for the whole life of the codebase, because the amendment
+that gave `image_context` its halves reasoned about that capability alone and nobody
+re-read the other one's declaration.
+
+Decision 1 is unchanged, and was applied as written: the composition was **drawn**, not
+withdrawn and not handed to the compiler to judge. `BarChartScene` now reads the shape of
+its box exactly as `ImageContextScene` does, and in a portrait box the title labels the
+chart instead of declaiming over it, while how many categories fit becomes a question the
+box answers. Both are degradations the capability already publishes — `TITLE_DENSITY` and
+the `Others` bucket — asked on the box's terms rather than only on the string's.
+`barChartGeometry` sits beside `splitLeftGeometry` and carries the same distinction: a
+composition is not a layout, and all three layouts keep their identity in half a frame.
+
+Withdrawing the claim was the considered alternative, and is worth recording because it was
+the cheaper one. It costs the shipped slice its narrator: with no half to yield into, the
+chart scene falls to rung d and compiles `PERSISTENT_ELEMENT_HIDDEN` for the whole 11.5
+seconds. Drawing the frame keeps the section a human can sit down and watch, which is what
+§12 asked for, and it errs in the recoverable direction — a drawn composition can be
+withdrawn later, while a withdrawn one leaves the compiler nothing to pick.
+
+**What is still not answered** is the general form of the review's objection: nothing checks
+that content the *schema* accepts but no example carries will fit. The gate asks the
+catalog's own examples, which is why it caught this one, and the schema's ceilings — a
+120-character headline, a 240-character caption, twenty categories — remain unrendered in
+any composition. Whether `supportedCompositions` should stay a static declaration or become
+content-dependent is a decision this ADR has not taken; it has only made the static
+declaration honest for the two capabilities that exist.

@@ -80,14 +80,22 @@ export const SceneTitle: React.FC<{
   startFrame: number;
   profile: MotionProfile;
   color?: string;
-}> = ({ children, startFrame, profile, color }) => {
+  /**
+   * Override the step the string would have chosen, for a scene whose *box* has the
+   * stronger claim. `titleStep` reads length only, which is the whole story on the full
+   * canvas and half of it in a composed frame: the same 68 characters that take two lines
+   * across 1497px take five down a 537px column, and five lines of display type is a
+   * header that has eaten its own scene.
+   */
+  step?: number;
+}> = ({ children, startFrame, profile, color, step }) => {
   const theme = useTheme();
   return (
     <AnimatedText
       startFrame={startFrame}
       profile={profile}
       font="display"
-      step={titleStep(children.length)}
+      step={step ?? titleStep(children.length)}
       weight={theme.type.weight.bold}
       tracking={theme.type.tracking.tight}
       color={color}

@@ -4,6 +4,7 @@ import './design/fonts';
 import type { CompiledDocument } from './compile/document';
 import { FPS, HEIGHT, WIDTH } from './design/theme';
 import { compileShippedPlan, shippedPlans } from './plans';
+import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';
 import { CompiledVideo } from './runtime/CompiledVideo';
 import { ExampleScene, compositionIdFor } from './runtime/ExampleScene';
 import { registry } from './scenes/registry';
@@ -77,6 +78,20 @@ export const RemotionRoot: React.FC = () => (
         durationInFrames: Math.max(1, props.document.durationInFrames),
         fps: props.document.fps,
       })}
+    />
+
+    {/*
+     * The reference frame the render contract tests measure against. One frame, because
+     * `Backdrop` does not move; see `runtime/BackdropControl.tsx` for why an absolute
+     * control says something two example renders compared to each other cannot.
+     */}
+    <Composition
+      id={BACKDROP_CONTROL_ID}
+      component={BackdropControl}
+      durationInFrames={1}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
     />
 
     {registry.flatMap((capability) =>

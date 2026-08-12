@@ -4,7 +4,7 @@ import { aggregateBeyond } from '../../core/aggregate';
 import { resolveEvents } from '../../core/events';
 import type { SceneProps } from '../../core/types';
 import type { MotionProfile } from '../../design/motion';
-import { emphasisColor } from '../../design/theme';
+import { type Theme, emphasisColor } from '../../design/theme';
 import {
   Backdrop,
   BarGroup,
@@ -13,11 +13,14 @@ import {
   EmptyState,
   SceneTitle,
   SlotFrame,
+  titleStep,
   useEntrance,
+  useFrameBox,
   useSpace,
+  useTypeSize,
 } from '../../primitives';
 import { barChartConstraints } from './constraints';
-import type { BarChartLayoutId } from './layouts';
+import { type BarChartLayoutId, barChartGeometry } from './layouts';
 import type { BarChartProps } from './schema';
 import { initialBarChartState, makeBarChartReducer } from './state';
 
@@ -36,12 +39,75 @@ export const BarChartScene: React.FC<SceneProps<BarChartProps>> = ({
   profile,
   durationInFrames,
 }) => {
+  return (
+    <Backdrop>
+      <CameraRig profile={profile} durationInFrames={durationInFrames}>
+        <SlotFrame safeArea={safeArea}>
+          <ChartFrame
+            props={props}
+            layout={layout}
+            events={events}
+            theme={theme}
+            profile={profile}
+          />
+        </SlotFrame>
+      </CameraRig>
+    </Backdrop>
+  );
+};
+
+/**
+ * Everything that depends on the box the scene was actually given, which is why it is a
+ * child: `useFrameBox` reads what `SlotFrame` provides, and `SlotFrame` is mounted above.
+ *
+ * The event fold lives here too, because the fold is seeded with `data.length` and the
+ * category count is now one of the things the box decides.
+ */
+const ChartFrame: React.FC<{
+  props: BarChartProps;
+  layout?: string;
+  events: SceneProps<BarChartProps>['events'];
+  theme: Theme;
+  profile: MotionProfile;
+}> = ({ props, layout, events, theme, profile }) => {
   const frame = useCurrentFrame();
   const columnGap = useSpace(5);
   const annotationGap = useSpace(4);
   const variant = (layout as BarChartLayoutId) ?? 'standard';
 
-  const data = aggregateBeyond(props.data, barChartConstraints.data?.recommendedMax ?? 8, 'Others');
+  const box = useFrameBox();
+  const composed = box.width / box.height < barChartGeometry.composeBelowAspect;
+
+  /**
+   * What one horizontal row costs, from the same tokens `BarGroup` lays it out with: the
+   * bar is `valueSize * 1.35` tall and the rows are separated by one `space[3]` gap. Read
+   * through the density scale, so it already accounts for a squeezed scene.
+   */
+  const rowPitch = useTypeSize(1) * 1.35 + useSpace(3);
+
+  /**
+   * How many categories this box can carry at full size.
+   *
+   * On the full canvas that is the published soft constraint and nothing else — the
+   * catalog says 8, and a scene that quietly kept 6 would make the manifest a lie. A
+   * composed box asks the same question of its own height, and the answer feeds the
+   * degradation the capability already declares rather than a new one: the weakest values
+   * collapse into `Others`, exactly as they do past the soft limit.
+   *
+   * Vertical columns are bounded by width rather than height and are not capped here: at
+   * `maxWidth: 200` per column, eight of them ask for 1600px and a half frame gives 537,
+   * so they simply get narrower — legible, and the frame the shipped slice already plays.
+   */
+  const recommendedMax = barChartConstraints.data?.recommendedMax ?? 8;
+  const capacity =
+    composed && variant === 'horizontal'
+      ? Math.max(
+          barChartGeometry.minCategories,
+          Math.floor((box.height * barChartGeometry.chartShare) / rowPitch),
+        )
+      : recommendedMax;
+
+  const data = aggregateBeyond(props.data, Math.min(recommendedMax, capacity), 'Others');
 
   const state = resolveEvents(
     events,
@@ -68,42 +134,24 @@ export const BarChartScene: React.FC<SceneProps<BarChartProps>> = ({
   );
 
   return (
-    <Backdrop>
-      <CameraRig profile={profile} durationInFrames={durationInFrames}>
-        <SlotFrame safeArea={safeArea}>
-          <Header title={props.title} accent={primary} profile={profile} />
+    <>
+      <Header title={props.title} accent={primary} profile={profile} composed={composed} />
 
-          {isEmpty ? (
-            <EmptyState startFrame={6} profile={profile} />
-          ) : variant === 'withCallout' ? (
-            <div style={{ flex: 1, display: 'flex', gap: columnGap, minHeight: 0 }}>
-              <div style={{ flex: 62, display: 'flex', minWidth: 0 }}>{chart}</div>
-              <div
-                style={{
-                  flex: 34,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  minWidth: 0,
-                }}
-              >
-                {annotation ? (
-                  <Callout
-                    text={annotation.text}
-                    label={annotation.label}
-                    startFrame={state.annotation.since}
-                    profile={profile}
-                    accent={theme.color.accentAlt}
-                  />
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            chart
-          )}
-
-          {variant !== 'withCallout' && annotation ? (
-            <div style={{ marginTop: annotationGap }}>
+      {isEmpty ? (
+        <EmptyState startFrame={6} profile={profile} />
+      ) : variant === 'withCallout' ? (
+        <div style={{ flex: 1, display: 'flex', gap: columnGap, minHeight: 0 }}>
+          <div style={{ flex: 62, display: 'flex', minWidth: 0 }}>{chart}</div>
+          <div
+            style={{
+              flex: 34,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              minWidth: 0,
+            }}
+          >
+            {annotation ? (
               <Callout
                 text={annotation.text}
                 label={annotation.label}
@@ -111,11 +159,28 @@ export const BarChartScene: React.FC<SceneProps<BarChartProps>> = ({
                 profile={profile}
                 accent={theme.color.accentAlt}
               />
-            </div>
-          ) : null}
-        </SlotFrame>
-      </CameraRig>
-    </Backdrop>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        /* `minHeight: 0` so the chart is sized by what the header left it, rather than
+           by its own rows — a flex child defaults to `min-height: auto` and pushes past
+           the frame instead of yielding to it. */
+        <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>{chart}</div>
+      )}
+
+      {variant !== 'withCallout' && annotation ? (
+        <div style={{ marginTop: annotationGap }}>
+          <Callout
+            text={annotation.text}
+            label={annotation.label}
+            startFrame={state.annotation.since}
+            profile={profile}
+            accent={theme.color.accentAlt}
+          />
+        </div>
+      ) : null}
+    </>
   );
 };
 
@@ -124,7 +189,9 @@ const Header: React.FC<{
   title: string;
   accent: string;
   profile: MotionProfile;
-}> = ({ title, accent, profile }) => {
+  /** In a portrait box the title labels the chart; it does not declaim over it. */
+  composed: boolean;
+}> = ({ title, accent, profile, composed }) => {
   const gap = useSpace(3);
   const bottom = useSpace(5);
   const draw = useEntrance(0, profile);
@@ -139,7 +206,11 @@ const Header: React.FC<{
           borderRadius: 2,
         }}
       />
-      <SceneTitle startFrame={2} profile={profile}>
+      <SceneTitle
+        startFrame={2}
+        profile={profile}
+        step={composed ? Math.max(2, titleStep(title.length) - 1) : undefined}
+      >
         {title}
       </SceneTitle>
     </div>

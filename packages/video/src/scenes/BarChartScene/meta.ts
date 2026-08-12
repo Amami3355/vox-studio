@@ -6,6 +6,16 @@ import type { SceneMeta } from '../../core/types';
  *
  * `avoidWhen` entries redirect explicitly. One line of redirection is worth three
  * paragraphs of description.
+ *
+ * On `supportedCompositions` — the halves are a claim that a layout exists for them, and
+ * for most of this file's life they were not. The list was written in the scaffold commit
+ * and never revisited; `tests/render/safe-area.test.ts` eventually rendered
+ * `example-long-ranking` into a half and found the ranking running off the bottom of the
+ * canvas, which is ADR-0003's "squeezed, silently and legally" in the flesh. The claim is
+ * now paid for: `Component.tsx` reads the shape of the box it was given and draws a
+ * composed form for a portrait one. Do not add an entry here without drawing the frame and
+ * looking at it — the suite will render whatever this list says, but only a person can say
+ * whether the result is worth watching.
  */
 export const barChartMeta: SceneMeta = {
   id: 'bar_chart',
