@@ -234,7 +234,10 @@ export type CompilerErrorCode =
   | 'BEAT_DOUBLE_BOOKED'
   | 'BEAT_UNCOVERED'
   | 'EMPTY_BEAT_SPAN'
-  | 'SCENE_CUTS_MID_SENTENCE';
+  | 'SCENE_CUTS_MID_SENTENCE'
+  /* A plan beat the voice-over never spoke. The compiler has no duration for it, and
+   * every window derived from it would be silently wrong rather than absent. */
+  | 'MISSING_BEAT_TIMING';
 
 export type CompilerError = {
   code: CompilerErrorCode;
