@@ -121,9 +121,12 @@ describe('ImageContextScene runtime', () => {
     ]);
 
     expect({ canonical, empty, longCopy }).toEqual({
-      canonical: '7d9d9202316f5d2396fe04e48a846207',
+      // Re-accepted when SlotFrame stopped letting a scene decline the camera allowance.
+      // `empty` is unchanged, and that is the corroboration: it renders `editorialStatic`,
+      // which has no camera, so there was no allowance for it to have been missing.
+      canonical: '0aad7bf2baef39a0d235b1c34cd4108c',
       empty: '9a1370a788be0fdb8c6abdc37bbfff2c',
-      longCopy: '98db40f314eeebdde965bada71a2d9e3',
+      longCopy: '34d4762b05fbc5e340b6ce317f14edc2',
     });
   });
 });

@@ -45,7 +45,7 @@ export const ImageContextScene: React.FC<SceneProps<ImageContextProps>> = ({
   return (
     <Backdrop>
       <CameraRig profile={profile} durationInFrames={durationInFrames}>
-        <SlotFrame safeArea={safeArea} padded={false}>
+        <SlotFrame safeArea={safeArea} gridMargin={false}>
           <SplitLayout
             headline={props.headline}
             caption={props.caption}

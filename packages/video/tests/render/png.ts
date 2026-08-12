@@ -166,6 +166,38 @@ export const hashRegions = (bitmap: Bitmap, regions: Region[]): string => {
 };
 
 /**
+ * The four bands hugging the *inner* edges of a rectangle — the border a scene is meant
+ * to leave quiet. `bandsOutside` asks whether a scene stayed in its rectangle at all;
+ * this asks whether it stopped short of the rectangle's edges, which is the difference
+ * between "legal" and "readable".
+ *
+ * Overlapping corners would be hashed twice and are trimmed off the vertical pair, so the
+ * bands remain an exact cover.
+ */
+export const bandsInside = (inside: Region, thickness: number): Region[] =>
+  [
+    { x: inside.x, y: inside.y, width: inside.width, height: thickness },
+    {
+      x: inside.x,
+      y: inside.y + inside.height - thickness,
+      width: inside.width,
+      height: thickness,
+    },
+    {
+      x: inside.x,
+      y: inside.y + thickness,
+      width: thickness,
+      height: inside.height - 2 * thickness,
+    },
+    {
+      x: inside.x + inside.width - thickness,
+      y: inside.y + thickness,
+      width: thickness,
+      height: inside.height - 2 * thickness,
+    },
+  ].filter((band) => band.width > 0 && band.height > 0);
+
+/**
  * The rectangles covering everything a safe area excludes: the bands above, below, left
  * and right of the rectangle the scene was given. Expressed as bands rather than as one
  * subtraction because the complement of a rectangle is not a rectangle, and four bands

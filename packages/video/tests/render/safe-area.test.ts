@@ -18,11 +18,13 @@
  *
  * - outside the reserved rectangle the two frames are byte-identical — that region is
  *   backdrop, and backdrop does not know what the scene says
- * - inside it they differ — which is what stops the first assertion passing because the
- *   probe was reading the wrong rectangle, or an empty one
+ * - along the inner border of that rectangle they are byte-identical too — a scene that
+ *   reaches its own edge is being cropped by it, whether or not it drew anything illegal
+ * - inside it they differ — which is what stops the first two assertions passing because
+ *   the probe was reading the wrong rectangle, or an empty one
  *
- * Both hold on any machine, in any font. What they cannot survive is a scene drawing
- * outside the frame it was given, which is the whole point.
+ * All three hold on any machine, in any font. What they cannot survive is a scene drawing
+ * outside the frame it was given, or up against it, which is the whole point.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -41,7 +43,25 @@ import type { SafeArea, Slot } from '../../src/core/types';
 import { HEIGHT, WIDTH, editorialCold } from '../../src/design/theme';
 import { compositionIdFor } from '../../src/runtime/ExampleScene';
 import { registry } from '../../src/scenes/registry';
-import { type Bitmap, type Region, bandsOutside, decodePng, hashRegions, pixelAt } from './png';
+import {
+  type Bitmap,
+  type Region,
+  bandsInside,
+  bandsOutside,
+  decodePng,
+  hashRegions,
+  pixelAt,
+} from './png';
+
+/**
+ * How close to its own edge a scene may put ink before the frame reads as clipped.
+ *
+ * Not a design margin — scenes choose their own, and `image_context` deliberately chooses
+ * a tighter one than `grid.margin`. It is the width at which *any* margin has effectively
+ * been spent: 16px is one step of the space scale, and text that ends there has either
+ * been cropped or is about to be.
+ */
+const EDGE_QUIET_PX = 16;
 
 /**
  * `cinematic` for every case, whatever the example declares.
@@ -199,6 +219,32 @@ describe('a declared composition renders into the rectangle it declared', () => 
         expect({ frame, region: hashRegions(a, outside) }).toEqual({
           frame,
           region: hashRegions(b, outside),
+        });
+      }
+    });
+
+    /**
+     * The half the first assertion cannot see.
+     *
+     * A scene that runs its copy off the *canvas* edge draws nothing illegal: there is no
+     * region outside the reserved rectangle for it to land in, so the frame is clipped by
+     * the canvas and every hash still matches. That is how a caption lost its last word in
+     * `section--vertical-slice` while this suite stayed green.
+     *
+     * Same relation, read one rectangle in: two examples carrying different copy must be
+     * byte-identical along the inner border, because backdrop does not know what the scene
+     * says. It therefore detects *content* reaching the edge — which is exactly the thing
+     * that gets cropped, and exactly the thing that differs between two examples.
+     */
+    it('leaves a quiet border inside that rectangle, so nothing is cropped by it', () => {
+      const border = bandsInside(insideOf(testCase.safeArea), EDGE_QUIET_PX);
+
+      for (const [index, frame] of testCase.frames.entries()) {
+        const [a, b] = frames[index] as [Bitmap, Bitmap];
+
+        expect({ frame, border: hashRegions(a, border) }).toEqual({
+          frame,
+          border: hashRegions(b, border),
         });
       }
     });

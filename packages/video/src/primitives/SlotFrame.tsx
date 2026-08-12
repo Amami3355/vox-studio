@@ -41,15 +41,31 @@ export const useFrameBox = (): FrameBox => useContext(FrameBoxCtx);
 export const SlotFrame: React.FC<{
   safeArea: SafeArea;
   children: React.ReactNode;
-  /** Set false for full-bleed content (an image plate) that must ignore the margin. */
-  padded?: boolean;
-}> = ({ safeArea, children, padded = true }) => {
+  /**
+   * False when the scene sets its own margin instead of the grid's — an image plate that
+   * wants a tighter, more editorial inset than `grid.margin`.
+   *
+   * It buys the design margin only. The camera allowance below is not negotiable, because
+   * it is not a design choice: it is the arithmetic that makes whatever margin was chosen
+   * mean the same thing at every frame of the shot.
+   */
+  gridMargin?: boolean;
+}> = ({ safeArea, children, gridMargin = true }) => {
   const theme = useTheme();
-  const margin = padded ? theme.grid.margin : 0;
+  const margin = gridMargin ? theme.grid.margin : 0;
 
-  // Whatever the camera will do at its most extreme frame, the margin survives it.
+  /**
+   * Whatever the camera will do at its most extreme frame, the margin survives it.
+   *
+   * Applied unconditionally. A scene used to be able to decline this along with the grid
+   * margin, and one did: `image_context` asked for a tighter inset and silently lost the
+   * allowance with it, so a 12% push-in ate the 46px it had left and cropped the caption
+   * off the canvas. Declining the margin is a statement about design; declining the
+   * allowance was only ever a way to be wrong. If a scene ever genuinely needs to bleed,
+   * that is a region saying so — not a whole frame giving up its physics.
+   */
   const bounds = useCameraBounds();
-  const camera = padded ? cameraInset(bounds) : { x: 0, y: 0 };
+  const camera = cameraInset(bounds);
 
   const top = margin + camera.y + (safeArea.top / 100) * HEIGHT;
   const right = margin + camera.x + (safeArea.right / 100) * WIDTH;

@@ -208,3 +208,41 @@ happens when two segments or two elements ask for different compositions. Decisi
 states the joint solve, decision 3 restates the ladder as a scene-wide rule with an
 explicit tie-break, and decision 7 writes down the section-wide fallback coupling that was
 true all along and documented nowhere.
+
+**2026-08-12 — the other half of the gate, and the camera allowance is no longer optional.**
+The amendment above ends by saying the suite answers *"did this scene stay inside the frame
+it was given"* and that the other half was found by rendering a frame and looking at it.
+That other half now has a gate too, and closing it turned up a defect in `SlotFrame`.
+
+The defect first: in `section--vertical-slice` the closing scene lost the end of its caption
+off the right of the canvas. `ImageContextScene` declined the grid margin — correct, it sets
+a tighter editorial inset of its own — and `padded={false}` silently also declined
+`cameraInset`, the compensation `CameraRig` publishes so that whatever margin was chosen
+survives the camera. A 12% push-in then ate the 46px the scene had left. Nothing illegal was
+drawn: for a `right` composition there is no region outside the reserved rectangle to the
+right of it, so the frame was clipped by the *canvas* and every containment hash still
+matched.
+
+`padded` was one boolean over two independent facts. The design margin is a scene's choice;
+the camera allowance is arithmetic, and declining it was only ever a way to be wrong. It is
+therefore no longer declinable: the prop is now `gridMargin`, it buys the grid margin and
+nothing else, and `SlotFrame` applies the allowance unconditionally. The interface got
+smaller rather than larger — no second boolean, no opt-in wrapper. Should a scene ever
+genuinely need to bleed, that is a *region* declaring itself, not a whole frame giving up
+its physics; nothing bleeds today, so no such seam was built for one hypothetical caller.
+
+The gate is a third assertion in the same generated suite, in the same relation: two
+examples carrying different copy must also be byte-identical along a 16px band *inside* the
+reserved rectangle. A scene reaching its own edge is being cropped by it, whether or not it
+drew anything illegal. It was falsified before being trusted — red on both `image_context`
+cases, green on both `bar_chart` cases, against the unfixed code.
+
+One corroboration worth keeping: of the three accepted key frames in
+`tests/render/image-context.test.ts`, only two moved. `example-empty-context` renders
+`editorialStatic`, which has no camera, so it had no allowance to be missing — the change
+moves a scene exactly where a camera moves it and nowhere else.
+
+The cost was accepted deliberately: under `pushIn` a half-frame scene now loses 115px per
+side horizontally, so the shot is visibly tighter. That is the trade `CameraRig`'s header
+already committed to — *"the cost of a big push-in is visible as a tighter frame rather than
+as a crop"* — and it had simply never been paid by the one scene that opted out.
