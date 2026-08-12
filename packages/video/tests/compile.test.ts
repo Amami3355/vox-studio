@@ -348,6 +348,37 @@ describe('compile', () => {
     expect(collisions(result.document)).toEqual([]);
   });
 
+  /**
+   * A scene's duration does not exist until milliseconds are frames, so this is the first
+   * gate the plan alone could never answer — and the reason it stayed open long enough for
+   * the fixtures to sit under it.
+   */
+  it('refuses a scene too short for the animation its capability is built around', () => {
+    const hurried: TimedBeat[] = [
+      { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 1000 },
+      { id: 'b2', text: 'London is the extreme case.', fromMs: 1000, toMs: 6000 },
+    ];
+
+    const result = compile({ plan: continuityPlan, beats: hurried });
+
+    expect(result.ok).toBe(false);
+    expect(result.document).toBeNull();
+    // 1000ms is 30 frames, where `bar_chart` declares a minimum of 90.
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'BELOW_MIN_DURATION', sceneId: 'chart' }),
+    );
+  });
+
+  it('warns about a scene that plays, but plays hurried', () => {
+    const result = compile({ plan: continuityPlan, beats: timedBeats });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    // 90 frames clears `bar_chart`'s minimum of 90 and misses its recommended 210.
+    expect(result.report.warnings).toContainEqual(
+      expect.objectContaining({ code: 'SCENE_BELOW_RECOMMENDED_DURATION', sceneId: 'chart' }),
+    );
+  });
+
   it('refuses a plan whose beats were never spoken', () => {
     const result = compile({ plan: onePlan, beats: [timedBeats[0] as TimedBeat] });
 

@@ -17,9 +17,10 @@ import type { TimedBeat } from '../src/core/types';
 const NARRATOR_URI =
   'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22150%22%20r=%22140%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E';
 
+/** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
 const beats: TimedBeat[] = [
-  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 2000 },
-  { id: 'b2', text: 'London is the extreme case.', fromMs: 2000, toMs: 5000 },
+  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
+  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000 },
 ];
 
 const plan: VideoPlan = {

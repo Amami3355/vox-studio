@@ -12,7 +12,9 @@ import { type FrameBeat, resolveEventTimings } from '../core/anchors';
 import {
   type CompileReport,
   type CompilerError,
+  type CompilerWarning,
   NO_SAFE_AREA,
+  type SceneCapability,
   type TimedBeat,
 } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
@@ -63,6 +65,13 @@ export const compile = ({
   const windowOf = (spansBeats: string[]) => spanWindow(spansBeats, frameBeats);
 
   const warnings = [...report.warnings];
+  /**
+   * Collected while the sections are built and gated once at the end, rather than thrown
+   * at the first breach: §8.1's messages are fed back to an agent for a repair pass, and a
+   * pass that fixes one scene only to be told about the next is a loop where a single
+   * report would have done.
+   */
+  const errors: CompilerError[] = [];
 
   const sections: CompiledSection[] = plan.sections.map((section) => {
     const bounds = windowOf(section.spansBeats);
@@ -71,6 +80,7 @@ export const compile = ({
       const sceneBounds = windowOf(scene.spansBeats);
 
       const capability = requireCapability(scene.component);
+      checkDuration(capability, scene.id, section.id, sceneBounds, errors, warnings);
 
       return {
         id: scene.id,
@@ -113,6 +123,10 @@ export const compile = ({
     };
   });
 
+  if (errors.length > 0) {
+    return { ok: false, document: null, report: { ...report, ok: false, errors, warnings } };
+  }
+
   return {
     ok: true,
     document: {
@@ -123,6 +137,55 @@ export const compile = ({
     },
     report: { ...report, warnings },
   };
+};
+
+/**
+ * Rule 5's two regimes over one number.
+ *
+ * `minDurationFrames` is a hard floor: under it the scene cannot play the animation its
+ * capability is built around, so §8.1 makes it an error and asks for a merge.
+ * `recommendedDurationFrames` is a soft one — the scene plays, it just plays hurried.
+ *
+ * This is the first check in the system a plan alone could not answer, which is why it
+ * lives here rather than in `validateVideoPlan`: a scene has no duration until the
+ * milliseconds someone actually spoke have become frames. Nothing above this line knows
+ * how long anything is.
+ */
+const checkDuration = (
+  capability: SceneCapability,
+  sceneId: string,
+  sectionId: string,
+  bounds: { from: number; to: number },
+  errors: CompilerError[],
+  warnings: CompilerWarning[],
+): void => {
+  const frames = bounds.to - bounds.from;
+  const { minDurationFrames, recommendedDurationFrames, id } = capability.meta;
+
+  if (frames < minDurationFrames) {
+    errors.push({
+      code: 'BELOW_MIN_DURATION',
+      sceneId,
+      sectionId,
+      field: 'spansBeats',
+      message: `Scene "${sceneId}" plays for ${frames} frames, under the ${minDurationFrames} "${id}" needs to complete its animation. Give it another beat, or merge it with the scene beside it.`,
+    });
+    return;
+  }
+
+  if (frames < recommendedDurationFrames) {
+    warnings.push({
+      code: 'SCENE_BELOW_RECOMMENDED_DURATION',
+      severity: 'quality',
+      sceneId,
+      sectionId,
+      field: 'spansBeats',
+      message: `Scene "${sceneId}" plays for ${frames} frames, where "${id}" is designed for ${recommendedDurationFrames}.`,
+      suggestion:
+        'It will read as hurried rather than broken. Let it span another beat, or move some ' +
+        'of what it says into the scene next to it.',
+    });
+  }
 };
 
 /**

@@ -32,9 +32,10 @@ import type { TimedBeat } from '../../src/core/types';
 const NARRATOR_URI =
   'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22150%22%20r=%22140%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E';
 
+/** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
 const timedBeats: TimedBeat[] = [
-  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 2000 },
-  { id: 'b2', text: 'London is the extreme case.', fromMs: 2000, toMs: 5000 },
+  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
+  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000 },
 ];
 
 const scenes = [
@@ -147,16 +148,16 @@ describe('the Section runtime', () => {
   it('plays a compiled document as one video, section and scene windows included', async () => {
     const document = documentFor(true);
 
-    // 5000ms of speech at 30fps, with the cut where b2 begins.
-    expect(document.durationInFrames).toBe(150);
+    // 8000ms of speech at 30fps, with the cut where b2 begins.
+    expect(document.durationInFrames).toBe(240);
     expect(document.sections[0]?.scenes.map((scene) => [scene.from, scene.to])).toEqual([
-      [0, 60],
-      [60, 150],
+      [0, 90],
+      [90, 240],
     ]);
 
     const [chartFrame, contextFrame] = await Promise.all([
       renderHash(document, 30),
-      renderHash(document, 90),
+      renderHash(document, 150),
     ]);
 
     expect(chartFrame).not.toBe(contextFrame);
@@ -173,8 +174,8 @@ describe('the Section runtime', () => {
 
   it('hides it over the scene that occupies the whole frame, changing nothing else', async () => {
     const [withNarrator, without] = await Promise.all([
-      renderHash(documentFor(true), 90),
-      renderHash(documentFor(false), 90),
+      renderHash(documentFor(true), 150),
+      renderHash(documentFor(false), 150),
     ]);
 
     expect(withNarrator).toBe(without);
