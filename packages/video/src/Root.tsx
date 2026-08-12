@@ -19,6 +19,8 @@ const EMPTY_DOCUMENT: CompiledDocument = {
   durationInFrames: 1,
   beats: [],
   sections: [],
+  /** No take, so nothing to play. Silence is the honest empty document. */
+  audio: {},
 };
 
 /**

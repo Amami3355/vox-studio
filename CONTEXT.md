@@ -113,6 +113,7 @@ which is what makes a video's composition assertable without rendering it. Avoid
 ## Layout of the repo
 
 ```
+packages/voice/           TTS: a recorded take → TimedBeat[]. Pure fold, impure shell
 packages/video/           the scene library — everything Remotion renders
   src/assets/             minimal Asset Resolver: identity cache, repository library, placeholder
   src/design/             L0 tokens: theme, motion profiles, fonts
@@ -125,10 +126,15 @@ apps/component-studio/    internal evaluation harness (grid, filmstrip, matrix)
 services/agents/          reserved for the Python ADK orchestration; not initialised
 ```
 
+**Take** — One recording of a plan's script: its `TimedBeat[]`, its audio, and the
+character alignment both were derived from. Synthesis is **not** reproducible, so a take is
+recorded deliberately and committed, and its three artifacts are one thing — swap any of
+them alone and the video is cut against words the audio does not say. See ADR-0004's last
+amendment. Avoid: "the voice-over" for the timings, or "regenerate" for what produces one.
+
 ## Not yet built
 
-`packages/voice` and its TTS timepoints — beat timings come from a fixture, and the
-compiler has never met a real one. Also: the Asset Resolver beyond identity
-cache/local library/placeholder, the remaining capabilities, the agents, and the product
-Studio UI. See the build order in `vox-studio-architecture-figee.md` §13, ADR-0002 for
-the time pipeline and ADR-0003 for slot conflicts.
+The Asset Resolver beyond identity cache/local library/placeholder, the remaining
+capabilities, the agents, and the product Studio UI. See the build order in
+`vox-studio-architecture-figee.md` §13, ADR-0002 for the time pipeline, ADR-0003 for slot
+conflicts and ADR-0004 for the voice.

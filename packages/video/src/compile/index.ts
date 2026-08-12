@@ -23,11 +23,21 @@ import {
 import type { MotionProfileId } from '../design/motion';
 import { FPS } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
-import type { CompiledDocument, CompiledScene, CompiledSection } from './document';
+import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { resolvePersistentLayer, safeAreaFor } from './persistent';
 import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
-export type { CompiledDocument, CompiledScene, CompiledSection } from './document';
+export type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
+
+/**
+ * The gate a take has to pass, published because `packages/voice` is what produces one.
+ *
+ * ADR-0004 decision 7 put a hand-folded take through this function to find out whether the
+ * contract survived real output. That check is now a standing test in the package that
+ * does the folding, and it needs the real thing: a second implementation of contiguity
+ * living in the producer is the drift this repository keeps refusing to build.
+ */
+export { checkTimings } from './timings';
 
 /**
  * The slot table, published from the compiler rather than from `core` on purpose.
@@ -52,6 +62,12 @@ export type CompileInput = {
    */
   resolver?: AssetResolver;
   fps?: number;
+  /**
+   * The take's audio, carried through rather than derived. The compiler never calls TTS
+   * and equally never guesses a filename: whoever recorded the beats knows what the audio
+   * is called, and nobody else does.
+   */
+  audio?: CompiledAudio;
 };
 
 /**
@@ -67,6 +83,7 @@ export const compile = ({
   beats,
   resolver = createAssetResolver({ library: repositoryAssetLibrary }),
   fps = FPS,
+  audio = {},
 }: CompileInput): CompileResult => {
   const report = validateVideoPlan(plan);
   if (!report.ok) return { ok: false, document: null, report };
@@ -169,6 +186,7 @@ export const compile = ({
       durationInFrames: frameBeats.at(-1)?.to ?? 0,
       beats: frameBeats,
       sections,
+      audio,
     },
     report: { ...report, warnings },
   };

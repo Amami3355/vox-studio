@@ -98,6 +98,19 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/voice:
+    dependencies:
+      '@vox/video':
+        specifier: workspace:*
+        version: link:../video
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.12
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
 packages:
 
   '@babel/code-frame@7.29.7':

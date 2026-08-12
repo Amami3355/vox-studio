@@ -9,6 +9,8 @@
  * test can hold those — but three of them are facts about the compiled document, and those
  * are asserted here. The ones that need eyes are named in the ADR and left to eyes.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { slotRect } from '../src/core/slots';
 import { NO_SAFE_AREA } from '../src/core/types';
@@ -70,17 +72,30 @@ describe('the vertical slice', () => {
   const { document, report } = compileShippedPlan(slice);
 
   /**
-   * The two the slice actually carries, named rather than counted.
+   * The four the slice actually carries, named rather than counted.
    *
-   * Both are the compiler doing its job — the narrator contends with each `image_context`
-   * scene in turn and both scenes yield — so `info` is the right severity and the slice is
-   * not broken. It is still something a person watching the section should be told, and it
-   * is the only reason this assertion exists: the day one of these becomes
-   * `PERSISTENT_ELEMENT_HIDDEN` at `important`, a character has silently stopped appearing
-   * and this test is what says so.
+   * The relocations are the compiler doing its job — the narrator contends with each
+   * `image_context` scene in turn and both scenes yield — so `info` is the right severity
+   * and the slice is not broken. The day one of them becomes `PERSISTENT_ELEMENT_HIDDEN`
+   * at `important`, a character has silently stopped appearing and this test is what says
+   * so.
+   *
+   * **The two hurried scenes arrived with the real voice-over, and they are the finding.**
+   * The hand-written timings gave b1 six seconds and b4 six and a half, which is exactly
+   * `image_context`'s recommended 180 frames — so the fixture had been quietly handing
+   * both scenes the duration the capability asks for. Read aloud, those sentences take
+   * 4.64s and 5.12s, and both scenes now play under it. That is §12's whole argument for
+   * an imperative real take: invented round-second boundaries flatter the plan, and
+   * nothing in the system could see it until something actually spoke the words.
+   *
+   * Recorded rather than repaired. `quality` means it reads hurried, not broken, and the
+   * two available fixes — write longer beats, or lower the recommendation — are editorial
+   * judgements this test has no business making on its own.
    */
-  it('reports the two relocations it was compiled with, and nothing louder', () => {
+  it('reports the two relocations and the two hurried scenes, and nothing louder', () => {
     expect(report.warnings.map((warning) => [warning.code, warning.severity])).toEqual([
+      ['SCENE_BELOW_RECOMMENDED_DURATION', 'quality'],
+      ['SCENE_BELOW_RECOMMENDED_DURATION', 'quality'],
       ['SLOT_RELOCATED', 'info'],
       ['SLOT_RELOCATED', 'info'],
     ]);
@@ -94,16 +109,55 @@ describe('the vertical slice', () => {
   });
 
   /**
+   * §12's imperative constraint, as a fact about the document rather than about the audio.
+   *
+   * The file check is the one that earns its keep. `staticFile` on a name that is not in
+   * `public/` does not throw and does not fail a render — it produces a video that plays
+   * in silence, and the compiled frames are identical either way, so no still, no hash and
+   * no visual gate can see it. This is the only place it can be caught cheaply.
+   */
+  it('names a voice-over that is actually on disk', () => {
+    const voiceover = document.audio.voiceover;
+    expect(voiceover).toBeDefined();
+    expect(existsSync(join(import.meta.dirname, '..', 'public', voiceover as string))).toBe(true);
+  });
+
+  /**
+   * The take and the timings are one artifact, checked from the video side.
+   *
+   * `packages/voice` asserts that the shipped beats are the fold of the alignment it
+   * recorded; this asserts the plan compiled from *those* beats rather than from anything
+   * else that happens to be lying around. Between them a beats file and an mp3 from two
+   * different takes cannot both pass.
+   */
+  it('compiles the recorded beats, not some other take of the same words', () => {
+    expect(document.beats.map((beat) => beat.id)).toEqual(slice.beats.map((beat) => beat.id));
+    expect(document.beats.at(-1)?.to).toBe(
+      Math.round(((slice.beats.at(-1)?.toMs as number) * document.fps) / 1000),
+    );
+  });
+
+  /**
    * §12: *"le personnage persistant survit aux changements de scène sans collision ni
    * saut"*. Two states rather than three is the "sans saut" half — the narrator crosses
    * the cut between `chart` and `closing` without the runtime remounting it.
    */
   it('carries the narrator across the scene changes as two placements, not five', () => {
     const states = document.sections[0]?.layoutStates ?? [];
+    const startOf = (beatId: string) => document.beats.find((beat) => beat.id === beatId)?.from;
 
+    /**
+     * Derived from the beat table rather than written as frame numbers, because the take
+     * is a recording and re-recording it moves every boundary. What the assertion is
+     * actually about survives that: the narrator's two placements are declared at
+     * `b2.start` and `b4.start`, and the second runs to the end of the section — two
+     * states rather than five, which is §12's *"sans saut"*. Hardcoded frames would fail
+     * on the next recording for a reason that has nothing to do with what is being
+     * checked.
+     */
     expect(states.map((state) => [state.elementId, state.from, state.to])).toEqual([
-      ['narrator', 180, 525],
-      ['narrator', 525, 720],
+      ['narrator', startOf('b2'), startOf('b4')],
+      ['narrator', startOf('b4'), document.durationInFrames],
     ]);
   });
 

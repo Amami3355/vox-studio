@@ -11,7 +11,7 @@
  * `useVideoConfig().durationInFrames` reports the scene's length rather than the video's.
  */
 import type React from 'react';
-import { AbsoluteFill, Img, Sequence } from 'remotion';
+import { AbsoluteFill, Audio, Img, Sequence, staticFile } from 'remotion';
 import type { CompiledDocument, CompiledSection, LayoutState } from '../compile/document';
 import { type Theme, defaultTheme } from '../design/theme';
 import { SceneRenderer } from './SceneRenderer';
@@ -21,6 +21,17 @@ export const CompiledVideo: React.FC<{
   theme?: Theme;
 }> = ({ document, theme = defaultTheme }) => (
   <AbsoluteFill style={{ backgroundColor: theme.color.bg }}>
+    {/*
+     * Outside every section and never inside one: the voice-over is what the sections were
+     * cut against, so it owns the whole timeline and starts at frame 0. A section-scoped
+     * `<Audio>` would restart it at each section boundary, which is the one mistake in
+     * this file that would still look plausible in the studio's timeline.
+     *
+     * No `trimBefore`, no offset, no rate. Every frame in this document was derived from
+     * this recording's own character timings, so the only correct alignment is none.
+     */}
+    {document.audio.voiceover ? <Audio src={staticFile(document.audio.voiceover)} /> : null}
+
     {document.sections.map((section) => (
       <Sequence
         key={section.id}

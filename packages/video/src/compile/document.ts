@@ -86,9 +86,23 @@ export type CompiledSection = {
   layoutStates: LayoutState[];
 };
 
+/**
+ * §10's `audio` block. Names of files in Remotion's `public/`, resolved by the runtime
+ * through `staticFile` — the frozen document writes them `asset://vo.mp3` for the same
+ * reason: the document says *which* audio, never where the bytes live on this machine.
+ *
+ * The voice-over is a **recording**, not something a build step can reproduce. Two
+ * identical synthesis requests return different audio and different boundaries, so the mp3
+ * named here and the `TimedBeat[]` the document was compiled from are one artifact. Swap
+ * either alone and every scene is cut against words the audio does not say, at no point
+ * failing anything.
+ */
+export type CompiledAudio = { voiceover?: string; music?: string };
+
 export type CompiledDocument = {
   fps: number;
   durationInFrames: number;
   beats: FrameBeat[];
   sections: CompiledSection[];
+  audio: CompiledAudio;
 };

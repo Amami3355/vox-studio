@@ -226,3 +226,57 @@ becomes a ceiling on narration length: roughly 5 000 characters under `eleven_v3
 under `eleven_multilingual_v2`. Nothing near the 30-second slice, and a real constraint on
 the product. Whether long videos are synthesised per section, with each section's alignment
 independent, is a question for whoever first needs one.
+
+**2026-08-13 — decision 7 reporting back a second time: synthesis is not reproducible, and
+that decides how this package is built.** The amendment above measured whether the
+*contract* survived real output. It never asked whether two calls agree, and every plan
+made since has quietly assumed they do.
+
+They do not. The four beats of the shipped slice went out as one 304-character script,
+twice, same model, same voice, no seed:
+
+| | first differing character | worst beat boundary | audio |
+|---|---|---|---|
+| no seed | index 1, 53ms vs 67ms | **213ms** (6.4 frames at 30fps) | different bytes, different length |
+| `seed: 7` | none | 0ms | different bytes, same length |
+| `seed: 42` | index 174, mid-script | 80ms, at the tail | different bytes, different length |
+
+So a seed pins the synthesiser much closer and **not** all the way. The seeded pairs are the
+more useful measurement, because they show the failure is not a coarse one to be rounded
+away: under a fixed seed the arrays still diverge in the middle of the script and
+re-converge, and the seed-42 pair agreed on every internal boundary only because the beat
+offsets happened to fall outside the region that moved. Nothing guarantees the next script
+is so lucky. The times are on a 1ms grid, so there is no quantum to snap to either; 80ms
+recurs in this data as a coincidence, not as a unit.
+
+**What follows is the whole design of `packages/voice`.** A take is something you
+**record**, deliberately, and commit — not something a build step regenerates. Three
+artifacts come out of *one* response and only mean anything together: the `TimedBeat[]` the
+compiler reads, the mp3 those timings describe, and the alignment the fold is tested
+against. `scripts/record-take.mts` writes all three in one pass for exactly that reason;
+assembled from two takes they would look perfectly well-formed and cut every picture
+against words the audio does not say, failing nothing anywhere.
+
+It also fixes where the testable seam goes. Nothing in the suite calls the API: a test that
+did could assert almost nothing, would spend quota on every run, and would need the
+credential this ADR's consequences promise no contributor needs. `foldAlignment` is a pure
+function of a recording and carries every property this package promises; `synthesise` is
+the thin impure shell around it. The fold test asserts that the shipped beats *are* the
+fold of the shipped alignment, so a beats file and an mp3 from different takes cannot both
+pass — the one failure that is otherwise undetectable, since the numbers look correct and
+the frames are identical.
+
+**Open question 1 is now cheap and worth taking.** Character timings give word onsets for
+free, as this document predicted, and the first thing that fell out of having them was a
+defect in the shipped plan that no test could previously see: `highlightBar` on London
+fires at frame 310, which is the exact frame the narrator begins the word **"Berlin"**, and
+`revealAll` lands 2.2 seconds after "London" was spoken. That is §12's *"les événements
+tombent sur les mots attendus"* failing, and it is the class of bug §12 named when it made
+a real take an imperative constraint. Whether the repair is arithmetic snapping, a different
+anchor, or an editorial rewrite of the beats is not decided here.
+
+**A recording ages against its plan.** `checkTimings` already refuses a take whose beat text
+no longer matches the plan, which is the protection that matters, and it is now the *only*
+one: edit a word and the correct response is to re-record, which moves every boundary in
+the video and not only the edited beat's. That is the true cost of this mechanism and it is
+worth stating plainly. It argues for recording late rather than often.

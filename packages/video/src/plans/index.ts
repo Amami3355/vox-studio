@@ -19,7 +19,7 @@
  * compiler is what decides whether it is a plan.
  */
 import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
-import { type CompiledDocument, compile } from '../compile';
+import { type CompiledAudio, type CompiledDocument, compile } from '../compile';
 import type { CompileReport, CompilerWarning, TimedBeat } from '../core/types';
 import verticalSliceBeats from './vertical-slice.beats.json';
 import verticalSlicePlan from './vertical-slice.plan.json';
@@ -31,16 +31,26 @@ export type ShippedPlan = {
   note: string;
   plan: VideoPlan;
   /**
-   * Hand-written, and **provisional**.
+   * A **recording**, and the plan's audio is the other half of it.
    *
-   * §12 calls a real TTS voice-over an imperative constraint, and it is right: invented
-   * round-second boundaries hide the entire synchronisation bug class — anchors resolving
-   * onto the wrong word, cuts landing mid-sentence, events half a second late. Nothing
-   * here validates §12's criteria. They are plausible durations for the text as written,
-   * so the section can be watched while `packages/voice` does not exist, and they live in
-   * their own file so a real take replaces them wholesale rather than by editing a plan.
+   * These were hand-written until a real take replaced them wholesale, which is what the
+   * separate file was always for. §12 calls a real TTS voice-over an imperative
+   * constraint, and it was right in a way the invented numbers could not show: six round
+   * seconds for b1 happened to be exactly `image_context`'s recommended duration, so the
+   * fixture had been flattering the plan. Spoken, that sentence takes 4.64s, and the
+   * compiler now says the scene is hurried.
+   *
+   * Produced by `packages/voice`'s `record-take` script, never by a build step. Synthesis
+   * is not reproducible — two identical requests return different audio and different
+   * boundaries — so these numbers and `audio.voiceover` are one artifact that must travel
+   * together. `packages/voice`'s fold test asserts exactly that, against the alignment
+   * recorded in the same call.
    */
   beats: TimedBeat[];
+  /**
+   * Names of files in `packages/video/public/`. The recording this plan's beats came from.
+   */
+  audio?: CompiledAudio;
 };
 
 export const shippedPlans: ShippedPlan[] = [
@@ -50,6 +60,8 @@ export const shippedPlans: ShippedPlan[] = [
     note: '§12 — rent across European cities, four beats, one narrator crossing three scenes.',
     plan: verticalSlicePlan as VideoPlan,
     beats: verticalSliceBeats as TimedBeat[],
+    /** Recorded 2026-08-13 with `eleven_v3`, voice `JBFqnCBsd6RMkjVDRZzb`, seed 7. */
+    audio: { voiceover: 'vertical-slice.vo.mp3' },
   },
 ];
 
@@ -72,7 +84,7 @@ export const shippedPlans: ShippedPlan[] = [
 export const compileShippedPlan = (
   shipped: ShippedPlan,
 ): { document: CompiledDocument; report: CompileReport } => {
-  const result = compile({ plan: shipped.plan, beats: shipped.beats });
+  const result = compile({ plan: shipped.plan, beats: shipped.beats, audio: shipped.audio ?? {} });
 
   if (!result.ok) {
     const errors = result.report.errors.map((e) => `${e.code}: ${e.message}`).join('\n  ');
