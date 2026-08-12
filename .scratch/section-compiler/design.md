@@ -68,8 +68,8 @@ One function. Behind it:
 3. Milliseconds to frames — the one conversion ADR-0002 names.
 4. Beat windows folded into scene windows and section windows.
 5. Anchors resolved to frames per scene (`resolveEventTimings`, already built).
-6. Placements resolved to runs, then ADR-0003's ladder run over every (scene, element)
-   pair, producing `layoutStates`, per-scene `safeArea`, and its warnings.
+6. Placements resolved to runs, then ADR-0003's ladder run over every scene and all the
+   elements crossing it, producing `layoutStates`, per-scene `safeArea`, and its warnings.
 7. Asset requirements resolved over the whole plan.
 8. Every warning and error from all of the above folded into one `CompileReport`.
 
@@ -120,20 +120,27 @@ Scene and section windows are **absolute**. The document says which is which per
 ## Module 3 — the conflict ladder (internal seam)
 
 ```ts
-export type ConflictOutcome =
-  | { kind: 'keep' }
-  | { kind: 'recompose'; composition: Slot }   // the scene yields
-  | { kind: 'relocate'; slot: Slot }           // the element moves
+export type ElementOutcome =
+  | { kind: 'keep' }                  // never in the way
+  | { kind: 'sceneYielded' }          // the scene took another composition for this element
+  | { kind: 'relocate'; slot: Slot }  // the element moved
   | { kind: 'hide' };
 
-export const resolveConflict = (
+export const resolveSceneConflicts = (
   scene: { occupies: Slot[]; supportedCompositions: Slot[] },
-  element: { wanted: Slot; declaredElsewhere: Slot[] },
-): ConflictOutcome;
+  elements: { wanted: Slot[]; declaredElsewhere: Slot[] }[],
+): { composition: Slot | null; outcomes: ElementOutcome[] };
 ```
 
 A pure function over **declarations**, not over plans. It never sees a `VideoPlan`, a
-frame, a section or a capability — only the four facts ADR-0003's ladder actually reads.
+frame, a section or a capability — only the facts ADR-0003's ladder actually reads.
+
+> **Corrected while building.** The signature was a (scene, element) *pair*, and the
+> implementation followed: one outcome per pair, with only `hide` promoted scene-wide. A
+> scene has one composition, so a pair-wise rule can choose `left` for one element and
+> `right` for the next and leave the second standing in the frame it just chose. The unit
+> is the scene and the argument is therefore the whole set of elements crossing it. See
+> ADR-0003's amendment.
 
 This is the module that earns a table test: ten slots against ten slots against a handful
 of composition sets is a table, and a table over this signature is three lines per case.
@@ -208,12 +215,13 @@ conflict resolution, and drift apart on the rounding. It earns its keep.
 Delete `CompiledVideo` and the same `<Sequence>` nesting reappears in three places. It
 earns less, but it earns.
 
-Delete `resolveConflict` as a separate module and ADR-0003's ladder dissolves into
+Delete `resolveSceneConflicts` as a separate module and ADR-0003's ladder dissolves into
 branches inside a loop inside `compile`. The behaviour survives; the test surface does not.
 
 ## Test surface
 
-- `resolveConflict` — a table, at the internal seam. Every branch of the ladder.
+- `resolveSceneConflicts` — a table, at the internal seam. Every branch of the ladder, plus
+  the multi-element and mid-scene-placement cases the pair-wise version could not express.
 - `slots.ts` — geometry invariants: `full` overlaps everything, opposite halves overlap
   nothing, a corner is inside its two halves.
 - `compile` — the external seam. A handful of whole plans in, documents and reports out,
@@ -245,3 +253,5 @@ Recorded so the design and the code do not disagree.
   the plan to draw a character, which is the seam leaking.
 - `MISSING_BEAT_TIMING` was added to `CompilerErrorCode`. A plan beat the voice-over never
   spoke used to be a `NaN` propagating into every window derived from it.
+- The conflict ladder became **scene-wide** rather than pair-wise, and `persistent.ts` now
+  loops over scenes rather than over elements. See the note under Module 3.

@@ -17,7 +17,7 @@ import {
   type Slot,
 } from '../core/types';
 import { requireCapability } from '../scenes/registry';
-import { resolveConflict } from './conflict';
+import { type ElementOutcome, resolveSceneConflicts } from './conflict';
 import type { CompiledScene, LayoutState } from './document';
 
 type Window = { from: number; to: number };
@@ -34,40 +34,55 @@ export const resolvePersistentLayer = (
   frameBeats: FrameBeat[],
   bounds: Window,
 ): PersistentLayer => {
+  const elements = section.persistent ?? [];
+  const runsOf = new Map(
+    elements.map((element) => [element.id, placementRuns(element, frameBeats, bounds)]),
+  );
+
   const layoutStates: LayoutState[] = [];
   const safeAreaOf = new Map<string, SafeArea>();
   const warnings: CompilerWarning[] = [];
 
-  for (const element of section.persistent ?? []) {
-    const runs = placementRuns(element, frameBeats, bounds);
-    const declared = [...new Set(runs.map((run) => run.slot))];
+  /**
+   * ADR-0003 decision 2: the scene is the unit, for every element at once. The loop is
+   * over scenes rather than over elements because one scene has one composition, and a
+   * composition chosen for one element that another element still sits in is the overlap
+   * this rule exists to prevent.
+   */
+  for (const scene of scenes) {
+    const crossing = elements
+      .map((element) => ({
+        element,
+        segments: (runsOf.get(element.id) ?? [])
+          .map((run) => ({ slot: run.slot, ...intersect(run, scene) }))
+          .filter((segment) => segment.to > segment.from),
+      }))
+      .filter((entry) => entry.segments.length > 0);
 
-    for (const scene of scenes) {
-      const overlapping = runs
-        .map((run) => ({ slot: run.slot, ...intersect(run, scene) }))
-        .filter((segment) => segment.to > segment.from);
+    if (crossing.length === 0) continue;
 
-      if (overlapping.length === 0) continue;
+    const { meta } = requireCapability(scene.capabilityId);
+    const resolution = resolveSceneConflicts(
+      { occupies: meta.occupiesRegions, supportedCompositions: meta.supportedCompositions },
+      crossing.map(({ element, segments }) => {
+        const here = distinct(segments.map((segment) => segment.slot));
+        return {
+          wanted: here,
+          declaredElsewhere: distinct((runsOf.get(element.id) ?? []).map((run) => run.slot)).filter(
+            (slot) => !here.includes(slot),
+          ),
+        };
+      }),
+    );
 
-      const capability = requireCapability(scene.capabilityId);
-      const occupation = {
-        occupies: capability.meta.occupiesRegions,
-        supportedCompositions: capability.meta.supportedCompositions,
-      };
+    if (resolution.composition !== null) {
+      safeAreaOf.set(scene.id, slotRect(resolution.composition));
+    }
 
-      /**
-       * ADR-0003 decision 2: the scene is the unit. Every segment of this element inside
-       * this scene is resolved together and the worst outcome wins, because an element
-       * that appears and disappears mid-scene reads as a bug rather than as a resolution.
-       */
-      const outcomes = overlapping.map((segment) =>
-        resolveConflict(occupation, {
-          wanted: segment.slot,
-          declaredElsewhere: declared.filter((slot) => slot !== segment.slot),
-        }),
-      );
+    for (const [index, { element, segments }] of crossing.entries()) {
+      const outcome = resolution.outcomes[index] as ElementOutcome;
 
-      if (outcomes.some((outcome) => outcome.kind === 'hide')) {
+      if (outcome.kind === 'hide') {
         warnings.push({
           code: 'PERSISTENT_ELEMENT_HIDDEN',
           severity: 'important',
@@ -81,34 +96,39 @@ export const resolvePersistentLayer = (
         continue;
       }
 
-      const recomposed = outcomes.find((outcome) => outcome.kind === 'recompose');
-      if (recomposed?.kind === 'recompose') {
-        safeAreaOf.set(scene.id, slotRect(recomposed.composition));
+      if (outcome.kind === 'sceneYielded') {
         warnings.push(
-          relocation(section, scene, element, `the scene yields into "${recomposed.composition}"`),
+          relocation(
+            section,
+            scene,
+            element,
+            `the scene yields into "${resolution.composition as Slot}"`,
+          ),
         );
       }
 
-      for (const [index, segment] of overlapping.entries()) {
-        const outcome = outcomes[index];
-        const slot = outcome?.kind === 'relocate' ? outcome.slot : segment.slot;
+      if (outcome.kind === 'relocate') {
+        warnings.push(
+          relocation(
+            section,
+            scene,
+            element,
+            `the element moves to "${outcome.slot}", which it also uses in this section`,
+          ),
+        );
+      }
 
-        if (outcome?.kind === 'relocate') {
-          warnings.push(
-            relocation(
-              section,
-              scene,
-              element,
-              `the element moves to "${slot}", which it also uses in this section`,
-            ),
-          );
-        }
-
+      /**
+       * A relocated element takes one slot for the scene's whole duration, so its segments
+       * inside this scene collapse onto it; anything else kept the slots it was authored
+       * into, including a move the author asked for mid-scene.
+       */
+      for (const segment of segments) {
         layoutStates.push({
           elementId: element.id,
           from: segment.from,
           to: segment.to,
-          rect: slotRect(slot),
+          rect: slotRect(outcome.kind === 'relocate' ? outcome.slot : segment.slot),
         });
       }
     }
@@ -167,15 +187,23 @@ const intersect = (a: Window, b: Window): Window => ({
   to: Math.min(a.to, b.to),
 });
 
+const distinct = <T>(values: T[]): T[] => [...new Set(values)];
+
 /**
  * Adjacent states of one element in one place become a single state.
  *
  * Without this a character crossing two scenes is two entries, the runtime remounts it at
  * the boundary, and any entrance animation restarts in the middle of a section — the
  * "character that jumps" arriving through the back door.
+ *
+ * Grouped by element before being ordered by time, because two elements sorted by time
+ * alone interleave, and interleaved states are never adjacent to their own predecessor:
+ * the merge would silently stop happening the moment a section held a second element.
  */
 const merge = (states: LayoutState[]): LayoutState[] => {
-  const sorted = [...states].sort((a, b) => a.from - b.from);
+  const sorted = [...states].sort(
+    (a, b) => a.elementId.localeCompare(b.elementId) || a.from - b.from,
+  );
   const merged: LayoutState[] = [];
 
   for (const state of sorted) {
