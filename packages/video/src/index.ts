@@ -9,4 +9,5 @@ export * from './assets';
 export { barChartCapability } from './scenes/BarChartScene';
 export { imageContextCapability } from './scenes/ImageContextScene';
 export * from './compile';
+export * from './plans';
 export * from './runtime/CompiledVideo';

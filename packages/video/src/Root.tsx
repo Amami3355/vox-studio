@@ -3,6 +3,7 @@ import { Composition } from 'remotion';
 import './design/fonts';
 import type { CompiledDocument } from './compile/document';
 import { FPS, HEIGHT, WIDTH } from './design/theme';
+import { compileShippedPlan, shippedPlans } from './plans';
 import { CompiledVideo } from './runtime/CompiledVideo';
 import { ExampleScene, compositionIdFor } from './runtime/ExampleScene';
 import { registry } from './scenes/registry';
@@ -29,9 +30,40 @@ const EMPTY_DOCUMENT: CompiledDocument = {
 export const RemotionRoot: React.FC = () => (
   <>
     {/*
-     * One composition for a whole compiled plan, sized from the document it is given.
-     * This is where a section is actually watched — the examples above each play a single
-     * scene, and §9.3's real problems only appear in sequence.
+     * One composition per shipped plan, compiled at load.
+     *
+     * This is where a section is actually watched. `compiled-document` below can play any
+     * plan, but only if somebody hands it one as input props — which meant that in
+     * practice nobody watched a section at all, and §9.3's real problems (brutal
+     * transitions, a character that jumps, rhythmic uniformity) are the ones that appear
+     * only in sequence. A registered composition is the difference between a capability
+     * the tooling *has* and a thing a human does.
+     *
+     * Compiled here rather than committed as a document: the plan is the artifact and the
+     * document is derived, so editing the JSON changes the video on the next reload with
+     * nothing to regenerate. A plan that stops compiling throws on open, and
+     * `tests/plans.test.ts` is what makes that a red test first.
+     */}
+    {shippedPlans.map((shipped) => {
+      const document = compileShippedPlan(shipped);
+      return (
+        <Composition
+          key={`section--${shipped.id}`}
+          id={`section--${shipped.id}`}
+          component={CompiledVideo}
+          durationInFrames={document.durationInFrames}
+          fps={document.fps}
+          width={WIDTH}
+          height={HEIGHT}
+          defaultProps={{ document }}
+        />
+      );
+    })}
+
+    {/*
+     * The generic one, kept: it is the composition `renderMedia` targets for a plan that
+     * was compiled somewhere else, and it has to exist before anything has been compiled
+     * at all.
      */}
     <Composition
       id="compiled-document"

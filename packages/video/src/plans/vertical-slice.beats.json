@@ -1,0 +1,26 @@
+[
+  {
+    "id": "b1",
+    "text": "Across Europe's biggest cities, rent has climbed every year for a decade.",
+    "fromMs": 0,
+    "toMs": 6000
+  },
+  {
+    "id": "b2",
+    "text": "In London, a median income now loses almost half of itself to rent alone.",
+    "fromMs": 6000,
+    "toMs": 11500
+  },
+  {
+    "id": "b3",
+    "text": "Berlin sits twenty points lower, and the distance between them keeps growing.",
+    "fromMs": 11500,
+    "toMs": 17500
+  },
+  {
+    "id": "b4",
+    "text": "The squeeze is quietly deciding who can still afford to live in a city at all.",
+    "fromMs": 17500,
+    "toMs": 24000
+  }
+]
