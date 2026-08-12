@@ -11,6 +11,7 @@ import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
 import { resolveEventTimings } from '../core/anchors';
 import { ASSET_REQUIREMENT_FIELD } from '../core/assets';
 import {
+  type AssetRef,
   type CompileReport,
   type CompilerError,
   type CompilerWarning,
@@ -133,9 +134,26 @@ export const compile = ({
       id: section.id,
       ...bounds,
       scenes,
-      persistent: (section.persistent ?? []).map(({ id, element, asset }) =>
-        asset === undefined ? { id, element } : { id, element, asset },
-      ),
+      /**
+       * Resolved through the *same* resolver the scenes used, so its identity cache is
+       * shared. That is the whole reason ADR-0005 sends elements through the resolver
+       * rather than validating the reference they used to carry: an element and a scene
+       * declaring the same `identityKey` are declaring they show the same thing, and two
+       * resolvers would let them disagree.
+       */
+      persistent: (section.persistent ?? []).map(({ id, element, assetRequirement }) => {
+        if (assetRequirement === undefined) return { id, element };
+
+        const asset = resolver.resolve(assetRequirement);
+        reportDegradedAsset(asset, {
+          subject: `"${id}"`,
+          sectionId: section.id,
+          field: `persistent[${id}].${ASSET_REQUIREMENT_FIELD}`,
+          warnings,
+        });
+
+        return { id, element, asset };
+      }),
       layoutStates: layer.layoutStates,
     };
   });
@@ -175,20 +193,48 @@ const reportDegradedAssets = (
   sceneId: string,
   sectionId: string,
   warnings: CompilerWarning[],
-): void => {
-  const ref = assets[ASSET_REQUIREMENT_FIELD];
-  if (ref === undefined || ref.status === 'ready') return;
+): void =>
+  reportDegradedAsset(assets[ASSET_REQUIREMENT_FIELD], {
+    subject: `"${sceneId}"`,
+    sceneId,
+    sectionId,
+    field: `props.${ASSET_REQUIREMENT_FIELD}`,
+    warnings,
+  });
 
-  const field = `props.${ASSET_REQUIREMENT_FIELD}`;
+/**
+ * One `AssetRef`, said out loud — for a scene's plate or a persistent element's figure.
+ *
+ * `sceneId` is omitted for an element rather than filled with the element's id: the field
+ * means what it says, and a warning claiming a scene that does not exist would be worse
+ * than one that names the element in `field` and in the message, which is what this does.
+ */
+const reportDegradedAsset = (
+  ref: AssetRef | undefined,
+  {
+    subject,
+    sceneId,
+    sectionId,
+    field,
+    warnings,
+  }: {
+    subject: string;
+    sceneId?: string;
+    sectionId: string;
+    field: string;
+    warnings: CompilerWarning[];
+  },
+): void => {
+  if (ref === undefined || ref.status === 'ready') return;
 
   if (ref.status === 'placeholder') {
     warnings.push({
       code: 'ASSET_PLACEHOLDER',
       severity: 'quality',
-      sceneId,
+      ...(sceneId ? { sceneId } : {}),
       sectionId,
       field,
-      message: `"${sceneId}" renders a placeholder plate: nothing has resolved requirement ${ref.pendingRequirementId} yet.`,
+      message: `${subject} renders a placeholder plate: nothing has resolved requirement ${ref.pendingRequirementId} yet.`,
       suggestion:
         'Add a matching entry to the local asset library, or run the generation pass that fills the resolver cache before compiling.',
     });
@@ -198,10 +244,10 @@ const reportDegradedAssets = (
   warnings.push({
     code: 'ASSET_PLACEHOLDER',
     severity: 'important',
-    sceneId,
+    ...(sceneId ? { sceneId } : {}),
     sectionId,
     field,
-    message: `"${sceneId}" renders a placeholder plate because requirement ${ref.requirementId} failed to resolve: ${ref.reason}`,
+    message: `${subject} renders a placeholder plate because requirement ${ref.requirementId} failed to resolve: ${ref.reason}`,
     suggestion:
       'Fix or replace the asset this requirement points at. Unlike a pending placeholder, nothing downstream will resolve it later.',
   });

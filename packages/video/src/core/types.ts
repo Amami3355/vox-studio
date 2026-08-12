@@ -176,11 +176,21 @@ export type SceneInstance = {
  */
 export type Placement = { at: string; slot: Slot };
 
-/** Declared on the section, never by scene nesting. */
+/**
+ * Declared on the section, never by scene nesting.
+ *
+ * `assetRequirement`, not `asset`. This field was typed `AssetRef` until ADR-0005, which
+ * meant a plan could hand an element a *location* — and the vertical slice did, with an
+ * inline `data:` URI for its narrator. `core/assets.ts` has said all along that the agent
+ * writes the requirement and may never write the reference; scenes were held to it because
+ * a scene has to go through the resolver to get a picture at all, and elements were not
+ * because they had a channel that let them skip it. Same rule, same resolver, same
+ * identity cache: an element sharing an `identityKey` with a scene now shares its picture.
+ */
 export type PersistentElement = {
   id: string;
   element: 'character' | 'image' | 'label';
-  asset?: AssetRef;
+  assetRequirement?: AssetRequirement;
   placements: Placement[];
 };
 

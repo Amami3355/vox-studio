@@ -14,9 +14,6 @@ import type { VideoPlan } from '../src/catalog/validate';
 import { compile } from '../src/compile';
 import type { TimedBeat } from '../src/core/types';
 
-const NARRATOR_URI =
-  'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22150%22%20r=%22140%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E';
-
 /** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
 const beats: TimedBeat[] = [
   { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
@@ -33,7 +30,15 @@ const plan: VideoPlan = {
         {
           id: 'narrator',
           element: 'character',
-          asset: { status: 'ready', uri: NARRATOR_URI },
+          // Same identity as the shipped slice's narrator, so both draw the one figure
+          // the library holds. ADR-0005: a plan names what it needs, never where it is.
+          assetRequirement: {
+            type: 'character',
+            subject: 'Narrator figure, flat editorial silhouette',
+            treatment: 'illustration',
+            orientation: 'square',
+            identityKey: 'narrator',
+          },
           placements: [{ at: 'b1.start', slot: 'cornerBR' }],
         },
       ],

@@ -16,6 +16,19 @@ import { requireCapability } from '../src/scenes/registry';
 const format = (report: CompileReport) =>
   report.errors.map((error) => `${error.code} ${error.message}`).join(' · ');
 
+/**
+ * What the fixtures' narrator needs, semantically — never where it is. ADR-0005 removed
+ * the `AssetRef` channel a plan used to have, so an element asks for a picture exactly as
+ * a scene does and the repository library answers with the figure it holds.
+ */
+const narratorRequirement = {
+  type: 'character',
+  subject: 'Narrator figure, flat editorial silhouette',
+  treatment: 'illustration',
+  orientation: 'square',
+  identityKey: 'narrator',
+} as const;
+
 const barChartProps = {
   title: 'Share of income spent on rent',
   unit: '%',
@@ -73,7 +86,7 @@ const continuityPlan: VideoPlan = {
         {
           id: 'narrator',
           element: 'character',
-          asset: { status: 'ready', uri: 'asset://test/narrator' },
+          assetRequirement: narratorRequirement,
           placements: [{ at: 'b1.start', slot: 'cornerBR' }],
         },
       ],
@@ -122,7 +135,7 @@ const movingElementPlan = withPersistent([
   {
     id: 'narrator',
     element: 'character',
-    asset: { status: 'ready', uri: 'asset://test/narrator' },
+    assetRequirement: narratorRequirement,
     placements: [
       { at: 'b1.start', slot: 'cornerBR' },
       { at: 'b1.mid', slot: 'cornerBL' },
@@ -136,7 +149,7 @@ const twoElementPlan = withPersistent([
   {
     id: 'narrator',
     element: 'character',
-    asset: { status: 'ready', uri: 'asset://test/narrator' },
+    assetRequirement: narratorRequirement,
     placements: [
       { at: 'b1.start', slot: 'cornerBR' },
       { at: 'b2.start', slot: 'cornerTR' },
@@ -360,17 +373,77 @@ describe('compile', () => {
     expect(result.report.warnings.filter((w) => w.code === 'ASSET_PLACEHOLDER')).toEqual([]);
   });
 
-  it('carries what a persistent element looks like, so the runtime never reads the plan', () => {
+  /**
+   * The document carries a *reference* where the plan carried a *requirement*, which is
+   * ADR-0005's boundary in one assertion: the plan says what the narrator must show, the
+   * resolver says where it is, and the runtime reads only the second. The plan could name
+   * a location until this landed, and nothing checked what it named.
+   */
+  it('resolves what a persistent element looks like, so the runtime never reads the plan', () => {
     const result = compile({ plan: continuityPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
 
-    expect(result.document.sections[0]?.persistent).toEqual([
+    const element = result.document.sections[0]?.persistent[0];
+
+    expect(element?.id).toBe('narrator');
+    expect(element?.asset?.status).toBe('ready');
+    expect(element?.asset?.uri).toMatch(/^data:image\/svg\+xml,/);
+    expect(JSON.stringify(continuityPlan)).not.toContain('data:image');
+  });
+
+  /**
+   * Decision 3 of ADR-0005, which the shared identity cache is what buys: an element and a
+   * scene declaring the same `identityKey` are declaring they show the same thing. Two
+   * resolvers, or a resolver per section, would let them disagree.
+   */
+  it('gives an element and a scene sharing an identity the same picture', () => {
+    const shared = withPersistent([
       {
         id: 'narrator',
         element: 'character',
-        asset: { status: 'ready', uri: 'asset://test/narrator' },
+        assetRequirement: {
+          ...narratorRequirement,
+          type: 'image',
+          subject: 'Dense apartment buildings in a European city at dusk',
+          treatment: 'photo',
+          orientation: 'landscape',
+          identityKey: 'housing-city-context',
+        },
+        placements: [{ at: 'b1.start', slot: 'cornerBR' }],
       },
     ]);
+    const result = compile({ plan: shared, beats: timedBeats });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    const section = result.document.sections[0];
+    const scene = section?.scenes.find((one) => one.id === 'context');
+
+    expect(section?.persistent[0]?.asset?.uri).toBe(scene?.assets.assetRequirement?.uri);
+  });
+
+  /**
+   * The worklist of ADR-0005 decision 4 has to include elements, or a character with no
+   * picture is the one thing the compiler never mentions.
+   */
+  it('puts an unresolved element on the placeholder worklist, naming the element', () => {
+    const unknown = withPersistent([
+      {
+        id: 'narrator',
+        element: 'character',
+        assetRequirement: { ...narratorRequirement, identityKey: 'nobody-has-drawn-this' },
+        placements: [{ at: 'b1.start', slot: 'cornerBR' }],
+      },
+    ]);
+    const result = compile({ plan: unknown, beats: timedBeats });
+
+    expect(
+      result.report.warnings.find((warning) => warning.code === 'ASSET_PLACEHOLDER'),
+    ).toMatchObject({
+      code: 'ASSET_PLACEHOLDER',
+      severity: 'quality',
+      sectionId: 'sec1',
+      field: 'persistent[narrator].assetRequirement',
+    });
   });
 
   /**

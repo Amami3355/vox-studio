@@ -58,6 +58,28 @@ const HOUSING_CITY_AT_DUSK =
   '%3Crect%20x=%22964%22%20y=%22484%22%20width=%22236%22%20height=%22716%22/%3E%3C/g%3E' +
   '%3C/svg%3E';
 
+/**
+ * Editorial stand-in for the narrator: a flat figure badge in the accent, drawn square
+ * because a persistent element is fitted to a slot rect and a corner slot is square.
+ *
+ * It lived inline in `plans/vertical-slice.plan.json` until ADR-0005, which is the whole
+ * point of moving it: a plan that can carry a `data:` URI is a plan that can hand an
+ * element a location, and the boundary in `core/assets.ts` forbids exactly that. Here it
+ * is what it always was — repository-controlled media, addressed by identity.
+ *
+ * Deliberately a stand-in, and it looks like one. §7 of the handoff's gap list is right
+ * that `PersistentElementLayer` fits the asset to the whole slot, so this figure occupies
+ * half the canvas at `left` and reads as absurd. That is a judgement to make against real
+ * character art, which arrives through ADR-0005's loop; the identity key is the contract
+ * and the bytes are not.
+ */
+const NARRATOR_FIGURE =
+  'data:image/svg+xml,' +
+  '%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E' +
+  '%3Ccircle%20cx=%22150%22%20cy=%22105%22%20r=%2252%22%20fill=%22%23FF5A1F%22/%3E' +
+  '%3Cpath%20d=%22M40%20300%20C40%20215%2088%20175%20150%20175%20C212%20175%20260%20215%20260%20300%20Z%22%20fill=%22%23FF5A1F%22/%3E' +
+  '%3C/svg%3E';
+
 const entries: LocalAssetEntry[] = [
   {
     requirement: {
@@ -68,6 +90,16 @@ const entries: LocalAssetEntry[] = [
       identityKey: 'housing-city-context',
     },
     ref: { status: 'ready', uri: HOUSING_CITY_AT_DUSK },
+  },
+  {
+    requirement: {
+      type: 'character',
+      subject: 'Narrator figure, flat editorial silhouette',
+      treatment: 'illustration',
+      orientation: 'square',
+      identityKey: 'narrator',
+    },
+    ref: { status: 'ready', uri: NARRATOR_FIGURE },
   },
 ];
 

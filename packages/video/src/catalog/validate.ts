@@ -5,6 +5,7 @@
  * plus a warning. The two regimes are distinct and never overlap: nothing in this file
  * turns a warning into an error or the reverse.
  */
+import { ASSET_REQUIREMENT_FIELD, assetRequirementSchema } from '../core/assets';
 import {
   ALL_SLOTS,
   type Beat,
@@ -460,11 +461,29 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
 /**
  * Placements are to persistent elements what events are to scenes, so they are held to
  * the same two rules: a real anchor, and a slot that exists.
+ *
+ * And since ADR-0005, an element's `assetRequirement` is held to the same schema a scene's
+ * is. Nothing here checked the asset field at all before — it was typed `AssetRef`, so a
+ * plan could hand an element an arbitrary `data:` URI and the validator would not look.
+ * Removing the channel is what fixed that; parsing what replaced it is what stops the next
+ * plan from putting something else through.
  */
 const checkPlacements = (section: VideoPlanSection, scope: string[]): CompilerError[] => {
   const errors: CompilerError[] = [];
 
   for (const element of section.persistent ?? []) {
+    if (element.assetRequirement !== undefined) {
+      const parsed = assetRequirementSchema.safeParse(element.assetRequirement);
+      for (const issue of parsed.success ? [] : parsed.error.issues) {
+        errors.push({
+          code: 'INVALID_PROPS',
+          sectionId: section.id,
+          field: `persistent[${element.id}].${ASSET_REQUIREMENT_FIELD}${issue.path.length > 0 ? `.${issue.path.join('.')}` : ''}`,
+          message: issue.message,
+        });
+      }
+    }
+
     // Guarded like every other required field reached from a plan: TypeScript makes an
     // absent list unrepresentable, a JSON plan from an agent does not, and a TypeError
     // here would replace the whole CompileReport with a crash.

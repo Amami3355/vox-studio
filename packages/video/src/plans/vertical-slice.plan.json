@@ -25,9 +25,12 @@
         {
           "id": "narrator",
           "element": "character",
-          "asset": {
-            "status": "ready",
-            "uri": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22105%22%20r=%2252%22%20fill=%22%23FF5A1F%22/%3E%3Cpath%20d=%22M40%20300%20C40%20215%2088%20175%20150%20175%20C212%20175%20260%20215%20260%20300%20Z%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E"
+          "assetRequirement": {
+            "type": "character",
+            "subject": "Narrator figure, flat editorial silhouette",
+            "treatment": "illustration",
+            "orientation": "square",
+            "identityKey": "narrator"
           },
           "placements": [
             { "at": "b2.start", "slot": "cornerBR" },

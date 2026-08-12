@@ -35,8 +35,18 @@ import { compile } from '../../src/compile';
 import type { CompiledDocument } from '../../src/compile/document';
 import type { Slot, TimedBeat } from '../../src/core/types';
 
-const NARRATOR_URI =
-  'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22300%22%20height=%22300%22%3E%3Ccircle%20cx=%22150%22%20cy=%22150%22%20r=%22140%22%20fill=%22%23FF5A1F%22/%3E%3C/svg%3E';
+/**
+ * The narrator's picture is no longer written here, because a plan cannot write one:
+ * ADR-0005 removed the `AssetRef` channel and an element now asks for what it needs. The
+ * figure comes from `assets/library.ts` through the resolver, like every other asset.
+ */
+const NARRATOR_REQUIREMENT = {
+  type: 'character' as const,
+  subject: 'Narrator figure, flat editorial silhouette',
+  treatment: 'illustration' as const,
+  orientation: 'square' as const,
+  identityKey: 'narrator',
+};
 
 /** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
 const timedBeats: TimedBeat[] = [
@@ -92,7 +102,7 @@ const planWith = (slot: Slot | null): VideoPlan => ({
               {
                 id: 'narrator',
                 element: 'character' as const,
-                asset: { status: 'ready' as const, uri: NARRATOR_URI },
+                assetRequirement: NARRATOR_REQUIREMENT,
                 placements: [{ at: 'b1.start', slot }],
               },
             ],
