@@ -153,8 +153,15 @@ exported from the package.
 export type Rect = { top: number; right: number; bottom: number; left: number }; // %
 export const slotRect = (slot: Slot): Rect;
 export const overlaps = (a: Slot, b: Slot): boolean;
-export const safeAreaFor = (composition: Slot, keepClear: Rect[]): SafeArea;
 ```
+
+> **Corrected while building.** The planned `safeAreaFor(composition, keepClear)` does not
+> exist: under ADR-0003's ladder a retained element never intersects the scene's effective
+> composition — `keep` means no overlap, `recompose` and `relocate` both end disjoint, and
+> `hide` removes the element — so `keepClear` is always empty and the safe area is exactly
+> `slotRect(composition)`. A parameter that can only ever be empty is a worse interface
+> than no parameter. `Rect` is defined as *insets from each edge*, the same shape and
+> reading as `SafeArea`, which is what removes the conversion.
 
 One table. `overlaps` is rectangle intersection over it and `safeAreaFor` is derived from
 it, so the symbolic relation and the percentages cannot drift apart. The compiler is the
@@ -222,4 +229,19 @@ migration · any second layout or capability.
 
 One small gap to close while here: `checkPlacements` accepts `scene.start` in a placement,
 where `scene` is meaningless — placements belong to a section, not a scene. It should be
-rejected with the same `UNKNOWN_ANCHOR` the events path uses.
+rejected with the same `UNKNOWN_ANCHOR` the events path uses. **Still open** — the
+compiler resolves such an anchor against the *section's* bounds, which is a defensible
+reading but not one anybody chose.
+
+---
+
+## What the build changed
+
+Recorded so the design and the code do not disagree.
+
+- `safeAreaFor` collapsed into `slotRect` — see the note above.
+- `CompiledSection` gained a **`persistent`** table: `layoutStates` says where an element
+  is, and that table says what it looks like. Without it the runtime would have to read
+  the plan to draw a character, which is the seam leaking.
+- `MISSING_BEAT_TIMING` was added to `CompilerErrorCode`. A plan beat the voice-over never
+  spoke used to be a `NaN` propagating into every window derived from it.

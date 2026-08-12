@@ -16,9 +16,9 @@ Built for [Agentic Cinema: The Blockbuster Hackathon](https://agentic-cinema.dev
 
 ## Status
 
-Early. What exists today is the foundation of the scene library — steps 1–5 of the build
-order in `vox-studio-architecture-figee.md` §13, with step 5 deliberately cut to the
-smallest continuity-testable scope:
+Early. What exists today is the foundation of the scene library and the compiler that
+sequences it — steps 1–6 of the build order in `vox-studio-architecture-figee.md` §13,
+with step 5 deliberately cut to the smallest continuity-testable scope:
 
 - **L0 design system** — one theme (`editorial-cold`), six motion profiles, type and
   spacing scales, fonts.
@@ -32,10 +32,16 @@ smallest continuity-testable scope:
   immediate placeholder fallback. No network or cloud dependency.
 - **Catalog + the four tools** — generated manifest, `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
+- **Minimal compiler** — a plan plus real beat timings become a compiled document:
+  milliseconds to frames, anchors to absolute frames, and slot conflicts resolved per
+  ADR-0003. The document is JSON, so what a video *composes* is testable without a browser.
+- **Section runtime** — one generic component plays a compiled document, persistent
+  elements included. It takes no layout decisions; the compiler already took them.
 - **Component Studio** — grid, six-frame filmstrip and layout × motion-profile matrix.
 
-Not built yet: beat compiler, TTS timepoints, Section runtime, the wider Asset Resolver,
-the remaining capabilities, the agents, and the product Studio UI.
+Not built yet: TTS timepoints and `packages/voice`, the wider Asset Resolver, the
+remaining capabilities, the agents, and the product Studio UI. Beat timings currently
+come from a fixture.
 
 ## Getting started
 
@@ -44,7 +50,8 @@ Requires Node 20+ and pnpm 9.
 ```bash
 pnpm install
 pnpm catalog          # generate the scene manifest
-pnpm studio           # Remotion Studio — one composition per catalog example
+pnpm studio           # Remotion Studio — one composition per catalog example, plus
+                      # `compiled-document`, which plays a whole compiled plan
 pnpm grid             # Component Studio — the evaluation harness, localhost:5273
 ```
 
@@ -74,7 +81,8 @@ packages/video/           the scene library — everything Remotion renders
   src/primitives/         L1, never exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability
   src/catalog/            manifest generation, the four tools, validation
-  src/runtime/            scene rendering and example playback
+  src/compile/            plan + beat timings → the compiled document
+  src/runtime/            scene rendering, example playback, the Section runtime
 apps/component-studio/    internal evaluation harness
 services/agents/          reserved for the Python ADK orchestration
 ```

@@ -88,6 +88,11 @@ reference is an error; a resolved placeholder is not. `failed` is distinguished 
 registry, committed, never hand-edited. It is everything the agent knows about the
 scene library. If the manifest is insufficient, fix the manifest, not the prompt.
 
+**Compiled document** — What the compiler emits and the Section runtime plays. Frames,
+percentages and resolved assets; never an anchor, a slot or a millisecond. It is JSON,
+which is what makes a video's composition assertable without rendering it. Avoid:
+"timeline", and "compiled plan" — a plan is the input.
+
 **Compile report** — A structured deliverable (`errors[]`, `warnings[]`), not a log.
 
 ## The six rules
@@ -111,7 +116,8 @@ packages/video/           the scene library — everything Remotion renders
   src/design/             L0 tokens: theme, motion profiles, fonts
   src/primitives/         L1, not exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability
-  src/runtime/            scene rendering and example playback
+  src/compile/            the compiler: plan + timed beats → the compiled document
+  src/runtime/            scene rendering, example playback, the Section runtime
   src/catalog/            manifest generation, the four tools, validation
 apps/component-studio/    internal evaluation harness (grid, filmstrip, matrix)
 services/agents/          reserved for the Python ADK orchestration; not initialised
@@ -119,7 +125,8 @@ services/agents/          reserved for the Python ADK orchestration; not initial
 
 ## Not yet built
 
-Beat compiler, `packages/voice` and its TTS timepoints, Section runtime, the Asset
-Resolver beyond identity cache/local library/placeholder, the remaining capabilities,
-the agents, and the product Studio UI. See the build order in
-`vox-studio-architecture-figee.md` §13, and ADR-0002 for the time pipeline.
+`packages/voice` and its TTS timepoints — beat timings come from a fixture, and the
+compiler has never met a real one. Also: the Asset Resolver beyond identity
+cache/local library/placeholder, the remaining capabilities, the agents, and the product
+Studio UI. See the build order in `vox-studio-architecture-figee.md` §13, ADR-0002 for
+the time pipeline and ADR-0003 for slot conflicts.

@@ -11,23 +11,26 @@ Do not reopen it.** The remaining open questions are at the bottom, ranked. Read
 
 ## Where we are
 
-Steps 1–5 of the build order in `vox-studio-architecture-figee.md` §13. The scene library
-now has two materially different SceneCapabilities, the minimal offline Asset Resolver
-path exists, the catalog generates, the four tools work, and the evaluation harness
-builds. The next move is step 6: the generic Section runtime and minimal compiler.
+Steps 1–6 of the build order in `vox-studio-architecture-figee.md` §13. The scene library
+has two materially different SceneCapabilities, the minimal offline Asset Resolver path
+exists, the catalog generates, the four tools work, the evaluation harness builds — and
+a plan now **compiles and plays**.
 
-ADR-0002 has since been **applied to the existing code**: `Beat`/`TimedBeat` exist,
-`spansBeats` is required at both levels, the beat partition is checked over scenes and
-over sections, and a scene may no longer end mid-sentence. What ADR-0002 decided but
-nothing has yet built is the part that needs new packages — `packages/voice` and
-`packages/video/src/compile/`.
+ADR-0002 is applied to the code: `Beat`/`TimedBeat` exist, `spansBeats` is required at
+both levels, the beat partition is checked over scenes and over sections, and a scene may
+not end mid-sentence. ADR-0003 is applied too — the slot conflict ladder is in
+`src/compile/conflict.ts` and its outcomes are visible in the render suite.
 
-Deadline: **7 September 2026, 14:00 PDT**. Roughly four weeks.
+What ADR-0002 decided and nothing has built is **`packages/voice`**. Beat timings come
+from a fixture, so the compiler has never met a real timepoint. That is the next move.
+
+Deadline: **7 September 2026, 14:00 PDT**.
 
 ### Verified, not assumed
 
-`pnpm typecheck` clean · 135 tests pass in ~1s · Biome clean on 75 files · `catalog:check`
-in sync · `apps/component-studio` builds · 3 render tests pass through headless Remotion.
+`pnpm typecheck` clean · 155 tests pass in ~1s · Biome clean on 85 files · `catalog:check`
+in sync · `apps/component-studio` builds · 6 render tests pass through headless Remotion.
+The compiled section was rendered to stills and looked at, not only hashed.
 
 **There are two suites now.** `pnpm test` is the deterministic core and must stay fast
 enough to run on every save; `pnpm test:render` bundles the project and drives headless
@@ -66,12 +69,20 @@ pnpm test:render      # separately: minutes, and a browser
 - **The beat contract** of ADR-0002: `Beat`/`TimedBeat`/`FrameBeat`, required
   `spansBeats`, the partition checked over scenes and sections, the sentence rule,
   and placement validation for persistent elements.
+- **The minimal compiler** (`src/compile/`) — `compile({ plan, beats })` returns a
+  compiled document or a report, never both. Milliseconds to frames by converting
+  *boundaries*; anchors to frames; ADR-0003's ladder; assets resolved onto the runtime
+  channel; layout and motion profile decided. `document` is `null` exactly when `ok` is
+  false, so a plan that failed cannot be rendered.
+- **The Section runtime** (`runtime/CompiledVideo.tsx`) — plays a whole document,
+  persistent elements included, and decides nothing. The `compiled-document` composition
+  takes a document as input props, so a section can be watched in Studio.
 
 ### Not built
 
-Beat compiler · `packages/voice` · Section runtime · compiler · the Asset Resolver beyond
-identity cache/local library/placeholder · the other 6–10 capabilities · the agents ·
-the product Studio UI. `services/agents/` is a reserved empty directory.
+`packages/voice` and real TTS timepoints · the Asset Resolver beyond identity
+cache/local library/placeholder · the other 6–10 capabilities · the agents · the product
+Studio UI. `services/agents/` is a reserved empty directory.
 
 ---
 
@@ -104,8 +115,9 @@ chosen composition reaches the component · slot geometry is one table in
 **Scope and sequencing**, decided in the same session but too reversible to earn an ADR:
 
 - ImageContextScene's deliberately narrow increment is complete: one layout, one
-  placeholder treatment, no event vocabulary. Build the Section runtime and minimal
-  compiler now, then run the continuity test before adding another layout or capability.
+  placeholder treatment, no event vocabulary. The Section runtime and minimal compiler
+  are built; run the continuity test on real voice-over before adding another layout or
+  capability.
 - Vertical slice: §12's own example, housing/rent, **in English**.
 - Asset Resolver ships with §5.4 links 1 and 3 only — identity cache and local library —
   plus the placeholder path. No Gemini generation, no licensed search, no cutout or
@@ -123,17 +135,20 @@ workflow step that named forced alignment.
 
 ## Known risks
 
-**TTS is no longer the top risk.** ADR-0002 replaced forced alignment with SSML
-timepoints, which removed the research problem. What remains is an API call and a fold —
-but it is still unwritten and still unverified against the real API. The first thing to
-confirm empirically: **does a trailing `<mark>` at the end of the SSML reliably return a
-timepoint at the end of speech?** The whole `toMs` of the last beat rests on it, and the
-fallback (decoding `audioContent` for a duration) is uglier.
+**TTS is the top risk again, and now it is the only thing between here and a video.**
+ADR-0002 removed the research problem; what remains is an API call and a fold, unwritten
+and unverified against the real API. The compiler consumes `TimedBeat[]` and does not
+care where they come from, so the seam is clean — but every timing it has ever seen came
+from a fixture. The first thing to confirm empirically: **does a trailing `<mark>` at the
+end of the SSML reliably return a timepoint at the end of speech?** The whole `toMs` of
+the last beat rests on it, and the fallback (decoding `audioContent` for a duration) is
+uglier.
 
-**Polishing either isolated capability further is a trap.** The second capability now
-exists. §9.3 says the remaining real problems appear only in sequence — slot collisions,
-brutal transitions, a character that jumps, rhythmic uniformity. Reaching the continuity
-test is now the largest single risk to the deadline.
+**Polishing either isolated capability further is a trap.** §9.3's real problems appear
+only in sequence — slot collisions, brutal transitions, a character that jumps, rhythmic
+uniformity. Slot collisions are now answered (ADR-0003) and one section demonstrably
+plays; the rest of that list is still unmet, and reaching the continuity test on real
+voice-over is the largest single risk to the deadline.
 
 **`@google/adk` on npm (1.6.0) is unverified.** The ADK Python path is the documented
 one. Confirm before betting the orchestration on the JS package. Lower stakes than it
