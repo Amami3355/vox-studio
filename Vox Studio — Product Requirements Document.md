@@ -1649,7 +1649,16 @@ Parallel
 
 ## Visual assets
 
-Google image-generation capabilities lorsque nécessaire.
+~~Google image-generation capabilities lorsque nécessaire.~~
+
+Les assets sont **générés par IA avec un humain dans la boucle, et les fichiers générés
+sont commités** — c'est ce qui maintient la garantie de rendu hors-ligne d'
+`assets/library.ts`. Le prompt est dérivé **déterministiquement** de la sémantique de
+l'`AssetRequirement`, du ratio du slot et de la palette `editorial-cold` ; l'agent ne
+fournit que le `subject`. Une image par `identityKey`, jamais par scène, et les
+avertissements `ASSET_PLACEHOLDER` *sont* la liste de travail. Le fournisseur n'est pas
+nommé : la forme de la boucle est ce dont le film dépend, et elle survit à un changement
+de fournisseur. Voir ADR-0005.
 
 ---
 
