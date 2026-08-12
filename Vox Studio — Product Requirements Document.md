@@ -1655,7 +1655,12 @@ Google image-generation capabilities lorsque nécessaire.
 
 ## Audio
 
-Google/Gemini TTS ou infrastructure Google appropriée retenue pour la V1.
+~~Google/Gemini TTS ou infrastructure Google appropriée retenue pour la V1.~~
+
+**ElevenLabs** `/v1/text-to-speech/{voice_id}/with-timestamps` retenu pour la V1, et la
+voix est en anglais. Les frontières de beats sont dérivées des offsets caractère de
+l'`alignment` renvoyé — pas de `<mark>` SSML, ElevenLabs n'en fournit pas. Voir ADR-0004,
+qui remplace la première décision d'ADR-0002 (Google Cloud TTS `v1beta1` + `<mark>`).
 
 ---
 

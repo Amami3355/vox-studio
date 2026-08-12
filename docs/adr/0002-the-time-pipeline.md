@@ -1,6 +1,6 @@
 # ADR-0002 — The time pipeline
 
-**Status:** accepted · 2026-08-11
+**Status:** accepted · 2026-08-11 · **superseded in part by ADR-0004** · 2026-08-12
 **Scope:** everything between "an agent has written a narrative" and "the compiler has
 absolute frames" — the beat contract, how beats acquire timings, and where that work
 lives. §7 of the frozen document specified the shape of this pipeline but not its
@@ -37,6 +37,11 @@ is recorded as an open question in `docs/handoff.md`, and the decision below mak
 cheaper to adopt rather than harder — a mark per word costs one more mark, and is exact.
 
 ## Decisions
+
+> **The first two decisions below are superseded by ADR-0004.** The provider is ElevenLabs
+> and there are no SSML marks; beat boundaries come from character start-offsets instead.
+> The n+1 *shape* survives, and so does the reasoning that rejected forced alignment — see
+> ADR-0004 decisions 2 and 3. Everything from "Timepoints are in seconds" onward stands.
 
 **SSML marks, not a forced aligner.** Google Cloud TTS `v1beta1` with
 `enableTimePointing: ['SSML_MARK']` returns a timepoint for every `<mark>` in the input.
@@ -157,7 +162,8 @@ artifact.
   API call and a fold.
 - The voice-over script cannot be authored independently of the beats. Any writing agent
   or hand-written plan produces beats, not prose to be chopped afterwards.
-- `packages/voice` needs Google Cloud credentials; the compiler and the renderer never do.
+- `packages/voice` needs a synthesis credential — an `ELEVENLABS_API_KEY` under ADR-0004,
+  Google Cloud credentials as originally decided; the compiler and the renderer never do.
   Nothing in CI or in a contributor's checkout requires a cloud account to run the tests.
 - Making `spansBeats` required costs nothing at the call sites: all five `BarChartScene`
   examples and every fixture in `validate.test.ts` already set it. What it removes is the
@@ -193,7 +199,9 @@ Two of those are worth their own sentence.
 **Contiguity is an invariant, not a policy.** Nothing above decides that a voice-over may
 not pause. It is that this ADR synthesises n beats from n+1 marks, so mark *i* is both the
 end of one beat and the start of the next — a take built the way this document describes
-cannot have a gap, and one that does was not built that way. The compiler cares because
+cannot have a gap, and one that does was not built that way. (Under ADR-0004 the marks
+become character start-offsets and the invariant is unchanged; see its decision 3.) The
+compiler cares because
 scene and section windows are derived from beat boundaries: 200ms nobody owns is a black
 flash between two scenes, not silence under a picture.
 
@@ -215,3 +223,20 @@ The check has no cost today, because every timing the compiler has ever seen cam
 fixture the same file constructed. It is written now because that stops being true the
 moment `packages/voice` lands, and a stale take is not a failure anyone notices by
 watching the video — it is a video that plays.
+
+**2026-08-12 — the provider changes; see ADR-0004.** The first two decisions of this
+document are superseded. ElevenLabs has no SSML `<mark>`, so beat boundaries are derived
+from the n+1 character start-offsets of its `with-timestamps` alignment instead of from
+n+1 marks. Three things are worth knowing without opening the other file.
+
+The **shape** is unchanged: n+1 boundaries, the first one read rather than assumed to be
+zero, the tail taken from the end of the last character because there is still no duration
+field to recover it from. The **contiguity invariant is unchanged**, and so is every line
+of `compile/timings.ts` written above — only the sentence justifying it moves, from "n
+beats from n+1 marks" to "n beats from n+1 character offsets".
+
+And the **rejection of forced alignment stands**, which is the part a quick reading gets
+backwards. Character timings are the synthesiser reporting what it spoke, not an aligner
+inferring it from a waveform, so the class of bug this document rejected — a boundary off
+by a syllable, to be debugged — is not what was adopted. ElevenLabs' actual Forced
+Alignment API remains rejected, for the reasons given above.

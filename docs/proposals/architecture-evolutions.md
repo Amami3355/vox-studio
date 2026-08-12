@@ -68,12 +68,16 @@ with a dangling label reference fails exactly the same way and was not covered.
 
 **Frozen doc:** §7.2 puts `TTS + alignement forcé` between the beat plan and the timed
 beats, and §12 makes it an imperative constraint of the vertical slice.
-**Decision:** Google Cloud TTS `v1beta1` with one SSML `<mark>` per beat boundary.
+**Decision:** ElevenLabs `/v1/text-to-speech/{voice_id}/with-timestamps`, beat boundaries
+derived from n+1 character start-offsets. Was Google Cloud TTS `v1beta1` with one SSML
+`<mark>` per boundary, until ADR-0004.
 
 The anchor grammar the agent can write is entirely beat-relative (`ANCHOR_RE` in
 `catalog/validate.ts`), so the compiler consumes beat boundaries, never word timings.
-Marks give those boundaries exactly; an aligner would give them approximately. See
-ADR-0002 — a real aligner remains the documented fallback and composes on top.
+Character timings give those boundaries exactly; an aligner would give them approximately.
+The distinction survives the change of provider — timestamps returned *by the synthesiser*
+are a report, not an inference — so §7.2's "alignement forcé" is still not what was built.
+See ADR-0004, and ADR-0002 for the argument it inherits.
 
 ## §3 resolution is per scene, and relocation targets must already be declared
 
@@ -130,6 +134,47 @@ inside the scene rather than emitting negative frames.
 §8.2 types `CompileReport.ok` but never says what sets it. The code sets
 `ok = errors.length === 0`; warnings never affect it. This is the only reading
 consistent with §8.1/§8.3, but it should be stated.
+
+---
+
+## §13 step 8 becomes depth in the capabilities that exist, not four new ones
+
+**Frozen doc:** §13 step 8 is "CharacterExplainer, TypographicStatement, Map, Comparison".
+**Decision:** no new capability ships before the step 9 harness has measured the two that
+exist. Step 8's budget goes into depth — `image_context` gains compositions, layouts, prop
+slots and an action vocabulary, and every new composition ships its render-level contract
+test in the same commit.
+
+§14 already argues this and the two sections disagree: the catalogue strategy is "8–12
+capabilities robustes × plusieurs layouts × plusieurs actions", against the alternative it
+names and rejects, "40 scènes moyennes". Today's catalogue is two capabilities, and only
+one of them is deep. `image_context` ships **one** layout, **zero** actions, and
+`supportedCompositions: ['full']`, against §14's promise that a single `ImageContextScene`
+covers full bleed, split, détourage sur aplat, and the rest.
+
+Three consequences, each a reason the harness would otherwise measure the wrong thing:
+
+- **"Actions inventées" is one of step 9's four measures**, and `image_context` has no
+  action vocabulary to invent against. A capability with zero actions cannot fail that
+  measure, which means it cannot pass it either.
+- **ADR-0003's ladder has never met a scene that could yield.** Rung b needs a
+  `supportedCompositions` entry that clears every element crossing the scene; with `full`
+  as the only entry, every `image_context` conflict falls through to relocation or hiding.
+  The joint solve committed in `4a3e064` is untested against the case it was written for —
+  and ADR-0003 decision 6 says the way to make a character survive an `ImageContextScene`
+  is to declare a composition and design that layout. That is this work.
+- **Each new capability is another unverified claim.** ADR-0003's consequences record that
+  a declared composition is trusted and nothing renders it to check. Four new capabilities
+  would be four more of them, on a foundation that has not been checked once.
+
+Order: compositions (`full`, `left`, `right`), then layouts, then prop slots, then actions.
+Compositions and actions are the two the measures cannot do without; the middle two are
+volume, and are the first things to cut if the schedule slips.
+
+`Map` is the one worth naming separately, because it is also what the essayistic reference
+films are made of. What those films contribute here is *pace* — cut rhythm, push-ins — and
+that lives in motion profiles and a `cameraPush` action, not in a capability. If maps are
+still wanted after the measure, that is step 8 proper and it will have earned its place.
 
 ---
 
