@@ -42,27 +42,46 @@ persistent element to a slot that element itself uses elsewhere in the same sect
 never invents a slot, and never carves a scene that did not declare it can render smaller.
 When nothing declared fits, it hides and warns.
 
-**2. The scene is the unit of resolution.** One outcome per (scene, persistent element)
-pair, held for the scene's whole duration. If an element's placements change *within* the
-conflicting scene, the segments are resolved together and the worst outcome wins: any
-irreducible segment hides the element for the entire scene. Visibility that changes
-mid-scene reads as a bug, not as a resolution.
+**2. The scene is the unit of resolution — for every element at once.** A scene has one
+effective composition, held for its whole duration, and every persistent element crossing
+it is resolved against that same composition in one pass. Four consequences, all of them
+load-bearing:
 
-**3. The ladder**, tried in this order, per scene, per persistent element:
+- **An element that moves inside the scene is one crossing.** Its placements are resolved
+  together: the scene must clear every slot the element occupies while it plays, and an
+  element that relocates takes a single slot for the scene's whole duration. Position or
+  visibility that changes mid-scene *as a resolution* reads as a bug.
+- **The worst outcome wins, within one element.** Any irreducible part of a crossing hides
+  that element for the whole scene. It never hides the others.
+- **The scene yields for everyone or for no one.** A composition is taken only if it clears
+  every element crossing the scene, including the ones that were never in the way. Yielding
+  into a half that still contains someone rehouses the conflict instead of resolving it;
+  yielding for one element while a second has to relocate anyway buys a smaller frame *and*
+  a character that jumps — both repairs, for the benefit of one.
+- **Elements are resolved in declaration order**, and a relocation target must clear the
+  scene *and* everything already standing in it: elements the compiler is not moving hold
+  their authored slots from the start, and each relocation adds its own. Two characters
+  sent to the same free corner would be this rule's own failure, one level down.
+
+**3. The ladder**, tried in this order, per scene:
 
 | # | Condition | Outcome | Warning |
 |---|---|---|---|
-| a | The element's slot does not overlap the scene's occupancy | Both keep what they declared | — |
-| b | Overlap, and the scene declares a `supportedCompositions` entry that clears the element's slot | The scene takes that composition; the element does not move | `SLOT_RELOCATED` |
-| c | Overlap, no such composition, but the element declares a slot elsewhere in the same section that clears the scene | The element takes that slot for the scene's duration | `SLOT_RELOCATED` |
+| a | No element's slots overlap the scene's occupancy | Everyone keeps what they declared | — |
+| b | Overlap, and the scene declares a `supportedCompositions` entry that clears *every* element crossing it | The scene takes that composition; no element moves | `SLOT_RELOCATED`, per contending element |
+| c | Overlap, no such composition, but a contending element declares a slot elsewhere in the same section that clears the scene and everything already standing | That element takes that slot for the scene's duration | `SLOT_RELOCATED` |
 | d | Neither | The element is hidden for the scene's duration | `PERSISTENT_ELEMENT_HIDDEN` |
 
-The scene yields before the element moves. A scene composed into a declared alternative is
-a composition somebody designed; a relocated element is a character that jumps. Where both
-are possible, prefer the one that was drawn on purpose.
+Rungs c and d are per element; rungs a and b are properties of the whole scene. The scene
+yields before any element moves: a scene composed into a declared alternative is a
+composition somebody designed, and a relocated element is a character that jumps. Where
+both are possible, prefer the one that was drawn on purpose.
 
-Multiple persistent elements are resolved in declaration order, and a relocation target
-must clear the scene *and* every element already placed.
+Ties are broken by declaration order throughout — the first entry of
+`supportedCompositions` that clears everyone, and the first slot in the element's own
+placement order that clears the scene. Nothing is scored, and nothing is optimised: a
+compiler that picked the "best" composition would be picking between frames on a criterion
+no one wrote down.
 
 **4. `safeArea` is how a chosen composition reaches the component.** It is derived from the
 scene's effective composition — the frame minus the rectangle the scene renders into,
@@ -80,6 +99,17 @@ compiler warns. This is the rule applied, not an exception carved for it. To mak
 character survive an `ImageContextScene`, declare a supported composition the scene can
 render into and design that layout. That is a design act, in the capability, reviewed like
 any other frame — not something the compiler should decide at 3am on the night of a demo.
+
+**7. A scene's resolution depends on the whole section, and that coupling is stated rather
+than discovered.** Rung c draws its fallback from slots the element occupies *elsewhere in
+the same section*, so adding a placement at the end of a section can change an earlier
+scene's outcome from hidden to relocated with nothing in that scene edited. That is
+genuinely surprising if you read the compiler as a per-scene function, and it is the direct
+price of decision 1: the only slots the compiler may use are slots a human put the element
+in, and the section is the scope over which a persistent element is one continuous
+character. The rule is kept and the surprise is paid for in the report — `SLOT_RELOCATED`
+names the slot the element moved to, so the coupling is legible to whoever reads the
+compile output rather than only to whoever reads this file.
 
 ## Considered options
 
@@ -119,3 +149,33 @@ Both recorded in `docs/proposals/architecture-evolutions.md`.
   happened; the code alone is ambiguous and the report is a deliverable, not a log.
 - The slot geometry table is new work the Section runtime slice must carry, and it is the
   first thing in the codebase that assigns slots a size.
+- **A declared composition is trusted, and nothing yet checks that it renders.** The
+  compiler treats a `supportedCompositions` entry as proof that the capability has a layout
+  for it, but the only thing a composition changes at runtime is `safeArea`: a capability
+  that declares `left` without a layout designed for a half-frame gets squeezed, silently
+  and legally. This is decision 1's bet, taken knowingly — the alternative is the compiler
+  judging layouts it cannot see — but the bet is only paid off by a render-level contract
+  test per declared composition, which does not exist yet. Until it does,
+  `supportedCompositions` is a claim a reviewer has to check by eye.
+- **The scene's yield is all-or-nothing, so a second persistent element can cost the first
+  one its composition.** Adding an element that no composition can clear makes the scene
+  stop yielding for the element that was previously kept in frame. That follows from
+  decision 2 and is the intended trade, but it means the persistent layer of a section is
+  resolved as a whole and cannot be reasoned about one element at a time.
+
+## Amendments
+
+**2026-08-12 — decisions 2, 3 and 7, after an adversarial review of the implementation.**
+The original text already made the scene the unit, but only for one element at a time, and
+the first implementation followed it literally: outcomes were computed per placement
+segment and per element, and only `hide` was promoted to the whole scene. One element with
+`cornerBR` then `cornerBL` inside one scene selected `left` for the first segment and
+`right` for the second; the first won, and the element spent the second half of the scene
+standing inside the half the scene had just been composed into. Two elements collided the
+same way through the scene's safe area.
+
+The defect was in the code, but the ADR was thin enough to permit it: it never said what
+happens when two segments or two elements ask for different compositions. Decision 2 now
+states the joint solve, decision 3 restates the ladder as a scene-wide rule with an
+explicit tie-break, and decision 7 writes down the section-wide fallback coupling that was
+true all along and documented nowhere.
