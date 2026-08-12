@@ -14,10 +14,17 @@ import type { VideoPlan } from '../src/catalog/validate';
 import { compile } from '../src/compile';
 import type { TimedBeat } from '../src/core/types';
 
-/** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
+/**
+ * Long enough that both scenes clear the `minDurationFrames` their capabilities declare.
+ *
+ * `words: []` because these timings are invented rather than spoken. Nothing in the system
+ * fabricates a word onset — a take that was not folded from a recorded alignment reports
+ * having no words, and a word anchor written against one fails loudly instead of resolving
+ * to a plausible frame. This demo uses boundary anchors only, so it costs nothing here.
+ */
 const beats: TimedBeat[] = [
-  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
-  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000 },
+  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000, words: [] },
+  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000, words: [] },
 ];
 
 const plan: VideoPlan = {

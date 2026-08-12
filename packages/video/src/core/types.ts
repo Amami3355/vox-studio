@@ -56,13 +56,27 @@ export const NO_SAFE_AREA: SafeArea = { top: 0, right: 0, bottom: 0, left: 0 };
 export type Beat = { id: string; text: string };
 
 /**
+ * One spoken word and the moment it begins. No end: a word's end is not a thing any
+ * anchor names, and the next word's onset is the only boundary the picture ever cuts on.
+ */
+export type TimedWord = { text: string; fromMs: number };
+
+/**
  * A beat plus its real bounds, as spoken. Produced by `packages/voice` from the TTS
  * timepoints; the agent produces `Beat` and never this.
  *
  * Milliseconds, not seconds and not frames. There are exactly two conversions in the
  * system — seconds to ms at the edge of `packages/voice`, ms to frames in the compiler.
+ *
+ * `words` is required rather than optional, for the reason ADR-0002 made `spansBeats`
+ * required: a take without them is not a take with less detail, it is a take no word
+ * anchor can be resolved against, and an optional field would let that failure arrive at
+ * the anchor instead of at the take. They are also not new information — a beat already
+ * carries its text verbatim, and the words are that text tokenised with the onsets the
+ * character alignment always contained. Nothing here has to be kept in sync with the
+ * text; `checkTimings` proves it was derived from it.
  */
-export type TimedBeat = Beat & { fromMs: number; toMs: number };
+export type TimedBeat = Beat & { fromMs: number; toMs: number; words: TimedWord[] };
 
 /* ------------------------------------------------------------------ events */
 
@@ -229,6 +243,11 @@ export type CompilerErrorCode =
   | 'UNKNOWN_LAYOUT'
   | 'INVALID_PAYLOAD'
   | 'UNKNOWN_ANCHOR'
+  /* A well-formed word anchor into the right beat that still cannot resolve, because the
+   * beat speaks that word more than once. Its own code rather than UNKNOWN_ANCHOR: the
+   * word is not unknown, it is unaddressable, and the repair is to split the beat or take
+   * a boundary rather than to look for a different word. */
+  | 'AMBIGUOUS_ANCHOR'
   | 'UNKNOWN_SLOT'
   | 'BELOW_MIN_DURATION'
   | 'MISSING_ASSET_REFERENCE'

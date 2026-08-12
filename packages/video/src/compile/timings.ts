@@ -10,6 +10,7 @@
 import type { VideoPlan } from '../catalog/validate';
 import type { FrameBeat } from '../core/anchors';
 import type { CompilerError, TimedBeat } from '../core/types';
+import { tokenise } from '../core/words';
 
 /**
  * A `TimedBeat[]` is a **projection of the plan's beats**, and this checks it as one.
@@ -102,6 +103,74 @@ export const checkTimings = (plan: VideoPlan, beats: TimedBeat[], fps: number): 
     }
 
     errors.push(...checkWindow(timed, beats[index - 1]));
+    errors.push(...checkWords(timed));
+  }
+
+  return errors;
+};
+
+/**
+ * The words of a beat are a projection of its own text, and this checks them as one.
+ *
+ * The same argument as text equality one level up, applied to the field a word anchor
+ * resolves against. A word list is an easier thing to get subtly wrong than a boundary —
+ * an extra word, a word belonging to the neighbouring beat, an onset outside the window —
+ * and every one of those resolves an anchor to a plausible frame and cuts the picture
+ * against the wrong word. That is the exact defect the word vocabulary exists to repair,
+ * and it is invisible in the render: the video plays, the highlight appears, it appears
+ * over the wrong syllable.
+ *
+ * Equality against `tokenise`, not containment. "Every word the take names appears
+ * somewhere in the text" would accept a take with the words in the wrong order and a take
+ * missing half of them, which are the two ways a fold with an off-by-one produces output
+ * that still looks like English.
+ *
+ * An empty list passes deliberately. A take assembled by hand, or by anything that did not
+ * fold a recorded alignment, genuinely has no word timings — `render-demo.mts` is one, and
+ * so is every catalog example. Requiring words here would make the compiler refuse plans
+ * that use no word anchors at all. The anchor is where the absence becomes an error,
+ * because the anchor is where someone asked for a word.
+ */
+const checkWords = (beat: TimedBeat): CompilerError[] => {
+  if (beat.words.length === 0) return [];
+
+  const at = (message: string): CompilerError => ({
+    code: 'INVALID_TIMING_INPUT',
+    field: `beats.${beat.id}.words`,
+    message,
+  });
+
+  const expected = tokenise(beat.text).map((word) => word.text);
+  const actual = beat.words.map((word) => word.text);
+
+  if (expected.length !== actual.length || expected.some((word, i) => word !== actual[i])) {
+    return [
+      at(
+        `Beat "${beat.id}" carries the words [${actual.join(', ')}] where its text reads [${expected.join(', ')}]. The words are the beat's own text tokenised, so a list that is not it was folded against different characters — and every anchor into it points at the wrong one.`,
+      ),
+    ];
+  }
+
+  const errors: CompilerError[] = [];
+
+  for (const [i, word] of beat.words.entries()) {
+    if (!Number.isFinite(word.fromMs) || word.fromMs < beat.fromMs || word.fromMs >= beat.toMs) {
+      errors.push(
+        at(
+          `"${word.text}" is timed at ${word.fromMs}ms in beat "${beat.id}", which runs ${beat.fromMs}–${beat.toMs}ms. A word spoken outside the beat that carries it puts an anchor in a scene the agent never named.`,
+        ),
+      );
+      continue;
+    }
+
+    const previous = beat.words[i - 1];
+    if (previous !== undefined && word.fromMs < previous.fromMs) {
+      errors.push(
+        at(
+          `"${word.text}" starts at ${word.fromMs}ms after "${previous.text}" at ${previous.fromMs}ms, in beat "${beat.id}". Words are in spoken order or they are not this beat's words.`,
+        ),
+      );
+    }
   }
 
   return errors;
@@ -159,7 +228,17 @@ export const toFrameBeats = (plan: VideoPlan, beats: TimedBeat[], fps: number): 
 
   return plan.beats.map((beat) => {
     const timing = timingOf.get(beat.id) as TimedBeat;
-    return { id: beat.id, from: toFrame(timing.fromMs), to: toFrame(timing.toMs) };
+    return {
+      id: beat.id,
+      from: toFrame(timing.fromMs),
+      to: toFrame(timing.toMs),
+      /**
+       * Words cross with the same `toFrame` as the boundaries, so a word onset and the
+       * beat boundary it may coincide with round identically. Two rounding rules here
+       * would put the first word of a beat one frame before the beat it belongs to.
+       */
+      words: timing.words.map((word) => ({ text: word.text, frame: toFrame(word.fromMs) })),
+    };
   });
 };
 

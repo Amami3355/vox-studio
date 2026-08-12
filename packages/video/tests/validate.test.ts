@@ -167,6 +167,92 @@ describe('validateVideoPlan', () => {
   });
 });
 
+/**
+ * A word anchor is checkable from the plan alone, and this is the reason that matters.
+ *
+ * Whether "London" is a word of b2 is a fact about the beat text the agent just wrote — no
+ * audio, no credential, no recording. So the `validate` tool of `catalog/tools.ts` answers
+ * it in the cold pass, before a single second of quota is spent, and the agent repairs it
+ * unaided under §8.1. The compiler holds the same line against a *take* rather than a
+ * plan; `checkTimings` proves the two agree by proving a take's words are the tokenisation
+ * of its text, which is what makes one check the consequence of the other rather than a
+ * second source of truth.
+ */
+describe('validateVideoPlan — word anchors, checked without a take', () => {
+  const withEvent = (at: string): VideoPlan => ({
+    beats: [
+      { id: 'b1', text: 'Rents rose faster than wages.' },
+      { id: 'b2', text: 'In London, rent takes half of a median income, and rent keeps rising.' },
+    ],
+    sections: [
+      {
+        id: 'sec1',
+        spansBeats: ['b1', 'b2'],
+        scenes: [
+          base({ id: 's1', spansBeats: ['b1'], events: [] }),
+          base({ id: 's2', spansBeats: ['b2'], events: [{ at, action: 'revealAll' }] }),
+        ],
+      },
+    ],
+  });
+
+  it('accepts a word the beat actually speaks', () => {
+    expect(validateVideoPlan(withEvent('b2.word:London')).ok).toBe(true);
+  });
+
+  it('rejects a word the beat does not speak, listing the ones it does', () => {
+    const report = validateVideoPlan(withEvent('b2.word:Berlin'));
+    const unknown = report.errors.find((e) => e.code === 'UNKNOWN_ANCHOR');
+
+    expect(unknown).toBeDefined();
+    /** `expected` rather than the prose, as every other correctable error in this file. */
+    expect(unknown?.expected).toContain('median');
+    expect(unknown?.expected).not.toContain('London,');
+  });
+
+  /** "rent" is in b2 twice. Picking one silently is the defect, not the repair. */
+  it('rejects a word the beat speaks twice', () => {
+    const report = validateVideoPlan(withEvent('b2.word:rent'));
+
+    expect(report.errors.some((e) => e.code === 'AMBIGUOUS_ANCHOR')).toBe(true);
+  });
+
+  /** The same word in another beat is not ambiguous, and not in scope either. */
+  it('rejects a word that is in the plan but not in the beat named', () => {
+    const report = validateVideoPlan(withEvent('b2.word:wages'));
+
+    expect(report.errors.some((e) => e.code === 'UNKNOWN_ANCHOR')).toBe(true);
+  });
+
+  it('rejects a word on the scene pseudo-beat, which has no text', () => {
+    const report = validateVideoPlan(withEvent('scene.word:London'));
+
+    expect(report.errors.some((e) => e.code === 'UNKNOWN_ANCHOR')).toBe(true);
+  });
+
+  /** Placements are held to the same rule as events, as they are for every other check. */
+  it('holds a persistent element placement to the same rule', () => {
+    const plan = withEvent('b2.start');
+    const section = plan.sections[0] as (typeof plan.sections)[number];
+    section.persistent = [
+      {
+        id: 'narrator',
+        element: 'character',
+        assetRequirement: {
+          type: 'character',
+          subject: 'Narrator figure',
+          treatment: 'illustration',
+          orientation: 'square',
+          identityKey: 'narrator',
+        },
+        placements: [{ at: 'b2.word:Berlin', slot: 'cornerBR' }],
+      },
+    ];
+
+    expect(validateVideoPlan(plan).errors.some((e) => e.code === 'UNKNOWN_ANCHOR')).toBe(true);
+  });
+});
+
 describe('validateVideoPlan — the beat partition over scenes', () => {
   it('rejects a scene whose beats are not contiguous', () => {
     const report = validateVideoPlan(

@@ -7,9 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { validateScene } from '../src/catalog/tools';
+import { parseAnchor } from '../src/core/anchor-grammar';
 import { registry } from '../src/scenes/registry';
-
-const ANCHOR_RE = /^([A-Za-z0-9_-]+)\.(start|mid|end)(?:[+-](short|long))?$/;
 
 describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_id, capability) => {
   it('declares selection metadata with explicit redirections', () => {
@@ -64,9 +63,15 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
         expect(report.errors).toEqual([]);
       });
 
+      /**
+       * `parseAnchor` rather than a regex written here. This file held a third copy of the
+       * grammar, which passed only because no example used a word anchor yet — the first
+       * one to try would have been rejected by a test whose subject is "is this symbolic",
+       * not "is this a boundary". The grammar has one definition; this asks it.
+       */
       it('expresses time symbolically — an example carrying a frame teaches the agent frames', () => {
         for (const event of example.events ?? []) {
-          expect(event.at).toMatch(ANCHOR_RE);
+          expect(parseAnchor(event.at)).not.toBeNull();
         }
       });
 

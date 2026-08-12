@@ -44,9 +44,31 @@ const barChartProps = {
  * declares. A fixture under that minimum would be a plan the compiler must refuse.
  */
 const timedBeats: TimedBeat[] = [
-  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
-  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000 },
+  {
+    id: 'b1',
+    text: 'Rents have climbed for a decade.',
+    fromMs: 0,
+    toMs: 3000,
+    words: at(0, 500, ['Rents', 'have', 'climbed', 'for', 'a', 'decade']),
+  },
+  {
+    id: 'b2',
+    text: 'London is the extreme case.',
+    fromMs: 3000,
+    toMs: 8000,
+    words: at(3000, 1000, ['London', 'is', 'the', 'extreme', 'case']),
+  },
 ];
+
+/**
+ * Word onsets written out rather than derived, at round intervals a reader can do in their
+ * head. Real ones come from a recorded alignment and are nobody's round numbers; these
+ * exist so the arithmetic of a word anchor is checkable by hand — "London" at 3000ms is
+ * frame 90 at 30fps, and that is the whole assertion.
+ */
+function at(first: number, every: number, words: string[]): TimedBeat['words'] {
+  return words.map((text, i) => ({ text, fromMs: first + i * every }));
+}
 
 const onePlan: VideoPlan = {
   beats: timedBeats.map(({ id, text }) => ({ id, text })),
@@ -501,8 +523,8 @@ describe('compile', () => {
    */
   it('refuses a scene too short for the animation its capability is built around', () => {
     const hurried: TimedBeat[] = [
-      { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 1000 },
-      { id: 'b2', text: 'London is the extreme case.', fromMs: 1000, toMs: 6000 },
+      { ...(timedBeats[0] as TimedBeat), toMs: 1000, words: [] },
+      { ...(timedBeats[1] as TimedBeat), fromMs: 1000, toMs: 6000, words: [] },
     ];
 
     const result = compile({ plan: continuityPlan, beats: hurried });
@@ -556,7 +578,7 @@ describe('compile', () => {
       ['beats in an order the plan does not have', [...timedBeats].reverse()],
       [
         'a timing for a beat the plan does not define',
-        [...timedBeats, { id: 'b3', text: 'And then?', fromMs: 8000, toMs: 9000 }],
+        [...timedBeats, { id: 'b3', text: 'And then?', fromMs: 8000, toMs: 9000, words: [] }],
       ],
     ])('%s', (_, beats) => {
       const result = compile({ plan: onePlan, beats });
@@ -566,6 +588,64 @@ describe('compile', () => {
       expect(result.report.errors).toContainEqual(
         expect.objectContaining({ code: 'INVALID_TIMING_INPUT' }),
       );
+    });
+
+    /**
+     * The words are a projection of the beat's own text, exactly as the beat is a
+     * projection of the plan — and for the same reason ADR-0002's amendment gave.
+     *
+     * A take arriving as JSON has none of the guarantees its type makes, and a word list
+     * is a far easier thing to get subtly wrong than a boundary: an extra word, a word
+     * belonging to the neighbouring beat, an onset outside the window. Every one of those
+     * produces an anchor that resolves to a plausible frame and cuts the picture against
+     * the wrong word — which is the entire defect this vocabulary exists to repair, and it
+     * would be undetectable in the render.
+     *
+     * An empty list is not a defect. A take that was never folded from a recorded
+     * alignment genuinely has no word timings, and says so; the anchor is where that
+     * becomes an error, because that is where someone asked for one.
+     */
+    it.each([
+      ['a word the beat does not contain', spoken([{ words: at(0, 500, ['Rents', 'fell']) }])],
+      [
+        'words the beat contains in the wrong order',
+        spoken([{ words: at(0, 500, ['have', 'Rents']) }]),
+      ],
+      [
+        'a word list missing one the text has',
+        spoken([{ words: at(0, 500, ['Rents', 'climbed']) }]),
+      ],
+      ['an onset before the beat is spoken', spoken([{ words: [{ text: 'Rents', fromMs: -1 }] }])],
+      [
+        // b1 ends at 3000ms; six words 900ms apart put the last of them at 4500.
+        'an onset after the beat has ended',
+        spoken([{ words: at(0, 900, ['Rents', 'have', 'climbed', 'for', 'a', 'decade']) }]),
+      ],
+      [
+        'onsets that run backwards',
+        spoken([
+          {
+            words: [
+              { text: 'Rents', fromMs: 900 },
+              { text: 'have', fromMs: 100 },
+            ],
+          },
+        ]),
+      ],
+    ])('refuses %s', (_, beats) => {
+      const result = compile({ plan: onePlan, beats });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT' }),
+      );
+    });
+
+    it('accepts a take that simply has no word timings', () => {
+      const result = compile({ plan: onePlan, beats: spoken([{ words: [] }, { words: [] }]) });
+
+      expect(result.ok).toBe(true);
     });
 
     it('refuses an fps that cannot produce a frame', () => {

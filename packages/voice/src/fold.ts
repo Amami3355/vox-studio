@@ -12,7 +12,7 @@
  * be written against a live call. Every property this package promises is a property of
  * the fold, and the fold is tested against a recorded alignment.
  */
-import type { Beat, TimedBeat } from '@vox/video';
+import { type Beat, type TimedBeat, type TimedWord, tokenise } from '@vox/video';
 
 /**
  * The three parallel arrays ElevenLabs returns. Seconds, per character.
@@ -74,6 +74,26 @@ export const beatOffsets = (beats: Beat[]): number[] => {
   });
 };
 
+/**
+ * The words of one beat, with the onset of each.
+ *
+ * `offset` is where this beat's text begins in the script, so a word at local index *i*
+ * is character `offset + i` of the alignment — and a word's onset is simply the start
+ * time of its first character. That is the whole trick, and it is why ADR-0004 predicted
+ * word timings would come "for free": the synthesiser already reported when it began
+ * every character it spoke, and nothing until now read past the four it was asked for.
+ *
+ * `tokenise` is imported rather than written here on purpose. The compiler proves this
+ * fold's output *is* the tokenisation of the beat text, so a second definition of a word
+ * living in this package would make that proof compare two things that were allowed to
+ * disagree.
+ */
+const wordsOf = (text: string, offset: number, starts: number[]): TimedWord[] =>
+  tokenise(text).map((word) => ({
+    text: word.text,
+    fromMs: Math.round((starts[offset + word.index] as number) * 1000),
+  }));
+
 export const foldAlignment = (beats: Beat[], alignment: Alignment): TimedBeat[] => {
   if (beats.length === 0) {
     throw new AlignmentMismatchError(
@@ -110,6 +130,7 @@ export const foldAlignment = (beats: Beat[], alignment: Alignment): TimedBeat[] 
   return beats.map((beat, i) => ({
     id: beat.id,
     text: beat.text,
+    words: wordsOf(beat.text, offsets[i] as number, starts),
     fromMs: ms(starts[offsets[i] as number] as number),
     /**
      * The tail is the only value in the system read from an end time, and it is the least

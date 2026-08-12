@@ -49,8 +49,23 @@ are the Remotion domain; the compiler is the one place they meet.
 a beat travels through: `Beat` narrative → `TimedBeat` audio → `FrameBeat` Remotion. Only
 the compiler crosses the second seam. Avoid: calling any of the three just "beat" in code.
 
-**Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`. The agent
-writes anchors. The compiler writes frames. An agent that writes a frame is a bug.
+**Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`,
+`b2.word:London`. The agent writes anchors. The compiler writes frames. An agent that
+writes a frame is a bug.
+
+**Word anchor** — The one anchor form that names a word instead of arithmetic:
+`b2.word:London` resolves to the frame the narrator begins that word. For events that must
+land on what is being said — a highlight is a pointing gesture — because no boundary,
+midpoint or offset of a beat lands on a particular word. The word must appear **exactly
+once** in that beat: twice is `AMBIGUOUS_ANCHOR`, since picking one silently is the defect
+this form exists to repair. No offset is allowed. Resolvable only against a real take, never
+`syntheticBeats`. See ADR-0002's last amendment. Avoid: "snapping", which was measured and
+rejected.
+
+**Timed word** — One word of a beat and the moment it begins, in milliseconds. Carried on
+the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information
+beside the beat, the same information the alignment always had. Empty means "this take was
+never recorded", which is legal; a word anchor against it is not.
 
 **Motion profile** — A motion *role* chosen per scene from a closed set
 (`editorialStatic`, `subtleDrift`, `pushIn`, `energetic`, `impact`, `cinematic`).
@@ -116,6 +131,7 @@ which is what makes a video's composition assertable without rendering it. Avoid
 packages/voice/           TTS: a recorded take → TimedBeat[]. Pure fold, impure shell
 packages/video/           the scene library — everything Remotion renders
   src/assets/             minimal Asset Resolver: identity cache, repository library, placeholder
+  src/core/               shared vocabulary: anchors and their grammar, words, slots, types
   src/design/             L0 tokens: theme, motion profiles, fonts
   src/primitives/         L1, not exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability

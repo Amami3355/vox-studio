@@ -5,6 +5,7 @@
  * plus a warning. The two regimes are distinct and never overlap: nothing in this file
  * turns a warning into an error or the reverse.
  */
+import { ANCHOR_EXPECTATION, parseAnchor } from '../core/anchor-grammar';
 import { ASSET_REQUIREMENT_FIELD, assetRequirementSchema } from '../core/assets';
 import {
   ALL_SLOTS,
@@ -16,6 +17,7 @@ import {
   type SceneCapability,
   type SceneInstance,
 } from '../core/types';
+import { tokenise } from '../core/words';
 import { motionProfileIds } from '../design/motion';
 import { capabilityIds, findCapability } from '../scenes/registry';
 import { checkPlanShape } from './plan-shape';
@@ -35,8 +37,6 @@ export type VideoPlan = {
   beats: Beat[];
   sections: VideoPlanSection[];
 };
-
-const ANCHOR_RE = /^([A-Za-z0-9_-]+)\.(start|mid|end)(?:[+-](short|long))?$/;
 
 export const validateScene = (instance: SceneInstance): CompileReport => {
   const errors: CompilerError[] = [];
@@ -174,18 +174,18 @@ const validateEvents = (
       });
     }
 
-    const match = ANCHOR_RE.exec(event.at);
-    if (!match) {
+    const parsed = parseAnchor(event.at);
+    if (!parsed) {
       errors.push({
         code: 'UNKNOWN_ANCHOR',
         sceneId: instance.id,
         field: `events[${index}].at`,
-        message: `"${event.at}" is not a valid anchor. Expected <beatId>.start|mid|end with an optional +short/-short/+long/-long offset.`,
+        message: `"${event.at}" is not a valid anchor. Expected ${ANCHOR_EXPECTATION}`,
       });
       continue;
     }
 
-    const beatId = match[1] as string;
+    const beatId = parsed.beatId;
     const scope = instance.spansBeats ?? [];
     if (beatId !== 'scene' && !scope.includes(beatId)) {
       errors.push({
@@ -426,6 +426,7 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
     errors.push(...checkPartition(section.scenes, domain, 'Scene', section.id));
     errors.push(...checkSentenceBoundaries(section, textOf));
     errors.push(...checkPlacements(section, domain));
+    errors.push(...checkWordAnchors(section, textOf));
 
     let previousProfile: string | undefined;
 
@@ -456,6 +457,90 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
   }
 
   return { ok: errors.length === 0, errors, warnings };
+};
+
+/**
+ * Word anchors, answered from the plan and nothing else.
+ *
+ * This is the check that makes the vocabulary usable by an agent. Whether "London" is a
+ * word of b2 is a fact about the beat text the agent has just written — no audio, no
+ * credential, no recording, no quota. So `validate` in `tools.ts` answers it in the cold
+ * pass and the agent repairs it unaided, which is what §13's first gate measure is about.
+ *
+ * It is not a second source of truth beside `resolveAnchor`, which asks the same question
+ * of a *take*. `checkTimings` requires a take's words to be exactly the tokenisation of
+ * its text, so the two are answering one question about two representations of the same
+ * string — and the compiler's version is the unreachable defensive half, not the one an
+ * agent ever sees.
+ *
+ * Two codes, because they are two corrections. A word the beat does not speak is a typo or
+ * a misremembered beat, repaired by naming another word. A word the beat speaks twice is a
+ * well-chosen word the vocabulary cannot address, and the repair is usually to split the
+ * beat or reach for a boundary — different enough to be worth telling apart when the
+ * report is being read by something that must decide what to do about it.
+ */
+const checkWordAnchors = (
+  section: VideoPlanSection,
+  textOf: Map<string, string>,
+): CompilerError[] => {
+  const errors: CompilerError[] = [];
+
+  const check = (at: string, field: string, sceneId?: string): void => {
+    const parsed = parseAnchor(at);
+    if (!parsed || parsed.target.kind !== 'word') return;
+
+    /** Pulled out of the union here: narrowing does not survive into the callbacks below. */
+    const named = parsed.target.word;
+    const base = { sectionId: section.id, field, ...(sceneId ? { sceneId } : {}) };
+
+    /** `scene` is bounds without text, so it can answer a boundary and never a word. */
+    if (parsed.beatId === 'scene') {
+      errors.push({
+        ...base,
+        code: 'UNKNOWN_ANCHOR',
+        message: `Anchor "${at}" names a word on "scene", the pseudo-beat used for a scene's own bounds. It has no text. Name the beat that speaks the word.`,
+      });
+      return;
+    }
+
+    const text = textOf.get(parsed.beatId);
+    if (text === undefined) return; // the unknown beat is already reported by the scope check
+
+    const spoken = tokenise(text).map((word) => word.text);
+    const matches = spoken.filter((word) => word === named);
+
+    if (matches.length === 0) {
+      errors.push({
+        ...base,
+        code: 'UNKNOWN_ANCHOR',
+        message: `Anchor "${at}" names "${named}", which beat "${parsed.beatId}" does not speak.`,
+        expected: spoken,
+      });
+      return;
+    }
+
+    if (matches.length > 1) {
+      errors.push({
+        ...base,
+        code: 'AMBIGUOUS_ANCHOR',
+        message: `Anchor "${at}" is ambiguous: "${named}" appears ${matches.length} times in beat "${parsed.beatId}". Name a word that appears once, or use ${parsed.beatId}.start, ${parsed.beatId}.mid or ${parsed.beatId}.end.`,
+      });
+    }
+  };
+
+  for (const scene of section.scenes) {
+    for (const [index, event] of (scene.events ?? []).entries()) {
+      check(event.at, `events[${index}].at`, scene.id);
+    }
+  }
+
+  for (const element of section.persistent ?? []) {
+    for (const [index, placement] of element.placements.entries()) {
+      check(placement.at, `persistent[${element.id}].placements[${index}].at`);
+    }
+  }
+
+  return errors;
 };
 
 /**
@@ -500,18 +585,18 @@ const checkPlacements = (section: VideoPlanSection, scope: string[]): CompilerEr
         });
       }
 
-      const match = ANCHOR_RE.exec(placement.at);
-      if (!match) {
+      const parsed = parseAnchor(placement.at);
+      if (!parsed) {
         errors.push({
           code: 'UNKNOWN_ANCHOR',
           sectionId: section.id,
           field: `${field}.at`,
-          message: `"${placement.at}" is not a valid anchor. Expected <beatId>.start|mid|end with an optional +short/-short/+long/-long offset.`,
+          message: `"${placement.at}" is not a valid anchor. Expected ${ANCHOR_EXPECTATION}`,
         });
         continue;
       }
 
-      const beatId = match[1] as string;
+      const beatId = parsed.beatId;
       if (!scope.includes(beatId)) {
         errors.push({
           code: 'UNKNOWN_ANCHOR',

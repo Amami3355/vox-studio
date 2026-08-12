@@ -17,6 +17,22 @@ import { NO_SAFE_AREA } from '../src/core/types';
 import { type ShippedPlan, compileShippedPlan, shippedPlans } from '../src/plans';
 import { requireCapability } from '../src/scenes/registry';
 
+/**
+ * The actions whose payload names a word *and* whose whole meaning is "this one, now".
+ *
+ * A highlight is a pointing gesture: it refers to a datum at the moment the narrator does,
+ * and landing it elsewhere is the §12 defect. An `annotate` names the bar its note attaches
+ * to and takes its timing from the sentence that justifies the note, which may be a beat
+ * away — so holding it to the same rule would be wrong rather than strict.
+ *
+ * Written here as a list because the catalog does not say which of an action's payload
+ * fields refer to something spoken. That belongs on the capability eventually — it is the
+ * kind of fact the manifest exists to publish, and the agent could use it as well as this
+ * test can. Until then, one list, in the open, rather than a gate that quietly checks less
+ * than it appears to.
+ */
+const DEICTIC_ACTIONS = ['highlightBar'];
+
 const sliceOf = (id: string): ShippedPlan => {
   const found = shippedPlans.find((plan) => plan.id === id);
   if (!found) throw new Error(`No shipped plan "${id}".`);
@@ -80,22 +96,22 @@ describe('the vertical slice', () => {
    * at `important`, a character has silently stopped appearing and this test is what says
    * so.
    *
-   * **The two hurried scenes arrived with the real voice-over, and they are the finding.**
+   * **The two hurried scenes are gone, and how they went is the record worth keeping.**
    * The hand-written timings gave b1 six seconds and b4 six and a half, which is exactly
-   * `image_context`'s recommended 180 frames — so the fixture had been quietly handing
-   * both scenes the duration the capability asks for. Read aloud, those sentences take
-   * 4.64s and 5.12s, and both scenes now play under it. That is §12's whole argument for
-   * an imperative real take: invented round-second boundaries flatter the plan, and
-   * nothing in the system could see it until something actually spoke the words.
+   * `image_context`'s recommended 180 frames — so the fixture had been quietly handing both
+   * scenes the duration the capability asks for. Read aloud, those same sentences took
+   * 4.64s and 5.12s, and both scenes compiled `SCENE_BELOW_RECOMMENDED_DURATION`. That is
+   * §12's whole argument for an imperative real take: invented round-second boundaries
+   * flatter the plan, and nothing in the system could see it until something spoke the
+   * words.
    *
-   * Recorded rather than repaired. `quality` means it reads hurried, not broken, and the
-   * two available fixes — write longer beats, or lower the recommendation — are editorial
-   * judgements this test has no business making on its own.
+   * The repair was editorial, which is why it waited for a human. b1 and b4 each gained a
+   * clause rather than the recommendation being lowered to meet them — the capability's
+   * 180 frames is a claim about how long its animation needs to read, and shortening the
+   * claim to fit the writing would have made the warning unable to fire again.
    */
-  it('reports the two relocations and the two hurried scenes, and nothing louder', () => {
+  it('reports the two relocations, and nothing louder', () => {
     expect(report.warnings.map((warning) => [warning.code, warning.severity])).toEqual([
-      ['SCENE_BELOW_RECOMMENDED_DURATION', 'quality'],
-      ['SCENE_BELOW_RECOMMENDED_DURATION', 'quality'],
       ['SLOT_RELOCATED', 'info'],
       ['SLOT_RELOCATED', 'info'],
     ]);
@@ -187,6 +203,112 @@ describe('the vertical slice', () => {
     });
 
     expect(overlaps).toEqual([]);
+  });
+
+  /**
+   * §12's *"les événements tombent sur les mots attendus"*, as an assertion rather than an
+   * argument. The last of its success criteria that no test held.
+   *
+   * The rule: when an event's payload names something the narrator says out loud, the event
+   * fires while the narrator is saying it. `highlightBar { label: 'London' }` is a claim
+   * about a word, and the bar lighting up 150 frames after that word has passed is the
+   * defect — visible to anyone watching, invisible to everything else in this repository.
+   *
+   * **Independent of the anchor, which is what makes it worth keeping.** The threshold is
+   * measured between the event's compiled frame and the onset the *take* recorded for the
+   * word in the event's *payload*. Nothing makes those agree: the anchor is authored
+   * separately, and `b1.start` with a London payload compiles perfectly. So this stays a
+   * real constraint after word anchors exist rather than restating that they resolve.
+   *
+   * Twelve frames — four hundred milliseconds. Loose enough that a deliberate `+short` lag
+   * off a boundary still passes, tight enough that a highlight is unmistakably on its word.
+   * The defect it was written against missed by 150.
+   *
+   * Derived from the take, never hardcoded: re-recording moves every frame in this table,
+   * and what is being checked survives that.
+   */
+  it('fires every event that names a word while that word is being spoken', () => {
+    const TOLERANCE_FRAMES = 12;
+    const spoken = document.beats.flatMap((beat) => beat.words);
+
+    const late = (document.sections[0]?.scenes ?? []).flatMap((scene) =>
+      scene.events.flatMap((event) => {
+        if (!DEICTIC_ACTIONS.includes(event.action)) return [];
+        const label = (event.payload as { label?: string } | undefined)?.label;
+        if (label === undefined) return [];
+
+        /**
+         * Every utterance of the word, not the first. A script may say "London" twice and
+         * an event is early or late relative to whichever one it was written for — taking
+         * the nearest is what keeps this a test of landing rather than of word choice.
+         */
+        const utterances = spoken.filter((word) => word.text === label);
+        if (utterances.length === 0) return [];
+
+        const at = scene.from + event.frame;
+        const distances = utterances.map((word) => Math.abs(at - word.frame));
+        const nearest = Math.min(...distances);
+
+        return nearest <= TOLERANCE_FRAMES
+          ? []
+          : [
+              `${event.action}("${label}") fires at frame ${at}, ${nearest} frames from the nearest time "${label}" is spoken (${utterances.map((w) => w.frame).join(', ')})`,
+            ];
+      }),
+    );
+
+    expect(late).toEqual([]);
+  });
+
+  /**
+   * The gate above can only discriminate if the slice actually names words in payloads and
+   * the take actually reports them. Both have been silently absent before — a take with no
+   * word timings passes every assertion above vacuously, and so does a plan whose events
+   * carry no labels.
+   */
+  it('has words to check against, and a deictic event that names one', () => {
+    expect(document.beats.every((beat) => beat.words.length > 0)).toBe(true);
+
+    const checked = (document.sections[0]?.scenes ?? [])
+      .flatMap((scene) => scene.events)
+      .filter(
+        (event) =>
+          DEICTIC_ACTIONS.includes(event.action) &&
+          (event.payload as { label?: string } | undefined)?.label !== undefined,
+      );
+
+    expect(checked.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * `annotate` is excluded from the gate above, and this is what holds it instead.
+   *
+   * Its payload names the bar the note attaches to; it does not name the moment. The
+   * annotation here reads "Twenty points above Berlin", and the narrator says Berlin and
+   * "twenty points" a whole beat after saying London — so anchoring it to "London" would
+   * put the comparison on screen before either side of it has been spoken. Timing an
+   * annotation follows the sentence that justifies it, not the bar it points at.
+   *
+   * What is still checkable, and worth checking, is the order: a note about a bar that has
+   * not been highlighted yet is a note about a bar the viewer has not been shown.
+   */
+  it('annotates the London bar only after it has been highlighted', () => {
+    const chart = document.sections[0]?.scenes.find((scene) => scene.id === 'chart');
+    if (!chart) throw new Error('the slice compiled without its chart scene');
+
+    const frameOf = (action: string) =>
+      chart.events.find(
+        (event) =>
+          event.action === action &&
+          (event.payload as { label?: string } | undefined)?.label === 'London',
+      )?.frame;
+
+    const highlight = frameOf('highlightBar');
+    const annotation = frameOf('annotate');
+
+    expect(highlight).toBeDefined();
+    expect(annotation).toBeDefined();
+    expect(annotation as number).toBeGreaterThan(highlight as number);
   });
 
   /**

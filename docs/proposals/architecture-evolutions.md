@@ -72,12 +72,26 @@ beats, and §12 makes it an imperative constraint of the vertical slice.
 derived from n+1 character start-offsets. Was Google Cloud TTS `v1beta1` with one SSML
 `<mark>` per boundary, until ADR-0004.
 
-The anchor grammar the agent can write is entirely beat-relative (`ANCHOR_RE` in
-`catalog/validate.ts`), so the compiler consumes beat boundaries, never word timings.
-Character timings give those boundaries exactly; an aligner would give them approximately.
+Character timings give beat boundaries exactly; an aligner would give them approximately.
 The distinction survives the change of provider — timestamps returned *by the synthesiser*
 are a report, not an inference — so §7.2's "alignement forcé" is still not what was built.
 See ADR-0004, and ADR-0002 for the argument it inherits.
+
+## The anchor grammar gains a word form
+
+**Frozen doc:** §7.2's anchor vocabulary is entirely beat-relative, and §12 requires that
+"les événements tombent sur les mots attendus" without saying how an event names a word.
+**Decision:** the grammar gains `<beatId>.word:<word>` beside `start|mid|end`, and the take
+carries a word onset per word. `ANCHOR_RE` is gone: one grammar in `core/anchor-grammar.ts`,
+parsed by both the validator and the resolver, with one tokeniser in `core/words.ts` shared
+with the fold.
+
+The first real take showed the two are not the same requirement. Boundary anchors are exact
+and still landed on the wrong words, because arithmetic over a beat cannot name one — the
+slice highlighted London on the exact frame the narrator began "Berlin". ADR-0002 expected
+to close this with a snapping rule and the measurement rejected it: the failing anchor was
+already on an onset. Rule 3 is unaffected — an agent naming a word writes less arithmetic
+than one naming a midpoint, not more. See ADR-0002's last amendment.
 
 ## §3 resolution is per scene, and relocation targets must already be declared
 

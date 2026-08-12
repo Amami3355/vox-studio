@@ -50,8 +50,8 @@ const NARRATOR_REQUIREMENT = {
 
 /** Long enough that both scenes clear the `minDurationFrames` their capabilities declare. */
 const timedBeats: TimedBeat[] = [
-  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000 },
-  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000 },
+  { id: 'b1', text: 'Rents have climbed for a decade.', fromMs: 0, toMs: 3000, words: [] },
+  { id: 'b2', text: 'London is the extreme case.', fromMs: 3000, toMs: 8000, words: [] },
 ];
 
 const scenes = [

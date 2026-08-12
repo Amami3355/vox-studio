@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type FrameBeat,
   UnknownAnchorError,
+  UnresolvableWordError,
   resolveAnchor,
   resolveEventTimings,
   syntheticBeats,
@@ -10,11 +12,11 @@ const beats = syntheticBeats(['b1', 'b2', 'b3'], 300);
 const bounds = { from: 0, to: 300 };
 
 describe('syntheticBeats', () => {
-  it('splits the duration evenly and covers it exactly', () => {
+  it('splits the duration evenly and covers it exactly, and speaks no words', () => {
     expect(beats).toEqual([
-      { id: 'b1', from: 0, to: 100 },
-      { id: 'b2', from: 100, to: 200 },
-      { id: 'b3', from: 200, to: 300 },
+      { id: 'b1', from: 0, to: 100, words: [] },
+      { id: 'b2', from: 100, to: 200, words: [] },
+      { id: 'b3', from: 200, to: 300, words: [] },
     ]);
   });
 
@@ -62,6 +64,123 @@ describe('resolveAnchor', () => {
     expect(() => resolveAnchor('b1', beats, bounds)).toThrow(UnknownAnchorError);
     expect(() => resolveAnchor('b1.middle', beats, bounds)).toThrow(UnknownAnchorError);
     expect(() => resolveAnchor('frame 312', beats, bounds)).toThrow(UnknownAnchorError);
+  });
+});
+
+/**
+ * The vocabulary that repairs "the events do not land on the words".
+ *
+ * ADR-0002 left snapping an arithmetic anchor to the nearest word as the open repair.
+ * Measured against the shipped take it was the wrong one: the worst failure in the slice —
+ * `highlightBar` on London — already sat exactly on a word onset, and the onset was
+ * "Berlin"'s. Precision was never what was missing. The ability to say *which word* was.
+ */
+describe('word anchors', () => {
+  /** A take, so the words are measured rather than fabricated. `syntheticBeats` has none. */
+  const spoken: FrameBeat[] = [
+    {
+      id: 'b1',
+      from: 0,
+      to: 100,
+      words: [
+        { text: 'Rent', frame: 0 },
+        { text: 'has', frame: 20 },
+        { text: 'climbed', frame: 55 },
+      ],
+    },
+    {
+      id: 'b2',
+      from: 100,
+      to: 200,
+      words: [
+        { text: 'In', frame: 100 },
+        { text: 'London', frame: 121 },
+        { text: 'rent', frame: 160 },
+        { text: 'beats', frame: 180 },
+        { text: 'rent', frame: 190 },
+      ],
+    },
+  ];
+
+  it('resolves to the frame the word begins on', () => {
+    expect(resolveAnchor('b2.word:London', spoken, bounds)).toBe(121);
+    expect(resolveAnchor('b1.word:climbed', spoken, bounds)).toBe(55);
+  });
+
+  /**
+   * The assertion that says why this vocabulary exists rather than a snapping rule. `b2`'s
+   * boundaries and midpoint are 100, 150 and 200; "London" is at 121, which is not the
+   * nearest anything. No arithmetic over this beat produces it.
+   */
+  it('reaches a frame no boundary, midpoint or offset of that beat can', () => {
+    const arithmetic = [
+      resolveAnchor('b2.start', spoken, bounds),
+      resolveAnchor('b2.mid', spoken, bounds),
+      resolveAnchor('b2.end', spoken, bounds),
+      resolveAnchor('b2.start+short', spoken, bounds),
+      resolveAnchor('b2.start+long', spoken, bounds),
+      resolveAnchor('b2.mid-short', spoken, bounds),
+    ];
+
+    expect(arithmetic).not.toContain(121);
+  });
+
+  it('refuses a word the beat does not speak, and lists the ones it does', () => {
+    expect(() => resolveAnchor('b2.word:Berlin', spoken, bounds)).toThrow(UnresolvableWordError);
+    try {
+      resolveAnchor('b2.word:Berlin', spoken, bounds);
+    } catch (error) {
+      expect((error as Error).message).toContain('In, London, rent, beats, rent');
+    }
+  });
+
+  /**
+   * The decision this vocabulary turns on. Resolving to the first "rent" would be a silent
+   * choice of which word the picture cuts on — the exact failure the vocabulary exists to
+   * prevent, arriving through the mechanism built to prevent it.
+   */
+  it('refuses a word the beat speaks twice rather than picking one', () => {
+    expect(() => resolveAnchor('b2.word:rent', spoken, bounds)).toThrow(UnresolvableWordError);
+    try {
+      resolveAnchor('b2.word:rent', spoken, bounds);
+    } catch (error) {
+      expect((error as Error).message).toContain('appears 2 times');
+    }
+  });
+
+  /** The same word in a *different* beat is not ambiguous — scope is the beat. */
+  it('resolves a word that is repeated across beats but unique within one', () => {
+    expect(resolveAnchor('b1.word:has', spoken, bounds)).toBe(20);
+  });
+
+  /**
+   * A synthetic take can answer where a beat begins and never when a word was spoken.
+   * Fabricating an onset from a duration would produce a number indistinguishable from a
+   * measured one, which is the failure mode this whole increment removes.
+   */
+  it('refuses a word anchor against a take that has no words', () => {
+    expect(() => resolveAnchor('b2.word:London', beats, bounds)).toThrow(UnresolvableWordError);
+  });
+
+  it('refuses a word on the scene pseudo-beat, which has bounds and no text', () => {
+    expect(() => resolveAnchor('scene.word:London', spoken, bounds)).toThrow(UnresolvableWordError);
+  });
+
+  /**
+   * `-long` is an offset and a hyphen is a word character, so `b2.word:month-long` could
+   * only ever be read one way — and English has enough `-long` compounds that guessing
+   * would be a real misparse rather than a hypothetical one. A word anchor names the word
+   * and nothing else; the next word is what "slightly later" means here.
+   */
+  it('takes no offset, so a hyphenated word cannot be misread as one', () => {
+    expect(() => resolveAnchor('b2.word:London+short', spoken, bounds)).toThrow(UnknownAnchorError);
+  });
+
+  it("treats an apostrophe as inside a word and doesn't split on it", () => {
+    const withApostrophe: FrameBeat[] = [
+      { id: 'b1', from: 0, to: 100, words: [{ text: "Europe's", frame: 12 }] },
+    ];
+    expect(resolveAnchor("b1.word:Europe's", withApostrophe, bounds)).toBe(12);
   });
 });
 

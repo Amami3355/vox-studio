@@ -1,26 +1,342 @@
 [
   {
     "id": "b1",
-    "text": "Across Europe's biggest cities, rent has climbed every year for a decade.",
+    "text": "Across Europe's biggest cities, rent has climbed every year for a decade, and pay has not come close to keeping up.",
+    "words": [
+      {
+        "text": "Across",
+        "fromMs": 0
+      },
+      {
+        "text": "Europe's",
+        "fromMs": 446
+      },
+      {
+        "text": "biggest",
+        "fromMs": 850
+      },
+      {
+        "text": "cities",
+        "fromMs": 1257
+      },
+      {
+        "text": "rent",
+        "fromMs": 1984
+      },
+      {
+        "text": "has",
+        "fromMs": 2280
+      },
+      {
+        "text": "climbed",
+        "fromMs": 2460
+      },
+      {
+        "text": "every",
+        "fromMs": 2920
+      },
+      {
+        "text": "year",
+        "fromMs": 3200
+      },
+      {
+        "text": "for",
+        "fromMs": 3560
+      },
+      {
+        "text": "a",
+        "fromMs": 3720
+      },
+      {
+        "text": "decade",
+        "fromMs": 3829
+      },
+      {
+        "text": "and",
+        "fromMs": 4620
+      },
+      {
+        "text": "pay",
+        "fromMs": 4880
+      },
+      {
+        "text": "has",
+        "fromMs": 5160
+      },
+      {
+        "text": "not",
+        "fromMs": 5320
+      },
+      {
+        "text": "come",
+        "fromMs": 5472
+      },
+      {
+        "text": "close",
+        "fromMs": 5667
+      },
+      {
+        "text": "to",
+        "fromMs": 6027
+      },
+      {
+        "text": "keeping",
+        "fromMs": 6130
+      },
+      {
+        "text": "up",
+        "fromMs": 6560
+      }
+    ],
     "fromMs": 0,
-    "toMs": 4640
+    "toMs": 7080
   },
   {
     "id": "b2",
-    "text": "In London, a median income now loses almost half of itself to rent alone.",
-    "fromMs": 4640,
-    "toMs": 10331
+    "text": "Nowhere is that gap wider than in London, where a median income now loses almost half of itself to rent alone.",
+    "words": [
+      {
+        "text": "Nowhere",
+        "fromMs": 7080
+      },
+      {
+        "text": "is",
+        "fromMs": 8107
+      },
+      {
+        "text": "that",
+        "fromMs": 8208
+      },
+      {
+        "text": "gap",
+        "fromMs": 8480
+      },
+      {
+        "text": "wider",
+        "fromMs": 8787
+      },
+      {
+        "text": "than",
+        "fromMs": 9152
+      },
+      {
+        "text": "in",
+        "fromMs": 9333
+      },
+      {
+        "text": "London",
+        "fromMs": 9509
+      },
+      {
+        "text": "where",
+        "fromMs": 10067
+      },
+      {
+        "text": "a",
+        "fromMs": 10440
+      },
+      {
+        "text": "median",
+        "fromMs": 10537
+      },
+      {
+        "text": "income",
+        "fromMs": 10960
+      },
+      {
+        "text": "now",
+        "fromMs": 11540
+      },
+      {
+        "text": "loses",
+        "fromMs": 11920
+      },
+      {
+        "text": "almost",
+        "fromMs": 12377
+      },
+      {
+        "text": "half",
+        "fromMs": 12784
+      },
+      {
+        "text": "of",
+        "fromMs": 13067
+      },
+      {
+        "text": "itself",
+        "fromMs": 13189
+      },
+      {
+        "text": "to",
+        "fromMs": 13627
+      },
+      {
+        "text": "rent",
+        "fromMs": 13760
+      },
+      {
+        "text": "alone",
+        "fromMs": 14173
+      }
+    ],
+    "fromMs": 7080,
+    "toMs": 14903
   },
   {
     "id": "b3",
     "text": "Berlin sits twenty points lower, and the distance between them keeps growing.",
-    "fromMs": 10331,
-    "toMs": 15360
+    "words": [
+      {
+        "text": "Berlin",
+        "fromMs": 14903
+      },
+      {
+        "text": "sits",
+        "fromMs": 16080
+      },
+      {
+        "text": "twenty",
+        "fromMs": 16446
+      },
+      {
+        "text": "points",
+        "fromMs": 16766
+      },
+      {
+        "text": "lower",
+        "fromMs": 17120
+      },
+      {
+        "text": "and",
+        "fromMs": 17820
+      },
+      {
+        "text": "the",
+        "fromMs": 18040
+      },
+      {
+        "text": "distance",
+        "fromMs": 18204
+      },
+      {
+        "text": "between",
+        "fromMs": 18610
+      },
+      {
+        "text": "them",
+        "fromMs": 18992
+      },
+      {
+        "text": "keeps",
+        "fromMs": 19173
+      },
+      {
+        "text": "growing",
+        "fromMs": 19500
+      }
+    ],
+    "fromMs": 14903,
+    "toMs": 20300
   },
   {
     "id": "b4",
-    "text": "The squeeze is quietly deciding who can still afford to live in a city at all.",
-    "fromMs": 15360,
-    "toMs": 20480
+    "text": "The squeeze is quietly deciding who can still afford to live in a city at all, and the answer is changing every year.",
+    "words": [
+      {
+        "text": "The",
+        "fromMs": 20300
+      },
+      {
+        "text": "squeeze",
+        "fromMs": 21030
+      },
+      {
+        "text": "is",
+        "fromMs": 21573
+      },
+      {
+        "text": "quietly",
+        "fromMs": 21730
+      },
+      {
+        "text": "deciding",
+        "fromMs": 22151
+      },
+      {
+        "text": "who",
+        "fromMs": 22820
+      },
+      {
+        "text": "can",
+        "fromMs": 23160
+      },
+      {
+        "text": "still",
+        "fromMs": 23320
+      },
+      {
+        "text": "afford",
+        "fromMs": 23577
+      },
+      {
+        "text": "to",
+        "fromMs": 23973
+      },
+      {
+        "text": "live",
+        "fromMs": 24112
+      },
+      {
+        "text": "in",
+        "fromMs": 24267
+      },
+      {
+        "text": "a",
+        "fromMs": 24360
+      },
+      {
+        "text": "city",
+        "fromMs": 24480
+      },
+      {
+        "text": "at",
+        "fromMs": 24827
+      },
+      {
+        "text": "all",
+        "fromMs": 24980
+      },
+      {
+        "text": "and",
+        "fromMs": 25480
+      },
+      {
+        "text": "the",
+        "fromMs": 25880
+      },
+      {
+        "text": "answer",
+        "fromMs": 26046
+      },
+      {
+        "text": "is",
+        "fromMs": 26400
+      },
+      {
+        "text": "changing",
+        "fromMs": 26604
+      },
+      {
+        "text": "every",
+        "fromMs": 27013
+      },
+      {
+        "text": "year",
+        "fromMs": 27360
+      }
+    ],
+    "fromMs": 20300,
+    "toMs": 27760
   }
 ]

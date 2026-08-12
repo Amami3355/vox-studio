@@ -36,6 +36,11 @@ nearest word onset. That rule is not in the frozen document and is not decided h
 is recorded as an open question in `docs/handoff.md`, and the decision below makes it
 cheaper to adopt rather than harder — a mark per word costs one more mark, and is exact.
 
+> **Closed on 2026-08-13, and against this expectation.** Measured against a real take,
+> snapping was the wrong repair: the worst failure in the shipped slice was already exactly
+> on a word onset — the wrong word's. The answer is a word-naming anchor, and `.mid` stays
+> arithmetic on purpose. See the last amendment.
+
 ## Decisions
 
 > **The first two decisions below are superseded by ADR-0004.** The provider is ElevenLabs
@@ -176,6 +181,9 @@ artifact.
   rule is decided. Until then, an event that must land on a specific word belongs on a
   beat boundary — which means the writing agent's beat granularity, not the anchor, is
   what buys precision. Worth saying out loud when the beat texts for the slice are written.
+  **Superseded by the amendment of 2026-08-13**: such an event belongs on a word anchor,
+  and snapping was measured to be the wrong repair. `.mid` and the offsets stay arithmetic
+  on purpose.
 
 ## Amendments
 
@@ -240,3 +248,81 @@ backwards. Character timings are the synthesiser reporting what it spoke, not an
 inferring it from a waveform, so the class of bug this document rejected — a boundary off
 by a syllable, to be debugged — is not what was adopted. ElevenLabs' actual Forced
 Alignment API remains rejected, for the reasons given above.
+
+**2026-08-13 — open question 1 is closed, and the answer is not snapping.**
+
+This document recorded, twice, that `.mid` and offset anchors "land wherever they land,
+which is on no particular word", and named the repair it expected: a **snapping rule**, the
+compiler moving an arithmetic anchor to the nearest word onset. It called that rule
+undecided and said the decision above made it *cheaper to adopt*. The first real take made
+the question measurable, and the measurement says snapping would not have worked.
+
+The shipped slice's worst failure was `highlightBar { label: 'London' }` at `b3.start`,
+firing at frame 310. Frame 310 was the exact onset of a word. The word was **"Berlin"**.
+Snapping moves an anchor to the nearest onset; that anchor was already *on* one. A second
+failure, `revealAll` at `b2.mid`, landed mid-word on "loses" — snapping would have moved it
+about seven frames, onto "loses", still 2.2 seconds after "London" was spoken and still
+wrong. Neither defect was a precision defect. Both were the anchor naming the wrong moment
+with complete precision.
+
+So the repair is **naming, not snapping**: the grammar gains `<beatId>.word:<word>`, and an
+event that must land on a word says which word. The agent still writes no frame and no
+millisecond — rule 3 is untouched, and if anything sharpened, because "the word London" is
+more semantic than "the midpoint of b2" ever was.
+
+Four things follow, and are worth stating because each was a choice with a losing
+alternative.
+
+**Word anchors take no offset.** `b2.start+short` is meaningful — the boundary is exact and
+the lag is deliberate. `b2.word:London+short` is not: an offset from a word onset is the
+same arithmetic this branch exists to replace, one token later. Naming the next word is
+exact where `+short` is only close. It also removes a real ambiguity rather than
+documenting one: `-short` and `-long` are offsets, `-` is a word character, and
+`b2.word:month-long` would otherwise parse as "month" plus an offset, silently.
+
+**A repeated word is an error, not a first match.** `b2.word:rent` where the beat says
+"rent" twice is `AMBIGUOUS_ANCHOR`. Resolving it to the first occurrence would be a silent
+choice of which word the picture cuts on — the exact failure this branch repairs, arriving
+through the mechanism built to prevent it. The correction is cheap and an agent can make it
+unaided: name a word that appears once, or take a boundary.
+
+**The words live on the `TimedBeat`, and are a projection of its own text.** Not a separate
+`TimedWord[]` beside the take: a beat already carries its voice-over verbatim, and its words
+are that same text tokenised with onsets the character alignment always contained. So
+`checkTimings` requires `beat.words` to be exactly `tokenise(beat.text)` — equality, not
+containment, because "every word appears somewhere in the text" would accept a fold with an
+off-by-one whose output still looks like English. One tokeniser, in `core/words.ts`, shared
+by the fold, the grammar and the compiler; three definitions of a word that agreed by hand
+would make a word visible in the beat text unnameable and say nothing about why.
+
+**Empty is legal at the take and loud at the anchor.** A take that was not folded from a
+recorded alignment — `render-demo.mts`, every catalog example under `syntheticBeats` —
+genuinely has no word timings, and reports `words: []`. Fabricating onsets by spreading
+words across a duration was rejected outright: the numbers would be indistinguishable from
+measured ones and would cut the picture against the wrong syllable. So the compiler accepts
+a take with no words, and `resolveAnchor` refuses the *anchor* that asks for one, because
+that is where somebody asked.
+
+The check that matters most is the cheapest one. Whether "London" is a word of b2 is a fact
+about the beat text the agent has just written — no audio, no credential, no quota — so
+`validateVideoPlan` answers it in the cold pass and the agent repairs it unaided under §8.1.
+The compiler's version of the same question, asked of a take rather than a plan, is the
+unreachable defensive half.
+
+### What is still not word-synchronised
+
+The consequence below that reads *"an event that must land on a specific word belongs on a
+beat boundary"* is superseded: it belongs on a word anchor. But `.mid` and the offsets are
+**unchanged and still arithmetic**, deliberately. They were never broken — a push-in that
+begins halfway through a beat is not trying to land on a word — and giving them a snapping
+rule now would move every existing anchor in the catalog to serve a case that has its own
+grammar. What changed is that an event with a word in mind is no longer forced to express
+itself in arithmetic.
+
+And the vocabulary only reaches events that *name* something spoken. `annotate` names the
+bar its note attaches to, and takes its timing from the sentence that justifies the note,
+which may be a beat away — the slice's annotation reads "Twenty points above Berlin" and
+fires on "twenty" in b3, while its payload says London. Which of an action's payload fields
+refer to something the narrator says is not in the manifest, and the vertical slice's
+landing gate carries that list in the open until it is. That is the next thing this
+vocabulary wants.

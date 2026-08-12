@@ -2,11 +2,11 @@
   "beats": [
     {
       "id": "b1",
-      "text": "Across Europe's biggest cities, rent has climbed every year for a decade."
+      "text": "Across Europe's biggest cities, rent has climbed every year for a decade, and pay has not come close to keeping up."
     },
     {
       "id": "b2",
-      "text": "In London, a median income now loses almost half of itself to rent alone."
+      "text": "Nowhere is that gap wider than in London, where a median income now loses almost half of itself to rent alone."
     },
     {
       "id": "b3",
@@ -14,7 +14,7 @@
     },
     {
       "id": "b4",
-      "text": "The squeeze is quietly deciding who can still afford to live in a city at all."
+      "text": "The squeeze is quietly deciding who can still afford to live in a city at all, and the answer is changing every year."
     }
   ],
   "sections": [
@@ -78,10 +78,10 @@
           },
           "events": [
             { "at": "b2.start", "action": "showBaseline" },
-            { "at": "b2.mid", "action": "revealAll" },
-            { "at": "b3.start", "action": "highlightBar", "payload": { "label": "London" } },
+            { "at": "b2.start+long", "action": "revealAll" },
+            { "at": "b2.word:London", "action": "highlightBar", "payload": { "label": "London" } },
             {
-              "at": "b3.mid",
+              "at": "b3.word:twenty",
               "action": "annotate",
               "payload": { "label": "London", "text": "Twenty points above Berlin" }
             }
