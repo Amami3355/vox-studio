@@ -15,10 +15,13 @@ import {
   FPS,
   HEIGHT,
   type MotionProfileId,
+  type SceneCapability,
+  type Slot,
   WIDTH,
   defaultTheme,
   motionProfileIds,
   registry,
+  slotRect,
 } from '@vox/video';
 import { useMemo, useState } from 'react';
 
@@ -26,6 +29,21 @@ type Mode = 'grid' | 'filmstrip' | 'matrix';
 
 const FILMSTRIP_POSITIONS = [0, 0.2, 0.4, 0.6, 0.8, 1];
 const t = defaultTheme;
+
+/**
+ * The harness standing in for the compiler: pick a composition, hand the scene the
+ * rectangle that follows.
+ *
+ * It refuses to compose a capability into a slot that capability does not declare, which
+ * is not a convenience — it is ADR-0003 decision 1 applied to the tool. An undeclared
+ * carve is a frame nobody designed, and a grid that renders one teaches whoever is
+ * reviewing it that the frame exists. `undefined` means the whole canvas, which is what
+ * an example gets when nothing contends with it.
+ */
+const safeAreaFor = (capability: SceneCapability, composition: string) =>
+  composition && capability.meta.supportedCompositions.includes(composition as Slot)
+    ? slotRect(composition as Slot)
+    : undefined;
 
 export const App = () => {
   const flat = useMemo(
@@ -40,6 +58,17 @@ export const App = () => {
   const [mode, setMode] = useState<Mode>('grid');
   const [layoutOverride, setLayoutOverride] = useState<string>('');
   const [profileOverride, setProfileOverride] = useState<string>('');
+  const [compositionOverride, setCompositionOverride] = useState<string>('');
+
+  /**
+   * Every composition any capability declares, not just the selected one's: in grid mode
+   * the whole catalog is on screen, and the point of picking `left` there is to see which
+   * capabilities can take it and what each one does with it.
+   */
+  const compositions = useMemo(
+    () => [...new Set(registry.flatMap((c) => c.meta.supportedCompositions))],
+    [],
+  );
 
   const selected = flat.find((f) => f.example.id === selectedId) ?? flat[0];
 
@@ -103,6 +132,13 @@ export const App = () => {
               onChange={setProfileOverride}
               options={['', ...motionProfileIds]}
             />
+            <Select
+              label="composition"
+              value={compositionOverride}
+              onChange={setCompositionOverride}
+              options={['', ...compositions]}
+              emptyLabel="whole frame"
+            />
           </div>
         </header>
 
@@ -117,6 +153,7 @@ export const App = () => {
                     exampleId: example.id,
                     layout: layoutOverride || null,
                     motionProfile: (profileOverride as MotionProfileId) || null,
+                    safeArea: safeAreaFor(capability, compositionOverride),
                   }}
                   durationInFrames={capability.meta.recommendedDurationFrames}
                   fps={FPS}
@@ -131,6 +168,13 @@ export const App = () => {
                   <strong>{example.title}</strong>
                   <span style={styles.captionMeta}>
                     {example.layout} · {example.motionProfile}
+                    {compositionOverride
+                      ? ` · ${
+                          safeAreaFor(capability, compositionOverride)
+                            ? compositionOverride
+                            : `no ${compositionOverride}`
+                        }`
+                      : ''}
                   </span>
                 </figcaption>
               </figure>
@@ -158,6 +202,7 @@ export const App = () => {
                         exampleId: selected.example.id,
                         layout: layoutOverride || null,
                         motionProfile: (profileOverride as MotionProfileId) || null,
+                        safeArea: safeAreaFor(selected.capability, compositionOverride),
                       }}
                       durationInFrames={duration}
                       frameToDisplay={frame}
@@ -200,6 +245,7 @@ export const App = () => {
                             exampleId: selected.example.id,
                             layout: layoutId,
                             motionProfile: profileId,
+                            safeArea: safeAreaFor(selected.capability, compositionOverride),
                           }}
                           durationInFrames={duration}
                           frameToDisplay={Math.round(duration * 0.6)}
@@ -227,18 +273,21 @@ const Select = ({
   value,
   onChange,
   options,
+  emptyLabel = 'from example',
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: readonly string[];
+  /** What the empty option means. A composition has no example to fall back to. */
+  emptyLabel?: string;
 }) => (
   <label style={styles.selectWrap}>
     <span style={styles.selectLabel}>{label}</span>
     <select value={value} onChange={(e) => onChange(e.target.value)} style={styles.select}>
       {options.map((option) => (
         <option key={option || 'default'} value={option}>
-          {option || 'from example'}
+          {option || emptyLabel}
         </option>
       ))}
     </select>

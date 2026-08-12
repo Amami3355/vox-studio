@@ -28,6 +28,17 @@ import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
 export type { CompiledDocument, CompiledScene, CompiledSection } from './document';
 
+/**
+ * The slot table, published from the compiler rather than from `core` on purpose.
+ *
+ * `core/slots.ts` says the compiler is its only consumer, and that stands: a *scene* that
+ * reads it is reading a vocabulary it is specified never to see. But Component Studio has
+ * to stand in for the compiler — it picks a composition a capability declares and hands
+ * the scene the rectangle that follows — and the alternative is a second table in the
+ * harness, which is exactly the drift ADR-0003 decision 5 exists to prevent.
+ */
+export { type Rect, slotRect } from '../core/slots';
+
 export type CompileInput = {
   plan: VideoPlan;
   /** From `packages/voice`, or a fixture. The compiler never calls TTS itself. */
