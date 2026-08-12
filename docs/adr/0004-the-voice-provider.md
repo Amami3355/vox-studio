@@ -85,9 +85,13 @@ normalised array shifts every boundary in any script containing a number, silent
 
 This is the same class of failure as ADR-0002's seconds-versus-milliseconds warning, and
 earns the same treatment: written down before it is met. `packages/voice` reads
-`alignment` and never `normalized_alignment`. If the two arrays differ in length, the
-script contained text that normalised — which is exactly when to be suspicious, and cheap
-enough to assert.
+`alignment` and never `normalized_alignment`.
+
+A difference in length between the two is **not** a usable signal that something normalised
+— see the amendment below, where it was measured firing on prose containing nothing to
+normalise. The assertion that does hold is against the input: `alignment.characters` must
+have exactly as many entries as the script has UTF-16 units, and joining them must
+reproduce the script.
 
 **5. The slice speaks English.** This was never decided, and the absence has been read as
 a decision in both directions: §12 of the frozen document writes its example beats in
@@ -172,3 +176,53 @@ ADR-0002 updated §41, §17.3 and §47 when it superseded the separate-`Script` 
   nécessaire" — is now also out of date**, for a different reason and by a different
   decision. It is left alone here deliberately; it belongs with whatever documents the
   asset generation loop.
+
+## Amendments
+
+**2026-08-12 — decision 7 reporting back.** The spike was run the same day this document
+was written. Everything below is measured against the live API rather than argued, and it
+closes two of the consequences above and corrects one sentence of decision 4.
+
+**Decision 3 is validated end to end.** Both fixture beats were synthesised as a single
+script — `"Rents have climbed for a decade."`, a space, `"London is the extreme case."`,
+60 UTF-16 units — and folded into a `TimedBeat[]` by the rule above. Put through the real
+`checkTimings`: **zero errors**. The same alignment folded the naive way, each beat ending
+at the end of its own last character, fails with exactly the error this document predicted:
+*"Beat b2 starts at 2240ms where b1 ended at 2160ms."* The inter-beat silence is **80ms** —
+2.4 frames at 30fps, a black flash of two or three frames between two scenes, on a
+two-sentence script. The hazard is not theoretical and the interval is not small.
+
+**The script is beat texts joined by a separator, and the separator has to be in the
+arithmetic.** ADR-0002 says the script is "the ordered concatenation of beat texts", which
+taken literally would have the voice read "a decade.London". A single space between beats
+is what was synthesised, so `offset(i)` advances by `text.length + separator.length` and
+the separator's own time falls inside the preceding beat's window — which is correct, and
+is the reason the derived beats are contiguous rather than merely close. `packages/voice`
+owns the separator, and it must be the same string used to build the request and to compute
+the offsets. Two sources for it would be rule 1's violation in miniature.
+
+**`eleven_v3` returns full character alignment**, which closes the open consequence above.
+There is no quality-versus-timing trade to make: the most expressive model is also the one
+with timings. Its 5 000-character ceiling is what distinguishes it from
+`eleven_multilingual_v2`'s 10 000, and that is a *video length* constraint rather than a
+timing one — which is worth its own line, below.
+
+**The UTF-16 assumption holds and is now asserted rather than trusted.** 32 characters in,
+32 entries out; 60 in, 60 out; joining the array reproduced the input exactly, in both
+runs.
+
+**Decision 4's suggested guard was wrong, and the measurement is the reason.**
+`eleven_multilingual_v2` returned **34** entries in `normalized_alignment` against 32 in
+`alignment` — for a sentence containing no number, abbreviation or symbol. `eleven_v3`
+returned 32 and 32 for the same input. So a length difference between the two arrays is
+ordinary, varies by model, and would have been a false alarm on the first call. The
+decision to read only `alignment` is strengthened by this; the assertion built on top of it
+is removed, and replaced with the one that held.
+
+**A video is capped by one synthesis request.** Because boundaries are offsets into a
+single alignment array, two responses cannot be stitched — their offsets have no common
+origin. The whole script therefore goes in one call, and `maximum_text_length_per_request`
+becomes a ceiling on narration length: roughly 5 000 characters under `eleven_v3`, 10 000
+under `eleven_multilingual_v2`. Nothing near the 30-second slice, and a real constraint on
+the product. Whether long videos are synthesised per section, with each section's alignment
+independent, is a question for whoever first needs one.
