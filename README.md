@@ -35,6 +35,9 @@ with step 5 deliberately cut to the smallest continuity-testable scope:
 - **Minimal compiler** — a plan plus real beat timings become a compiled document:
   milliseconds to frames, anchors to absolute frames, and slot conflicts resolved per
   ADR-0003. The document is JSON, so what a video *composes* is testable without a browser.
+  It refuses what it cannot compile honestly — timings that are not a projection of the
+  plan, and scenes too short for the animation their capability is built around — and says
+  in the report when a scene is rendering a placeholder rather than a picture.
 - **Section runtime** — one generic component plays a compiled document, persistent
   elements included. It takes no layout decisions; the compiler already took them.
 - **Component Studio** — grid, six-frame filmstrip and layout × motion-profile matrix.

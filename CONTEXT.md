@@ -70,7 +70,9 @@ vocabularies never cross.
 **Slot conflict** — A scene's occupancy overlapping a persistent element's placement.
 Resolved in favour of what was declared: a composition the scene supports, failing that
 another slot the element already uses in the section, failing that the element is hidden
-for the scene. The compiler never invents a position. See ADR-0003.
+for the scene. The compiler never invents a position. The **scene** is the unit and it is
+solved as a whole — one composition, every element crossing it resolved against that same
+composition, held for the scene's duration. See ADR-0003.
 
 **Action** — A member of a capability's *closed* event vocabulary (`highlightBar`,
 `annotate`). An action outside the vocabulary is a compilation error, never a silence.
