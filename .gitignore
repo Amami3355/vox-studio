@@ -10,3 +10,4 @@ build/
 coverage/
 .vite/
 .turbo/
+.scratch/section-compiler/output/
