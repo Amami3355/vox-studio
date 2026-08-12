@@ -108,19 +108,25 @@ moment it is being watched.
 
 ## Consequences
 
-- **`PersistentElement` changes shape, and so does the vertical slice's JSON.** The
-  narrator's inline `data:` URI becomes a requirement with an `identityKey`, and the SVG
-  moves into `assets/library.ts` beside the housing stand-in. Until that lands, the plan
-  carries a reference the boundary forbids, and this document is ahead of the code.
-- **The resolver's scope widens from a `SceneInstance` to anything carrying requirements.**
-  `resolveSceneAssets` takes a scene today; a section's persistent elements need the same
-  service from the same identity cache, or two narrators in one section could resolve
-  differently — which is the exact bug the identity-first rule exists to prevent.
-- **`SceneRenderer`'s `MISSING_ASSET_REFERENCE` guard has no counterpart for elements.**
-  `CompiledVideo` draws nothing for an element with no asset and says so is deliberate
-  ("inventing a stand-in here would be the runtime deciding"). Once elements carry
-  requirements, an unresolved one is a warning at compile time rather than a silent
-  absence at render time.
+- **`PersistentElement` changed shape, and so did the vertical slice's JSON.** *Done in
+  the same session.* The narrator's inline `data:` URI became a requirement with an
+  `identityKey`, and the SVG moved into `assets/library.ts` beside the housing stand-in;
+  `scripts/render-demo.mts` went with it, so the pattern that predated the plan is gone
+  too. `catalog/validate.ts` parses the requirement, where it had not looked at the asset
+  field at all. The rendered frame is unchanged — the same figure, arriving by the route
+  the boundary specifies.
+- **The resolver is shared between scenes and elements, not merely alike.** The compiler
+  passes elements the *same* `AssetResolver` instance the scenes used, so both draw on one
+  identity cache: an element and a scene declaring the same `identityKey` resolve to the
+  same picture, and `tests/compile.test.ts` asserts it. Two resolvers would have been the
+  exact bug the identity-first rule exists to prevent.
+- **`SceneRenderer`'s `MISSING_ASSET_REFERENCE` guard still has no counterpart for
+  elements**, and now needs one less badly. `CompiledVideo` drawing nothing for an element
+  with no asset remains deliberate — "inventing a stand-in here would be the runtime
+  deciding" — but an element whose requirement did not resolve is now an
+  `ASSET_PLACEHOLDER` warning at compile time rather than a silent absence at render time.
+  An element with no requirement *at all* is still silent, which is correct: a `label` does
+  not need a picture.
 - **A character still fills its whole slot.** `PersistentElementLayer` fits the asset to
   the slot rect, so an element at `left` occupies half the canvas. Nothing here changes
   that, and it is the wrong thing to judge against a placeholder — but the generated art
