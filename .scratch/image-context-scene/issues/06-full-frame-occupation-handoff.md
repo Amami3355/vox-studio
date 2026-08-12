@@ -32,3 +32,9 @@ it immediately before the Section runtime, not inside it.
 
 Rationale recorded in `meta.ts` so the next reader does not re-litigate it from the
 layout geometry alone.
+
+**Resolved, 2026-08-12** — `docs/adr/0003-slot-conflict-resolution.md`. The compiler hides
+the persistent element for the duration of this scene and warns. It does not carve: the
+rule is that the compiler chooses only among declared alternatives, and this scene declares
+none it can yield into. Making the character survive is a design act — a layout the scene
+can be composed into, declared in `supportedCompositions` — not a compiler behaviour.

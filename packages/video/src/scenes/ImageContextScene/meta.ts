@@ -8,12 +8,15 @@
  * On `occupiesRegions: ['full']` — it is the honest declaration, not a placeholder for a
  * finer one. `splitLeft` is a 7/5 division *of the whole frame*: there is no quadrant it
  * leaves empty, so claiming `left` or `right` would tell the compiler a corner is free
- * when a headline is sitting in it. Coexistence with a persistent element is bought
- * through `safeArea` — the compiler shrinks the frame, the layout reflows — and not by
- * pretending the scene occupies less than it does. `supportedCompositions: ['full']`
- * follows: with one layout, being composed *into* a half is a capability this scene does
- * not yet have. Both facts are inputs to the `PERSISTENT_ELEMENT_HIDDEN` rule the
- * compiler increment has to decide; neither is a defect to paper over here.
+ * when a headline is sitting in it. `supportedCompositions: ['full']` follows: with one
+ * layout, being composed *into* a half is a capability this scene does not yet have.
+ *
+ * Under ADR-0003 those two declarations decide the outcome: a persistent element that
+ * overlaps this scene is **hidden for its duration**, with a `PERSISTENT_ELEMENT_HIDDEN`
+ * warning, because there is no declared composition to yield into and the compiler does
+ * not carve a frame nobody designed. To make a character survive this scene, add a layout
+ * it can be composed into and declare that composition here. Do not soften
+ * `occupiesRegions` to buy the same thing — the declaration is the input, not the problem.
  */
 import type { SceneMeta } from '../../core/types';
 

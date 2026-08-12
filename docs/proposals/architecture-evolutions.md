@@ -75,6 +75,20 @@ The anchor grammar the agent can write is entirely beat-relative (`ANCHOR_RE` in
 Marks give those boundaries exactly; an aligner would give them approximately. See
 ADR-0002 — a real aligner remains the documented fallback and composes on top.
 
+## §3 resolution is per scene, and relocation targets must already be declared
+
+**Frozen doc:** §3 resolves competing slot occupations "frame par frame", and a resolvable
+conflict moves the persistent element "vers un slot libre".
+**Decision:** ADR-0003 makes the **scene** the unit of resolution — outputs stay
+frame-accurate, but one outcome holds for a scene's whole duration — and narrows "free
+slot" to a slot that element already uses elsewhere in the same section.
+
+An element that appears and disappears inside one scene reads as a bug rather than as a
+resolution, and a compiler free to place a character anywhere manufactures §9.3's "a
+character that jumps" while fixing a slot collision. The same principle rejects carving a
+safe area out of a scene that never declared it can render smaller: the compiler chooses
+among declared alternatives or it hides the element.
+
 ## §7.2 and §10 name the same output differently
 
 `SectionTimeline` in §7.2, `layoutStates` in §10. `CONTEXT.md` adopts `layoutStates`,

@@ -62,9 +62,15 @@ the internal distribution of events, never the length of a scene.
 **Slot** — A coarse region of the canvas an element occupies (`left`, `cornerBR`, …).
 The agent speaks slots.
 
-**Safe area** — Percentages of the canvas a scene must keep clear, computed by the
-compiler from competing slot occupations. The component speaks safe areas. The two
+**Safe area** — The rectangle a scene renders into, given to the component as percentages
+from each edge. It is how the compiler's resolution of competing slot occupations reaches
+the frame. The component speaks safe areas, the agent speaks slots, and the two
 vocabularies never cross.
+
+**Slot conflict** — A scene's occupancy overlapping a persistent element's placement.
+Resolved in favour of what was declared: a composition the scene supports, failing that
+another slot the element already uses in the section, failing that the element is hidden
+for the scene. The compiler never invents a position. See ADR-0003.
 
 **Action** — A member of a capability's *closed* event vocabulary (`highlightBar`,
 `annotate`). An action outside the vocabulary is a compilation error, never a silence.

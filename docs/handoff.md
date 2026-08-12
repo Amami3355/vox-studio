@@ -93,6 +93,14 @@ and persistent elements declare placements · `spansBeats` required, contiguous,
 and total at both levels · compiler in `packages/video/src/compile/`, TTS in
 `packages/voice`, which returns the audio as well as the timings.
 
+**Slot conflicts** (`docs/adr/0003-slot-conflict-resolution.md`): the compiler resolves an
+overlap only among declared alternatives — a composition the scene supports, else a slot
+the element already uses in that section — and otherwise hides the element and warns · the
+scene yields before the element moves, because a relocated character is §9.3's "character
+that jumps" · the **scene**, not the frame, is the unit of resolution · `safeArea` is how a
+chosen composition reaches the component · slot geometry is one table in
+`core/slots.ts`. `ImageContextScene` hides, by the rule and not by exception.
+
 **Scope and sequencing**, decided in the same session but too reversible to earn an ADR:
 
 - ImageContextScene's deliberately narrow increment is complete: one layout, one
@@ -144,28 +152,19 @@ step 10.
    a snapping rule in the compiler, fed by one mark per word. Marks make word timings
    cheap and exact, so the option is open; the rule is not written anywhere. Until it is
    decided, precision at the word is bought by **splitting beats**, not by moving anchors.
-2. **Slot conflict resolution.** `SLOT_RELOCATED` and `PERSISTENT_ELEMENT_HIDDEN` are
-   specified as behaviour, never as an algorithm. Now answerable, since ADR-0002 fixed
-   placements as the input: when a persistent element sits in `cornerBR` and a scene
-   occupies `cornerBR`, which one yields, and by what rule?
-
-   `ImageContextScene` sharpens this into the hard case. It declares
-   `occupiesRegions: ['full']` truthfully — `splitLeft` divides the whole frame and
-   leaves no quadrant empty — so `SLOT_RELOCATED` has nowhere to relocate to. Either the
-   compiler hides the persistent element for the duration of a `full` scene, or it carves
-   a safe area out of the scene and accepts a tighter composition. See
-   `.scratch/image-context-scene/issues/06-full-frame-occupation-handoff.md`. Do not
-   "fix" the metadata instead; the declaration is the input, not the problem.
-3. **The four beat texts of the slice.** ~75 words in English, four beats, housing/rent
+2. **The four beat texts of the slice.** ~75 words in English, four beats, housing/rent
    per §12. A content decision; the slice cannot be built without it. Note that beat
    granularity is now also a *timing* decision, per open question 1.
-4. **Aggregation for rate units.** Summing percentages into "Others" is meaningless; the
+3. **Aggregation for rate units.** Summing percentages into "Others" is meaningless; the
    frozen doc's rule assumes counts. See the proposals file. Blocked on a fact, not a
    decision — render both variants and look.
-5. **Second theme, and when.** The `Theme` type supports it; only one exists. Adding it
+4. **Second theme, and when.** The `Theme` type supports it; only one exists. Adding it
    before the second capability means arguing about colour instead of composition.
-6. **Prop migration on `replaceComponent`.** Native to the architecture, real to
+5. **Prop migration on `replaceComponent`.** Native to the architecture, real to
    implement. Not needed until the Studio UI exists.
+
+**Closed:** slot conflict resolution, formerly ranked 2, is decided in
+`docs/adr/0003-slot-conflict-resolution.md`.
 
 ## What this session got wrong, so it is not repeated
 
