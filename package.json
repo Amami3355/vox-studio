@@ -16,6 +16,7 @@
     "typecheck": "pnpm -r --parallel typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:render": "vitest run --config vitest.render.config.ts",
     "check": "biome check .",
     "fix": "biome check --write ."
   },

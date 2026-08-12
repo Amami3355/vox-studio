@@ -30,6 +30,28 @@ Same output, one fewer dependency, faster validation. See ADR-0001.
 
 ---
 
+## [already deviating] Resolved assets travel beside the plan, not inside it
+
+**Frozen doc:** §5.2 has the Asset Resolver rewrite the plan, so a scene's `AssetRef`
+arrives *inside* it — "Plan avec AssetRef en status ready | placeholder | failed".
+**Code:** the plan is never rewritten. `SceneProps` gains an `assets` input
+(`core/types.ts`), a `ResolvedSceneAssets` value keyed by the requirement field
+(`core/assets.ts`), and `resolveSceneAssets` returns it without touching `props`.
+
+Rewriting the plan would put a resolver output where an agent writes its input. The
+manifest is generated from the same schema the agent authors against, so an `AssetRef`
+reachable from `props` is an `AssetRef` the Visual Planner learns to write — and rule 1
+gives it no second source of truth to be corrected against. Keeping the resolved
+reference on a separate runtime channel is what lets `assetRequirement` stay strictly
+semantic and lets the future compiler reject a missing reference without ever teaching an
+agent to author one.
+
+The cost is one extra input threaded through the generic renderer, which every
+capability now carries whether or not it needs assets. `NO_RESOLVED_SCENE_ASSETS` keeps
+that free for the capabilities that do not.
+
+---
+
 ## [already deviating] `SceneCapability.checks`
 
 Added an optional per-capability hook for referential integrity that the generic

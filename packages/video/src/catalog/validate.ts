@@ -214,7 +214,7 @@ const collectSoftWarnings = (
 
     if (constraint.recommendedMax !== undefined && size > constraint.recommendedMax) {
       warnings.push({
-        code: field === 'title' || field === 'headline' ? 'TITLE_DENSITY' : 'SOFT_LIMIT_EXCEEDED',
+        code: constraint.onExceedCode ?? 'SOFT_LIMIT_EXCEEDED',
         severity: 'quality',
         sceneId: instance.id,
         field,

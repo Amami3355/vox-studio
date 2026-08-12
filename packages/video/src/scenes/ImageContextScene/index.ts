@@ -21,6 +21,6 @@ export { ImageContextScene } from './Component';
 export { imageContextSchema, type ImageContextProps } from './schema';
 export { imageContextMeta } from './meta';
 export { imageContextActions } from './actions';
-export { imageContextLayouts, type ImageContextLayoutId } from './layouts';
+export { imageContextLayouts } from './layouts';
 export { imageContextConstraints } from './constraints';
 export { imageContextExamples } from './examples';

@@ -26,10 +26,15 @@ Deadline: **7 September 2026, 14:00 PDT**. Roughly four weeks.
 
 ### Verified, not assumed
 
-`pnpm typecheck` clean · 128 tests pass · Biome clean on 73 files · `catalog:check` in
-sync · `apps/component-studio` builds · stills render through headless Remotion.
-`ImageContextScene` key frames are hash-locked for ready, placeholder, failed, empty and
-long-copy inputs; placeholder and failed deliberately share the same rendered hash.
+`pnpm typecheck` clean · 135 tests pass in ~1s · Biome clean on 75 files · `catalog:check`
+in sync · `apps/component-studio` builds · 3 render tests pass through headless Remotion.
+
+**There are two suites now.** `pnpm test` is the deterministic core and must stay fast
+enough to run on every save; `pnpm test:render` bundles the project and drives headless
+Chrome. What the render suite asserts as a *relation* — three asset states render,
+placeholder and failed degrade identically — holds on any machine. The literal key-frame
+hashes are a separate test, and that one is supposed to fail when the design changes on
+purpose.
 
 ```bash
 pnpm install
@@ -37,6 +42,7 @@ pnpm catalog          # regenerate the manifest — required in any commit touch
 pnpm studio           # Remotion Studio, one composition per example
 pnpm grid             # Component Studio, localhost:5273
 pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
+pnpm test:render      # separately: minutes, and a browser
 ```
 
 ### Built
@@ -48,9 +54,12 @@ pnpm typecheck && pnpm test && pnpm check && pnpm catalog:check
   files, three layouts, five examples including the 20-entry, empty and negative cases.
 - **L2** `ImageContextScene` — one `splitLeft` layout, three examples, strict semantic
   `AssetRequirement`, and deterministic ready/placeholder/failed rendering.
-- **Minimal Asset Resolver** — explicit project-scoped identity cache, injectable and
-  verified local library, deterministic placeholder fallback, and resolved assets keyed
-  by SceneInstance id plus requirement field rather than written into semantic props.
+- **Minimal Asset Resolver** — explicit project-scoped identity cache, a
+  repository-controlled and verified local library, deterministic placeholder fallback,
+  and resolved assets travelling on a runtime channel rather than written into semantic
+  props. Resolution is **identity first**: a requirement carrying an `identityKey` is
+  answered by that key alone, which is what makes the result independent of the order
+  requirements arrive in. Subject matching is the keyless path.
 - **Catalog** `catalog.json` generated and committed; `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** grid · six-frame filmstrip · layout × motion-profile matrix.
@@ -139,6 +148,14 @@ step 10.
    specified as behaviour, never as an algorithm. Now answerable, since ADR-0002 fixed
    placements as the input: when a persistent element sits in `cornerBR` and a scene
    occupies `cornerBR`, which one yields, and by what rule?
+
+   `ImageContextScene` sharpens this into the hard case. It declares
+   `occupiesRegions: ['full']` truthfully — `splitLeft` divides the whole frame and
+   leaves no quadrant empty — so `SLOT_RELOCATED` has nowhere to relocate to. Either the
+   compiler hides the persistent element for the duration of a `full` scene, or it carves
+   a safe area out of the scene and accepts a tighter composition. See
+   `.scratch/image-context-scene/issues/06-full-frame-occupation-handoff.md`. Do not
+   "fix" the metadata instead; the declaration is the input, not the problem.
 3. **The four beat texts of the slice.** ~75 words in English, four beats, housing/rent
    per §12. A content decision; the slice cannot be built without it. Note that beat
    granularity is now also a *timing* decision, per open question 1.

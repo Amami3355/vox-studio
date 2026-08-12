@@ -17,6 +17,7 @@ export const barChartConstraints: SoftConstraints = {
   title: {
     recommendedMax: 40,
     onExceed: 'Title drops one step of the type scale.',
+    onExceedCode: 'TITLE_DENSITY',
   },
 };
 

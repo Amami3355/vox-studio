@@ -1,8 +1,10 @@
 import type React from 'react';
+import { useMemo } from 'react';
 import { useVideoConfig } from 'remotion';
+import { repositoryAssetLibrary } from '../assets/library';
 import { createAssetResolver, resolveSceneAssets } from '../assets/resolver';
 import { resolveEventTimings, syntheticBeats } from '../core/anchors';
-import type { ResolvedAssets } from '../core/assets';
+import type { ResolvedSceneAssets } from '../core/assets';
 import type { MotionProfileId } from '../design/motion';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
@@ -14,7 +16,7 @@ export type ExampleSceneProps = {
   layout?: string | null;
   motionProfile?: MotionProfileId | null;
   /** Runtime/test override. Never published in the agent-facing catalog examples. */
-  resolvedAssets?: ResolvedAssets;
+  assets?: ResolvedSceneAssets;
 };
 
 /**
@@ -29,7 +31,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   exampleId,
   layout,
   motionProfile,
-  resolvedAssets,
+  assets,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const capability = requireCapability(capabilityId);
@@ -47,14 +49,23 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
     from: 0,
     to: durationInFrames,
   });
-  const assets = resolvedAssets ?? resolveSceneAssets(example, createAssetResolver());
+
+  /**
+   * One resolution scope per example, memoised so Remotion's per-frame re-render does
+   * not rebuild the resolver 180 times. The scope is deliberately local rather than a
+   * module-level singleton: a shared identity cache surviving between compositions would
+   * be exactly the process-global rendering state the resolver is specified to avoid.
+   */
+  const resolved = useMemo(
+    () => resolveSceneAssets(example, createAssetResolver({ library: repositoryAssetLibrary })),
+    [example],
+  );
 
   return (
     <SceneRenderer
       capabilityId={capabilityId}
-      sceneId={example.id}
       props={example.props}
-      resolvedAssets={assets}
+      assets={assets ?? resolved}
       events={events}
       layout={layout ?? example.layout}
       motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}

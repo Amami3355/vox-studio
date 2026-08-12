@@ -17,6 +17,14 @@ import {
 import { splitLeftGeometry } from './layouts';
 import type { ImageContextProps } from './schema';
 
+/**
+ * The image half is the composition; the copy half supports it. Everything visual comes
+ * from L0/L1 — this file adds no colour, easing or duration of its own.
+ *
+ * It never throws over a missing asset: `SceneRenderer` is where a capability that
+ * requires assets fails loudly, so by the time a frame is being drawn the only honest
+ * behaviour left is to degrade into the subject plate.
+ */
 export const ImageContextScene: React.FC<SceneProps<ImageContextProps>> = ({
   props,
   assets,
@@ -26,11 +34,6 @@ export const ImageContextScene: React.FC<SceneProps<ImageContextProps>> = ({
   durationInFrames,
 }) => {
   const asset = assets[ASSET_REQUIREMENT_FIELD];
-  if (!asset) {
-    throw new Error(
-      'ImageContextScene requires a resolved asset for "assetRequirement". Run the Asset Resolver before rendering.',
-    );
-  }
 
   return (
     <Backdrop>
@@ -54,7 +57,7 @@ const SplitLayout: React.FC<{
   headline: string;
   caption: string;
   subject: string;
-  asset: AssetRef;
+  asset: AssetRef | undefined;
   profile: MotionProfile;
   theme: Theme;
 }> = ({ headline, caption, subject, asset, profile, theme }) => {
@@ -120,12 +123,17 @@ const SplitLayout: React.FC<{
   );
 };
 
+/**
+ * `placeholder` and `failed` render identically on purpose. The distinction is
+ * operational — one needs patience, the other needs intervention — and it is carried by
+ * the `AssetRef` into the compile report, not by making the video look broken.
+ */
 const AssetPlate: React.FC<{
-  asset: AssetRef;
+  asset: AssetRef | undefined;
   subject: string;
   theme: Theme;
 }> = ({ asset, subject, theme }) => {
-  if (asset.status === 'ready') {
+  if (asset?.status === 'ready') {
     return (
       <Img
         src={asset.uri}

@@ -73,6 +73,110 @@ describe('ImageContextScene catalog contract', () => {
     );
   });
 
+  it('rejects a blank asset subject, which would render a label-less plate', () => {
+    const report = validateScene({
+      id: 'scene_context',
+      component: 'image_context',
+      layout: 'splitLeft',
+      spansBeats: ['b1'],
+      props: {
+        headline: 'The rent squeeze is reshaping city life',
+        assetRequirement: {
+          type: 'image',
+          subject: '',
+          treatment: 'photo',
+          orientation: 'landscape',
+        },
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INVALID_PROPS', field: 'assetRequirement.subject' }),
+      ]),
+    );
+  });
+
+  it('rejects a headline that is not a string', () => {
+    const report = validateScene({
+      id: 'scene_context',
+      component: 'image_context',
+      layout: 'splitLeft',
+      spansBeats: ['b1'],
+      props: {
+        headline: 42,
+        assetRequirement: {
+          type: 'image',
+          subject: 'Apartment buildings at dusk',
+          treatment: 'photo',
+          orientation: 'landscape',
+        },
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INVALID_PROPS', field: 'headline' }),
+      ]),
+    );
+  });
+
+  it('rejects copy past the hard ceiling rather than degrading it', () => {
+    const report = validateScene({
+      id: 'scene_context',
+      component: 'image_context',
+      layout: 'splitLeft',
+      spansBeats: ['b1'],
+      props: {
+        headline: 'x'.repeat(121),
+        assetRequirement: {
+          type: 'image',
+          subject: 'Apartment buildings at dusk',
+          treatment: 'photo',
+          orientation: 'landscape',
+        },
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INVALID_PROPS', field: 'headline' }),
+      ]),
+    );
+  });
+
+  it('rejects a layout the capability does not publish', () => {
+    const report = validateScene({
+      id: 'scene_context',
+      component: 'image_context',
+      layout: 'fullBleed',
+      spansBeats: ['b1'],
+      props: {
+        headline: 'The rent squeeze is reshaping city life',
+        assetRequirement: {
+          type: 'image',
+          subject: 'Apartment buildings at dusk',
+          treatment: 'photo',
+          orientation: 'landscape',
+        },
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'UNKNOWN_LAYOUT',
+          field: 'layout',
+          expected: ['splitLeft'],
+        }),
+      ]),
+    );
+  });
+
   it('warns on dense copy while keeping the SceneInstance valid', () => {
     const report = validateScene({
       id: 'scene_context',

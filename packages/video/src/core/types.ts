@@ -9,9 +9,9 @@
  */
 import type { z } from 'zod';
 import type { MotionProfileId, Pace } from '../design/motion';
-import type { AssetRef, AssetRequirement, ResolvedAssets, ResolvedSceneAssets } from './assets';
+import type { AssetRef, AssetRequirement, ResolvedSceneAssets } from './assets';
 
-export type { AssetRef, AssetRequirement, ResolvedAssets, ResolvedSceneAssets } from './assets';
+export type { AssetRef, AssetRequirement, ResolvedSceneAssets } from './assets';
 
 /* ------------------------------------------------------------------ layout */
 
@@ -101,6 +101,13 @@ export type FieldConstraint = {
   absoluteMax?: number;
   onExceed?: string;
   onEmpty?: string;
+  /**
+   * Which warning a breach of `recommendedMax` raises. It lives here, on the field that
+   * knows what it is, rather than in the validator: a generic validator matching field
+   * *names* to decide that "title" and "headline" mean density would need one more
+   * branch for every capability that invents another word for a heading.
+   */
+  onExceedCode?: Extract<CompilerWarningCode, 'SOFT_LIMIT_EXCEEDED' | 'TITLE_DENSITY'>;
 };
 
 export type SoftConstraints = Record<string, FieldConstraint>;

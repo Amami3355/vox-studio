@@ -98,7 +98,8 @@
         },
         "title": {
           "recommendedMax": 40,
-          "onExceed": "Title drops one step of the type scale."
+          "onExceed": "Title drops one step of the type scale.",
+          "onExceedCode": "TITLE_DENSITY"
         }
       },
       "layouts": [
@@ -534,6 +535,7 @@
               },
               "subject": {
                 "type": "string",
+                "minLength": 1,
                 "maxLength": 80,
                 "description": "Visual subject in natural language. Never a path or URI."
               },
@@ -561,6 +563,7 @@
               "identityKey": {
                 "description": "Stable identity shared by requirements that must resolve to the same asset.",
                 "type": "string",
+                "minLength": 1,
                 "maxLength": 80
               }
             },
@@ -583,7 +586,8 @@
           "recommendedMin": 1,
           "recommendedMax": 40,
           "onEmpty": "The asset subject becomes the only visible context label.",
-          "onExceed": "The headline drops one step of the type scale."
+          "onExceed": "The headline drops one step of the type scale.",
+          "onExceedCode": "TITLE_DENSITY"
         },
         "caption": {
           "recommendedMax": 120,

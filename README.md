@@ -28,8 +28,8 @@ smallest continuity-testable scope:
   soft constraints, closed action vocabulary, three layouts, five examples.
 - **L2 — `ImageContextScene`**, one `splitLeft` layout and three examples, with semantic
   asset requirements and deterministic ready/placeholder/failed rendering.
-- **Minimal Asset Resolver** — identity cache, injectable local library and immediate
-  placeholder fallback. No network or cloud dependency.
+- **Minimal Asset Resolver** — identity cache, repository-controlled local library and
+  immediate placeholder fallback. No network or cloud dependency.
 - **Catalog + the four tools** — generated manifest, `searchScenes`, `getSceneSpec`,
   `validateScene`, `validateVideoPlan`.
 - **Component Studio** — grid, six-frame filmstrip and layout × motion-profile matrix.
@@ -53,6 +53,7 @@ Checks:
 ```bash
 pnpm typecheck
 pnpm test             # deterministic core: schemas, event folding, anchors, aggregation
+pnpm test:render      # headless-Chrome stills; minutes, not seconds
 pnpm check            # Biome
 pnpm catalog:check    # fails if the manifest has drifted from the registry
 ```

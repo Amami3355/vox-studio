@@ -1,3 +1,14 @@
+/**
+ * Examples are normative. The agent imitates them far more faithfully than it follows a
+ * description, so the set has to cover the shape of the problem and not just its happy
+ * path: the canonical slice shot, an edge case that pushes copy past the recommended
+ * band, and an empty case that proves the scene survives with no copy at all.
+ *
+ * The canonical example carries an `identityKey` the repository library answers, so the
+ * one thing this increment had to demonstrate — a semantic requirement resolving to real
+ * committed media without the SceneInstance changing — is visible in Remotion Studio and
+ * not only in a test.
+ */
 import type { SceneExample } from '../../core/types';
 
 export const imageContextExamples: SceneExample[] = [

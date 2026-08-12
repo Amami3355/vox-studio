@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useVideoConfig } from 'remotion';
-import { NO_RESOLVED_ASSETS, NO_RESOLVED_SCENE_ASSETS, type ResolvedAssets } from '../core/assets';
+import { NO_RESOLVED_SCENE_ASSETS, type ResolvedSceneAssets } from '../core/assets';
+import { ASSET_REQUIREMENT_FIELD } from '../core/assets';
 import type { SafeArea, TimedEvent } from '../core/types';
 import { NO_SAFE_AREA } from '../core/types';
 import { type MotionProfileId, getMotionProfile } from '../design/motion';
@@ -13,12 +14,17 @@ import { requireCapability } from '../scenes/registry';
  *
  * Props are parsed through the capability schema rather than trusted, so defaults are
  * applied and a bad plan fails loudly here instead of rendering something subtly wrong.
+ *
+ * This is also where a capability that `requiresAssets` finds out whether the resolver
+ * actually ran. The check belongs to the generic runtime, not to each component: it is
+ * the runtime that owns the wiring, and putting the guard in one place keeps every scene
+ * component a pure function of the inputs it is handed.
  */
 export const SceneRenderer: React.FC<{
   capabilityId: string;
-  sceneId: string;
   props: Record<string, unknown>;
-  resolvedAssets?: ResolvedAssets;
+  /** Resolver output for *this* scene. The plan-level map is the compiler's shape. */
+  assets?: ResolvedSceneAssets;
   events?: TimedEvent[];
   layout?: string;
   motionProfile?: MotionProfileId;
@@ -26,9 +32,8 @@ export const SceneRenderer: React.FC<{
   theme?: Theme;
 }> = ({
   capabilityId,
-  sceneId,
   props,
-  resolvedAssets = NO_RESOLVED_ASSETS,
+  assets = NO_RESOLVED_SCENE_ASSETS,
   events = [],
   layout,
   motionProfile = 'subtleDrift',
@@ -46,9 +51,14 @@ export const SceneRenderer: React.FC<{
     );
   }
 
+  if (capability.meta.requiresAssets && assets[ASSET_REQUIREMENT_FIELD] === undefined) {
+    throw new Error(
+      `MISSING_ASSET_REFERENCE: "${capabilityId}" requires a resolved asset for "${ASSET_REQUIREMENT_FIELD}", and none was supplied. Run the Asset Resolver over the scene before rendering it.`,
+    );
+  }
+
   const parsed = capability.schema.parse(props);
   const Component = capability.component;
-  const assets = resolvedAssets[sceneId] ?? NO_RESOLVED_SCENE_ASSETS;
 
   return (
     <ThemeProvider theme={theme}>

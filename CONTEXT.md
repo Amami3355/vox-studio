@@ -101,7 +101,7 @@ scene library. If the manifest is insufficient, fix the manifest, not the prompt
 
 ```
 packages/video/           the scene library — everything Remotion renders
-  src/assets/             minimal Asset Resolver: identity cache, local library, placeholder
+  src/assets/             minimal Asset Resolver: identity cache, repository library, placeholder
   src/design/             L0 tokens: theme, motion profiles, fonts
   src/primitives/         L1, not exposed to the agent
   src/scenes/             L2, the catalog; one folder per capability
