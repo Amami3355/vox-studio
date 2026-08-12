@@ -12,7 +12,13 @@
  */
 import type { FrameBeat } from '../core/anchors';
 import type { Rect } from '../core/slots';
-import type { ResolvedSceneAssets, SafeArea, TimedEvent } from '../core/types';
+import type {
+  AssetRef,
+  PersistentElement,
+  ResolvedSceneAssets,
+  SafeArea,
+  TimedEvent,
+} from '../core/types';
 import type { MotionProfileId } from '../design/motion';
 
 /**
@@ -60,11 +66,23 @@ export type CompiledScene = {
   safeArea: SafeArea;
 };
 
+/**
+ * What a persistent element *is*, held once per section rather than repeated on every
+ * state — `layoutStates` says where it is, this says what it looks like. An element with
+ * no asset draws nothing; the runtime is not the place to invent a stand-in.
+ */
+export type CompiledPersistentElement = {
+  id: string;
+  element: PersistentElement['element'];
+  asset?: AssetRef;
+};
+
 export type CompiledSection = {
   id: string;
   from: number;
   to: number;
   scenes: CompiledScene[];
+  persistent: CompiledPersistentElement[];
   layoutStates: LayoutState[];
 };
 

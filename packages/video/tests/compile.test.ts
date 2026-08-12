@@ -67,6 +67,7 @@ const continuityPlan: VideoPlan = {
         {
           id: 'narrator',
           element: 'character',
+          asset: { status: 'ready', uri: 'asset://test/narrator' },
           placements: [{ at: 'b1.start', slot: 'cornerBR' }],
         },
       ],
@@ -211,6 +212,19 @@ describe('compile', () => {
     expect(result.document.sections[0]?.scenes[1]?.assets.assetRequirement).toMatchObject({
       status: 'placeholder',
     });
+  });
+
+  it('carries what a persistent element looks like, so the runtime never reads the plan', () => {
+    const result = compile({ plan: continuityPlan, beats: timedBeats });
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+
+    expect(result.document.sections[0]?.persistent).toEqual([
+      {
+        id: 'narrator',
+        element: 'character',
+        asset: { status: 'ready', uri: 'asset://test/narrator' },
+      },
+    ]);
   });
 
   it('refuses a plan whose beats were never spoken', () => {

@@ -102,7 +102,15 @@ export const compile = ({
       scene.safeArea = safeAreaFor(layer, scene.id);
     }
 
-    return { id: section.id, ...bounds, scenes, layoutStates: layer.layoutStates };
+    return {
+      id: section.id,
+      ...bounds,
+      scenes,
+      persistent: (section.persistent ?? []).map(({ id, element, asset }) =>
+        asset === undefined ? { id, element } : { id, element, asset },
+      ),
+      layoutStates: layer.layoutStates,
+    };
   });
 
   return {
