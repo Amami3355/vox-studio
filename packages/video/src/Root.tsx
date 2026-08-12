@@ -3,7 +3,7 @@ import { Composition } from 'remotion';
 import './design/fonts';
 import type { CompiledDocument } from './compile/document';
 import { FPS, HEIGHT, WIDTH } from './design/theme';
-import { compileShippedPlan, shippedPlans } from './plans';
+import { announceShippedPlan, compileShippedPlan, shippedPlans } from './plans';
 import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';
 import { CompiledVideo } from './runtime/CompiledVideo';
 import { ExampleScene, compositionIdFor } from './runtime/ExampleScene';
@@ -20,6 +20,21 @@ const EMPTY_DOCUMENT: CompiledDocument = {
   beats: [],
   sections: [],
 };
+
+/**
+ * Compiled here, at module load, which is what `compileShippedPlan` always claimed and
+ * only now does: it used to be called from inside the component body, so the failure it
+ * exists to cause arrived at first render and the work was redone on every one.
+ *
+ * Announcing the reports here too, once each. A plan that compiles `ok: true` has often
+ * still been changed on the way — the slice's narrator is relocated twice — and the studio
+ * console is where whoever just opened it is already looking.
+ */
+const compiledPlans = shippedPlans.map((shipped) => {
+  const { document, report } = compileShippedPlan(shipped);
+  announceShippedPlan(shipped, report);
+  return { shipped, document };
+});
 
 /**
  * One composition per example, generated from the registry.
@@ -45,21 +60,18 @@ export const RemotionRoot: React.FC = () => (
      * nothing to regenerate. A plan that stops compiling throws on open, and
      * `tests/plans.test.ts` is what makes that a red test first.
      */}
-    {shippedPlans.map((shipped) => {
-      const document = compileShippedPlan(shipped);
-      return (
-        <Composition
-          key={`section--${shipped.id}`}
-          id={`section--${shipped.id}`}
-          component={CompiledVideo}
-          durationInFrames={document.durationInFrames}
-          fps={document.fps}
-          width={WIDTH}
-          height={HEIGHT}
-          defaultProps={{ document }}
-        />
-      );
-    })}
+    {compiledPlans.map(({ shipped, document }) => (
+      <Composition
+        key={`section--${shipped.id}`}
+        id={`section--${shipped.id}`}
+        component={CompiledVideo}
+        durationInFrames={document.durationInFrames}
+        fps={document.fps}
+        width={WIDTH}
+        height={HEIGHT}
+        defaultProps={{ document }}
+      />
+    ))}
 
     {/*
      * The generic one, kept: it is the composition `renderMedia` targets for a plan that

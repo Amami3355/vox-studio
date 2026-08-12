@@ -20,7 +20,7 @@
  */
 import { type VideoPlan, validateVideoPlan } from '../catalog/validate';
 import { type CompiledDocument, compile } from '../compile';
-import type { TimedBeat } from '../core/types';
+import type { CompileReport, CompilerWarning, TimedBeat } from '../core/types';
 import verticalSliceBeats from './vertical-slice.beats.json';
 import verticalSlicePlan from './vertical-slice.plan.json';
 
@@ -60,8 +60,18 @@ export const shippedPlans: ShippedPlan[] = [
  * the studio down on open rather than rendering something subtly wrong. That is rule 5,
  * and it is why `tests/plans.test.ts` compiles every one of them in the fast suite: the
  * failure should be a red test, not a blank studio.
+ *
+ * **The report comes back with the document, because `ok: true` is not the same as
+ * "nothing to say".** A plan can compile cleanly and still have been changed on the way:
+ * a scene yielded into a half, an element relocated or hidden, a plate standing in for a
+ * picture. This function used to return `result.document` alone, which threw that away at
+ * the exact point it was produced — the slice compiles with two `SLOT_RELOCATED` warnings
+ * and nobody opening `section--vertical-slice` was ever told. ADR-0003 says the report is
+ * a deliverable rather than a log; a deliverable the only caller cannot see is neither.
  */
-export const compileShippedPlan = (shipped: ShippedPlan): CompiledDocument => {
+export const compileShippedPlan = (
+  shipped: ShippedPlan,
+): { document: CompiledDocument; report: CompileReport } => {
   const result = compile({ plan: shipped.plan, beats: shipped.beats });
 
   if (!result.ok) {
@@ -69,7 +79,34 @@ export const compileShippedPlan = (shipped: ShippedPlan): CompiledDocument => {
     throw new Error(`Shipped plan "${shipped.id}" does not compile:\n  ${errors}`);
   }
 
-  return result.document;
+  return { document: result.document, report: result.report };
+};
+
+/**
+ * Say, once, what compiling a shipped plan had to warn about.
+ *
+ * Console rather than anything cleverer, because the audience is whoever just opened the
+ * studio or started a render, and the studio's console is where they already are. Severity
+ * picks the channel: `important` means something is missing from the frames — an element
+ * hidden, a picture that never resolved — and belongs above the fold, while `info` and
+ * `quality` are the compiler narrating decisions it was right to take.
+ *
+ * Silent on a clean plan. A line that appears every time is a line nobody reads.
+ */
+export const announceShippedPlan = (shipped: ShippedPlan, report: CompileReport): void => {
+  if (report.warnings.length === 0) return;
+
+  const loud = report.warnings.filter((warning) => warning.severity === 'important');
+  const rest = report.warnings.filter((warning) => warning.severity !== 'important');
+  const line = (warning: CompilerWarning): string =>
+    `  ${warning.code}${warning.sceneId ? ` (${warning.sceneId})` : ''}: ${warning.message}`;
+
+  if (loud.length > 0) {
+    console.warn(`Shipped plan "${shipped.id}" compiled with:\n${loud.map(line).join('\n')}`);
+  }
+  if (rest.length > 0) {
+    console.info(`Shipped plan "${shipped.id}" compiled with:\n${rest.map(line).join('\n')}`);
+  }
 };
 
 /** The report, for a caller that wants the warnings rather than the frames. */

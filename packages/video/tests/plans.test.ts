@@ -28,6 +28,23 @@ describe.each(shippedPlans.map((plan) => [plan.id, plan] as const))(
       expect(() => compileShippedPlan(plan)).not.toThrow();
     });
 
+    /**
+     * `ok: true` is not the same as "nothing to say".
+     *
+     * A plan can compile cleanly and still have been *changed* on the way — a scene
+     * yielded into a half, an element relocated or hidden, a plate standing in for a
+     * picture. ADR-0003 calls the report a deliverable rather than a log, and a
+     * `compileShippedPlan` that returned only the frames threw that deliverable away at
+     * the exact point it was produced: whoever opened `section--vertical-slice` learned
+     * nothing about what the compiler had done to it.
+     */
+    it('hands back what compiling had to warn about, not only the frames', () => {
+      const { report } = compileShippedPlan(plan);
+
+      expect(report.ok).toBe(true);
+      for (const warning of report.warnings) expect(warning.message).not.toHaveLength(0);
+    });
+
     it('spans every beat it defines, so no beat is spoken over nothing', () => {
       const defined = plan.plan.beats.map((beat) => beat.id);
       const covered = plan.plan.sections.flatMap((section) => section.spansBeats);
@@ -50,7 +67,24 @@ describe.each(shippedPlans.map((plan) => [plan.id, plan] as const))(
  */
 describe('the vertical slice', () => {
   const slice = sliceOf('vertical-slice');
-  const document = compileShippedPlan(slice);
+  const { document, report } = compileShippedPlan(slice);
+
+  /**
+   * The two the slice actually carries, named rather than counted.
+   *
+   * Both are the compiler doing its job — the narrator contends with each `image_context`
+   * scene in turn and both scenes yield — so `info` is the right severity and the slice is
+   * not broken. It is still something a person watching the section should be told, and it
+   * is the only reason this assertion exists: the day one of these becomes
+   * `PERSISTENT_ELEMENT_HIDDEN` at `important`, a character has silently stopped appearing
+   * and this test is what says so.
+   */
+  it('reports the two relocations it was compiled with, and nothing louder', () => {
+    expect(report.warnings.map((warning) => [warning.code, warning.severity])).toEqual([
+      ['SLOT_RELOCATED', 'info'],
+      ['SLOT_RELOCATED', 'info'],
+    ]);
+  });
 
   it('runs the twenty to thirty seconds §12 asks for', () => {
     const seconds = document.durationInFrames / document.fps;
