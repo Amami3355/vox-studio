@@ -11,8 +11,12 @@
  */
 import { z } from 'zod';
 import { ANCHOR_GRAMMAR } from '../core/anchor-grammar';
+import { COMPILER_CHECKS } from '../core/compiler-checks';
 import type { SceneCapability, SceneExample, SceneMeta, SoftConstraints } from '../core/types';
 import { registry } from '../scenes/registry';
+import { videoPlanSchema } from './plan-shape';
+import { STRUCTURAL_PLAN_EXAMPLES, type StructuralPlanExample } from './structural-examples';
+import { validateVideoPlan } from './validate';
 
 export type JsonSchemaObject = Record<string, unknown>;
 
@@ -45,7 +49,7 @@ export type CatalogEntry = SceneMeta & {
 
 export type Catalog = {
   /** Bumped by hand when the shape of this file changes, not on every regeneration. */
-  manifestVersion: 2;
+  manifestVersion: 3;
   /**
    * Rule 3's vocabulary, which is not a property of any one capability.
    *
@@ -56,7 +60,15 @@ export type Catalog = {
    * drifted in three.
    */
   time: typeof ANCHOR_GRAMMAR;
+  /** Every error or warning a code-blind author can receive from the compiler. */
+  checks: typeof COMPILER_CHECKS;
   capabilities: CatalogEntry[];
+};
+
+export type PlanContract = {
+  contractVersion: 1;
+  schema: JsonSchemaObject;
+  examples: readonly StructuralPlanExample[];
 };
 
 const toJsonSchema = (schema: z.ZodType): JsonSchemaObject =>
@@ -86,10 +98,38 @@ export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => 
 });
 
 export const buildCatalog = (): Catalog => ({
-  manifestVersion: 2,
+  manifestVersion: 3,
   time: ANCHOR_GRAMMAR,
+  checks: COMPILER_CHECKS,
   capabilities: registry.map(buildCatalogEntry),
 });
 
+export const buildPlanContract = (): PlanContract => {
+  for (const example of STRUCTURAL_PLAN_EXAMPLES) {
+    const parsed = videoPlanSchema.safeParse(example.plan);
+    if (!parsed.success) {
+      throw new Error(`Structural plan example "${example.id}" fails videoPlanSchema.`);
+    }
+
+    const report = validateVideoPlan(parsed.data);
+    if (!report.ok) {
+      throw new Error(
+        `Structural plan example "${example.id}" fails semantic validation: ${report.errors
+          .map((error) => `${error.code}: ${error.message}`)
+          .join('; ')}`,
+      );
+    }
+  }
+
+  return {
+    contractVersion: 1,
+    schema: z.toJSONSchema(videoPlanSchema, { target: 'draft-2020-12' }) as JsonSchemaObject,
+    examples: STRUCTURAL_PLAN_EXAMPLES,
+  };
+};
+
 export const serializeCatalog = (catalog: Catalog): string =>
   `${JSON.stringify(catalog, null, 2)}\n`;
+
+export const serializePlanContract = (contract: PlanContract): string =>
+  `${JSON.stringify(contract, null, 2)}\n`;

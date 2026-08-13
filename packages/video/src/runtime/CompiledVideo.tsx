@@ -94,8 +94,8 @@ const PersistentElementLayer: React.FC<{ section: CompiledSection; state: Layout
 }) => {
   const element = section.persistent.find((candidate) => candidate.id === state.elementId);
 
-  /** No asset, nothing drawn. Inventing a stand-in here would be the runtime deciding. */
-  if (!element?.asset) return null;
+  /** Only verified media is readable; degraded states remain explicit in the document. */
+  if (element?.asset?.status !== 'ready') return null;
 
   return (
     <AbsoluteFill

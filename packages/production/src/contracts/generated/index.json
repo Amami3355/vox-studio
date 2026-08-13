@@ -1,0 +1,25 @@
+{
+  "contractVersion": 1,
+  "categories": [
+    {
+      "id": "language",
+      "summary": "Vox Studio domain terms and avoided synonyms."
+    },
+    {
+      "id": "plan",
+      "summary": "VideoPlan JSON Schema and validated full-plan examples."
+    },
+    {
+      "id": "catalog",
+      "summary": "Scene capabilities, semantic time and compiler checks."
+    },
+    {
+      "id": "checks",
+      "summary": "Compiler error and warning meanings and repairs."
+    },
+    {
+      "id": "protocol",
+      "summary": "Production commands, stages, outcomes and operating rules."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # Prove code-isolated rendering
 
 Type: prototype
-Status: open
+Status: resolved
 Blocked by: none
 
 ## Question
@@ -41,3 +41,59 @@ condition fails only when an implementation is readable from the agent's environ
 **On red, code-blindness is not weakened.** It is the defining property of the destination and
 the map's *Never cut* list holds it. The destination is redrawn explicitly by the user; the
 prototype's author may not silently redefine "without code access".
+
+## Answer
+
+**Green through candidate 2: a thin readable client calling production outside the agent's
+readable environment. Candidate 1 is rejected in the current runtime toolchain.**
+
+The two candidates were exercised from Docker containers with no repository mount. The
+throwaway source and full result record are captured outside the production branch at commit
+`10f4fd8` on branch `prototype/code-isolated-rendering-2026-08-13`.
+
+### Candidate 1 — local opaque runtime artifact
+
+The actual Remotion browser artifact needed by a local render contained 15 JavaScript
+sourcemaps totalling 12,007,644 bytes. Its `bundle.js.map` named 25 Vox source files and
+included their `sourcesContent`, including `src/compile/index.ts` and the precommitted JSDoc
+marker. Removing the maps would not make it opaque: `bundle.js` itself exposed readable Vox
+implementation and the distinctive internal identifier `reportDegradedAsset`.
+
+The probe run inside the container found all 15 forbidden `.map` files, 19 marker hits and
+readable implementation. The repository itself was absent, so the leak came from the runtime
+artifact rather than an accidental source mount. Minification is not a remedy under the threat
+model. This candidate would require a different, demonstrably non-readable runtime technology;
+the current JavaScript/Remotion packaging path fails.
+
+### Candidate 2 — thin client, external production process
+
+The agent container received only the readable HTTP client, `catalog.json`, the current
+`vertical-slice.plan.json`, its current timed-beat artifact, the leak probe and outputs. The
+repository-owning host service alone loaded the source, production dependencies and Remotion
+browser bundle.
+
+The following operations ran from the isolated container rather than being inferred from the
+design:
+
+- `validate` returned HTTP 200 with `ok: true`, zero errors and zero warnings;
+- `compile` returned HTTP 200 with `ok: true`, a one-section 833-frame document, zero errors
+  and the two expected `SLOT_RELOCATED`/`info` warnings;
+- `render` returned HTTP 200 and wrote an 8,441,801-byte MP4;
+- `ffprobe` identified H.264/AAC MP4, 1920×1080 at 30 fps, 27.818667 seconds;
+- the MP4 SHA-256 was
+  `EB1ACFF6C44747E8E72766F45939D0E7E293488473BF25FAE0572C33B5F327F9`;
+- the final read-only leak probe enumerated all eight agent-readable files and returned
+  `ok: true`, no `.ts`/`.tsx`/`.map`, no marker hits, and
+  `repositorySourceReachable: false`.
+
+The actively probed markers were the known JSDoc sentence from `compile/index.ts`, a
+`packages/video/src` fragment, `sourceMappingURL` and `reportDegradedAsset`. Public identifiers
+in the catalog and reports were allowed and were not treated as leaks.
+
+### Trade-offs and requirements exposed
+
+The green boundary keeps production implementations and dependencies outside the readable
+environment, but it introduces an authenticated transport, a separately operated production
+service, artifact upload/download, remote failure semantics and service-owned temporary
+rendering state. Those are production obligations for the boundary and artifact tickets; this
+throwaway service is not production packaging and does not settle their contracts.

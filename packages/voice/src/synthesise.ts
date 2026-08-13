@@ -23,6 +23,69 @@ export const MODEL_ID = 'eleven_v3';
  */
 export const MAX_SCRIPT_LENGTH = 5000;
 
+export type VoiceSettings = {
+  provider: 'elevenlabs';
+  voiceId: string;
+  modelId: string;
+  seed: number;
+};
+
+export type ProviderSynthesisRequest = {
+  text: string;
+  settings: VoiceSettings;
+};
+
+export type ProviderSynthesisResponse = {
+  audio: Uint8Array;
+  alignment: Alignment;
+};
+
+export type SynthesisAdapter = (
+  request: ProviderSynthesisRequest,
+) => Promise<ProviderSynthesisResponse>;
+
+export const requestSynthesis = async (
+  beats: Beat[],
+  settings: VoiceSettings,
+  adapter: SynthesisAdapter,
+): Promise<ProviderSynthesisResponse & { script: string }> => {
+  const script = scriptFor(beats);
+  if (script.length > MAX_SCRIPT_LENGTH) {
+    throw new Error(
+      `The script is ${script.length} characters, over ${settings.modelId}'s ${MAX_SCRIPT_LENGTH} limit. It cannot be split across two calls: beat boundaries are offsets into one alignment array.`,
+    );
+  }
+  const response = await adapter({ text: script, settings });
+  return { ...response, script };
+};
+
+export const createElevenLabsAdapter = ({
+  apiKey,
+  fetchImpl = fetch,
+}: {
+  apiKey: string;
+  fetchImpl?: typeof fetch;
+}): SynthesisAdapter => {
+  if (!apiKey) throw new Error('ElevenLabs adapter requires a service-side API key.');
+  return async ({ text, settings }) => {
+    if (settings.provider !== 'elevenlabs')
+      throw new Error(`Unsupported provider: ${settings.provider}`);
+    const response = await fetchImpl(
+      `https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}/with-timestamps`,
+      {
+        method: 'POST',
+        headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({ text, model_id: settings.modelId, seed: settings.seed }),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`ElevenLabs returned ${response.status}: ${await response.text()}`);
+    }
+    const body = (await response.json()) as { audio_base64: string; alignment: Alignment };
+    return { audio: Buffer.from(body.audio_base64, 'base64'), alignment: body.alignment };
+  };
+};
+
 export type SynthesisRequest = {
   beats: Beat[];
   voiceId: string;
@@ -61,36 +124,18 @@ export const synthesise = async ({
     throw new Error('ELEVENLABS_API_KEY is not set. Synthesis is the one step that needs it.');
   }
 
-  const script = scriptFor(beats);
-  if (script.length > MAX_SCRIPT_LENGTH) {
-    throw new Error(
-      `The script is ${script.length} characters, over ${MODEL_ID}'s ${MAX_SCRIPT_LENGTH} limit. It cannot be split across two calls: beat boundaries are offsets into one alignment array.`,
-    );
-  }
-
-  const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
-    {
-      method: 'POST',
-      headers: { 'xi-api-key': apiKey, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        text: script,
-        model_id: MODEL_ID,
-        ...(seed === undefined ? {} : { seed }),
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`ElevenLabs returned ${response.status}: ${await response.text()}`);
-  }
-
-  const body = (await response.json()) as { audio_base64: string; alignment: Alignment };
+  const settings: VoiceSettings = {
+    provider: 'elevenlabs',
+    voiceId,
+    modelId: MODEL_ID,
+    seed: seed ?? 7,
+  };
+  const response = await requestSynthesis(beats, settings, createElevenLabsAdapter({ apiKey }));
 
   return {
-    beats: foldAlignment(beats, body.alignment),
-    audio: Buffer.from(body.audio_base64, 'base64'),
-    script,
-    alignment: body.alignment,
+    beats: foldAlignment(beats, response.alignment),
+    audio: response.audio,
+    script: response.script,
+    alignment: response.alignment,
   };
 };

@@ -8,29 +8,47 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCatalog, serializeCatalog } from '../src/catalog/build';
+import {
+  buildCatalog,
+  buildPlanContract,
+  serializeCatalog,
+  serializePlanContract,
+} from '../src/catalog/build';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const target = resolve(here, '../src/catalog/catalog.json');
-
-const next = serializeCatalog(buildCatalog());
+const projections = [
+  {
+    name: 'catalog.json',
+    target: resolve(here, '../src/catalog/catalog.json'),
+    next: serializeCatalog(buildCatalog()),
+  },
+  {
+    name: 'plan-contract.json',
+    target: resolve(here, '../src/catalog/plan-contract.json'),
+    next: serializePlanContract(buildPlanContract()),
+  },
+] as const;
 const check = process.argv.includes('--check');
 
 if (check) {
-  let current: string;
-  try {
-    current = readFileSync(target, 'utf8');
-  } catch {
-    console.error('catalog.json is missing. Run: pnpm catalog');
-    process.exit(1);
+  for (const projection of projections) {
+    let current: string;
+    try {
+      current = readFileSync(projection.target, 'utf8');
+    } catch {
+      console.error(`${projection.name} is missing. Run: pnpm catalog`);
+      process.exit(1);
+    }
+    if (current !== projection.next) {
+      console.error(`${projection.name} is out of date. Run: pnpm catalog`);
+      process.exit(1);
+    }
   }
-  if (current !== next) {
-    console.error('catalog.json is out of date with the scene registry. Run: pnpm catalog');
-    process.exit(1);
-  }
-  console.info('catalog.json is up to date.');
+  console.info('Public catalog projections are up to date.');
 } else {
-  writeFileSync(target, next, 'utf8');
+  for (const projection of projections) {
+    writeFileSync(projection.target, projection.next, 'utf8');
+  }
   const count = buildCatalog().capabilities.length;
-  console.info(`Wrote catalog.json — ${count} capability(ies).`);
+  console.info(`Wrote catalog.json and plan-contract.json — ${count} capability(ies).`);
 }

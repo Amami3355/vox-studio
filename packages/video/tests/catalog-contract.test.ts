@@ -6,9 +6,10 @@
  * that fails a build instead of something someone remembers to read.
  */
 import { describe, expect, it } from 'vitest';
-import { buildCatalog, buildCatalogEntry } from '../src/catalog/build';
+import { buildCatalog, buildCatalogEntry, buildPlanContract } from '../src/catalog/build';
 import { validateScene } from '../src/catalog/tools';
 import { parseAnchor } from '../src/core/anchor-grammar';
+import { COMPILER_CHECKS } from '../src/core/compiler-checks';
 import { registry } from '../src/scenes/registry';
 
 /**
@@ -20,6 +21,51 @@ import { registry } from '../src/scenes/registry';
  * while every event in every example is anchored.
  */
 describe('the manifest', () => {
+  it('publishes the canonical compiler-check registry once in catalog v3', () => {
+    const catalog = buildCatalog();
+
+    expect(catalog.manifestVersion).toBe(3);
+    expect(catalog.checks).toBe(COMPILER_CHECKS);
+
+    const entries = [
+      ...Object.entries(catalog.checks.errors),
+      ...Object.entries(catalog.checks.warnings),
+    ];
+    expect(new Set(entries.map(([, check]) => check.code)).size).toBe(entries.length);
+
+    for (const [key, check] of entries) {
+      expect(check.code).toBe(key);
+      expect(check.means.trim().length).toBeGreaterThan(20);
+      expect(check.repair.trim().length).toBeGreaterThan(20);
+      expect(check.means.trim().toUpperCase()).not.toBe(check.code);
+      expect(check.repair.trim().toUpperCase()).not.toBe(check.code);
+    }
+  });
+
+  it('publishes strict schema-valid and semantically valid full-plan examples', () => {
+    const contract = buildPlanContract();
+
+    expect(contract.contractVersion).toBe(1);
+    expect(contract.schema.additionalProperties).toBe(false);
+    expect(contract.examples.length).toBeGreaterThanOrEqual(2);
+
+    const projected = JSON.stringify(contract.examples);
+    for (const forbidden of ['fromMs', 'toMs', 'durationInFrames', 'frame', 'frames']) {
+      expect(projected).not.toContain(`"${forbidden}"`);
+    }
+
+    const demonstrations = contract.examples.flatMap((example) => example.demonstrates);
+    expect(demonstrations).toEqual(
+      expect.arrayContaining([
+        'multiple capabilities',
+        'persistent elements',
+        'placements',
+        'events',
+        'word anchor',
+      ]),
+    );
+  });
+
   /**
    * Asked through `parseAnchor` rather than compared against the grammar's own string,
    * which would recompute the expectation the way the code does and pass by construction.

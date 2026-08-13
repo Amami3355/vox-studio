@@ -20,23 +20,9 @@ import {
 import { tokenise } from '../core/words';
 import { motionProfileIds } from '../design/motion';
 import { capabilityIds, findCapability } from '../scenes/registry';
-import { checkPlanShape } from './plan-shape';
+import { type VideoPlan, type VideoPlanSection, checkPlanShape } from './plan-shape';
 
-export type VideoPlanSection = {
-  id: string;
-  /**
-   * The contiguous run of beats this section covers. Required, because totality has
-   * nothing to compare the union of its scenes' beats against without it.
-   */
-  spansBeats: string[];
-  persistent?: PersistentElement[];
-  scenes: SceneInstance[];
-};
-
-export type VideoPlan = {
-  beats: Beat[];
-  sections: VideoPlanSection[];
-};
+export type { VideoPlan, VideoPlanSection } from './plan-shape';
 
 export const validateScene = (instance: SceneInstance): CompileReport => {
   const errors: CompilerError[] = [];
@@ -685,13 +671,13 @@ const checkPlacements = (section: VideoPlanSection, scope: string[]): CompilerEr
     for (const [index, placement] of element.placements.entries()) {
       const field = `persistent[${element.id}].placements[${index}]`;
 
-      if (!(ALL_SLOTS as string[]).includes(placement.slot)) {
+      if (!(ALL_SLOTS as readonly string[]).includes(placement.slot)) {
         errors.push({
           code: 'UNKNOWN_SLOT',
           sectionId: section.id,
           field: `${field}.slot`,
           message: `Unknown slot "${placement.slot}".`,
-          expected: ALL_SLOTS,
+          expected: [...ALL_SLOTS],
         });
       }
 

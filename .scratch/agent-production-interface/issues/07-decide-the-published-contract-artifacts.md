@@ -1,7 +1,7 @@
 # Decide the published contract artifacts
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 01, 04
 
 ## Question
@@ -40,3 +40,37 @@ rather than being dropped.
 The artifacts, their canonical source, their generated projections and their ADR home are
 fixed, and ADR-0006's implementation can graduate into an implementation ticket against a
 settled topology.
+
+## Answer
+
+Cut-line item 2 was applied: this artifact decision is absorbed by
+[the production-boundary decision](04-decide-the-code-blind-production-boundary.md), not
+dropped. The agent reads no hand-maintained documentation bundle and receives no public
+TypeScript. `vox production contract index` is the compact discovery surface and
+`vox production contract show <category>` returns these versioned JSON projections:
+
+| Category | Projection | Canonical source |
+|---|---|---|
+| `language` | Generated glossary data | `CONTEXT.md` |
+| `plan` | JSON Schema plus validated complete-plan examples | Private `videoPlanSchema` and structural-example data |
+| `catalog` | Manifest version 3 with `time`, `capabilities` and `checks` | Registered SceneCapability data, `ANCHOR_GRAMMAR` and `COMPILER_CHECKS` |
+| `checks` | On-demand view of the catalog's exact generated check data | `COMPILER_CHECKS` |
+| `protocol` | Commands, stages, outcomes and production rules | Declarative production-contract data |
+
+The repository's TypeScript `VideoPlan` type and the public JSON Schema both derive from the
+private `videoPlanSchema`; only the JSON Schema crosses the boundary. The `checks` view is a
+projection of ADR-0006's catalog block, never a second source. Every projection is generated
+and contract-tested against its canonical source.
+
+The architectural home is
+[ADR-0007](../../../docs/adr/0007-isolate-agent-production-behind-a-trusted-service.md), which
+records both the trusted execution boundary and the public projection topology. ADR-0006 is
+not widened: it remains the decision that `COMPILER_CHECKS` is canonical and `catalog.json`
+carries its generated top-level `checks` block. With the topology fixed, its implementation is
+ready to graduate into an implementation ticket.
+
+## Comments
+
+Tickets 01, 02, 03 and 04 settled every prerequisite. The schedule cut combined this question
+with ticket 04; the user's confirmations for its received surface and ADR home are recorded in
+that ticket's grilling rounds 2 and 3.

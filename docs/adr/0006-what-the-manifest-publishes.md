@@ -19,7 +19,7 @@ sentence derived from it rather than written twice.
 The same measurement, repeated one field over, finds the next one. **`catalog.json`
 publishes no compiler error codes at all.** It was noticed while adding
 `DEICTIC_ANCHOR_REQUIRED`, which is consistent with existing practice and therefore equally
-unpublished: nineteen error codes and seven warning codes exist as TypeScript unions whose
+unpublished: twenty error codes and seven warning codes exist as TypeScript unions whose
 meaning lives in comments beside them, in a file the agent by rule 2 never reads.
 
 **The anchor argument does not transfer, and it is worth saying why.** An anchor is
@@ -46,7 +46,7 @@ under the wrong measure.
 Beside `time` and `capabilities`, for the reason `time` sits there: a check is not a property
 of any one capability, and repeating it per capability would be the copy that drifts.
 
-**2. All twenty-six codes, not a curated subset.** A subset needs a membership rule; the rule
+**2. All twenty-seven codes, not a curated subset.** A subset needs a membership rule; the rule
 would be "can the agent act on it?"; and that judgement drifts as the agent's authorship
 surface grows. `MISSING_BEAT_TIMING` looks internal and fires *because* the agent named a
 beat the take has no timing for. The whole set costs a few hundred tokens once, and curating
@@ -68,6 +68,12 @@ incompetence rather than like a missing fact.
 rejection and a `means` for a reader who has never seen the vocabulary. The call site keeps
 its situated `message` and its `expected[]` — which field, which bar, which alternatives. The
 data says what the code means and what to do about it; it does not say which bar.
+
+`severity` is a non-empty list of the levels that a situated report may carry. Most warning
+codes admit one level. `SOFT_LIMIT_EXCEEDED` also reports an empty but valid state as `info`,
+and `ASSET_PLACEHOLDER` escalates a failed resolution from `quality` to `important`; keeping
+those distinctions public preserves existing Rule 5 behaviour without inventing a second
+private severity source.
 
 **4. `COMPILER_CHECKS` is the source, and the TypeScript unions derive from it.**
 `CompilerErrorCode` and `CompilerWarningCode` become `keyof typeof COMPILER_CHECKS.errors`
@@ -99,7 +105,7 @@ looks tidiest in the manifest and costs the most over time.
 from ADR-0002's amendment, restated for a different vocabulary, and it loses for the same
 reason: a vocabulary that describes itself twice describes itself differently within a month.
 
-**Generate the call-site messages from the data too.** Rejected. Twenty-six codes with
+**Generate the call-site messages from the data too.** Rejected. Twenty-seven codes with
 situated text would become a template language, and the situated messages are the part of
 the current errors that is actually good — `expected` carrying the anchors that would fix a
 `DEICTIC_ANCHOR_REQUIRED` is not something a generic sentence can do.
@@ -110,7 +116,7 @@ the current errors that is actually good — `expected` carrying the anchors tha
   wiring and a version bump — days rather than weeks — and it is an entry condition for a
   fair cold pass. Doing it first also means the actions added next publish their codes as
   they land, instead of being retrofitted by someone who has to rediscover this document.
-- **The `means` and `repair` text is new writing, and it is the real cost.** Twenty-six
+- **The `means` and `repair` text is new writing, and it is the real cost.** Twenty-seven
   entries of prose aimed at a reader who has never seen the codebase. Written badly it is
   worse than nothing: a `repair` that restates the code name teaches the agent that the
   block is noise, and it will read the rest of the manifest in that light.

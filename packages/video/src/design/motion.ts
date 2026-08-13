@@ -100,7 +100,9 @@ export const springConfig = (profile: MotionProfile) => motion.spring[profile.sp
  * Pace is a rhythm token, not a duration. It scales how tightly events are packed
  * inside a scene; it never sets the scene length, which comes from the beats.
  */
-export type Pace = 'quick' | 'measured' | 'slow';
+export const paceIds = ['quick', 'measured', 'slow'] as const;
+
+export type Pace = (typeof paceIds)[number];
 
 export const paceMultiplier: Record<Pace, number> = {
   quick: 0.72,

@@ -1,7 +1,7 @@
 # Wayfinder — Agent production interface
 
 Type: wayfinder:map
-Status: open
+Status: resolved
 
 ## Destination
 
@@ -69,13 +69,13 @@ unservable Brief, represented as an explicit result artifact or protocol state a
 only as a process exit code. `docs/measurement-gate.md` measure 5 makes declining a first-
 class outcome, and the gate consumes this interface later.
 
-### Known implementation obligations awaiting sequencing
+### Known implementation obligations
 
-Known work, not unresolved decisions. They remain unsliced only because their ordering and
-ticket boundaries depend on open decisions above.
+Known work, not unresolved decisions. The implementation tickets below now own their ordering,
+boundaries and change-scoped verification.
 
 - **Implement ADR-0006** — `COMPILER_CHECKS` as data, `CompilerErrorCode` and
-  `CompilerWarningCode` derived from it, the twenty-six `means`/`repair` prose entries, the
+  `CompilerWarningCode` derived from it, the twenty-seven `means`/`repair` prose entries, the
   top-level `checks` block, `manifestVersion` → 3. Decided 2026-08-13 and not built; the
   manifest today publishes `manifestVersion`, `time` and `capabilities` only.
 - **Generalise recording.** `packages/voice/scripts/record-take.mts` records
@@ -85,9 +85,75 @@ ticket boundaries depend on open decisions above.
 
 ## Decisions so far
 
+- [Define the authoring-knowledge frame](issues/01-define-the-authoring-knowledge-frame.md) —
+  a compact discovery index over five canonical categories: ubiquitous language,
+  `VideoPlan` structure, SceneCapability authoring, compiler checks and production protocol.
+  Facts live once beside the behaviour they govern; projections and full-plan structural
+  examples are generated and contract-tested.
+- [Define the public command lifecycle](issues/02-define-the-public-command-lifecycle.md) —
+  explicit `vox production` contract and Run commands advance a persistent Run through
+  validation, advisory Preflight, recording, authoritative compilation and rendering. JSON
+  inputs/results, Decline, write containment and process exit semantics are fixed; quota and
+  network remain exclusive to `record`.
 - [Choose the production voice](issues/08-choose-the-production-voice.md) — George
   (`JBFqnCBsd6RMkjVDRZzb`), `eleven_v3`, seed 7, no paid listening comparison before the
   deadline. Deferred cost recorded in the ticket.
+- [Prove code-isolated rendering](issues/03-prove-code-isolated-rendering.md) — green through
+  a thin readable client calling a production process outside the agent's filesystem. The
+  current local Remotion artifact is rejected because it exposes sourcemaps and readable Vox
+  implementation; the external-process candidate actually validated, compiled and rendered
+  the current plan before passing the in-container leak probe.
+
+- [Decide the code-blind production boundary](issues/04-decide-the-code-blind-production-boundary.md)
+  — production executes in a trusted Production service reached only through authenticated
+  OS-local IPC. The agent receives a thin native launcher, public contracts and Run outputs;
+  source, runtimes, dependencies and credentials stay outside its readable environment, and
+  isolation plus leak scans are standing release gates.
+- [Define duration preflight](issues/05-define-duration-preflight.md) — authored UTF-16 text is
+  estimated at 66.25 ms/unit for the fixed English voice configuration with a provisional 20%
+  uncertainty margin. Minimum and recommended risks remain explicitly advisory, missing or
+  falsified calibration never blocks recording, and future verified Takes invalidate rather
+  than silently retune a calibration that fails its published bounds.
+- [Bind artifacts, retries and resume](issues/06-bind-artifacts-retries-and-resume.md) — the
+  agent-writable Run carries immutable content-addressed artifacts, an authenticated Run
+  checkpoint and chained receipts; a private monotonic Run ledger prevents quota rollback and
+  grant replay. Every consumer reverifies its inputs, identical operations reuse verified
+  results, text/segmentation/voice changes stale a Take, and uncertain recording dispatches
+  never retry automatically.
+- [Decide the published contract artifacts](issues/07-decide-the-published-contract-artifacts.md)
+  — absorbed into the boundary decision under the schedule cut. The five Authoring knowledge
+  frame categories are versioned JSON projections from their canonical sources; JSON Schema,
+  not TypeScript, is public, and ADR-0007 owns the topology while ADR-0006 remains scoped to
+  compiler checks in the manifest.
+- [Specify the code-blind end-to-end proof](issues/09-specify-the-code-blind-end-to-end-proof.md)
+  — a fresh isolated agent must turn the permanently measurement-ineligible fictional
+  Northbridge Brief into one 20–30 second narrated MP4 with both capabilities, a March Word
+  anchor, visible placeholder degradation and exactly one synthesis dispatch. Machine evidence,
+  zero-network paused/failed probes and a signed watch/listen verdict are mandatory; no
+  code-blind end-to-end claim exists before both actual verdicts pass.
+
+- [Implement compile and render stages](issues/17-implement-compile-and-render-stages.md) -
+  the Production service now reverifies every plan/report/Preflight/Take/fold/compiler input,
+  publishes content-addressed compile and preview artifacts, preserves all three asset states,
+  reuses exact inputs without recomputation and renders the recorded vertical slice as a
+  ffprobe-confirmed H.264/AAC MP4 without outbound network access.
+
+- [Implement recording reuse and authorisation](issues/18-implement-record-reuse-and-authorisation.md)
+  - `run.record` now verifies and reuses authenticated Take history, durably charges every
+  provider dispatch before I/O, recovers complete private responses without network, pauses
+  uncertain attempts, and enforces scoped one-time replacement grants plus the hard Run cap.
+
+- [Build the OS-local IPC boundary and native launcher](issues/19-build-local-ipc-and-native-launcher.md)
+  - every public command now crosses authenticated, replay-resistant Windows named-pipe IPC
+  through one leak-scanned `vox.exe`; its restricted-token suite proves an isolated work root
+  is read/write while repository and trusted service roots remain unreadable, without claiming
+  that the fresh-agent Northbridge proof has run.
+
+- [Build the code-blind proof harness](issues/20-build-code-blind-proof-harness.md) - the
+  frozen Northbridge fixture now produces real H.264/AAC media and a complete hash-indexed,
+  fail-closed evidence bundle. All itemized checks pass except the deliberately ineligible
+  scripted-agent assertion; seeded leak and network violations each fail independently. A
+  hardened fresh-Codex driver is wired for the separate actual proof without claiming it ran.
 
 ## Cost
 
@@ -125,12 +191,27 @@ reversal. Every node on the critical path is a defining guarantee, so a choice t
 one is resolved by the user or the destination is redrawn — the deadline does not authorise
 guessing.
 
-## Not yet specified
+## Implementation sequence
 
-- The implementation sequence, ticket boundaries and change-scoped verification commands.
-  These depend on the authoring-knowledge frame, the command lifecycle, the code-blind
-  boundary, the artifact state machine and the proof specification; graduate them only after
-  those decisions are resolved. Graduating them is this map's final act.
+The child tickets' `Blocked by` fields remain the authoritative dependency graph. Their
+numeric order is the intended frontier when more than one ticket is unblocked:
+
+1. [Implement the compiler-check registry and catalog v3](issues/10-implement-compiler-check-registry.md).
+2. [Publish the plan schema and structural examples](issues/11-publish-plan-schema-and-structural-examples.md).
+3. [Build the production contract projections](issues/12-build-production-contract-projections.md).
+4. [Implement the authenticated Run store](issues/13-implement-authenticated-run-store.md).
+5. [Implement duration Preflight](issues/14-implement-duration-preflight.md).
+6. [Generalise recording and Take folds](issues/15-generalize-recording-and-take-folds.md).
+7. [Implement the non-network production commands](issues/16-implement-non-network-production-commands.md).
+8. [Implement compile and render stages](issues/17-implement-compile-and-render-stages.md).
+9. [Implement recording reuse and authorisation](issues/18-implement-record-reuse-and-authorisation.md).
+10. [Build the OS-local IPC boundary and native launcher](issues/19-build-local-ipc-and-native-launcher.md).
+11. [Build the code-blind proof harness](issues/20-build-code-blind-proof-harness.md).
+12. [Execute the Northbridge code-blind proof](issues/21-execute-northbridge-code-blind-proof.md).
+
+Each ticket carries its own acceptance criteria and verification commands. Resolving this
+map means the planning destination is complete; it does not claim that implementation or the
+code-blind proof has run.
 
 ## Out of scope
 

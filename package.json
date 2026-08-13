@@ -11,8 +11,8 @@
   "scripts": {
     "studio": "pnpm --filter @vox/video studio",
     "grid": "pnpm --filter @vox/component-studio dev",
-    "catalog": "pnpm --filter @vox/video catalog",
-    "catalog:check": "pnpm --filter @vox/video catalog:check",
+    "catalog": "pnpm --filter @vox/video catalog && pnpm --filter @vox/production contracts",
+    "catalog:check": "pnpm --filter @vox/video catalog:check && pnpm --filter @vox/production contracts:check",
     "typecheck": "pnpm -r --parallel typecheck",
     "test": "vitest run",
     "test:watch": "vitest",

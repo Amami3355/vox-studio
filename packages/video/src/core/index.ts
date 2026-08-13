@@ -1,4 +1,5 @@
 export * from './types';
+export * from './compiler-checks';
 export * from './words';
 export * from './assets';
 export * from './events';

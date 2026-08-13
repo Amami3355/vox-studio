@@ -5,6 +5,7 @@ export * from './scenes/registry';
 export * from './runtime/SceneRenderer';
 export * from './runtime/ExampleScene';
 export * from './catalog/tools';
+export * from './catalog/plan-shape';
 export * from './assets';
 export { barChartCapability } from './scenes/BarChartScene';
 export { imageContextCapability } from './scenes/ImageContextScene';

@@ -1,0 +1,905 @@
+{
+  "category": "catalog",
+  "contractVersion": 3,
+  "contract": {
+    "manifestVersion": 3,
+    "time": {
+      "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
+      "forms": [
+        {
+          "form": "<beatId>.start|mid|end",
+          "expectation": "with an optional +short/-short/+long/-long offset",
+          "means": "A boundary or the midpoint of one beat, optionally nudged by a rhythm token. Use it when the event follows the shape of the sentence rather than any particular word in it. `scene` is a pseudo-beat meaning the scene’s own bounds.",
+          "examples": [
+            "b2.start",
+            "b4.end-short",
+            "scene.mid"
+          ]
+        },
+        {
+          "form": "<beatId>.word:<word>",
+          "expectation": "naming a word the beat actually speaks (no offset)",
+          "means": "The frame the narrator begins that word. Use it when the event must land on what is being said — an action listing `deicticFields` is saying exactly that about those payload fields, so anchor it to the word it names. The word must appear in that beat’s text exactly once — twice is an error, not a first match — and takes no offset, because an offset from a word onset is the arithmetic this form exists to avoid: if the event belongs slightly later, name the next word. `scene` has no text, so it cannot carry this form.",
+          "examples": [
+            "b2.word:London"
+          ]
+        }
+      ],
+      "offsets": [
+        "short",
+        "long"
+      ],
+      "sceneBeatId": "scene"
+    },
+    "checks": {
+      "errors": {
+        "UNKNOWN_CAPABILITY": {
+          "code": "UNKNOWN_CAPABILITY",
+          "regime": "error",
+          "means": "A scene names a capability that the catalog does not publish.",
+          "repair": "Choose a capability id from catalog.capabilities and rewrite the scene for it."
+        },
+        "INVALID_PROPS": {
+          "code": "INVALID_PROPS",
+          "regime": "error",
+          "means": "A scene property does not satisfy the selected capability schema.",
+          "repair": "Use the reported field and expected values to make props match that schema."
+        },
+        "UNKNOWN_ACTION": {
+          "code": "UNKNOWN_ACTION",
+          "regime": "error",
+          "means": "An event names an action the selected capability does not support.",
+          "repair": "Choose an action from the capability actions, or remove the event."
+        },
+        "UNKNOWN_LAYOUT": {
+          "code": "UNKNOWN_LAYOUT",
+          "regime": "error",
+          "means": "A scene selects a layout that its capability does not publish.",
+          "repair": "Replace it with one of the capability layouts listed in expected."
+        },
+        "INVALID_PAYLOAD": {
+          "code": "INVALID_PAYLOAD",
+          "regime": "error",
+          "means": "An event payload is absent when required or fails its action schema.",
+          "repair": "Author the payload from the action payloadSchema and the reported field details."
+        },
+        "UNKNOWN_ANCHOR": {
+          "code": "UNKNOWN_ANCHOR",
+          "regime": "error",
+          "means": "An event anchor is malformed or points outside the beats available to its scene.",
+          "repair": "Use catalog.time forms and anchor the event to scene or to a beat the scene spans."
+        },
+        "AMBIGUOUS_ANCHOR": {
+          "code": "AMBIGUOUS_ANCHOR",
+          "regime": "error",
+          "means": "A word anchor names text that occurs more than once in the same beat.",
+          "repair": "Split or rephrase the beat, or use an unambiguous boundary anchor."
+        },
+        "DEICTIC_ANCHOR_REQUIRED": {
+          "code": "DEICTIC_ANCHOR_REQUIRED",
+          "regime": "error",
+          "means": "A pointing action does not land while the narration says the value it identifies.",
+          "repair": "Move the event to one of the word anchors listed in expected."
+        },
+        "UNKNOWN_SLOT": {
+          "code": "UNKNOWN_SLOT",
+          "regime": "error",
+          "means": "A persistent element requests a placement slot outside the public slot vocabulary.",
+          "repair": "Choose a slot listed in expected and revalidate the plan."
+        },
+        "BELOW_MIN_DURATION": {
+          "code": "BELOW_MIN_DURATION",
+          "regime": "error",
+          "means": "A compiled scene is too short to perform its capability animation safely.",
+          "repair": "Give the scene more narration time, usually by merging adjacent beats into its span."
+        },
+        "MISSING_ASSET_REFERENCE": {
+          "code": "MISSING_ASSET_REFERENCE",
+          "regime": "error",
+          "means": "A scene that requires media has no authored asset requirement to resolve.",
+          "repair": "Add the required asset-reference field described by the capability schema."
+        },
+        "MALFORMED_PLAN": {
+          "code": "MALFORMED_PLAN",
+          "regime": "error",
+          "means": "The plan JSON does not have the required VideoPlan structure or field types.",
+          "repair": "Repair the reported structural field using the published VideoPlan JSON Schema."
+        },
+        "DUPLICATE_ID": {
+          "code": "DUPLICATE_ID",
+          "regime": "error",
+          "means": "Two authored objects reuse an id that must be unique in its plan scope.",
+          "repair": "Rename one duplicate and update every reference to it."
+        },
+        "BEAT_NOT_CONTIGUOUS": {
+          "code": "BEAT_NOT_CONTIGUOUS",
+          "regime": "error",
+          "means": "A section or scene claims beats that are separated in narration order.",
+          "repair": "Make spansBeats one uninterrupted ordered range, or split the claimant."
+        },
+        "BEAT_DOUBLE_BOOKED": {
+          "code": "BEAT_DOUBLE_BOOKED",
+          "regime": "error",
+          "means": "More than one section or scene claims the same narration beat.",
+          "repair": "Assign that beat to exactly one claimant by adjusting their spansBeats arrays."
+        },
+        "BEAT_UNCOVERED": {
+          "code": "BEAT_UNCOVERED",
+          "regime": "error",
+          "means": "A narration beat belongs to no section or to no scene within its section.",
+          "repair": "Extend or add one claimant so every beat is covered exactly once."
+        },
+        "EMPTY_BEAT_SPAN": {
+          "code": "EMPTY_BEAT_SPAN",
+          "regime": "error",
+          "means": "A section or scene claims no narration beats and therefore has no duration.",
+          "repair": "Assign at least one beat, or remove the empty section or scene."
+        },
+        "SCENE_CUTS_MID_SENTENCE": {
+          "code": "SCENE_CUTS_MID_SENTENCE",
+          "regime": "error",
+          "means": "A scene boundary interrupts a sentence before the narration reaches its end.",
+          "repair": "Move the boundary to a sentence end or keep the sentence in one scene."
+        },
+        "MISSING_BEAT_TIMING": {
+          "code": "MISSING_BEAT_TIMING",
+          "regime": "error",
+          "means": "The verified Take contains no timing for a beat present in the plan.",
+          "repair": "Restore the matching plan and Take, or record a new Take for the changed narration."
+        },
+        "INVALID_TIMING_INPUT": {
+          "code": "INVALID_TIMING_INPUT",
+          "regime": "error",
+          "means": "Take timings are invalid or are not a faithful projection of the current plan.",
+          "repair": "Do not edit timings; verify the Take binding and record again when it is stale."
+        }
+      },
+      "warnings": {
+        "SOFT_LIMIT_EXCEEDED": {
+          "code": "SOFT_LIMIT_EXCEEDED",
+          "regime": "warning",
+          "severity": [
+            "info",
+            "quality"
+          ],
+          "means": "A value is outside a capability recommendation but still satisfies its hard schema.",
+          "repair": "Follow the situated suggestion when visual quality matters; the plan may still ship."
+        },
+        "SLOT_RELOCATED": {
+          "code": "SLOT_RELOCATED",
+          "regime": "warning",
+          "severity": [
+            "info"
+          ],
+          "means": "The compiler moved a persistent element to avoid an unsafe or occupied placement.",
+          "repair": "Accept the safe placement, or choose a conflict-free preferred slot."
+        },
+        "PERSISTENT_ELEMENT_HIDDEN": {
+          "code": "PERSISTENT_ELEMENT_HIDDEN",
+          "regime": "warning",
+          "severity": [
+            "important"
+          ],
+          "means": "No safe placement remained, so a persistent element is absent for part of the render.",
+          "repair": "Reduce simultaneous elements or change their requested placements."
+        },
+        "ASSET_PLACEHOLDER": {
+          "code": "ASSET_PLACEHOLDER",
+          "regime": "warning",
+          "severity": [
+            "quality",
+            "important"
+          ],
+          "means": "Required media is represented by a placeholder because resolution is pending or failed.",
+          "repair": "Resolve a pending requirement, or fix the reported failed asset before final delivery."
+        },
+        "MOTION_PROFILE_REPETITION": {
+          "code": "MOTION_PROFILE_REPETITION",
+          "regime": "warning",
+          "severity": [
+            "quality"
+          ],
+          "means": "Adjacent scenes repeat a motion profile often enough to make pacing feel mechanical.",
+          "repair": "Vary a scene motionProfile while keeping its intended editorial tone."
+        },
+        "TITLE_DENSITY": {
+          "code": "TITLE_DENSITY",
+          "regime": "warning",
+          "severity": [
+            "quality"
+          ],
+          "means": "Prominent title text is denser than the capability recommends for legibility.",
+          "repair": "Shorten the title or move supporting detail into secondary copy."
+        },
+        "SCENE_BELOW_RECOMMENDED_DURATION": {
+          "code": "SCENE_BELOW_RECOMMENDED_DURATION",
+          "regime": "warning",
+          "severity": [
+            "quality"
+          ],
+          "means": "A scene clears its hard duration floor but has less time than its recommended pacing.",
+          "repair": "Span more narration beats when the resulting slower presentation is preferable."
+        }
+      }
+    },
+    "capabilities": [
+      {
+        "id": "bar_chart",
+        "name": "BarChartScene",
+        "family": "data",
+        "summary": "Comparison of discrete values across named categories.",
+        "useWhen": [
+          "comparing quantities between named categories",
+          "showing a ranking",
+          "contrasting two to eight values",
+          "making one value in a set stand out"
+        ],
+        "avoidWhen": [
+          "continuous change over time → line_chart",
+          "share of a whole → stat_donut",
+          "a single value → stat_counter",
+          "a sequence of dated events → timeline"
+        ],
+        "supportsEvents": true,
+        "requiresAssets": false,
+        "occupiesRegions": [
+          "bottom",
+          "left"
+        ],
+        "supportedCompositions": [
+          "full",
+          "left",
+          "right"
+        ],
+        "minDurationFrames": 90,
+        "recommendedDurationFrames": 210,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Headline shown above the chart. Best under 40 characters; beyond that the type scale drops a step automatically."
+            },
+            "data": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Category name shown under the bar."
+                  },
+                  "value": {
+                    "type": "number",
+                    "description": "Plotted value. Negative values recompute the axis."
+                  }
+                },
+                "required": [
+                  "label",
+                  "value"
+                ]
+              },
+              "description": "Series to compare. Best between 2 and 8 entries. From 9 to 20 the weakest are collapsed into a single 'Others' bar. An empty array renders a typographic empty state rather than a blank frame."
+            },
+            "unit": {
+              "default": "",
+              "description": "Suffix appended to every value, e.g. '%' or '€'. Empty for bare numbers.",
+              "type": "string",
+              "maxLength": 8
+            },
+            "highlight": {
+              "description": "The `label` of the bar to bring forward. Every other bar recedes toward the background. Must match a label present in `data`.",
+              "type": "string"
+            },
+            "emphasis": {
+              "default": "neutral",
+              "description": "Semantic reading of the highlighted value. Selects the accent role from the theme; never a raw colour.",
+              "type": "string",
+              "enum": [
+                "neutral",
+                "positive",
+                "negative"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "data"
+          ]
+        },
+        "softConstraints": {
+          "data": {
+            "recommendedMin": 2,
+            "recommendedMax": 8,
+            "absoluteMax": 20,
+            "onExceed": "Values ranked below the top 8 are collapsed into a single 'Others' bar.",
+            "onEmpty": "Typographic empty state showing the title alone."
+          },
+          "title": {
+            "recommendedMax": 40,
+            "onExceed": "Title drops one step of the type scale.",
+            "onExceedCode": "TITLE_DENSITY"
+          }
+        },
+        "layouts": [
+          {
+            "id": "standard",
+            "description": "Vertical columns under a headline. The default reading order.",
+            "slots": [
+              "title",
+              "chart"
+            ]
+          },
+          {
+            "id": "horizontal",
+            "description": "Horizontal bars with labels on the left. Use for long category names or for a ranking.",
+            "slots": [
+              "title",
+              "chart"
+            ]
+          },
+          {
+            "id": "withCallout",
+            "description": "Chart on the left, a reserved annotation column on the right. Use when the scene carries an `annotate` event.",
+            "slots": [
+              "title",
+              "chart",
+              "annotation"
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "id": "showBaseline",
+            "description": "Reveal the first bar alone, as a reference point.",
+            "payloadSchema": null
+          },
+          {
+            "id": "revealAll",
+            "description": "Reveal the remaining bars in a staggered cascade.",
+            "payloadSchema": null
+          },
+          {
+            "id": "highlightBar",
+            "description": "Bring one bar forward and recede all the others.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "Must match a `label` present in `data`."
+                }
+              },
+              "required": [
+                "label"
+              ]
+            },
+            "deicticFields": [
+              "label"
+            ]
+          },
+          {
+            "id": "annotate",
+            "description": "Show a short annotation pointing at one bar.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "Must match a `label` present in `data`."
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "description": "Annotation copy. Keep it under 50 characters."
+                }
+              },
+              "required": [
+                "label",
+                "text"
+              ]
+            }
+          }
+        ],
+        "examples": [
+          {
+            "id": "example-rent-burden",
+            "title": "Ranking with a late highlight",
+            "note": "The canonical shape: baseline, cascade, then one value pulled forward.",
+            "component": "bar_chart",
+            "layout": "standard",
+            "motionProfile": "energetic",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "pace": "measured",
+            "props": {
+              "title": "Share of income spent on rent",
+              "unit": "%",
+              "emphasis": "negative",
+              "data": [
+                {
+                  "label": "Berlin",
+                  "value": 27
+                },
+                {
+                  "label": "Paris",
+                  "value": 33
+                },
+                {
+                  "label": "Amsterdam",
+                  "value": 38
+                },
+                {
+                  "label": "Dublin",
+                  "value": 42
+                },
+                {
+                  "label": "London",
+                  "value": 47
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "showBaseline"
+              },
+              {
+                "at": "b2.start",
+                "action": "revealAll"
+              },
+              {
+                "at": "b3.start",
+                "action": "highlightBar",
+                "payload": {
+                  "label": "London"
+                }
+              }
+            ]
+          },
+          {
+            "id": "example-annotated-comparison",
+            "title": "Annotated comparison",
+            "note": "Uses the withCallout layout so the annotation has a reserved column.",
+            "component": "bar_chart",
+            "layout": "withCallout",
+            "motionProfile": "pushIn",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3",
+              "b4"
+            ],
+            "pace": "slow",
+            "props": {
+              "title": "Median deposit needed for a first home",
+              "unit": "k",
+              "emphasis": "neutral",
+              "highlight": "2025",
+              "data": [
+                {
+                  "label": "2005",
+                  "value": 18
+                },
+                {
+                  "label": "2010",
+                  "value": 24
+                },
+                {
+                  "label": "2015",
+                  "value": 39
+                },
+                {
+                  "label": "2020",
+                  "value": 52
+                },
+                {
+                  "label": "2025",
+                  "value": 71
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "showBaseline"
+              },
+              {
+                "at": "b2.start",
+                "action": "revealAll"
+              },
+              {
+                "at": "b3.start",
+                "action": "highlightBar",
+                "payload": {
+                  "label": "2025"
+                }
+              },
+              {
+                "at": "b4.start",
+                "action": "annotate",
+                "payload": {
+                  "label": "2025",
+                  "text": "Four times the 2005 figure"
+                }
+              }
+            ]
+          },
+          {
+            "id": "example-long-ranking",
+            "title": "Edge case — 20 entries, long title",
+            "note": "Soft limits both breached: the weakest values collapse into 'Others' and the title drops a type step.",
+            "component": "bar_chart",
+            "layout": "horizontal",
+            "motionProfile": "impact",
+            "spansBeats": [
+              "b1"
+            ],
+            "pace": "quick",
+            "props": {
+              "title": "New homes completed last year across every metropolitan area surveyed",
+              "unit": "k",
+              "emphasis": "neutral",
+              "data": [
+                {
+                  "label": "Lisbon",
+                  "value": 19
+                },
+                {
+                  "label": "Athens",
+                  "value": 17
+                },
+                {
+                  "label": "Madrid",
+                  "value": 16
+                },
+                {
+                  "label": "Milan",
+                  "value": 15
+                },
+                {
+                  "label": "Warsaw",
+                  "value": 14
+                },
+                {
+                  "label": "Prague",
+                  "value": 13
+                },
+                {
+                  "label": "Vienna",
+                  "value": 12
+                },
+                {
+                  "label": "Lyon",
+                  "value": 11
+                },
+                {
+                  "label": "Rotterdam",
+                  "value": 9
+                },
+                {
+                  "label": "Hamburg",
+                  "value": 8
+                },
+                {
+                  "label": "Gothenburg",
+                  "value": 8
+                },
+                {
+                  "label": "Antwerp",
+                  "value": 7
+                },
+                {
+                  "label": "Bologna",
+                  "value": 7
+                },
+                {
+                  "label": "Malmo",
+                  "value": 6
+                },
+                {
+                  "label": "Bilbao",
+                  "value": 6
+                },
+                {
+                  "label": "Aarhus",
+                  "value": 5
+                },
+                {
+                  "label": "Leipzig",
+                  "value": 5
+                },
+                {
+                  "label": "Porto",
+                  "value": 4
+                },
+                {
+                  "label": "Tampere",
+                  "value": 3
+                },
+                {
+                  "label": "Graz",
+                  "value": 2
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "revealAll"
+              }
+            ]
+          },
+          {
+            "id": "example-empty",
+            "title": "Empty case — no data",
+            "note": "A missing series is a legitimate state. Renders a typographic frame, not a black screen.",
+            "component": "bar_chart",
+            "layout": "standard",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "title": "No comparable figures were published",
+              "unit": "",
+              "emphasis": "neutral",
+              "data": []
+            },
+            "events": []
+          },
+          {
+            "id": "example-negative-swing",
+            "title": "Edge case — negative values",
+            "note": "A negative value recomputes the axis around a zero line instead of drawing off-frame.",
+            "component": "bar_chart",
+            "layout": "standard",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "props": {
+              "title": "Change in housing starts",
+              "unit": "%",
+              "emphasis": "positive",
+              "highlight": "Spain",
+              "data": [
+                {
+                  "label": "Spain",
+                  "value": 12
+                },
+                {
+                  "label": "France",
+                  "value": 4
+                },
+                {
+                  "label": "Germany",
+                  "value": -6
+                },
+                {
+                  "label": "Sweden",
+                  "value": -14
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "revealAll"
+              },
+              {
+                "at": "b2.mid",
+                "action": "highlightBar",
+                "payload": {
+                  "label": "Spain"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "image_context",
+        "name": "ImageContextScene",
+        "family": "context",
+        "summary": "Editorial image paired with concise context copy for openings and transitions.",
+        "useWhen": [
+          "establishing a documentary subject with one strong image",
+          "providing visual context before or after a data scene",
+          "pairing a photo or illustration with a concise editorial claim"
+        ],
+        "avoidWhen": [
+          "comparing numeric categories → bar_chart",
+          "locating a place or route → map",
+          "presenting a typography-only statement → typographic_statement",
+          "making a character carry the explanation → character_explainer"
+        ],
+        "supportsEvents": false,
+        "requiresAssets": true,
+        "occupiesRegions": [
+          "full"
+        ],
+        "supportedCompositions": [
+          "full",
+          "left",
+          "right"
+        ],
+        "minDurationFrames": 90,
+        "recommendedDurationFrames": 180,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "headline": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Editorial headline paired with the image. Best under 40 characters; longer copy reduces the type scale."
+            },
+            "caption": {
+              "default": "",
+              "description": "Optional supporting context. Best under 120 characters.",
+              "type": "string",
+              "maxLength": 240
+            },
+            "assetRequirement": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "character",
+                    "map",
+                    "document"
+                  ],
+                  "description": "Semantic kind of visual material required by the scene."
+                },
+                "subject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "description": "Visual subject in natural language. Never a path or URI."
+                },
+                "treatment": {
+                  "default": "photo",
+                  "description": "Editorial treatment requested from the Asset Resolver.",
+                  "type": "string",
+                  "enum": [
+                    "photo",
+                    "cutout",
+                    "illustration",
+                    "duotone"
+                  ]
+                },
+                "orientation": {
+                  "default": "landscape",
+                  "description": "Composition the resolved asset should support.",
+                  "type": "string",
+                  "enum": [
+                    "landscape",
+                    "portrait",
+                    "square"
+                  ]
+                },
+                "identityKey": {
+                  "description": "Stable identity shared by requirements that must resolve to the same asset.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "type",
+                "subject"
+              ],
+              "additionalProperties": false,
+              "description": "Semantic visual request resolved before compilation. Never provide a path or URI."
+            }
+          },
+          "required": [
+            "headline",
+            "assetRequirement"
+          ],
+          "additionalProperties": false
+        },
+        "softConstraints": {
+          "headline": {
+            "recommendedMin": 1,
+            "recommendedMax": 40,
+            "onEmpty": "The asset subject becomes the only visible context label.",
+            "onExceed": "The headline drops one step of the type scale.",
+            "onExceedCode": "TITLE_DENSITY"
+          },
+          "caption": {
+            "recommendedMax": 120,
+            "onExceed": "Shorten the caption to preserve an image-led composition."
+          }
+        },
+        "layouts": [
+          {
+            "id": "splitLeft",
+            "description": "Editorial image on the left with a concise headline and optional caption on the right. Composed into half a frame, the same three slots stack: plate above, copy below.",
+            "slots": [
+              "image",
+              "headline",
+              "caption"
+            ]
+          }
+        ],
+        "actions": [],
+        "examples": [
+          {
+            "id": "example-housing-context",
+            "title": "Housing context opener",
+            "note": "Canonical image-led opening for the housing and rent vertical slice.",
+            "component": "image_context",
+            "layout": "splitLeft",
+            "motionProfile": "cinematic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "The rent squeeze is reshaping city life",
+              "caption": "A growing share of income now disappears before the month begins.",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Dense apartment buildings in a European city at dusk",
+                "treatment": "photo",
+                "orientation": "landscape",
+                "identityKey": "housing-city-context"
+              }
+            }
+          },
+          {
+            "id": "example-long-context",
+            "title": "Edge case — long editorial copy",
+            "note": "Edge case for headline density, caption length, and a portrait-oriented request.",
+            "component": "image_context",
+            "layout": "splitLeft",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "For first-time buyers, the distance between wages and housing costs keeps widening",
+              "caption": "Even households that save consistently are watching deposits and monthly payments move further out of reach in the largest cities.",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Young renter looking through an apartment window above a crowded city street",
+                "treatment": "illustration",
+                "orientation": "portrait"
+              }
+            }
+          },
+          {
+            "id": "example-empty-context",
+            "title": "Empty case — unresolved image and copy",
+            "note": "Empty copy remains renderable while the subject-labelled asset placeholder carries context.",
+            "component": "image_context",
+            "layout": "splitLeft",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "",
+              "caption": "",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Housing context image pending",
+                "treatment": "duotone",
+                "orientation": "landscape"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

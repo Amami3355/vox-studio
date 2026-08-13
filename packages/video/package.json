@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./fonts": "./src/design/fonts.ts",
-    "./catalog.json": "./src/catalog/catalog.json"
+    "./catalog.json": "./src/catalog/catalog.json",
+    "./plan-contract.json": "./src/catalog/plan-contract.json"
   },
   "scripts": {
     "studio": "remotion studio src/remotion-entry.ts",

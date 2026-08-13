@@ -27,7 +27,13 @@ import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } 
 import { resolvePersistentLayer, safeAreaFor } from './persistent';
 import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
-export type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
+export {
+  compiledDocumentSchema,
+  type CompiledAudio,
+  type CompiledDocument,
+  type CompiledScene,
+  type CompiledSection,
+} from './document';
 
 /**
  * The gate a take has to pass, published because `packages/voice` is what produces one.

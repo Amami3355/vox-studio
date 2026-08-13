@@ -102,7 +102,11 @@ export const foldAlignment = (beats: Beat[], alignment: Alignment): TimedBeat[] 
   }
 
   const script = scriptFor(beats);
-  const { characters, character_start_times_seconds: starts } = alignment;
+  const {
+    characters,
+    character_start_times_seconds: starts,
+    character_end_times_seconds: ends,
+  } = alignment;
 
   /**
    * Both assertions, rather than the one that reads better. The count catches a UTF-16
@@ -115,6 +119,27 @@ export const foldAlignment = (beats: Beat[], alignment: Alignment): TimedBeat[] 
     throw new AlignmentMismatchError(
       `The alignment has ${characters.length} characters where the script has ${script.length} UTF-16 units. It was synthesised from different text, or the characters are not code units.`,
     );
+  }
+
+  if (starts.length !== characters.length || ends.length !== characters.length) {
+    throw new AlignmentMismatchError(
+      'The alignment character, start-time and end-time arrays must have the same length.',
+    );
+  }
+
+  for (let index = 0; index < starts.length; index += 1) {
+    const start = starts[index] as number;
+    const end = ends[index] as number;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) {
+      throw new AlignmentMismatchError(
+        `The alignment carries an invalid interval at character ${index}.`,
+      );
+    }
+    if (index > 0 && start < (starts[index - 1] as number)) {
+      throw new AlignmentMismatchError(
+        `The alignment start times move backwards at character ${index}.`,
+      );
+    }
   }
 
   if (characters.join('') !== script) {

@@ -159,11 +159,47 @@ production executes locally and opaquely or outside the agent's environment enti
 Minification alone does not establish code-blindness. Avoid: "catalog CLI", which names one
 transport rather than the whole production boundary.
 
+**Production service** — The trusted side of the Agent production interface, outside the
+agent-readable environment. It owns production execution and discloses only public contracts,
+artifacts and results. Avoid: "backend", which does not name the trust boundary, and "runtime
+bundle", which suggests something delivered into the agent environment.
+
+**Authoring knowledge frame** — The categorised, progressively discoverable public knowledge
+through which an agent learns to author a valid VideoPlan and operate the Agent production
+interface. Every fact has one canonical source and may appear elsewhere only as a derived
+projection. Avoid: "prompt", "manual" or "documentation bundle", which imply a second,
+hand-maintained source of truth.
+
+**Run** — One persistent production attempt for one Brief and its operator-owned production
+configuration. It advances through explicit stages, survives interruption and retains the
+last successful stage when a command needs repair, pauses or fails. Avoid: "session", which
+suggests state that disappears with the process.
+
+**Run checkpoint** — The authenticated, agent-readable view of a Run's current artifact
+bindings and freshness. It is inspectable and recoverable, but it is not the authority for
+irreversible quota or authorisation state. Avoid: "run manifest", which suggests the file is
+self-authorising.
+
+**Run ledger** — The Production service's private monotonic authority for a Run's revision,
+quota-bearing recording dispatches and consumed replacement authorisations. It anchors the
+public checkpoint against rollback without hiding the Run's media. Avoid: "cache", which
+suggests disposable derived state.
+
+**Decline** — A terminal Run outcome stating that the Brief cannot be served by the current
+catalogue and naming the unmet editorial need and catalogue gap. It produces no preview and
+is never represented by a process exit code alone. Avoid: "failure", because refusing an
+unservable Brief is correct production behaviour.
+
 **Preflight** — A plan-only, non-authoritative assessment performed before recording. It
 reports the risks estimable without a Take — duration above all, since a scene has no duration
 until spoken milliseconds become frames and `BELOW_MIN_DURATION` is a hard error the compiler
 alone can raise. It never claims that an estimated duration or word timing compiled. Avoid:
 "dry compile", which promises the authority it is defined not to have.
+
+**Duration calibration** — Configuration-scoped evidence that Preflight uses to estimate
+narration length from authored Beat text before a Take exists. It is advisory and remains
+usable only while later verified Takes stay inside its declared uncertainty. Avoid: "synthetic
+timing", which would make an estimate indistinguishable from recorded evidence.
 
 **Recording input** — The operator-authorised synthesis request derived from ordered beat text
 and production voice settings. It determines whether spending quota is a first recording or a

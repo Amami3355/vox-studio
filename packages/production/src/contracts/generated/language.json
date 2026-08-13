@@ -1,0 +1,213 @@
+{
+  "category": "language",
+  "contractVersion": 1,
+  "contract": {
+    "entries": [
+      {
+        "term": "SceneCapability",
+        "definition": "A *type* of scene available in the catalog (`bar_chart`, `image_context`, …). 8–12 exist in V1. Defined by code, generated into the manifest at build time, immutable at runtime.",
+        "avoid": "\"component\", \"scene type\", \"template\"."
+      },
+      {
+        "term": "SceneInstance",
+        "definition": "One *use* of a capability inside one video. Dozens per project. Authored by the agent, edited by the user, serialised into the video document. The studio edits instances, never capabilities.",
+        "avoid": "\"scene\" on its own when the capability is meant."
+      },
+      {
+        "term": "Scene",
+        "definition": "Level 2 only. A scene is a SceneCapability or an instance of one. Never a primitive, never a section.",
+        "avoid": null
+      },
+      {
+        "term": "Primitive",
+        "definition": "A level 1 visual building block (`AnimatedText`, `Bar`, `Callout`, `CameraRig`, `SlotFrame`). Not exposed to the agent, ever.",
+        "avoid": null
+      },
+      {
+        "term": "Section",
+        "definition": "Level 3. The scope of a persistent element: a contiguous run of beats over which the same persistent elements survive. Authored by the agent, played by a generic runtime — there is no hand-written section component per video. Every beat of a section belongs to exactly one of its scenes.",
+        "avoid": null
+      },
+      {
+        "term": "Persistent element",
+        "definition": "Something (usually a character cutout) that survives across scene boundaries inside a section. Declared on the section, never by scene nesting.",
+        "avoid": null
+      },
+      {
+        "term": "Placement",
+        "definition": "A persistent element's slot at an anchor. Placements are to persistent elements what events are to scenes: the agent writes them symbolically, the compiler folds them into `layoutStates` with absolute frames.",
+        "avoid": "\"SectionTimeline\", which §7.2 of the frozen doc uses for the same generated output that §10 calls `layoutStates`."
+      },
+      {
+        "term": "Beat",
+        "definition": "The narrative unit the agents work in. A beat carries its own voice-over text verbatim, so the spoken script is the ordered concatenation of beat texts and never exists as a separate artifact. Beats get real timings from the voice-over; scenes derive their durations from the beats they span.",
+        "avoid": "\"script\" as something written alongside beats, or a beat that merely points at a range of one."
+      },
+      {
+        "term": "VideoPlan",
+        "definition": "The agent-authored semantic document: ordered Beats partitioned into Sections, with their SceneInstances, persistent elements and placements. It contains no timings, frames, safe areas or resolved asset references; the compiler combines it with a Take to produce the Compiled document.",
+        "avoid": "\"compiled plan\" — compilation produces a different artifact."
+      },
+      {
+        "term": "Timed beat",
+        "definition": "A Beat plus its real start and end, in milliseconds, as spoken. The agent produces Beats and never TimedBeats. Milliseconds are the audio domain and frames are the Remotion domain; the compiler is the one place they meet.",
+        "avoid": null
+      },
+      {
+        "term": "Frame beat",
+        "definition": "A beat's window in frames, `{ id, from, to }`. The third and last domain a beat travels through: `Beat` narrative → `TimedBeat` audio → `FrameBeat` Remotion. Only the compiler crosses the second seam.",
+        "avoid": "calling any of the three just \"beat\" in code."
+      },
+      {
+        "term": "Anchor",
+        "definition": "A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`, `b2.word:London`. The agent writes anchors. The compiler writes frames. An agent that writes a frame is a bug. The grammar has one definition, `ANCHOR_GRAMMAR` in the canonical implementation source, and both the compiler's rejection message and the manifest's `time` block are generated from it — an anchor vocabulary the manifest does not publish is one rule 2 makes unlearnable.",
+        "avoid": null
+      },
+      {
+        "term": "Word anchor",
+        "definition": "The one anchor form that names a word instead of arithmetic: `b2.word:London` resolves to the frame the narrator begins that word. For events that must land on what is being said — a highlight is a pointing gesture — because no boundary, midpoint or offset of a beat lands on a particular word. The word must appear **exactly once** in that beat: twice is `AMBIGUOUS_ANCHOR`, since picking one silently is the defect this form exists to repair. No offset is allowed. Resolvable only against a real take, never `syntheticBeats`. See ADR-0002's last amendment.",
+        "avoid": "\"snapping\", which was measured and rejected."
+      },
+      {
+        "term": "Timed word",
+        "definition": "One word of a beat and the moment it begins, in milliseconds. Carried on the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information beside the beat, the same information the alignment always had. Empty means \"this take was never recorded\", which is legal; a word anchor against it is not, and it is a property of the *take* — a take with words on some beats and not others is refused.",
+        "avoid": null
+      },
+      {
+        "term": "Take manifest",
+        "definition": "`<id>.take.json`: a take id and SHA-256 of the audio and the alignment, written by the canonical implementation source at the one moment \"these were recorded together\" is a fact rather than an assumption. The take id is derived from the two hashes, so it *is* which take this is rather than a claim about it. the canonical implementation source verifies it before overwriting the beats, and a standing test holds the committed mp3 against it. See ADR-0004's last amendment.",
+        "avoid": "treating it as metadata — it is the only thing that authenticates the audio."
+      },
+      {
+        "term": "Motion profile",
+        "definition": "A motion *role* chosen per scene from a closed set (`editorialStatic`, `subtleDrift`, `pushIn`, `energetic`, `impact`, `cinematic`). The agent picks a profile; it never picks an easing, a duration or a camera amount.",
+        "avoid": null
+      },
+      {
+        "term": "Pace / hold",
+        "definition": "Rhythm tokens (`quick|measured|slow`, `none|short|long`). They shape the internal distribution of events, never the length of a scene.",
+        "avoid": null
+      },
+      {
+        "term": "Slot",
+        "definition": "A coarse region of the canvas an element occupies (`left`, `cornerBR`, …). The agent speaks slots.",
+        "avoid": null
+      },
+      {
+        "term": "Safe area",
+        "definition": "The rectangle a scene renders into, given to the component as percentages from each edge. It is how the compiler's resolution of competing slot occupations reaches the frame. The component speaks safe areas, the agent speaks slots, and the two vocabularies never cross.",
+        "avoid": null
+      },
+      {
+        "term": "Slot conflict",
+        "definition": "A scene's occupancy overlapping a persistent element's placement. Resolved in favour of what was declared: a composition the scene supports, failing that another slot the element already uses in the section, failing that the element is hidden for the scene. The compiler never invents a position. The **scene** is the unit and it is solved as a whole — one composition, every element crossing it resolved against that same composition, held for the scene's duration. See ADR-0003.",
+        "avoid": null
+      },
+      {
+        "term": "Action",
+        "definition": "A member of a capability's *closed* event vocabulary (`highlightBar`, `annotate`). An action outside the vocabulary is a compilation error, never a silence.",
+        "avoid": null
+      },
+      {
+        "term": "Deictic field",
+        "definition": "A payload field of an action whose value is a word the narrator speaks and which the event must therefore *land on*: `highlightBar` declares `deicticFields: ['label']`, because \"this one\" is only true while the narrator is saying the thing pointed at. Declared on the action and published in the manifest, so the rule reaches every capability rather than the ones a test remembered. `annotate` declares none — its label names the same bar, but the note's timing follows the sentence that justifies it. The anchor to write for a deictic field is a Word anchor, and a plan that anchors one elsewhere is refused with `DEICTIC_ANCHOR_REQUIRED`. Enforced over a *plan*, never a bare instance: an instance with no take cannot carry a word anchor, and every catalog example is one. A multi-word value lands on any one of its tokens.",
+        "avoid": "treating it as \"the payload mentions a word\", which is what `annotate` also does."
+      },
+      {
+        "term": "Hard constraint",
+        "definition": "Expressed in the Zod schema. Violating it rejects the plan.",
+        "avoid": null
+      },
+      {
+        "term": "Soft constraint",
+        "definition": "Expressed in the canonical implementation source and published to the manifest. Violating it degrades the render and emits a warning.",
+        "avoid": null
+      },
+      {
+        "term": "AssetRef",
+        "definition": "A discriminated union of `ready | placeholder | failed`. A missing reference is an error; a resolved placeholder is not. `failed` is distinguished from `placeholder` because one needs intervention and the other needs patience.",
+        "avoid": null
+      },
+      {
+        "term": "Manifest / catalog",
+        "definition": "the canonical implementation source. Generated from the registry, committed, never hand-edited. It is everything the agent knows about the scene library. If the manifest is insufficient, fix the manifest, not the prompt.",
+        "avoid": null
+      },
+      {
+        "term": "Compiled document",
+        "definition": "What the compiler emits and the Section runtime plays. Frames, percentages and resolved assets; never an anchor, a slot or a millisecond. It is JSON, which is what makes a video's composition assertable without rendering it.",
+        "avoid": "\"timeline\", and \"compiled plan\" — a plan is the input."
+      },
+      {
+        "term": "Compile report",
+        "definition": "A structured deliverable (`errors[]`, `warnings[]`), not a log.",
+        "avoid": null
+      },
+      {
+        "term": "Measurement gate",
+        "definition": "§13 step 9: a generalist model, given only the manifest and ten briefs written by the user, authors plans that are scored on five measures. It measures the **catalog**, never the agent, and anything under threshold is repaired by depth and never by adding a capability. Specified in the canonical implementation source.",
+        "avoid": "\"the eval\", which suggests the model is the subject."
+      },
+      {
+        "term": "Brief",
+        "definition": "One paragraph of editorial intent, written by the user, carrying no structure and no vocabulary from the manifest. The gate's input. Two of the ten are deliberately unservable.",
+        "avoid": "\"prompt\" — a brief is not addressed to a model's instructions."
+      },
+      {
+        "term": "Agent production interface",
+        "definition": "The complete agent-visible boundary through which a generalist agent authors a plan and requests the production operations that turn a Brief into a narrated preview. It exposes generated contracts and public vocabulary, but no repository source, sourcemaps, internal commentary or readable implementation. It holds whether production executes locally and opaquely or outside the agent's environment entirely. Minification alone does not establish code-blindness.",
+        "avoid": "\"catalog CLI\", which names one transport rather than the whole production boundary."
+      },
+      {
+        "term": "Production service",
+        "definition": "The trusted side of the Agent production interface, outside the agent-readable environment. It owns production execution and discloses only public contracts, artifacts and results.",
+        "avoid": "\"backend\", which does not name the trust boundary, and \"runtime bundle\", which suggests something delivered into the agent environment."
+      },
+      {
+        "term": "Authoring knowledge frame",
+        "definition": "The categorised, progressively discoverable public knowledge through which an agent learns to author a valid VideoPlan and operate the Agent production interface. Every fact has one canonical source and may appear elsewhere only as a derived projection.",
+        "avoid": "\"prompt\", \"manual\" or \"documentation bundle\", which imply a second, hand-maintained source of truth."
+      },
+      {
+        "term": "Run",
+        "definition": "One persistent production attempt for one Brief and its operator-owned production configuration. It advances through explicit stages, survives interruption and retains the last successful stage when a command needs repair, pauses or fails.",
+        "avoid": "\"session\", which suggests state that disappears with the process."
+      },
+      {
+        "term": "Run checkpoint",
+        "definition": "The authenticated, agent-readable view of a Run's current artifact bindings and freshness. It is inspectable and recoverable, but it is not the authority for irreversible quota or authorisation state.",
+        "avoid": "\"run manifest\", which suggests the file is self-authorising."
+      },
+      {
+        "term": "Run ledger",
+        "definition": "The Production service's private monotonic authority for a Run's revision, quota-bearing recording dispatches and consumed replacement authorisations. It anchors the public checkpoint against rollback without hiding the Run's media.",
+        "avoid": "\"cache\", which suggests disposable derived state."
+      },
+      {
+        "term": "Decline",
+        "definition": "A terminal Run outcome stating that the Brief cannot be served by the current catalogue and naming the unmet editorial need and catalogue gap. It produces no preview and is never represented by a process exit code alone.",
+        "avoid": "\"failure\", because refusing an unservable Brief is correct production behaviour."
+      },
+      {
+        "term": "Preflight",
+        "definition": "A plan-only, non-authoritative assessment performed before recording. It reports the risks estimable without a Take — duration above all, since a scene has no duration until spoken milliseconds become frames and `BELOW_MIN_DURATION` is a hard error the compiler alone can raise. It never claims that an estimated duration or word timing compiled.",
+        "avoid": "\"dry compile\", which promises the authority it is defined not to have."
+      },
+      {
+        "term": "Duration calibration",
+        "definition": "Configuration-scoped evidence that Preflight uses to estimate narration length from authored Beat text before a Take exists. It is advisory and remains usable only while later verified Takes stay inside its declared uncertainty.",
+        "avoid": "\"synthetic timing\", which would make an estimate indistinguishable from recorded evidence."
+      },
+      {
+        "term": "Recording input",
+        "definition": "The operator-authorised synthesis request derived from ordered beat text and production voice settings. It determines whether spending quota is a first recording or a replacement request; it does not identify the resulting recording. Identical recording inputs can produce *different* Takes — synthesis is not reproducible even at a fixed seed — which is why replaying one is a replacement attempt rather than a reproduction, and why `takeId`, digested from the audio and the alignment, is what identifies and binds the Take that comes out.",
+        "avoid": null
+      },
+      {
+        "term": "Take",
+        "definition": "One recording of a plan's script: its `TimedBeat[]`, its audio, and the character alignment both were derived from. Synthesis is **not** reproducible, so a take is recorded deliberately and committed, and its three artifacts are one thing — swap any of them alone and the video is cut against words the audio does not say. See ADR-0004's last amendment.",
+        "avoid": "\"the voice-over\" for the timings, or \"regenerate\" for what produces one."
+      }
+    ]
+  }
+}

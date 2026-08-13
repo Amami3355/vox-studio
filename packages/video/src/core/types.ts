@@ -7,27 +7,22 @@
  * project, authored by the agent, edited by the user, serialised into the document).
  * No code may blur that boundary.
  */
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { MotionProfileId, Pace } from '../design/motion';
 import type { AssetRef, AssetRequirement, ResolvedSceneAssets } from './assets';
+import {
+  COMPILER_CHECKS,
+  type CompilerErrorCode,
+  type CompilerWarningCode,
+  type CompilerWarningSeverityFor,
+} from './compiler-checks';
 
 export type { AssetRef, AssetRequirement, ResolvedSceneAssets } from './assets';
+export type { CompilerErrorCode, CompilerWarningCode } from './compiler-checks';
 
 /* ------------------------------------------------------------------ layout */
 
-export type Slot =
-  | 'full'
-  | 'left'
-  | 'right'
-  | 'top'
-  | 'bottom'
-  | 'center'
-  | 'cornerTL'
-  | 'cornerTR'
-  | 'cornerBL'
-  | 'cornerBR';
-
-export const ALL_SLOTS: Slot[] = [
+export const ALL_SLOTS = [
   'full',
   'left',
   'right',
@@ -38,7 +33,9 @@ export const ALL_SLOTS: Slot[] = [
   'cornerTR',
   'cornerBL',
   'cornerBR',
-];
+] as const;
+
+export type Slot = (typeof ALL_SLOTS)[number];
 
 /** Percentages of the canvas that a scene must keep clear. Computed, never authored. */
 export type SafeArea = { top: number; right: number; bottom: number; left: number };
@@ -224,9 +221,11 @@ export type Placement = { at: string; slot: Slot };
  * because they had a channel that let them skip it. Same rule, same resolver, same
  * identity cache: an element sharing an `identityKey` with a scene now shares its picture.
  */
+export const PERSISTENT_ELEMENT_TYPES = ['character', 'image', 'label'] as const;
+
 export type PersistentElement = {
   id: string;
-  element: 'character' | 'image' | 'label';
+  element: (typeof PERSISTENT_ELEMENT_TYPES)[number];
   assetRequirement?: AssetRequirement;
   placements: Placement[];
 };
@@ -259,50 +258,6 @@ export type SceneProps<P> = {
 
 /* ---------------------------------------------------------------- reporting */
 
-export type CompilerErrorCode =
-  | 'UNKNOWN_CAPABILITY'
-  | 'INVALID_PROPS'
-  | 'UNKNOWN_ACTION'
-  | 'UNKNOWN_LAYOUT'
-  | 'INVALID_PAYLOAD'
-  | 'UNKNOWN_ANCHOR'
-  /* A well-formed word anchor into the right beat that still cannot resolve, because the
-   * beat speaks that word more than once. Its own code rather than UNKNOWN_ANCHOR: the
-   * word is not unknown, it is unaddressable, and the repair is to split the beat or take
-   * a boundary rather than to look for a different word. */
-  | 'AMBIGUOUS_ANCHOR'
-  /* An action declaring `deicticFields` anchored somewhere that is not the word it points
-   * at. Its own code because the repair is unlike either anchor error: the anchor is
-   * well-formed and resolves fine, and what is wrong is that it resolves to a moment the
-   * narrator is not saying the thing the payload names. The correction is to move the
-   * event onto the word, which is why `expected` carries the anchors that would do it. */
-  | 'DEICTIC_ANCHOR_REQUIRED'
-  | 'UNKNOWN_SLOT'
-  | 'BELOW_MIN_DURATION'
-  | 'MISSING_ASSET_REFERENCE'
-  /* The structural gate. A plan arriving as JSON has none of the guarantees its
-   * TypeScript type makes, and every semantic check downstream assumes them. */
-  | 'MALFORMED_PLAN'
-  | 'DUPLICATE_ID'
-  /* The beat partition. Three codes rather than one, because they are three different
-   * corrections to feed back to the agent. Each carries `sectionId` when it fires over
-   * the scenes of a section and omits it when it fires over the sections of a plan,
-   * which is how the report says which of the two partitions broke. */
-  | 'BEAT_NOT_CONTIGUOUS'
-  | 'BEAT_DOUBLE_BOOKED'
-  | 'BEAT_UNCOVERED'
-  | 'EMPTY_BEAT_SPAN'
-  | 'SCENE_CUTS_MID_SENTENCE'
-  /* A plan beat the voice-over never spoke. The compiler has no duration for it, and
-   * every window derived from it would be silently wrong rather than absent. */
-  | 'MISSING_BEAT_TIMING'
-  /* Timings that are not a projection of the plan: out of order, non-finite, reversed,
-   * gapped, or spoken from text the plan no longer contains. One code rather than the
-   * beat partition's three, because these are not three corrections an agent can make —
-   * rule 3 forbids an agent from writing a timing, so the only repair is to synthesise
-   * again and the message carries which property broke. */
-  | 'INVALID_TIMING_INPUT';
-
 export type CompilerError = {
   code: CompilerErrorCode;
   sceneId?: string;
@@ -313,18 +268,7 @@ export type CompilerError = {
   expected?: string[];
 };
 
-export type CompilerWarningCode =
-  | 'SOFT_LIMIT_EXCEEDED'
-  | 'SLOT_RELOCATED'
-  | 'PERSISTENT_ELEMENT_HIDDEN'
-  | 'ASSET_PLACEHOLDER'
-  | 'MOTION_PROFILE_REPETITION'
-  | 'TITLE_DENSITY'
-  | 'SCENE_BELOW_RECOMMENDED_DURATION';
-
-export type CompilerWarning = {
-  code: CompilerWarningCode;
-  severity: 'info' | 'quality' | 'important';
+type CompilerWarningFields = {
   sceneId?: string;
   sectionId?: string;
   field?: string;
@@ -332,10 +276,79 @@ export type CompilerWarning = {
   suggestion?: string;
 };
 
+export type CompilerWarning = {
+  [Code in CompilerWarningCode]: CompilerWarningFields & {
+    code: Code;
+    severity: CompilerWarningSeverityFor<Code>;
+  };
+}[CompilerWarningCode];
+
 export type CompileReport = {
   ok: boolean;
   errors: CompilerError[];
   warnings: CompilerWarning[];
 };
+
+const compilerErrorCodeSchema = z.enum(
+  Object.keys(COMPILER_CHECKS.errors) as [CompilerErrorCode, ...CompilerErrorCode[]],
+);
+const compilerWarningCodeSchema = z.enum(
+  Object.keys(COMPILER_CHECKS.warnings) as [CompilerWarningCode, ...CompilerWarningCode[]],
+);
+const compilerLocationSchema = {
+  sceneId: z.string().optional(),
+  sectionId: z.string().optional(),
+  field: z.string().optional(),
+};
+
+/** Strict runtime gate for persisted validation and compilation reports. */
+const runtimeCompileReportSchema = z
+  .object({
+    ok: z.boolean(),
+    errors: z.array(
+      z
+        .object({
+          code: compilerErrorCodeSchema,
+          ...compilerLocationSchema,
+          message: z.string().min(1),
+          expected: z.array(z.string()).optional(),
+        })
+        .strict(),
+    ),
+    warnings: z.array(
+      z
+        .object({
+          code: compilerWarningCodeSchema,
+          severity: z.enum(['info', 'quality', 'important']),
+          ...compilerLocationSchema,
+          message: z.string().min(1),
+          suggestion: z.string().optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (report.ok !== (report.errors.length === 0)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ok'],
+        message: 'CompileReport.ok must equal whether errors is empty.',
+      });
+    }
+    for (const [index, warning] of report.warnings.entries()) {
+      const allowed = COMPILER_CHECKS.warnings[warning.code].severity as readonly string[];
+      if (!allowed.includes(warning.severity)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['warnings', index, 'severity'],
+          message: `${warning.code} does not allow severity ${warning.severity}.`,
+        });
+      }
+    }
+  });
+
+export const compileReportSchema =
+  runtimeCompileReportSchema as unknown as z.ZodType<CompileReport>;
 
 export const emptyReport = (): CompileReport => ({ ok: true, errors: [], warnings: [] });

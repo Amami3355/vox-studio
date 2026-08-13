@@ -10,7 +10,9 @@
  * test that takes a millisecond. That is what keeps assertions about composition out of
  * the render suite.
  */
+import { z } from 'zod';
 import type { FrameBeat } from '../core/anchors';
+import { assetRefSchema } from '../core/assets';
 import type { Rect } from '../core/slots';
 import type {
   AssetRef,
@@ -19,7 +21,7 @@ import type {
   SafeArea,
   TimedEvent,
 } from '../core/types';
-import type { MotionProfileId } from '../design/motion';
+import { type MotionProfileId, motionProfileIds } from '../design/motion';
 
 /**
  * Where one persistent element sits, over one run of frames.
@@ -106,3 +108,82 @@ export type CompiledDocument = {
   sections: CompiledSection[];
   audio: CompiledAudio;
 };
+
+const nonNegativeInteger = z.number().int().nonnegative();
+const frameRangeSchema = {
+  from: nonNegativeInteger,
+  to: nonNegativeInteger,
+};
+const rectSchema = z
+  .object({
+    top: z.number().min(0).max(100),
+    right: z.number().min(0).max(100),
+    bottom: z.number().min(0).max(100),
+    left: z.number().min(0).max(100),
+  })
+  .strict();
+const timedEventSchema = z
+  .object({
+    frame: nonNegativeInteger,
+    action: z.string().min(1),
+    payload: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+const compiledSceneSchema = z
+  .object({
+    id: z.string().min(1),
+    capabilityId: z.string().min(1),
+    props: z.record(z.string(), z.unknown()),
+    layout: z.string().min(1),
+    motionProfile: z.enum(motionProfileIds),
+    assets: z.object({ assetRequirement: assetRefSchema.optional() }).strict(),
+    ...frameRangeSchema,
+    events: z.array(timedEventSchema),
+    safeArea: rectSchema,
+  })
+  .strict();
+const persistentElementSchema = z
+  .object({
+    id: z.string().min(1),
+    element: z.enum(['character', 'image', 'label']),
+    asset: assetRefSchema.optional(),
+  })
+  .strict();
+const layoutStateSchema = z
+  .object({
+    elementId: z.string().min(1),
+    ...frameRangeSchema,
+    rect: rectSchema,
+  })
+  .strict();
+
+/** Runtime gate for persisted compiler output before the renderer receives it. */
+export const compiledDocumentSchema: z.ZodType<CompiledDocument> = z
+  .object({
+    fps: z.number().int().positive(),
+    durationInFrames: nonNegativeInteger,
+    beats: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          ...frameRangeSchema,
+          words: z.array(z.object({ text: z.string().min(1), frame: nonNegativeInteger }).strict()),
+        })
+        .strict(),
+    ),
+    sections: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          ...frameRangeSchema,
+          scenes: z.array(compiledSceneSchema),
+          persistent: z.array(persistentElementSchema),
+          layoutStates: z.array(layoutStateSchema),
+        })
+        .strict(),
+    ),
+    audio: z
+      .object({ voiceover: z.string().min(1).optional(), music: z.string().min(1).optional() })
+      .strict(),
+  })
+  .strict();

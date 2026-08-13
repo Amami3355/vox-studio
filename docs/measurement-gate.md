@@ -179,12 +179,12 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
 - **With two capabilities, measure 3 has almost nothing to be wrong about.** Selection
   relevance needs briefs for which at least two capabilities are plausible; otherwise it
   scores the absence of alternatives.
-- **The manifest publishes no check vocabulary**, and in the cold pass `validate` is
-  withheld, so nothing the compiler checks is knowable. ADR-0006 closes this, and the gate
-  should not be run before it does — the same argument that made publishing the anchor
-  grammar block session 11's work rather than follow it.
+- **Catalog v3 now publishes the complete check vocabulary.** The canonical registry owns
+  every code, regime, allowed warning severity, meaning and repair, and the report-code types
+  derive from it. This ADR-0006 entry condition is met; it remains a release precondition
+  that `catalog:check` proves the committed projection has not drifted.
 
-Entry conditions, therefore: ADR-0006 is carried out; every capability publishes at least
+Entry conditions, therefore: catalog v3 remains aligned with ADR-0006; every capability publishes at least
 one action; every capability meets §15's checklist including its three examples with an edge
 case and an empty case; and the majority of the ten briefs admit more than one plausible
 capability.

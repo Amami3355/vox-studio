@@ -1,0 +1,342 @@
+import { execFile, spawn } from 'node:child_process';
+import { access, rm } from 'node:fs/promises';
+import { delimiter, join } from 'node:path';
+import { promisify } from 'node:util';
+import type { AgentDriver, AgentSandboxEvidence } from './harness';
+import { NORTHBRIDGE_TASK_MESSAGE } from './northbridge';
+
+const execFileAsync = promisify(execFile);
+const proofProfile = 'vox-code-blind-proof';
+const defaultModel = 'gpt-5.6-sol';
+
+type ProcessResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+};
+
+const windowsSystemPath = (workRoot: string) =>
+  [
+    workRoot,
+    'C:\\Windows\\System32',
+    'C:\\Windows',
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0',
+  ].join(delimiter);
+
+const profileDefinitionOverrides = () => [
+  '-c',
+  `permissions.${proofProfile}.filesystem={ ":minimal"="read", ":workspace_roots"={ "."="write" } }`,
+  '-c',
+  `permissions.${proofProfile}.network.enabled=false`,
+  '-c',
+  'windows.sandbox="elevated"',
+];
+
+export const codexProofSandboxArguments = (workRoot: string, command: string[]) => [
+  'sandbox',
+  '-P',
+  proofProfile,
+  ...profileDefinitionOverrides(),
+  '-C',
+  workRoot,
+  ...command,
+];
+
+const permissionOverrides = () => [
+  '-c',
+  `default_permissions="${proofProfile}"`,
+  ...profileDefinitionOverrides(),
+];
+
+const agentOverrides = () => [
+  '-c',
+  'approval_policy="never"',
+  ...permissionOverrides(),
+  '-c',
+  'allow_login_shell=false',
+  '-c',
+  'web_search="disabled"',
+  '-c',
+  'features.apps=false',
+  '-c',
+  'features.plugins=false',
+  '-c',
+  'features.multi_agent=false',
+  '-c',
+  'analytics.enabled=false',
+  '-c',
+  'shell_environment_policy={ inherit="all", ignore_default_excludes=true, filters={ PATH="include", PATHEXT="include", SystemRoot="include", WINDIR="include", ComSpec="include", TEMP="include", TMP="include", VOX_PIPE_NAME="include", VOX_IPC_TOKEN="include" } }',
+];
+
+export const codexProofExecArguments = (workRoot: string, model: string, prompt: string) => [
+  'exec',
+  '--json',
+  '--ephemeral',
+  '--ignore-user-config',
+  '--ignore-rules',
+  '--skip-git-repo-check',
+  '--strict-config',
+  '--cd',
+  workRoot,
+  '--model',
+  model,
+  ...agentOverrides(),
+  prompt,
+];
+
+const resolveCodex = async () => {
+  if (process.env.VOX_PROOF_CODEX_BIN) return process.env.VOX_PROOF_CODEX_BIN;
+  const located = await execFileAsync('where.exe', ['codex'], { windowsHide: true });
+  const path = located.stdout
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!path) throw new Error('PROOF_CODEX_CLI_NOT_FOUND');
+  return path;
+};
+
+const run = async (
+  executable: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number },
+): Promise<ProcessResult> => {
+  try {
+    const result = await execFileAsync(executable, args, {
+      cwd: options.cwd,
+      env: options.env,
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: options.timeout ?? 30_000,
+      windowsHide: true,
+    });
+    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr, timedOut: false };
+  } catch (error) {
+    const failure = error as {
+      code?: number | string;
+      stdout?: string;
+      stderr?: string;
+      killed?: boolean;
+      signal?: string;
+    };
+    return {
+      exitCode: typeof failure.code === 'number' ? failure.code : 1,
+      stdout: failure.stdout ?? '',
+      stderr: failure.stderr ?? String(failure.code ?? 'unknown failure'),
+      timedOut:
+        failure.killed === true ||
+        failure.code === 'ETIMEDOUT' ||
+        typeof failure.signal === 'string',
+    };
+  }
+};
+
+const sandboxCommand = (
+  codex: string,
+  workRoot: string,
+  env: NodeJS.ProcessEnv,
+  command: string[],
+  timeout = 30_000,
+) => run(codex, codexProofSandboxArguments(workRoot, command), { cwd: workRoot, env, timeout });
+
+const compactProbe = (result: ProcessResult) => ({
+  exitCode: result.exitCode,
+  stdout: result.stdout,
+  stderr: result.stderr,
+  timedOut: result.timedOut,
+});
+
+const verifySandbox = async (input: {
+  codex: string;
+  workRoot: string;
+  repositoryProbePath: string;
+  serviceProbePath: string;
+  credentialsProbePath: string;
+  environment: NodeJS.ProcessEnv;
+}): Promise<AgentSandboxEvidence> => {
+  await Promise.all([
+    access(input.repositoryProbePath),
+    access(input.serviceProbePath),
+    access(input.credentialsProbePath),
+    access('C:\\Windows\\System32\\curl.exe'),
+  ]);
+  const marker = join(input.workRoot, '.codex-sandbox-write-probe');
+  const workRoot = await sandboxCommand(
+    input.codex,
+    input.workRoot,
+    input.environment,
+    ['cmd.exe', '/d', '/c', 'type nul > .codex-sandbox-write-probe'],
+    5 * 60_000,
+  );
+  if (workRoot.exitCode !== 0 || workRoot.timedOut) {
+    await rm(marker, { force: true });
+    throw new Error(`PROOF_CODEX_SANDBOX_UNAVAILABLE:${JSON.stringify(compactProbe(workRoot))}`);
+  }
+  const probes = {
+    workRoot,
+    repository: await sandboxCommand(input.codex, input.workRoot, input.environment, [
+      'cmd.exe',
+      '/d',
+      '/c',
+      `type "${input.repositoryProbePath}"`,
+    ]),
+    service: await sandboxCommand(input.codex, input.workRoot, input.environment, [
+      'cmd.exe',
+      '/d',
+      '/c',
+      `dir /b "${input.serviceProbePath}"`,
+    ]),
+    credentials: await sandboxCommand(input.codex, input.workRoot, input.environment, [
+      'cmd.exe',
+      '/d',
+      '/c',
+      `type "${input.credentialsProbePath}"`,
+    ]),
+    network: await sandboxCommand(input.codex, input.workRoot, input.environment, [
+      'curl.exe',
+      '--silent',
+      '--show-error',
+      '--connect-timeout',
+      '3',
+      'https://example.com/',
+    ]),
+  };
+  const evidence: AgentSandboxEvidence = {
+    backend: 'codex-windows-elevated',
+    workRootReadWrite: probes.workRoot.exitCode === 0 && !probes.workRoot.timedOut,
+    repositoryDenied: probes.repository.exitCode !== 0 && !probes.repository.timedOut,
+    serviceDenied: probes.service.exitCode !== 0 && !probes.service.timedOut,
+    credentialsDenied: probes.credentials.exitCode !== 0 && !probes.credentials.timedOut,
+    directNetworkDenied: probes.network.exitCode !== 0 && !probes.network.timedOut,
+    probes: Object.fromEntries(
+      Object.entries(probes).map(([name, result]) => [name, compactProbe(result)]),
+    ),
+  };
+  await rm(marker, { force: true });
+  if (
+    !evidence.workRootReadWrite ||
+    !evidence.repositoryDenied ||
+    !evidence.serviceDenied ||
+    !evidence.credentialsDenied ||
+    !evidence.directNetworkDenied
+  ) {
+    throw new Error(`PROOF_CODEX_SANDBOX_PREFLIGHT_FAILED:${JSON.stringify(evidence)}`);
+  }
+  return evidence;
+};
+
+const appendJsonLines = (value: string, transcript: unknown[]) => {
+  for (const line of value.split(/\r?\n/u)) {
+    if (!line.trim()) continue;
+    try {
+      transcript.push(JSON.parse(line));
+    } catch {
+      transcript.push({ type: 'codex.raw-output', text: line });
+    }
+  }
+};
+
+const executeCodex = async (input: {
+  codex: string;
+  workRoot: string;
+  environment: NodeJS.ProcessEnv;
+  transcript: unknown[];
+  model: string;
+}) => {
+  const args = codexProofExecArguments(
+    input.workRoot,
+    input.model,
+    NORTHBRIDGE_TASK_MESSAGE,
+  );
+  return new Promise<ProcessResult>((resolvePromise, reject) => {
+    const child = spawn(input.codex, args, {
+      cwd: input.workRoot,
+      env: input.environment,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    let stdoutRemainder = '';
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('PROOF_CODEX_AGENT_TIMEOUT'));
+    }, 30 * 60_000);
+    child.stdout.on('data', (chunk: Buffer) => {
+      const combined = `${stdoutRemainder}${chunk.toString('utf8')}`;
+      const lines = combined.split(/\r?\n/u);
+      stdoutRemainder = lines.pop() ?? '';
+      appendJsonLines(lines.join('\n'), input.transcript);
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once('close', (code) => {
+      clearTimeout(timeout);
+      appendJsonLines(stdoutRemainder, input.transcript);
+      resolvePromise({ exitCode: code ?? 1, stdout, stderr, timedOut: false });
+    });
+  });
+};
+
+const terminalEventObserved = (transcript: unknown[]) =>
+  transcript.some(
+    (entry) =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      'type' in entry &&
+      (entry as { type?: unknown }).type === 'turn.completed',
+  );
+
+export const createCodexAgentDriver =
+  (options: { model?: string } = {}): AgentDriver =>
+  async ({
+    workRoot,
+    transcript,
+    launcherEnvironment,
+    repositoryProbePath,
+    serviceProbePath,
+    credentialsProbePath,
+  }) => {
+    const codex = await resolveCodex();
+    const environment = {
+      ...process.env,
+      ...launcherEnvironment,
+      PATH: windowsSystemPath(workRoot),
+      TEMP: workRoot,
+      TMP: workRoot,
+    };
+    const sandboxEvidence = await verifySandbox({
+      codex,
+      workRoot,
+      repositoryProbePath,
+      serviceProbePath,
+      credentialsProbePath,
+      environment,
+    });
+    const version = await run(codex, ['--version'], { cwd: workRoot, env: environment });
+    if (version.exitCode !== 0) throw new Error('PROOF_CODEX_VERSION_UNAVAILABLE');
+    const model = options.model ?? process.env.VOX_PROOF_CODEX_MODEL ?? defaultModel;
+    const result = await executeCodex({ codex, workRoot, environment, transcript, model });
+    if (result.stderr.trim()) {
+      transcript.push({ type: 'codex.stderr', text: result.stderr });
+    }
+    if (result.exitCode !== 0) {
+      throw new Error(`PROOF_CODEX_AGENT_FAILED:${result.exitCode}`);
+    }
+    return {
+      authorship: 'fresh-generalist',
+      unscripted: true,
+      humanHints: 0,
+      model,
+      modelVersion: version.stdout.trim(),
+      transcriptComplete: terminalEventObserved(transcript),
+      directNetworkDenied: sandboxEvidence.directNetworkDenied,
+      directNetworkEvents: [],
+      sandboxEvidence,
+    };
+  };

@@ -34,7 +34,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
 
 const seedArg = process.argv.indexOf('--seed');
-const seed = seedArg === -1 ? undefined : Number(process.argv[seedArg + 1]);
+const seed = seedArg === -1 ? 7 : Number(process.argv[seedArg + 1]);
 
 const shipped = shippedPlans[0];
 if (!shipped) throw new Error('No shipped plan to record.');
@@ -43,12 +43,12 @@ const script = scriptFor(shipped.plan.beats);
 console.info(
   `Recording "${shipped.id}": ${shipped.plan.beats.length} beats, ${script.length} characters`,
 );
-console.info(`voice ${VOICE_ID}${seed === undefined ? '' : `, seed ${seed}`}\n`);
+console.info(`voice ${VOICE_ID}, seed ${seed}\n`);
 
 const take = await synthesise({
   beats: shipped.plan.beats,
   voiceId: VOICE_ID,
-  ...(seed === undefined ? {} : { seed }),
+  seed,
 });
 
 /**
@@ -58,7 +58,7 @@ const take = await synthesise({
 const manifest = takeManifest({
   planId: shipped.id,
   voiceId: VOICE_ID,
-  ...(seed === undefined ? {} : { seed }),
+  seed,
   recordedAt: new Date().toISOString(),
   audio: take.audio,
   alignment: take.alignment,

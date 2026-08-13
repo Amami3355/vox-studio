@@ -1,0 +1,34 @@
+{
+  "name": "@vox/production",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "contracts": "tsx scripts/build-contracts.ts",
+    "contracts:check": "tsx scripts/build-contracts.ts --check",
+    "service": "tsx src/ipc/service-host.ts",
+    "build:agent-distribution": "tsx scripts/build-agent-distribution.ts",
+    "verify:agent-distribution": "tsx scripts/verify-agent-distribution.ts",
+    "setup:codex-sandbox": "tsx scripts/setup-codex-sandbox.ts",
+    "proof:northbridge": "tsx scripts/proof-northbridge.ts",
+    "verify:proof": "tsx scripts/verify-proof.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.508",
+    "@remotion/renderer": "4.0.508",
+    "@vox/video": "workspace:*",
+    "@vox/voice": "workspace:*",
+    "remotion": "4.0.508",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
