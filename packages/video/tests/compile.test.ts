@@ -10,7 +10,12 @@ import { createAssetResolver } from '../src/assets/resolver';
 import type { VideoPlan, VideoPlanSection } from '../src/catalog/validate';
 import { type CompiledDocument, compile } from '../src/compile';
 import { type Rect, slotRect } from '../src/core/slots';
-import { type CompileReport, NO_SAFE_AREA, type TimedBeat } from '../src/core/types';
+import {
+  type CompileReport,
+  NO_SAFE_AREA,
+  type SceneInstance,
+  type TimedBeat,
+} from '../src/core/types';
 import { requireCapability } from '../src/scenes/registry';
 
 const format = (report: CompileReport) =>
@@ -84,10 +89,64 @@ const onePlan: VideoPlan = {
           motionProfile: 'energetic',
           spansBeats: ['b1', 'b2'],
           props: barChartProps,
+          /**
+           * `annotate` rather than `highlightBar`, because this fixture is about boundary
+           * anchors and the timing failures around them — it needs an action carrying a
+           * payload, not a pointing gesture. `highlightBar` declares `deicticFields` and is
+           * therefore owed a word anchor, which every take-shape case below deliberately
+           * withholds. `annotate` names the same bar and claims nothing about when.
+           */
           events: [
             { at: 'b1.start', action: 'showBaseline' },
-            { at: 'b2.start', action: 'highlightBar', payload: { label: 'London' } },
+            {
+              at: 'b2.start',
+              action: 'annotate',
+              payload: { label: 'London', text: 'the extreme case' },
+            },
           ],
+        },
+      ],
+    },
+  ],
+};
+
+/**
+ * The same plan, anchored on a word instead of a boundary — "London" is spoken once in b2.
+ *
+ * A separate fixture rather than an edit to `onePlan`, because the difference between the
+ * two is the whole subject: a boundary anchor resolves against any take, and a word anchor
+ * resolves only against one that was recorded.
+ */
+const wordAnchorPlan: VideoPlan = {
+  ...onePlan,
+  sections: [
+    {
+      ...(onePlan.sections[0] as VideoPlanSection),
+      scenes: [
+        {
+          ...((onePlan.sections[0] as VideoPlanSection).scenes[0] as SceneInstance),
+          events: [
+            { at: 'b1.start', action: 'showBaseline' },
+            { at: 'b2.word:London', action: 'highlightBar', payload: { label: 'London' } },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+/** The same question asked of a persistent element, which resolves anchors on the same path. */
+const wordAnchorPlacementPlan: VideoPlan = {
+  ...onePlan,
+  sections: [
+    {
+      ...(onePlan.sections[0] as VideoPlanSection),
+      persistent: [
+        {
+          id: 'narrator',
+          element: 'character',
+          assetRequirement: narratorRequirement,
+          placements: [{ at: 'b1.word:climbed', slot: 'cornerBR' }],
         },
       ],
     },
@@ -235,7 +294,7 @@ describe('compile', () => {
     // b2 starts at 3000ms, which is frame 90, and the scene starts at frame 0.
     expect(result.document.sections[0]?.scenes[0]?.events).toEqual([
       { frame: 0, action: 'showBaseline' },
-      { frame: 90, action: 'highlightBar', payload: { label: 'London' } },
+      { frame: 90, action: 'annotate', payload: { label: 'London', text: 'the extreme case' } },
     ]);
   });
 
@@ -646,6 +705,109 @@ describe('compile', () => {
       const result = compile({ plan: onePlan, beats: spoken([{ words: [] }, { words: [] }]) });
 
       expect(result.ok).toBe(true);
+    });
+
+    /**
+     * The shape of `words` itself, which is the one field of a take nothing checked.
+     *
+     * This module's premise is that a take arriving as JSON "has none of the guarantees its
+     * TypeScript type makes", and every case above is that premise applied to a boundary or
+     * a text. Applied to `words` it had a hole: a take written before the field existed has
+     * no `words` key at all, and reading `.length` off it replaced the whole CompileReport
+     * with a TypeError. A legacy take is the ordinary way this arrives, and §8.1 needs the
+     * report for exactly the plan it cannot compile.
+     */
+    it.each([
+      ['a take from before the field existed', undefined],
+      ['a null word list', null],
+      ['a word list that is not a list', { 0: { text: 'Rents', fromMs: 0 } }],
+      ['a word that is not an object', ['Rents']],
+      ['a word with no text', [{ fromMs: 0 }]],
+      ['a word with no onset', [{ text: 'Rents' }]],
+      ['a word whose onset is not a number', [{ text: 'Rents', fromMs: '0' }]],
+    ])('refuses %s', (_, words) => {
+      const beats = timedBeats.map((beat, index) =>
+        index === 0 ? { ...beat, words } : beat,
+      ) as unknown as TimedBeat[];
+
+      const result = compile({ plan: onePlan, beats });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'beats.b1.words' }),
+      );
+    });
+
+    /**
+     * The door ADR-0002 left open on purpose, and the one thing on the other side of it.
+     *
+     * "Empty is legal at the take and loud at the anchor" is the recorded decision, and it
+     * is the right one — a synthetic take that fabricated onsets from a duration would
+     * produce numbers indistinguishable from measured ones. But *loud* was supposed to mean
+     * a report. It meant an `UnresolvableWordError` thrown clean out of `compile`, past a
+     * signature that promises a `CompileResult` and past §8.1's promise that a plan the
+     * compiler refuses comes back with a reason an agent can act on.
+     *
+     * `checkWordAnchors` cannot answer this: it reads the plan, and whether the *take* was
+     * recorded is not a fact about the plan. This is the take gate's half of one question.
+     */
+    it('refuses a word anchor when the take recorded no words', () => {
+      const result = compile({
+        plan: wordAnchorPlan,
+        beats: spoken([{ words: [] }, { words: [] }]),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'beats.b2.words' }),
+      );
+    });
+
+    /** A placement resolves anchors through the same door, so it goes through the same gate. */
+    it('refuses a word anchor in a placement when the take recorded no words', () => {
+      const result = compile({
+        plan: wordAnchorPlacementPlan,
+        beats: spoken([{ words: [] }, { words: [] }]),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'beats.b1.words' }),
+      );
+    });
+
+    /** The control: the same plan against the take that *was* recorded still compiles. */
+    it('accepts a word anchor when the take recorded the words', () => {
+      const result = compile({ plan: wordAnchorPlan, beats: timedBeats });
+
+      expect(result.ok).toBe(true);
+    });
+
+    /**
+     * "Recorded" is a property of a take, not of a beat within one.
+     *
+     * A fold either ran over an alignment or it did not, and it produces words for every
+     * beat or for none — CONTEXT.md defines an empty list as "this take was never recorded",
+     * which is a sentence about the take. A take carrying words on b1 and none on b2 is
+     * therefore not a legal state that happens to be unusual; it is a fold that half
+     * completed, a hand-edited artifact, or two takes spliced together. Each of those makes
+     * the words that *are* present untrustworthy, because whatever produced the gap was
+     * operating on the beats that have onsets too.
+     *
+     * Left alone it is quiet in the worst way: b1's anchors resolve to plausible frames and
+     * b2's are the only ones that complain.
+     */
+    it('refuses a take that recorded words for some beats and not others', () => {
+      const result = compile({ plan: onePlan, beats: spoken([{}, { words: [] }]) });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'beats.b2.words' }),
+      );
     });
 
     it('refuses an fps that cannot produce a frame', () => {

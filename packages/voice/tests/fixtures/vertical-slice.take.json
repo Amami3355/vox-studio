@@ -1,0 +1,15 @@
+{
+  "takeId": "0a663181b592",
+  "planId": "vertical-slice",
+  "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+  "seed": 7,
+  "recordedAt": "2026-08-12T23:24:17.869Z",
+  "audio": {
+    "bytes": 445170,
+    "sha256": "4fd1e20fdb94e0e065fcff6690d5aa339940739e2186eaf6316030bcdf1eeaf8"
+  },
+  "alignment": {
+    "characters": 422,
+    "sha256": "79de7b7713bb9ead49efc6c43193445ec50e23ae265bd2ecb7b87e1eff4f66b0"
+  }
+}

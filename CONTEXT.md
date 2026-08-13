@@ -68,7 +68,15 @@ rejected.
 **Timed word** — One word of a beat and the moment it begins, in milliseconds. Carried on
 the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information
 beside the beat, the same information the alignment always had. Empty means "this take was
-never recorded", which is legal; a word anchor against it is not.
+never recorded", which is legal; a word anchor against it is not, and it is a property of
+the *take* — a take with words on some beats and not others is refused.
+
+**Take manifest** — `<id>.take.json`: a take id and SHA-256 of the audio and the alignment,
+written by `record-take.mts` at the one moment "these were recorded together" is a fact
+rather than an assumption. The take id is derived from the two hashes, so it *is* which take
+this is rather than a claim about it. `refold.mts` verifies it before overwriting the beats,
+and a standing test holds the committed mp3 against it. See ADR-0004's last amendment.
+Avoid: treating it as metadata — it is the only thing that authenticates the audio.
 
 **Motion profile** — A motion *role* chosen per scene from a closed set
 (`editorialStatic`, `subtleDrift`, `pushIn`, `energetic`, `impact`, `cinematic`).
@@ -101,8 +109,11 @@ and which the event must therefore *land on*: `highlightBar` declares `deicticFi
 at. Declared on the action and published in the manifest, so the rule reaches every
 capability rather than the ones a test remembered. `annotate` declares none — its label
 names the same bar, but the note's timing follows the sentence that justifies it. The
-anchor to write for a deictic field is a Word anchor. Avoid: treating it as "the payload
-mentions a word", which is what `annotate` also does.
+anchor to write for a deictic field is a Word anchor, and a plan that anchors one elsewhere
+is refused with `DEICTIC_ANCHOR_REQUIRED`. Enforced over a *plan*, never a bare instance: an
+instance with no take cannot carry a word anchor, and every catalog example is one. A
+multi-word value lands on any one of its tokens. Avoid: treating it as "the payload mentions
+a word", which is what `annotate` also does.
 
 **Hard constraint** — Expressed in the Zod schema. Violating it rejects the plan.
 

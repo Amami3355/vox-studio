@@ -7,14 +7,17 @@
  *
  *   cd packages/voice && pnpm exec tsx scripts/record-take.mts [--seed 7]
  *
- * It writes three files from **one** response, and they only mean anything together:
+ * It writes four files from **one** response, and they only mean anything together:
  *
  *   packages/video/src/plans/<id>.beats.json            the timings the compiler reads
  *   packages/video/public/<id>.vo.mp3                   the audio those timings describe
  *   packages/voice/tests/fixtures/<id>.alignment.json   what the fold is tested against
+ *   packages/voice/tests/fixtures/<id>.take.json        what says the other three are one take
  *
  * Writing them in one pass is the point. Assembled from two takes they would look
- * perfectly well-formed and cut the pictures against words nobody says.
+ * perfectly well-formed and cut the pictures against words nobody says. This is the only
+ * moment that fact is *known* rather than assumed — the manifest exists so the knowledge
+ * survives the commit, and so `refold.mts` can check it instead of trusting it.
  */
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -22,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { shippedPlans } from '@vox/video';
 import { scriptFor } from '../src/fold';
 import { synthesise } from '../src/synthesise';
+import { describeTake, takeManifest } from '../src/take';
 
 /** George. Picked arbitrarily by the first spike and never revisited — see ADR-0004. */
 const VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb';
@@ -47,6 +51,19 @@ const take = await synthesise({
   ...(seed === undefined ? {} : { seed }),
 });
 
+/**
+ * Built before anything is written, from the response still in memory. This is the one
+ * instant where "these were recorded together" is a fact rather than an assumption.
+ */
+const manifest = takeManifest({
+  planId: shipped.id,
+  voiceId: VOICE_ID,
+  ...(seed === undefined ? {} : { seed }),
+  recordedAt: new Date().toISOString(),
+  audio: take.audio,
+  alignment: take.alignment,
+});
+
 writeFileSync(
   join(repo, 'packages/voice/tests/fixtures', `${shipped.id}.alignment.json`),
   `${JSON.stringify(take.alignment, null, 2)}\n`,
@@ -56,6 +73,12 @@ writeFileSync(
   `${JSON.stringify(take.beats, null, 2)}\n`,
 );
 writeFileSync(join(repo, 'packages/video/public', `${shipped.id}.vo.mp3`), take.audio);
+writeFileSync(
+  join(repo, 'packages/voice/tests/fixtures', `${shipped.id}.take.json`),
+  `${JSON.stringify(manifest, null, 2)}\n`,
+);
+
+console.info(`\n${describeTake(manifest)}`);
 
 console.info('beat        from      to    length');
 for (const beat of take.beats) {

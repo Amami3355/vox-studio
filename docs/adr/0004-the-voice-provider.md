@@ -280,3 +280,48 @@ no longer matches the plan, which is the protection that matters, and it is now 
 one: edit a word and the correct response is to re-record, which moves every boundary in
 the video and not only the edited beat's. That is the true cost of this mechanism and it is
 worth stating plainly. It argues for recording late rather than often.
+
+**2026-08-13 — the take's artifacts are bound by a manifest, because "one artifact" was
+enforced by nobody.** This document says the three artifacts come out of one response and
+only mean anything together, and `record-take.mts` writes them in one pass for that reason.
+What nothing established is that the three files *on disk* are still that set. The fold test
+ties the beats to the alignment and text equality ties the beats to the plan, so the two
+**derived** artifacts are checked against each other — and the audio, the one artifact
+nothing can re-derive, was checked against nothing at all.
+
+The consequence has a name and a script. `refold.mts` exists so a change to the fold does
+not cost a recording, and it read the plan and the alignment and rewrote the beats without
+ever opening the mp3. A cherry-pick, a partial revert, or a merge that took one file and not
+the other leaves alignment from take B beside audio from take A; refold then makes the beats
+agree with B. Every mechanical check in the repository still passes and the video is
+systematically mistimed, discoverable only by watching it. That is precisely the failure
+this ADR named as "the one failure that is otherwise undetectable" and then left to care.
+
+**The manifest is a digest of the pair, not a label beside it.** `<id>.take.json` carries a
+take id, the plan and voice ids, the seed, and SHA-256 of the audio and of the alignment.
+The id is derived from the two hashes rather than typed or timestamped: a hand-written id is
+a *claim* about which take this is and survives a splice unchanged, while a digest simply
+differs. `verifyTake` reports which artifact drifted, because the two repairs are opposite —
+restore the audio, or restore the alignment — and a caller told only that "something does
+not match" has an even chance of destroying the good half.
+
+**Verification gates the write, and a missing manifest is a refusal rather than a skip.**
+`refold.mts` verifies before folding, so a mismatched set costs nothing and changes nothing.
+"No manifest" and "verified" must not lead to the same place, or the check is advisory and
+the next take that arrives without one silently reopens the hole.
+
+**A hash cannot make a mismatched set match**, and nothing here pretends otherwise. Short of
+recording again there is no repair; what the binding buys is that a derived artifact is
+never written from a set that disagrees, which is the only move available to a script that
+cannot re-record.
+
+**The check is a standing test, not only a script.** `refold` protects whoever runs it, and
+the way this goes wrong is a merge — precisely the moment nobody is refolding. `take.test.ts`
+reads the committed mp3 and holds it against the manifest, which makes it the only assertion
+in the repository that the recording belongs to the set.
+
+**The take already committed was blessed retroactively**, since nothing can prove after the
+fact that two files were recorded together. It is not entirely blind: the mp3 is 445,170
+bytes, which at 128 kbps is ≈27.8s, against an alignment spanning 27.76s — the pair is
+consistent to about a tenth of a percent. The guarantee nonetheless begins at take
+`0a663181b592`, and any earlier splice would be inherited rather than detected.

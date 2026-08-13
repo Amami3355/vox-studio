@@ -367,3 +367,65 @@ The gate is now general rather than exemplary: it holds every action that declar
 deictic, in any capability, without a test file knowing their names. Declaring `annotate`
 deictic was used as the falsification and made it fail, which is what proved it reads the
 declaration rather than merely passing.
+
+**2026-08-13 — the declaration is enforced, and "loud at the anchor" is made to mean a
+report.** An adversarial review of the two sessions above found that `deicticFields` was
+published and read by nothing outside one test over one shipped plan. The amendment before
+this one closed with the claim that the gate was "general rather than exemplary"; it was
+general over the *slice*. A user-authored plan could anchor `highlightBar` with a payload
+saying London at `b3.word:Berlin`, or at `b1.start`, and validate and compile — reproducing
+by hand the exact defect in the shipped plan that having word onsets first revealed. Rule 2
+makes that worse than an omission: the manifest is what the agent learns from, so publishing
+a rule the compiler does not apply teaches a rule that is not true.
+
+**Landing is enforced over a plan, not over an instance, and that is forced.** An instance
+with no take cannot carry a word anchor at all — `syntheticBeats` has no words, by the
+decision above not to fabricate onsets — and every catalog example is such an instance.
+Holding `validateScene` to landing would make a pointing gesture impossible to *illustrate*,
+leaving the catalog unable to teach the rule it enforces. A plan is what gets a take, so a
+plan is what is held to it. `DEICTIC_ANCHOR_REQUIRED` is the code, and it carries the
+anchors that would satisfy it in `expected`, because the repair is mechanical.
+
+**A multi-word deictic value lands on any one of its tokens.** This was the open
+sub-question. `word:` names a single token by construction and a phrase has no single onset,
+so "New York" is satisfied by `b2.word:New` or `b2.word:York`. The narrator is saying the
+phrase across both and which of them the picture cuts on is an editorial choice the plan is
+entitled to make. Requiring a phrase-level selector was rejected: it would add a second
+anchor form to serve a case the existing one already covers acceptably.
+
+**Hard, not soft.** The plan renders either way — a gesture on the wrong frame is not a
+broken video — so rule 5 admits both readings. It is an error because the capability
+*declared* the obligation: `deicticFields` is the catalog saying this action means "this
+one", and a declaration the compiler downgrades to a warning is a declaration that does not
+hold. The soft reading is recorded here as the losing option in case a real plan makes the
+strictness intolerable.
+
+**"Empty is legal at the take and loud at the anchor" stands, and now means what it said.**
+Loud meant a thrown `UnresolvableWordError`, which left `compile` past a signature promising
+a `CompileResult` and past §8.1's promise of a reason. A crash is not a report. The
+resolver's throw is unchanged; `checkAnchoredWords` in `compile/timings.ts` now answers the
+take's half of the question before resolution runs, over the same `sectionAnchors` walk the
+plan's half uses — a placement and an event were checked differently before, which is why a
+word anchor in a placement crashed compilation while the same anchor in an event was
+reported.
+
+The claim in the amendment above that the compiler's copy of this question is "the
+unreachable defensive half" was **wrong for one input**, and the sentence was part of the
+defect: `checkWords` exempts an empty list, so a plan whose text speaks London passed the
+plan check, a take with `words: []` passed the take check, and the unreachable half was
+reached. Reachability is now a property of three checks rather than of a sentence in a
+docstring.
+
+**Recorded is a property of a take, not of a beat within one.** A take with onsets on some
+beats and none on others is refused. The glossary already defined empty as "this take was
+never recorded", which is a sentence about a take; a fold either ran or it did not. A mixed
+take is a fold that half completed, a hand-edited artifact, or two takes spliced, and it is
+the quiet case — only the beats that happen to lack words complain, while the rest resolve
+to plausible frames. A beat whose text tokenises to nothing is exempt, since an empty list
+is the correct fold of a beat with no words in it.
+
+**And `words` is checked for shape at all.** This ADR's own premise is that a take arriving
+as JSON has none of the guarantees its TypeScript type makes. `words` was the one field
+still leaning on them: a take written before the field existed has no `words` key, and
+reading `.length` off it threw a TypeError from inside the gate whose purpose is to return
+an error instead.

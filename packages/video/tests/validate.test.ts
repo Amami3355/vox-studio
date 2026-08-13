@@ -253,6 +253,116 @@ describe('validateVideoPlan — word anchors, checked without a take', () => {
   });
 });
 
+/**
+ * A declared deictic field, held to the anchor it declares.
+ *
+ * `deicticFields` said which payload fields name something spoken, and then nothing read it
+ * outside one test over one shipped plan. So a `highlightBar` whose payload says "London"
+ * could be anchored `b2.start`, or onto a word in another beat entirely, and validate and
+ * compile — reproducing by hand the exact defect the word vocabulary was built to remove.
+ * A declaration nothing enforces is documentation, and rule 2 says the manifest is what the
+ * agent learns from: publishing a rule the compiler does not apply teaches it wrongly.
+ *
+ * The seam is the *plan*, not the instance, and that is forced rather than chosen. An
+ * instance with no take cannot use a word anchor at all — `syntheticBeats` has no words by
+ * ADR-0002 — and every catalog example is exactly that. Holding `validateScene` to landing
+ * would make a pointing action impossible to *illustrate*, so the catalog could not teach
+ * the gesture it was enforcing. A plan is the thing that gets a take, so a plan is the
+ * thing held to the rule.
+ */
+describe('validateVideoPlan — an action lands on the word it points at', () => {
+  const pointing = (at: string, label = 'London'): VideoPlan => ({
+    beats: [
+      { id: 'b1', text: 'Rents rose faster than wages.' },
+      { id: 'b2', text: 'London is the extreme case, and New York is close behind.' },
+    ],
+    sections: [
+      {
+        id: 'sec1',
+        spansBeats: ['b1', 'b2'],
+        scenes: [
+          base({ id: 's1', spansBeats: ['b1'], events: [] }),
+          base({
+            id: 's2',
+            spansBeats: ['b2'],
+            props: {
+              title: 'Share of income spent on rent',
+              unit: '%',
+              data: [
+                { label: 'London', value: 47 },
+                { label: 'New York', value: 44 },
+              ],
+            },
+            events: [{ at, action: 'highlightBar', payload: { label } }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  it('accepts the gesture anchored to the word it names', () => {
+    expect(validateVideoPlan(pointing('b2.word:London')).ok).toBe(true);
+  });
+
+  it('rejects the gesture anchored to a boundary, which lands on no word at all', () => {
+    const report = validateVideoPlan(pointing('b2.start'));
+    const error = report.errors.find((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED');
+
+    expect(error).toBeDefined();
+    expect(error?.field).toBe('events[0].at');
+    expect(error?.expected).toContain('b2.word:London');
+  });
+
+  it('rejects the gesture anchored to a word that is not the one it points at', () => {
+    const report = validateVideoPlan(pointing('b2.word:extreme'));
+
+    expect(report.errors.some((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED')).toBe(true);
+  });
+
+  /**
+   * The sub-question nobody had answered: a deictic value that is more than one word.
+   *
+   * "New York" cannot be a word anchor — the form names one token by construction, and that
+   * is deliberate, since a phrase has no single onset. Landing on *any* token of the phrase
+   * is the rule, because the narrator is saying the phrase across all of them and which one
+   * the picture cuts on is an editorial choice the plan is entitled to make.
+   */
+  it('accepts a multi-word value anchored to any token of the phrase', () => {
+    expect(validateVideoPlan(pointing('b2.word:New', 'New York')).ok).toBe(true);
+    expect(validateVideoPlan(pointing('b2.word:York', 'New York')).ok).toBe(true);
+  });
+
+  it('rejects a multi-word value anchored outside the phrase', () => {
+    const report = validateVideoPlan(pointing('b2.word:extreme', 'New York'));
+
+    expect(report.errors.some((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED')).toBe(true);
+  });
+
+  /**
+   * The falsification that makes the rest of this suite mean anything.
+   *
+   * `annotate` names a bar in its payload exactly as `highlightBar` does, and declares no
+   * deictic field — its note's timing follows the sentence that justifies it, which may be a
+   * beat away. If this fires, the check is reading "the payload mentions a word" rather than
+   * the declaration, which is the distinction `deicticFields` exists to draw.
+   */
+  it('leaves an action that declares no deictic field to its own timing', () => {
+    const plan = pointing('b2.start');
+    const scene = plan.sections[0]?.scenes[1] as SceneInstance;
+    scene.events = [
+      {
+        at: 'b1.start',
+        action: 'annotate',
+        payload: { label: 'London', text: 'the extreme case' },
+      },
+    ];
+
+    expect(validateVideoPlan(plan).errors.some((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED')).toBe(
+      false,
+    );
+  });
+});
+
 describe('validateVideoPlan — the beat partition over scenes', () => {
   it('rejects a scene whose beats are not contiguous', () => {
     const report = validateVideoPlan(

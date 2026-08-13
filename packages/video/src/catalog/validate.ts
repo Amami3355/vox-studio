@@ -427,6 +427,7 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
     errors.push(...checkSentenceBoundaries(section, textOf));
     errors.push(...checkPlacements(section, domain));
     errors.push(...checkWordAnchors(section, textOf));
+    errors.push(...checkDeicticLanding(section));
 
     let previousProfile: string | undefined;
 
@@ -459,6 +460,34 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
   return { ok: errors.length === 0, errors, warnings };
 };
 
+/** One anchor a plan writes, and where it was written. */
+export type WrittenAnchor = { at: string; field: string; sceneId?: string };
+
+/**
+ * Every anchor one section writes — a scene's events and a persistent element's placements.
+ *
+ * Exported and walked once, because there are now two questions asked of a plan's anchors
+ * and they cannot both be asked here. Whether a beat *speaks* a word is a fact about the
+ * plan and is answered below. Whether the *take* recorded that word is a fact about a take,
+ * so `checkTimings` asks it, and it has to ask it of the same set of anchors. A second walk
+ * living in the compiler is how a placement gets checked in one place and not the other —
+ * which is exactly the asymmetry that let a word anchor in a placement crash compilation
+ * while the identical anchor in an event was reported.
+ */
+export function* sectionAnchors(section: VideoPlanSection): Generator<WrittenAnchor> {
+  for (const scene of section.scenes ?? []) {
+    for (const [index, event] of (scene.events ?? []).entries()) {
+      yield { at: event.at, field: `events[${index}].at`, sceneId: scene.id };
+    }
+  }
+
+  for (const element of section.persistent ?? []) {
+    for (const [index, placement] of (element.placements ?? []).entries()) {
+      yield { at: placement.at, field: `persistent[${element.id}].placements[${index}].at` };
+    }
+  }
+}
+
 /**
  * Word anchors, answered from the plan and nothing else.
  *
@@ -470,8 +499,16 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
  * It is not a second source of truth beside `resolveAnchor`, which asks the same question
  * of a *take*. `checkTimings` requires a take's words to be exactly the tokenisation of
  * its text, so the two are answering one question about two representations of the same
- * string — and the compiler's version is the unreachable defensive half, not the one an
- * agent ever sees.
+ * string — and the compiler's version is the defensive half, not the one an agent ever sees.
+ *
+ * That last claim used to read "unreachable", and it was wrong for one input. The identity
+ * it leans on has an exception: `checkWords` exempts an *empty* list, because a take that
+ * was never folded genuinely has no words. So a plan whose text speaks "London" passed this
+ * check, a take with `words: []` passed that one, and `resolveAnchor` threw out of `compile`
+ * — the defensive half reached, through the one door neither gate was watching. What closed
+ * it is `checkAnchoredWords` in `compile/timings.ts`, which is where a fact about a take
+ * belongs. Reachability is now a property of three checks rather than of this sentence, and
+ * anything that adds a fourth consumer of `resolveAnchor` is inheriting that argument.
  *
  * Two codes, because they are two corrections. A word the beat does not speak is a typo or
  * a misremembered beat, repaired by naming another word. A word the beat speaks twice is a
@@ -528,15 +565,88 @@ const checkWordAnchors = (
     }
   };
 
-  for (const scene of section.scenes) {
-    for (const [index, event] of (scene.events ?? []).entries()) {
-      check(event.at, `events[${index}].at`, scene.id);
-    }
+  for (const { at, field, sceneId } of sectionAnchors(section)) {
+    check(at, field, sceneId);
   }
 
-  for (const element of section.persistent ?? []) {
-    for (const [index, placement] of element.placements.entries()) {
-      check(placement.at, `persistent[${element.id}].placements[${index}].at`);
+  return errors;
+};
+
+/**
+ * A declared deictic field, held to the anchor it declares.
+ *
+ * `deicticFields` published which payload fields name something the narrator says, and then
+ * nothing outside one test over one shipped plan read it. A `highlightBar` payload saying
+ * "London" could be anchored to a boundary, or onto a word in a different beat, and
+ * validate and compile — which reproduces by hand the exact defect the word vocabulary was
+ * built to remove. Rule 2 makes that worse than an omission: the manifest is what the agent
+ * learns from, so publishing a rule the compiler does not apply teaches it a rule that is
+ * not true.
+ *
+ * Checked over a *plan* rather than an instance, and that is forced rather than preferred.
+ * An instance with no take cannot carry a word anchor at all — `syntheticBeats` has no
+ * words, by ADR-0002's decision not to fabricate onsets — and every catalog example is such
+ * an instance. Holding `validateScene` to landing would make a pointing gesture impossible
+ * to *illustrate*, leaving the catalog unable to teach the rule it enforces. A plan is what
+ * gets a take, so a plan is what is held to it.
+ *
+ * A multi-word value lands on any one of its tokens. `word:` names a single token by
+ * construction — a phrase has no single onset to cut on — so "New York" is satisfied by
+ * `b2.word:New` or `b2.word:York`. The narrator is saying the phrase across both, and which
+ * of them the picture takes is an editorial choice the plan is entitled to make.
+ *
+ * Whether the beat actually speaks that word is `checkWordAnchors`'s question, not this
+ * one. This check asks only that the anchor point at the thing the payload names; that the
+ * named word exists, once, is the other half and it reports separately.
+ */
+const checkDeicticLanding = (section: VideoPlanSection): CompilerError[] => {
+  const errors: CompilerError[] = [];
+
+  for (const scene of section.scenes ?? []) {
+    const capability = findCapability(scene.component);
+    /** An unknown capability is already reported; its actions are unknowable from here. */
+    if (!capability) continue;
+
+    for (const [index, event] of (scene.events ?? []).entries()) {
+      const declared = capability.actions[event.action]?.deicticFields;
+      if (!declared?.length) continue;
+
+      const parsed = parseAnchor(event.at);
+      /** An unparseable anchor is already reported, and has no landing to judge. */
+      if (!parsed) continue;
+
+      const payload = (event.payload ?? {}) as Record<string, unknown>;
+      const landsOn = parsed.target.kind === 'word' ? parsed.target.word : undefined;
+
+      for (const field of declared) {
+        const value = payload[field];
+        /**
+         * A field the payload does not carry reads `undefined` and checks nothing. That is
+         * a defect in the *declaration* rather than in this plan, and `catalog-contract`
+         * rejects it at the source — holding a plan to a field its action never takes would
+         * report the capability's mistake against the agent that wrote the event.
+         */
+        if (typeof value !== 'string') continue;
+
+        const tokens = tokenise(value).map((word) => word.text);
+        if (tokens.length === 0) continue;
+        if (landsOn !== undefined && tokens.includes(landsOn)) continue;
+
+        const beats = parsed.beatId === 'scene' ? (scene.spansBeats ?? []) : [parsed.beatId];
+        const missed =
+          landsOn === undefined
+            ? 'a boundary lands on whatever word happens to fall there'
+            : `"${landsOn}" is a different word`;
+
+        errors.push({
+          code: 'DEICTIC_ANCHOR_REQUIRED',
+          sceneId: scene.id,
+          sectionId: section.id,
+          field: `events[${index}].at`,
+          message: `Action "${event.action}" points at "${value}" through its "${field}", and "${event.at}" does not land on it. A pointing gesture says "this one", which is only true while the narrator is saying the thing pointed at — ${missed}. Anchor the event to the word it names, or use an action that makes no such claim.`,
+          expected: beats.flatMap((beat) => tokens.map((token) => `${beat}.word:${token}`)),
+        });
+      }
     }
   }
 

@@ -271,6 +271,12 @@ export type CompilerErrorCode =
    * word is not unknown, it is unaddressable, and the repair is to split the beat or take
    * a boundary rather than to look for a different word. */
   | 'AMBIGUOUS_ANCHOR'
+  /* An action declaring `deicticFields` anchored somewhere that is not the word it points
+   * at. Its own code because the repair is unlike either anchor error: the anchor is
+   * well-formed and resolves fine, and what is wrong is that it resolves to a moment the
+   * narrator is not saying the thing the payload names. The correction is to move the
+   * event onto the word, which is why `expected` carries the anchors that would do it. */
+  | 'DEICTIC_ANCHOR_REQUIRED'
   | 'UNKNOWN_SLOT'
   | 'BELOW_MIN_DURATION'
   | 'MISSING_ASSET_REFERENCE'

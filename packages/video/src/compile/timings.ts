@@ -7,7 +7,8 @@
  * one plus the checks that make it meaningful. Nothing above it knows what a frame is;
  * nothing below it knows what a millisecond was.
  */
-import type { VideoPlan } from '../catalog/validate';
+import { type VideoPlan, sectionAnchors } from '../catalog/validate';
+import { parseAnchor } from '../core/anchor-grammar';
 import type { FrameBeat } from '../core/anchors';
 import type { CompilerError, TimedBeat } from '../core/types';
 import { tokenise } from '../core/words';
@@ -106,6 +107,94 @@ export const checkTimings = (plan: VideoPlan, beats: TimedBeat[], fps: number): 
     errors.push(...checkWords(timed));
   }
 
+  errors.push(...checkTakeIsWhole(beats));
+  errors.push(...checkAnchoredWords(plan, beats));
+
+  return errors;
+};
+
+/**
+ * Recorded is a property of a take, not of a beat inside one.
+ *
+ * CONTEXT.md defines an empty word list as "this take was never recorded", and that is a
+ * sentence about a take: a fold either ran over an alignment or it did not, and it writes
+ * words for every beat or for none. So a take with onsets on b1 and none on b2 is not an
+ * unusual legal state — it is a fold that half completed, an artifact someone edited by
+ * hand, or two takes spliced. Every one of those makes the onsets that *are* present
+ * suspect, because whatever produced the gap was working on those beats as well.
+ *
+ * Worth its own check rather than leaving it to the anchor. Anchors only complain about
+ * the beats they name, so a mixed take is silent for every beat that happens to carry
+ * words — the failure resolves to plausible frames and says nothing, which is the shape of
+ * defect this whole module exists to make impossible.
+ *
+ * A beat whose text tokenises to nothing is exempt, because an empty list is the *correct*
+ * fold of a beat with no words in it. Without that, punctuation alone in a beat would look
+ * like a half-recorded take.
+ */
+const checkTakeIsWhole = (beats: TimedBeat[]): CompilerError[] => {
+  const shaped = beats.filter((beat) => Array.isArray(beat.words));
+  /** Shape is reported per beat by `checkWords`; coherence over a broken take says nothing. */
+  if (shaped.length !== beats.length) return [];
+
+  const speaking = shaped.filter((beat) => tokenise(beat.text).length > 0);
+  const recorded = speaking.filter((beat) => beat.words.length > 0);
+
+  if (recorded.length === 0 || recorded.length === speaking.length) return [];
+
+  return speaking
+    .filter((beat) => beat.words.length === 0)
+    .map((beat) => ({
+      code: 'INVALID_TIMING_INPUT' as const,
+      field: `beats.${beat.id}.words`,
+      message: `Beat "${beat.id}" carries no word timings, but ${recorded.length} of the take's ${speaking.length} speaking beats do. A take is recorded or it is not; a partial one is a fold that did not finish, an edited artifact, or two takes spliced together — and the onsets that are present were produced by whatever left this beat without any.`,
+    }));
+};
+
+/**
+ * A word anchor against a beat this take never recorded.
+ *
+ * ADR-0002 decided that `words: []` is legal at the take and *loud at the anchor*, and the
+ * decision stands — a synthetic take that spread words across a duration would report
+ * numbers indistinguishable from measured ones. What was missing is that loud meant a
+ * thrown `UnresolvableWordError`, which left `compile` past a signature promising a
+ * `CompileResult` and past §8.1's promise that a plan the compiler refuses comes back with
+ * a reason. A crash is not a report.
+ *
+ * This is the take's half of a question `checkWordAnchors` asks the plan's half of. Whether
+ * b2 speaks "London" is a fact about the beat text, answerable in the cold pass with no
+ * audio; whether *this* take measured it is a fact only a take carries. Asked here because
+ * this is the first point both are in the room, and asked over `sectionAnchors` so that a
+ * placement and an event are held to it identically.
+ *
+ * One error per beat rather than per anchor. Three anchors into an unrecorded beat are not
+ * three corrections — they are one take that needs recording, and a report naming each of
+ * them separately is the noise `MISSING_BEAT_TIMING` already refuses to make.
+ */
+const checkAnchoredWords = (plan: VideoPlan, beats: TimedBeat[]): CompilerError[] => {
+  const unrecorded = new Set(
+    beats.filter((beat) => Array.isArray(beat.words) && beat.words.length === 0).map((b) => b.id),
+  );
+  if (unrecorded.size === 0) return [];
+
+  const errors: CompilerError[] = [];
+  const reported = new Set<string>();
+
+  for (const section of plan.sections ?? []) {
+    for (const { at } of sectionAnchors(section)) {
+      const parsed = parseAnchor(at);
+      if (!parsed || parsed.target.kind !== 'word') continue;
+      if (!unrecorded.has(parsed.beatId) || reported.has(parsed.beatId)) continue;
+
+      reported.add(parsed.beatId);
+      errors.push({
+        code: 'INVALID_TIMING_INPUT',
+        field: `beats.${parsed.beatId}.words`,
+        message: `Anchor "${at}" names a word of beat "${parsed.beatId}", but this take carries no word timings for it. A word anchor resolves against a recorded take; this one was assembled without folding an alignment, so there is no measured onset to cut on. Record the take, or anchor to ${parsed.beatId}.start, ${parsed.beatId}.mid or ${parsed.beatId}.end.`,
+      });
+    }
+  }
+
   return errors;
 };
 
@@ -132,13 +221,31 @@ export const checkTimings = (plan: VideoPlan, beats: TimedBeat[], fps: number): 
  * because the anchor is where someone asked for a word.
  */
 const checkWords = (beat: TimedBeat): CompilerError[] => {
-  if (beat.words.length === 0) return [];
-
   const at = (message: string): CompilerError => ({
     code: 'INVALID_TIMING_INPUT',
     field: `beats.${beat.id}.words`,
     message,
   });
+
+  /**
+   * The field's own shape, checked before its contents.
+   *
+   * This module's premise is that a take arriving as JSON has none of the guarantees its
+   * TypeScript type makes, and `words` was the one field that leaned on them anyway: a take
+   * written before the field existed carries no `words` key, and reading `.length` off it
+   * threw a TypeError from inside the gate whose whole purpose is to return an error
+   * instead. A crash is not a report, and §8.1 needs the report for precisely the takes
+   * that cannot compile.
+   */
+  if (!Array.isArray(beat.words)) {
+    return [
+      at(
+        `Beat "${beat.id}" carries ${beat.words === undefined ? 'no word list at all' : `a word list that is not a list (${typeof beat.words})`}. A take records a list of words or an empty one; there is no third state, and every anchor into this beat would resolve against a value the fold never wrote.`,
+      ),
+    ];
+  }
+
+  if (beat.words.length === 0) return [];
 
   const expected = tokenise(beat.text).map((word) => word.text);
   const actual = beat.words.map((word) => word.text);
