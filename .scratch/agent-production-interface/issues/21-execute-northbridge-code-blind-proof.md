@@ -115,3 +115,42 @@ Evidence: `proofs/2026-08-13T225821-834Z-northbridge-night-bus`, `provider: elev
 
 **Still not a pass.** `humanVerdict` is `pending`: six unfilled rows, no named evaluator.
 `verticalSliceReviewed: false`; gap 8 stays open. Two dispatches have now been spent.
+
+### 2026-08-14 — the human verdict was cast, and it fails
+
+Mourad watched and listened to the preview on a built-in laptop display with wired headphones
+and completed the ticket-09 form at `2026-08-13T23:20:41.790Z` UTC. The on-disk preview hash
+was reverified as matching the form before the viewing. No dispatch was spent.
+
+Five rows pass: narration intelligible/complete/continuous and fact-matching; the March
+highlight perceptibly landing on the unique spoken word; legible opening, chart, hierarchy,
+transitions and ending; honest visible placeholder degradation; and the whole preview
+watchable and listenable without explanation.
+
+One row fails: **composition, typography, motion and pace are system-premium**. The recorded
+reason is that the design system is not yet good enough; the evaluator named no single
+offending element and located the gap in the design system rather than in this Run's
+authoring.
+
+Ticket 09 rules that any failed row fails the human verdict, so the bundle now records
+`machineVerdict: pass`, `humanVerdict: fail`. `hash-index.json` was regenerated with
+`writeHashIndex` and no other evidence byte was touched.
+
+`pnpm --filter @vox/production verify:proof` exits 1 with `PROOF_VERDICT_NOT_PASS`. That is
+the correct fail-closed result, not a harness defect: re-running `verifyProofBundle` with
+`requirePass: false` returns `{ integrity: 'ok', machineVerdict: 'pass', humanVerdict: 'fail' }`,
+so the hash index is complete, every indexed hash matches its bytes, the machine verdict
+matches its derivation, and the form is well-formed and bound to the correct preview and Take.
+The only thing failing is the verdict.
+
+**Consequences.** This ticket stays `claimed`. The Agent production interface may not be
+called code-blind end-to-end proven: ticket 09 requires both verdicts to pass, and one does
+not. What *is* established is the machine half — 56/56 assertions, one provider dispatch,
+direct network denied — plus five of six human rows on the real preview. The failure is a
+design-system quality gap downstream of the interface, tracked as ticket 22; the interface
+itself was not faulted by any row. Gap 8 remains open and `verticalSliceReviewed` is still
+`false`.
+
+A third paid dispatch would not change this. The preview is the correct output of the current
+design system, so the verdict can only turn once that system changes and a rebuilt preview is
+re-watched.
