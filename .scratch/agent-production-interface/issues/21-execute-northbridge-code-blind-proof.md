@@ -79,7 +79,39 @@ restricted token `SAFER_CONSTRAINED` over a Windows named pipe.
 - Preview SHA-256 `ca2d43f84f303fee8d3b13af50d3526a5e66ab01c3f44fa0c6cf4aab207545a5`
   (6,508,036 bytes), `takeId` `c5b3da491560`. On-disk hash reverified as matching the form.
 
-**This is not a pass.** `humanVerdict` is `pending`: all six rows are unfilled and no evaluator
-is named. The proof is incomplete until one named person watches and listens to that exact
-preview hash and every row passes. `verticalSliceReviewed: false`; gap 8 stays open. Do not
-spend a second dispatch — this budget is used.
+**This bundle does not count.** The user watched the preview and challenged it. Two assertions
+turned out to claim more than they measured, so its `machineVerdict: pass` rested on guarantees
+that were not real:
+
+- `media.audio-non-silent` ran `volumedetect` on the Take MP3 while `ffprobe` read the preview
+  MP4. A preview muxed with a silent AAC track would have passed.
+- The Codex driver spread the whole harness environment into the agent, so a machine-level
+  `ELEVENLABS_API_KEY` reached the sandbox. Confirmed empirically: `if defined
+  ELEVENLABS_API_KEY` answered `PRESENT` from inside the proof sandbox. The leak scan missed it
+  because it scans files and this was an environment variable.
+
+Both are fixed in `e9a92cf`. The preview itself was genuinely audible — that part of the
+challenge did not reproduce.
+
+### 2026-08-14 — second paid dispatch, against the fixed harness
+
+Authorised by the user after the defects were found. Ran to completion at exit 0 against commit
+`e9a92cf`, after 365 green tests, typecheck, native distribution and contract projections.
+
+Evidence: `proofs/2026-08-13T225821-834Z-northbridge-night-bus`, `provider: elevenlabs`,
+`claimEligible: true`, agent `fresh-generalist` (`gpt-5.6-sol` via `codex-cli 0.147.0`).
+
+- `machineVerdict: pass`, **56/56** assertions, no failures.
+- `isolation.credentials-environment-denied` passes on three per-secret sandbox probes, each
+  exit 0 and each answering `ABSENT:<name>` — by name only, no value in the evidence.
+- `media.preview-audio-non-silent` and `media.take-audio-non-silent` pass separately, measured
+  at -5.6 dB and -2.5 dB. The distinct readings prove the preview is now genuinely measured.
+- Exactly one provider dispatch; direct network denied with zero direct events.
+- Agent used 1 plan version, 1 `validate`, 1 Preflight, 0 post-record versions, 0 human hints.
+- Scenario: both capabilities, `highlightBar` on `March`, unique Word anchor, `placeholder`.
+- Media: H.264/AAC, Take 24.320 s, preview 24.362667 s.
+- Preview SHA-256 `502afe11b44324b4e165ee56148ffbdd66702d548e06bf8ccac8064d1f0a3c1a`
+  (5,394,777 bytes), `takeId` `f089beb94850`. Hash reverified on disk against the form.
+
+**Still not a pass.** `humanVerdict` is `pending`: six unfilled rows, no named evaluator.
+`verticalSliceReviewed: false`; gap 8 stays open. Two dispatches have now been spent.
