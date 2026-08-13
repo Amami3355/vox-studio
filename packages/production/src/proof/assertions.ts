@@ -16,6 +16,7 @@ export type NorthbridgeObservations = {
     repositoryDenied: boolean;
     serviceDenied: boolean;
     credentialsDenied: boolean;
+    credentialsEnvironmentDenied: boolean;
     writesContained: boolean;
   };
   leakScan: { pass: boolean; violations: string[] };
@@ -58,7 +59,8 @@ export type NorthbridgeObservations = {
   media: {
     videoCodec: string | null;
     audioCodec: string | null;
-    audioNonSilent: boolean;
+    previewAudioNonSilent: boolean;
+    takeAudioNonSilent: boolean;
     takeDurationSeconds: number | null;
     previewDurationSeconds: number | null;
   };
@@ -112,6 +114,12 @@ export const evaluateNorthbridgeAssertions = (
   item('isolation.credentials-denied', true, observed.isolation.credentialsDenied, [
     'permissions.json',
   ]),
+  item(
+    'isolation.credentials-environment-denied',
+    true,
+    observed.isolation.credentialsEnvironmentDenied,
+    ['permissions.json'],
+  ),
   item('isolation.write-containment', true, observed.isolation.writesContained, ['commands.jsonl']),
   item('leaks.agent-readable-files', true, observed.leakScan.pass, ['leak-scan.json']),
   item(
@@ -205,7 +213,10 @@ export const evaluateNorthbridgeAssertions = (
   item('compile.zero-errors', 0, observed.compilation.errorCount, ['main-run/artifacts']),
   item('media.h264-video', 'h264', observed.media.videoCodec, ['ffprobe.json']),
   item('media.aac-audio', 'aac', observed.media.audioCodec, ['ffprobe.json']),
-  item('media.audio-non-silent', true, observed.media.audioNonSilent, ['ffprobe.json']),
+  item('media.preview-audio-non-silent', true, observed.media.previewAudioNonSilent, [
+    'ffprobe.json',
+  ]),
+  item('media.take-audio-non-silent', true, observed.media.takeAudioNonSilent, ['ffprobe.json']),
   item(
     'media.take-duration',
     '20..30',

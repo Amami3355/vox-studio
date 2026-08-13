@@ -36,7 +36,7 @@ pnpm --filter @vox/production verify:proof -- <evidence-directory>
 
 ## Progress
 
-Claimed 2026-08-13. The paid proof has **not** run and no ElevenLabs provider dispatch occurred.
+Claimed 2026-08-13. The paid proof **has now run once**; see the 2026-08-14 entry at the end.
 
 - The one-time Windows setup completed with `CODEX_ELEVATED_SANDBOX_READY`. The fresh Codex
   driver now passes work-root, repository, trusted-service, credentials and direct-network
@@ -59,3 +59,27 @@ Claimed 2026-08-13. The paid proof has **not** run and no ElevenLabs provider di
 - `verify:proof` remains expected to fail with `PROOF_VERDICT_NOT_PASS` while the independent
   human verdict is pending. Do not run the one real George/`eleven_v3` dispatch without fresh
   explicit authorisation.
+
+### 2026-08-14 — the paid dispatch happened
+
+The single authorised ElevenLabs attempt ran to completion at exit 0 against commit `80623d9`,
+after a green re-verification (358 tests, typecheck, native distribution, contract projections).
+
+Evidence: `proofs/2026-08-13T222606-424Z-northbridge-night-bus`, `provider: elevenlabs`,
+`claimEligible: true`, agent `fresh-generalist` (`gpt-5.6-sol` via `codex-cli 0.147.0`),
+restricted token `SAFER_CONSTRAINED` over a Windows named pipe.
+
+- `machineVerdict: pass`, 54/54 assertions, no failures.
+- Exactly one `provider-dispatch` service event; direct network denied with zero direct events.
+- Agent used 3 plan versions, 3 `validate` calls, 1 Preflight, 0 post-record plan versions and
+  received no human hint. `record` then the harness probe reported `recorded` then `reused`.
+- Scenario: both capabilities, `highlightBar` on `March`, unique Word anchor, Northbridge asset
+  resolved exactly `placeholder`.
+- Media: H.264/AAC, Take 25.840 s, preview 25.877333 s, audio non-silent at −3.1 dB max.
+- Preview SHA-256 `ca2d43f84f303fee8d3b13af50d3526a5e66ab01c3f44fa0c6cf4aab207545a5`
+  (6,508,036 bytes), `takeId` `c5b3da491560`. On-disk hash reverified as matching the form.
+
+**This is not a pass.** `humanVerdict` is `pending`: all six rows are unfilled and no evaluator
+is named. The proof is incomplete until one named person watches and listens to that exact
+preview hash and every row passes. `verticalSliceReviewed: false`; gap 8 stays open. Do not
+spend a second dispatch — this budget is used.

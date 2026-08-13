@@ -24,7 +24,8 @@ const probeFixture = async () => ({
   videoCodec: 'h264',
   audioCodec: 'aac',
   previewDurationSeconds: 20.87,
-  audioNonSilent: true,
+  previewAudioNonSilent: true,
+  takeAudioNonSilent: true,
 });
 
 const execute = async (seededViolations: Array<'leak' | 'network'> = []) => {

@@ -13,6 +13,7 @@ const passingObservations = (): NorthbridgeObservations => ({
     repositoryDenied: true,
     serviceDenied: true,
     credentialsDenied: true,
+    credentialsEnvironmentDenied: true,
     writesContained: true,
   },
   leakScan: { pass: true, violations: [] },
@@ -55,7 +56,8 @@ const passingObservations = (): NorthbridgeObservations => ({
   media: {
     videoCodec: 'h264',
     audioCodec: 'aac',
-    audioNonSilent: true,
+    previewAudioNonSilent: true,
+    takeAudioNonSilent: true,
     takeDurationSeconds: 22,
     previewDurationSeconds: 22,
   },
@@ -83,6 +85,33 @@ describe('Northbridge machine assertions', () => {
     expect(assertions.find((assertion) => assertion.id === 'network.record-only')?.pass).toBe(
       false,
     );
+    expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('fails a silent preview even when the recorded Take is audible', () => {
+    const observations = passingObservations();
+    observations.media.previewAudioNonSilent = false;
+    const assertions = evaluateNorthbridgeAssertions(observations);
+    expect(
+      assertions.find((assertion) => assertion.id === 'media.preview-audio-non-silent')?.pass,
+    ).toBe(false);
+    expect(
+      assertions.find((assertion) => assertion.id === 'media.take-audio-non-silent')?.pass,
+    ).toBe(true);
+    expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('fails when a production credential reaches the agent environment', () => {
+    const observations = passingObservations();
+    observations.isolation.credentialsEnvironmentDenied = false;
+    const assertions = evaluateNorthbridgeAssertions(observations);
+    expect(
+      assertions.find((assertion) => assertion.id === 'isolation.credentials-environment-denied')
+        ?.pass,
+    ).toBe(false);
+    expect(
+      assertions.find((assertion) => assertion.id === 'leaks.agent-readable-files')?.pass,
+    ).toBe(true);
     expect(machineVerdict(assertions)).toBe('fail');
   });
 

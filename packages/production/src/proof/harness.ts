@@ -22,6 +22,7 @@ import { type ProductionPipeBridge, startProductionPipeBridge } from '../ipc/pip
 import { DurationCalibrationStore, activeInitialCalibration } from '../preflight/calibration';
 import { type RenderAdapter, createRemotionRenderAdapter } from '../render/remotion';
 import { type RunCheckpoint, RunStore } from '../run-store/run-store';
+import { remainingSecretVariables, scrubAgentEnvironment } from './agent-environment';
 import { evaluateNorthbridgeAssertions, machineVerdict } from './assertions';
 import {
   type FileInventoryEntry,
@@ -51,7 +52,10 @@ type MediaProbe = (input: { previewPath: string; takePath: string }) => Promise<
   videoCodec: string | null;
   audioCodec: string | null;
   previewDurationSeconds: number | null;
-  audioNonSilent: boolean;
+  /** Measured on the rendered preview: this is what a human actually hears. */
+  previewAudioNonSilent: boolean;
+  /** Measured on the Take: proves the provider returned audio, not that the render kept it. */
+  takeAudioNonSilent: boolean;
 }>;
 
 export type AgentSandboxEvidence = {
@@ -60,6 +64,7 @@ export type AgentSandboxEvidence = {
   repositoryDenied: boolean;
   serviceDenied: boolean;
   credentialsDenied: boolean;
+  credentialsEnvironmentDenied: boolean;
   directNetworkDenied: boolean;
   probes: Record<string, { exitCode: number; stdout: string; stderr: string; timedOut: boolean }>;
 };
@@ -142,6 +147,33 @@ const fixtureSynthesis = async (text: string): Promise<ProviderSynthesisResponse
   alignment: alignmentFor(text),
 });
 
+/**
+ * Peak level in dBFS, or null when the file has no decodable audio at all. Digital silence
+ * reports around -91 dB or -inf, so a peak is the honest discriminator between "carries a
+ * voice" and "carries an audio track that happens to be empty".
+ */
+const silenceFloorDb = -50;
+
+const maxVolumeDb = async (path: string): Promise<number | null> => {
+  const measured = await execFileAsync('ffmpeg', [
+    '-hide_banner',
+    '-nostats',
+    '-i',
+    path,
+    '-af',
+    'volumedetect',
+    '-f',
+    'null',
+    'NUL',
+  ]).catch((error) => error as { stderr?: string });
+  const matched = /max_volume:\s*(-?\d+(?:\.\d+)?|-inf) dB/i.exec(measured.stderr ?? '')?.[1];
+  if (matched === undefined || matched === '-inf') return null;
+  return Number(matched);
+};
+
+const audible = (maxVolume: number | null): boolean =>
+  maxVolume !== null && maxVolume > silenceFloorDb;
+
 const defaultMediaProbe: MediaProbe = async ({ previewPath, takePath }) => {
   const probe = await execFileAsync('ffprobe', [
     '-v',
@@ -156,25 +188,20 @@ const defaultMediaProbe: MediaProbe = async ({ previewPath, takePath }) => {
     streams?: Array<{ codec_type?: string; codec_name?: string }>;
     format?: { duration?: string };
   };
-  const volume = await execFileAsync('ffmpeg', [
-    '-hide_banner',
-    '-nostats',
-    '-i',
-    takePath,
-    '-af',
-    'volumedetect',
-    '-f',
-    'null',
-    'NUL',
-  ]).catch((error) => error as { stderr?: string });
-  const volumeText = volume.stderr ?? '';
-  const maxVolume = /max_volume:\s*(-?\d+(?:\.\d+)?|-inf) dB/i.exec(volumeText)?.[1] ?? null;
+  const [previewVolume, takeVolume] = await Promise.all([
+    maxVolumeDb(previewPath),
+    maxVolumeDb(takePath),
+  ]);
   return {
-    raw: { ffprobe: parsed, volume: { maxVolume } },
+    raw: {
+      ffprobe: parsed,
+      volume: { previewMaxVolumeDb: previewVolume, takeMaxVolumeDb: takeVolume },
+    },
     videoCodec: parsed.streams?.find((stream) => stream.codec_type === 'video')?.codec_name ?? null,
     audioCodec: parsed.streams?.find((stream) => stream.codec_type === 'audio')?.codec_name ?? null,
     previewDurationSeconds: parsed.format?.duration ? Number(parsed.format.duration) : null,
-    audioNonSilent: maxVolume !== null && maxVolume !== '-inf',
+    previewAudioNonSilent: audible(previewVolume),
+    takeAudioNonSilent: audible(takeVolume),
   };
 };
 
@@ -808,6 +835,11 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         credentialsDenied:
           authoring.sandboxEvidence?.credentialsDenied ??
           (credentialsProbe.exitCode === 0 && credentialsProbe.stdout === 'denied\n'),
+        // Without a spawned sandbox to interrogate, the honest fallback is to check the
+        // environment the harness would have handed over.
+        credentialsEnvironmentDenied:
+          authoring.sandboxEvidence?.credentialsEnvironmentDenied ??
+          remainingSecretVariables(scrubAgentEnvironment(process.env)).length === 0,
         writesContained: commands.every((record) =>
           [...record.created, ...record.changed].every((entry) => !entry.path.startsWith('../')),
         ),
@@ -914,7 +946,8 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       media: {
         videoCodec: media.videoCodec,
         audioCodec: media.audioCodec,
-        audioNonSilent: media.audioNonSilent,
+        previewAudioNonSilent: media.previewAudioNonSilent,
+        takeAudioNonSilent: media.takeAudioNonSilent,
         takeDurationSeconds,
         previewDurationSeconds: media.previewDurationSeconds,
       },

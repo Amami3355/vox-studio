@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { access, rm } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
+import { PRODUCTION_SECRET_VARIABLES, scrubAgentEnvironment } from './agent-environment';
 import type { AgentDriver, AgentSandboxEvidence } from './harness';
 import { NORTHBRIDGE_TASK_MESSAGE } from './northbridge';
 
@@ -138,6 +139,16 @@ const sandboxCommand = (
   timeout = 30_000,
 ) => run(codex, codexProofSandboxArguments(workRoot, command), { cwd: workRoot, env, timeout });
 
+/**
+ * Reports one secret's presence as a word, never its value, so that a probe which catches a
+ * leak cannot itself write the secret into the evidence bundle. One variable per invocation:
+ * `&` chaining does not survive the sandbox argument boundary, and a probe whose later halves
+ * were silently dropped would read as reassuring emptiness. `ABSENT:` is positive evidence
+ * that the probe ran, which silence would not be.
+ */
+export const credentialsEnvironmentProbeCommand = (name: string) =>
+  `if defined ${name} (echo PRESENT:${name}) else (echo ABSENT:${name})`;
+
 const compactProbe = (result: ProcessResult) => ({
   exitCode: result.exitCode,
   stdout: result.stdout,
@@ -199,6 +210,22 @@ const verifySandbox = async (input: {
       '3',
       'https://example.com/',
     ]),
+    ...Object.fromEntries(
+      await Promise.all(
+        PRODUCTION_SECRET_VARIABLES.map(
+          async (name) =>
+            [
+              `credentialsEnvironment:${name}`,
+              await sandboxCommand(input.codex, input.workRoot, input.environment, [
+                'cmd.exe',
+                '/d',
+                '/c',
+                credentialsEnvironmentProbeCommand(name),
+              ]),
+            ] as const,
+        ),
+      ),
+    ),
   };
   const evidence: AgentSandboxEvidence = {
     backend: 'codex-windows-elevated',
@@ -206,6 +233,18 @@ const verifySandbox = async (input: {
     repositoryDenied: probes.repository.exitCode !== 0 && !probes.repository.timedOut,
     serviceDenied: probes.service.exitCode !== 0 && !probes.service.timedOut,
     credentialsDenied: probes.credentials.exitCode !== 0 && !probes.credentials.timedOut,
+    // Fail closed: every secret needs its own probe to have actually run and said ABSENT.
+    // A missing, empty or errored probe is not evidence of absence.
+    credentialsEnvironmentDenied: PRODUCTION_SECRET_VARIABLES.every((name) => {
+      const result = probes[`credentialsEnvironment:${name}` as keyof typeof probes];
+      return (
+        result !== undefined &&
+        result.exitCode === 0 &&
+        !result.timedOut &&
+        result.stdout.includes(`ABSENT:${name}`) &&
+        !result.stdout.includes('PRESENT:')
+      );
+    }),
     directNetworkDenied: probes.network.exitCode !== 0 && !probes.network.timedOut,
     probes: Object.fromEntries(
       Object.entries(probes).map(([name, result]) => [name, compactProbe(result)]),
@@ -217,6 +256,9 @@ const verifySandbox = async (input: {
     !evidence.repositoryDenied ||
     !evidence.serviceDenied ||
     !evidence.credentialsDenied ||
+    // Aborts before the agent can reach the one quota-bearing command, so a credential leak
+    // costs nothing instead of being discovered in the assertions after the money is spent.
+    !evidence.credentialsEnvironmentDenied ||
     !evidence.directNetworkDenied
   ) {
     throw new Error(`PROOF_CODEX_SANDBOX_PREFLIGHT_FAILED:${JSON.stringify(evidence)}`);
@@ -242,11 +284,7 @@ const executeCodex = async (input: {
   transcript: unknown[];
   model: string;
 }) => {
-  const args = codexProofExecArguments(
-    input.workRoot,
-    input.model,
-    NORTHBRIDGE_TASK_MESSAGE,
-  );
+  const args = codexProofExecArguments(input.workRoot, input.model, NORTHBRIDGE_TASK_MESSAGE);
   return new Promise<ProcessResult>((resolvePromise, reject) => {
     const child = spawn(input.codex, args, {
       cwd: input.workRoot,
@@ -303,8 +341,10 @@ export const createCodexAgentDriver =
     credentialsProbePath,
   }) => {
     const codex = await resolveCodex();
+    // Scrub first, then re-apply the launcher capability: VOX_IPC_TOKEN is the authenticated
+    // IPC handle the agent is *meant* to hold, and it must survive the credential scrub.
     const environment = {
-      ...process.env,
+      ...scrubAgentEnvironment(process.env),
       ...launcherEnvironment,
       PATH: windowsSystemPath(workRoot),
       TEMP: workRoot,
