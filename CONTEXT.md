@@ -135,6 +135,16 @@ which is what makes a video's composition assertable without rendering it. Avoid
 
 **Compile report** — A structured deliverable (`errors[]`, `warnings[]`), not a log.
 
+**Measurement gate** — §13 step 9: a generalist model, given only the manifest and ten
+briefs written by the user, authors plans that are scored on five measures. It measures the
+**catalog**, never the agent, and anything under threshold is repaired by depth and never by
+adding a capability. Specified in `docs/measurement-gate.md`. Avoid: "the eval", which
+suggests the model is the subject.
+
+**Brief** — One paragraph of editorial intent, written by the user, carrying no structure
+and no vocabulary from the manifest. The gate's input. Two of the ten are deliberately
+unservable. Avoid: "prompt" — a brief is not addressed to a model's instructions.
+
 ## The six rules
 
 1. The schema is the single source of truth. Props, manifest, validation and docs are
@@ -176,4 +186,6 @@ amendment. Avoid: "the voice-over" for the timings, or "regenerate" for what pro
 The Asset Resolver beyond identity cache/local library/placeholder, the remaining
 capabilities, the agents, and the product Studio UI. See the build order in
 `vox-studio-architecture-figee.md` §13, ADR-0002 for the time pipeline, ADR-0003 for slot
-conflicts and ADR-0004 for the voice.
+conflicts and ADR-0004 for the voice. Step 9 of that build order is specified in
+`docs/measurement-gate.md`, which also states why it cannot usefully run against today's
+two capabilities.
