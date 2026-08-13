@@ -41,6 +41,12 @@ exists as a separate artifact. Beats get real timings from the voice-over; scene
 their durations from the beats they span. Avoid: "script" as something written alongside
 beats, or a beat that merely points at a range of one.
 
+**VideoPlan** — The agent-authored semantic document: ordered Beats partitioned into
+Sections, with their SceneInstances, persistent elements and placements. It contains no
+timings, frames, safe areas or resolved asset references; the compiler combines it with a
+Take to produce the Compiled document. Avoid: "compiled plan" — compilation produces a
+different artifact.
+
 **Timed beat** — A Beat plus its real start and end, in milliseconds, as spoken. The
 agent produces Beats and never TimedBeats. Milliseconds are the audio domain and frames
 are the Remotion domain; the compiler is the one place they meet.
@@ -144,6 +150,28 @@ suggests the model is the subject.
 **Brief** — One paragraph of editorial intent, written by the user, carrying no structure
 and no vocabulary from the manifest. The gate's input. Two of the ten are deliberately
 unservable. Avoid: "prompt" — a brief is not addressed to a model's instructions.
+
+**Agent production interface** — The complete agent-visible boundary through which a
+generalist agent authors a plan and requests the production operations that turn a Brief into
+a narrated preview. It exposes generated contracts and public vocabulary, but no repository
+source, sourcemaps, internal commentary or readable implementation. It holds whether
+production executes locally and opaquely or outside the agent's environment entirely.
+Minification alone does not establish code-blindness. Avoid: "catalog CLI", which names one
+transport rather than the whole production boundary.
+
+**Preflight** — A plan-only, non-authoritative assessment performed before recording. It
+reports the risks estimable without a Take — duration above all, since a scene has no duration
+until spoken milliseconds become frames and `BELOW_MIN_DURATION` is a hard error the compiler
+alone can raise. It never claims that an estimated duration or word timing compiled. Avoid:
+"dry compile", which promises the authority it is defined not to have.
+
+**Recording input** — The operator-authorised synthesis request derived from ordered beat text
+and production voice settings. It determines whether spending quota is a first recording or a
+replacement request; it does not identify the resulting recording. Identical recording inputs
+can produce *different* Takes — synthesis is not reproducible even at a fixed seed — which is
+why replaying one is a replacement attempt rather than a reproduction, and why `takeId`,
+digested from the audio and the alignment, is what identifies and binds the Take that comes
+out.
 
 ## The six rules
 

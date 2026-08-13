@@ -244,6 +244,14 @@ Each of these has an argument behind it; none is procedural fussiness.
 - The catalog changed between the first brief and the last.
 - A render was seen during the cold pass.
 - `validate` was reachable during the cold pass.
+- A brief was written or constrained for an **Agent production interface proof**.
+
+That last one is the same bias control seen from the other side. A proof brief is engineered
+*from* catalogue knowledge on purpose — it is written to force particular capabilities, an
+action, a word anchor — which is exactly right for proving the production interface works and
+exactly what voids a measurement. Such a brief is permanently ineligible for the ten. Its
+successful reuse may serve **regression testing only** and can never enter a scorecard as a
+blind brief.
 
 **Re-running on the same briefs after a repair is a regression check, not a fresh
 measurement.** It is legitimate and expected — it is how you learn the repair worked — but

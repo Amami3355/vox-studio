@@ -10,6 +10,9 @@ build/
 coverage/
 .vite/
 .turbo/
-# The whole directory, not one path inside it. The narrow rule let a `remotion render`
-# into `.scratch/` show up as an 8 MB untracked file that `git add -A` would have taken.
-.scratch/
+# Markdown under `.scratch/` is the repository's local issue tracker and is versioned.
+# Generated render artifacts stay local so `git add -A` cannot pick up videos or frames.
+.scratch/**
+!.scratch/**/
+!.scratch/*.md
+!.scratch/**/*.md
