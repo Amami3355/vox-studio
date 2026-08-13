@@ -297,3 +297,78 @@ catalog's own examples, which is why it caught this one, and the schema's ceilin
 any composition. Whether `supportedCompositions` should stay a static declaration or become
 content-dependent is a decision this ADR has not taken; it has only made the static
 declaration honest for the two capabilities that exist.
+
+**2026-08-13 — the declaration stays static, and the content it accepts gets rendered.**
+The question the amendment above left open is answered, and answering it started by
+separating two problems the paragraph fuses.
+
+**Eligibility and fit are not the same hole.** *May `bar_chart` be composed into `left` at
+all* is a static property of the capability, and the amendment above closed it the right way
+— by drawing the half frame rather than withdrawing the claim. *Does this instance's
+120-character headline survive the column it landed in* is a property of one plan's content,
+and it is the one still open. Making `supportedCompositions` content-dependent aims the
+first mechanism at the second problem.
+
+**So the declaration stays static, and the reason is rule 5.** Content-dependent eligibility
+turns "your title is too long" into "this capability may not be composed here" — a
+degradation promoted to a rejection, in a codebase whose fifth rule is that the two regimes
+never overlap. The degradations for this exact content already exist and already work:
+`titleStep` drops the type scale, `TITLE_DENSITY` says so, the `Others` bucket folds a
+twenty-category ranking. Nothing was missing from the *response* to oversized content. What
+was missing is that **no one had ever rendered it**.
+
+**The content-stress suite.** Cases are generated from the schemas rather than written:
+every `.max()` gives a ceiling — a 120-character headline, a 240-character caption, twenty
+categories, forty-character labels — and the deliberately-absent limits this file's own
+schema comment defends give the floor, since "no `.min(2)`, so the empty state stays
+reachable" is a promise with the same standing as a ceiling. Strings are filled
+deterministically from a fixed word corpus, because a string at the ceiling made of one
+token exercises no wrapping and wrapping is the whole question. Each case renders across
+**every layout × every composition × both camera profiles**: a layout is how the scene
+arranges itself and a composition is how much frame it gets, and the claim made above —
+*"all three layouts keep their identity in half a frame"* — is checkable no other way. It is
+also exactly the claim that went unverified for `bar_chart`'s `left` for the entire life of
+the codebase.
+
+**What it asserts, and why containment alone would have been theatre.** Containment and the
+quiet border, as `safe-area.test.ts` asks them against the `Backdrop` control — plus
+**nothing is clipped**, plus a line-count ceiling. The clipping assertion is the one that
+earns the suite. `AnimatedText` wraps its content in `overflow: 'hidden'` and `titleStep`
+floors at step 3, so a headline past the floor in a 537px column loses its tail *inside* the
+safe area: containment passes, the quiet border passes, and the sentence is gone. That is
+blind-by-construction in the same shape the absolute control was introduced to fix one
+amendment ago, arriving by a different route. The line ceiling makes a check out of a
+sentence this repository already wrote — *"five lines of display type is a header that has
+eaten its own scene"*.
+
+**Properties, never hashes.** The three curated key frames in `image-context.test.ts` stay
+hashed because three is a number a human will actually look at. A hash baseline over the
+hundred-odd generated cases would be re-accepted wholesale the first time anyone changed a
+font, and a baseline that is always bulk-accepted is a ritual wearing a check's clothes.
+
+**It runs as its own `pnpm test:stress`.** Own config, same `fileParallelism: false`, sharing
+`png.ts`. `test:render` is 44 tests in 47 seconds and the standing discipline that a red one
+is a real failure depends on people running it; the stress matrix roughly triples that today
+and more later. Splitting the slow suite off is what this repository already did once when
+`test:render` left `test`. It is obligatory for any commit touching a schema, a layout or
+`supportedCompositions` — a change-scoped obligation with `catalog:check` as its precedent,
+rather than a universal one nobody honours.
+
+**It is not on the cut line.** Grouped with the contract tests, for the same reason: both
+check that the catalog's *published claims* are true, and a claim nobody checks is worse
+than a claim never made. The scheduling argument is that its cost **self-scales with the
+cut** — the cases are generated from whatever schemas, layouts and compositions survive, so
+cutting scope shrinks the suite instead of leaving an obligation behind it.
+
+**The response to a failure is pre-committed**, before any case exists, for the same reason
+the measurement gate's is: after seeing the failure, "lower the ceiling" explains everything.
+Draw the box so it fits, or extend the degradation. Lowering a schema ceiling is legitimate
+**only** when no content at that size is editorially defensible — a 240-character caption may
+genuinely not be a caption any more, and saying so is an answer. What it may not be is the
+quiet repair, because a ceiling is a promise the schema makes to the agent and rule 1 makes
+the schema the single source of truth; lowering it moves the failure from the frame, where a
+human sees it, to the plan, where the agent meets it as a rejection.
+
+*Decided, not yet built.* The suite does not exist. It comes after ADR-0006's publication
+work and after the action group, and nothing in this amendment is carried out in the commit
+that records it.

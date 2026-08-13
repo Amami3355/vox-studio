@@ -1,6 +1,6 @@
 # The measurement gate
 
-**Status:** specified · 2026-08-13 · not yet run
+**Status:** accepted · 2026-08-13 · not yet run
 **Scope:** §13 step 9 — "test au harnais généraliste". What is measured, on what, by whom,
 under what isolation, and what a result obliges the project to do. Nothing about the agent
 crew of PRD §17: this gate runs *before* them and deliberately does not need them.
@@ -9,9 +9,13 @@ crew of PRD §17: this gate runs *before* them and deliberately does not need th
 
 The gate was settled in grilling sessions and then recorded **nowhere but a handoff file in
 the OS temp directory**, carried forward by hand for seven sessions on the understanding
-that one temp cleanup would lose it. This is that conversation written down. The sections
-marked *settled* are not new positions; the ones marked *specified here* are operational
-detail the handoff never carried, and are the only parts open to revision by reading them.
+that one temp cleanup would lose it. This is that conversation written down.
+
+Everything below is settled. The *settled* and *specified here* labels are kept as
+provenance, not as confidence: *settled* marks what came out of the earlier grilling
+sessions, *specified here* marks operational detail this file proposed on 2026-08-13 and had
+confirmed the same day. Both bind equally. Knowing which is which is what lets a future
+reader reopen one without reopening the other.
 
 It is a spec and not an ADR because it constrains a procedure, not the code. Nothing here
 generates, validates or renders anything.
@@ -53,12 +57,32 @@ against it — rule 5 keeps the two regimes apart, and a warning is by construct
 degradation the render survives. A brief that was declined contributes no instances to
 either side.
 
+The **warning count is still recorded**, as a reported number with no threshold attached.
+Folding warnings into the threshold would let a soft failure fail the gate — rule 5's line,
+crossed — but a plan tripping `SOFT_LIMIT_EXCEEDED` and `TITLE_DENSITY` on every scene
+scores 100% valid, and that is a fact the scorecard should carry rather than hide. Measure 4
+is where an ugly-but-valid plan is meant to be caught.
+
 **2 — Invention.** Machine-computable, no judgement: the number of `UNKNOWN_CAPABILITY`,
-`UNKNOWN_ACTION`, `UNKNOWN_LAYOUT` and `UNKNOWN_SLOT` errors across the cold-pass plans.
-Counted from `validateVideoPlan` and not `validateScene`, because `UNKNOWN_SLOT` is raised
-on a *placement* — it carries a `sectionId`, not a `sceneId` — and an invented slot on a
-persistent element is the same defect seen one level up. Nonzero fails the gate outright,
-whatever the other four say. Rule 2 is why: the agent sees
+`UNKNOWN_ACTION`, `UNKNOWN_LAYOUT`, `UNKNOWN_SLOT` and `UNKNOWN_ANCHOR` errors across the
+cold-pass plans. Counted from `validateVideoPlan` and not `validateScene`, because
+`UNKNOWN_SLOT` is raised on a *placement* — it carries a `sectionId`, not a `sceneId` — and
+an invented slot on a persistent element is the same defect seen one level up. Nonzero fails
+the gate outright, whatever the other four say.
+
+**The line is names and forms that do not exist.** `UNKNOWN_ANCHOR` counts because an
+unparseable anchor is invented *grammar*, and session 11 published `ANCHOR_GRAMMAR` to the
+manifest precisely so the grammar is learnable — an agent writing `b2.word:London+short`
+after reading the block that says word anchors take no offset has invented a form. What does
+*not* count is well-formed vocabulary used at the wrong moment: `AMBIGUOUS_ANCHOR` names a
+word the beat really speaks, twice, and `DEICTIC_ANCHOR_REQUIRED` resolves fine and lands
+somewhere the narrator is not looking. Both are measure 1's business.
+
+**A hard fail completes the run.** The verdict is failed the moment the count is nonzero,
+but every other measure is still computed, because those numbers are what say *which* repair
+to make — and the briefs' blindness is spent the moment they are used, so abandoning a run
+throws away the only unbiased read those ten briefs will ever give to save compute that
+costs nothing. Rule 2 is why: the agent sees
 the manifest and nothing else, so an invention is proof that something the manifest was
 supposed to teach was not learnable from it. That is a defect in the manifest even when the
 invented name is a reasonable guess — *especially* then.
@@ -144,7 +168,7 @@ push-ins. Pace lives in motion profiles and in a `cameraPush` action; it never b
 capability. There is no `Map`-style capability hiding in this reference, and reading it as
 one is how a catalog acquires a scene it does not need.
 
-## When the gate may be run — specified here
+## When the gate may be run
 
 The gate measures reach across a library. Run against today's catalog it would measure
 almost nothing, and that is worth stating precisely rather than as an intuition:
@@ -155,12 +179,39 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
 - **With two capabilities, measure 3 has almost nothing to be wrong about.** Selection
   relevance needs briefs for which at least two capabilities are plausible; otherwise it
   scores the absence of alternatives.
+- **The manifest publishes no check vocabulary**, and in the cold pass `validate` is
+  withheld, so nothing the compiler checks is knowable. ADR-0006 closes this, and the gate
+  should not be run before it does — the same argument that made publishing the anchor
+  grammar block session 11's work rather than follow it.
 
-Entry conditions, therefore: every capability in the catalog publishes at least one action;
-every capability meets §15's checklist including its three examples with an edge case and an
-empty case; and the majority of the ten briefs admit more than one plausible capability.
-**How many capabilities that takes is the user's call** — the PRD says 8–12 for V1, and the
-gate does not need all of V1 to be informative.
+Entry conditions, therefore: ADR-0006 is carried out; every capability publishes at least
+one action; every capability meets §15's checklist including its three examples with an edge
+case and an empty case; and the majority of the ten briefs admit more than one plausible
+capability.
+
+**Depth and breadth are not the same preparation, and the build plan only buys one.** §14's
+strategy is 8–12 capabilities × many variants, and groups 2, 3 and 4 are all variants of
+`ImageContextScene` — after all three the catalog still holds **two** capabilities. Group 4
+unblocks measure 2. *Nothing on the plan unblocks measure 3.*
+
+**The gate runs at four capabilities**: `bar_chart`, `image_context`, then
+TypographicStatement — the cheapest, being pure type with no assets and no resolver — and
+Comparison. Four is enough for a brief to admit a wrong answer, which is all measure 3 needs
+in order to stop being decorative. It is a weaker read than eight would give, and **the
+capability count is recorded on the scorecard as a caveat on measure 3** rather than left for
+a reader in September to reconstruct.
+
+**Order:** ADR-0006 → group 4 → TypographicStatement → Comparison → run the gate.
+
+**The cut line, revised.** The pre-agreed order was set when nothing but depth was on the
+plan. Both depth items now cut before either breadth capability, because measure 3 is
+decorative without breadth while depth only sharpens measures 1 and 4, which are already
+measurable:
+
+> group 3 → `cutoutOnFlat` → Comparison → repair-pass scoring.
+
+**Never cut:** group 1, group 4, TypographicStatement, the contract tests, and the
+content-stress suite of ADR-0003's last amendment.
 
 ## What a run leaves behind — specified here
 
@@ -168,9 +219,21 @@ Raw artifacts — transcripts, generated directory, plans, reports, renders — 
 `.scratch/measure/<date>/`, which is gitignored in full.
 
 The **scorecard** is committed, appended to the *Runs* section below: date, model and
-version, the catalog commit it ran against, the five results, the verdict, and — the part
-that matters six weeks later — **what it sent back to the catalog**. A gate whose findings
-are not traceable to the repairs they caused is a number, not a measurement.
+version, the catalog commit it ran against, the capability count, the five results, the
+unscored warning count, the verdict, and — the part that matters six weeks later — **what it
+sent back to the catalog**. A gate whose findings are not traceable to the repairs they
+caused is a number, not a measurement.
+
+**A partial scorecard is legitimate; a blocked run is not.** Measures 1, 2 and 5 are
+machine-computable and complete without anyone watching. Measures 3 and 4 need the user, and
+if they are not available those two record as **pending** rather than absent. Nobody else
+judges them — a model scoring plans it could have written is not an independent judge, and no
+substitute has been found that keeps the measure honest. What is not acceptable is holding
+back three computable numbers for scheduling reasons while the briefs' blindness expires.
+
+**One model per series.** A run compares catalog commits, so the model is held fixed;
+changing it starts a new series rather than adding to the old one. Model and version are on
+the scorecard, which makes the break visible instead of inferred.
 
 ## What voids a run — specified here
 
@@ -187,31 +250,33 @@ measurement.** It is legitimate and expected — it is how you learn the repair 
 the briefs are no longer blind to the catalog, because the catalog was changed in response
 to them. A fresh number needs fresh briefs, written under the same bias control.
 
-## Decisions I made writing this down
+## The operational decisions, and what they cost
 
-Each of these is operational detail the handoff never carried. Veto any of them and the
-sections above change accordingly.
+Detail the handoff never carried, proposed when this file was written and confirmed the same
+day. Recorded with their costs rather than as bare rulings, because the cost is what a future
+reader needs in order to reopen one honestly.
 
-1. **Warnings do not count against measure 1.** Follows rule 5, but it is a choice: it means
-   a plan full of `SOFT_LIMIT_EXCEEDED` scores as valid.
+1. **Warnings do not count against measure 1**, though the count is reported. Follows rule 5.
+   Cost: a plan tripping every soft limit scores 100% valid, and only measure 4 catches it.
 2. **A correctly declined brief scores as relevant in measure 3.** Otherwise the ceiling is
    8/10 and the threshold demands perfection on the servable eight.
-3. **A false decline fails measure 5.** Without it, refusing everything is a perfect score.
+3. **A false decline fails measure 5.** The load-bearing half: measure 5 exists to catch
+   force-fitting, and without this it rewards the opposite pathology instead of catching it.
 4. **`validate` is withheld in the cold pass.** The strictest reading of "one shot, no
-   feedback", and the one that makes the two passes measure different things.
-5. **`UNKNOWN_ANCHOR` is *not* counted in measure 2**, though I think it should be. Session
-   11 published `ANCHOR_GRAMMAR` to the manifest precisely so anchors are learnable, which
-   makes an unparseable anchor exactly the species measure 2 names. Left out because
-   tightening a hard-fail measure is not a thing to do while writing down someone else's
-   decision. It is the one item here I would actively argue for.
+   feedback". It separates what the *manifest* taught from what the *error messages* taught,
+   which are two repairs with two different owners. Cost: the cold pass measures a condition
+   that never occurs in production — deliberately, because with `validate` in both passes the
+   two passes measure the same thing and the second one reports nothing.
+5. **`UNKNOWN_ANCHOR` counts in measure 2.** Added on the line drawn under measure 2 above:
+   names and forms that do not exist. Cost: it makes a hard-fail measure stricter, so it is
+   the one decision here that can fail the gate on its own.
 
-## Open, deliberately
+## Open
 
-- **How many capabilities before the gate runs at all** — see *When the gate may be run*.
-- **Who judges measures 3 and 4 if the user is unavailable.** No answer that keeps the
-  measure honest has been found; a model judging plans it could have written is not one.
-- **Whether a second run reuses the model of the first.** Comparing across models measures
-  the model; comparing across catalog commits with one model is what the gate is for.
+Nothing. The three questions this file opened with — how many capabilities, who judges 3 and
+4 without the user, and whether a run reuses the previous model — were closed the same day,
+and the answers are in *When the gate may be run* and *What a run leaves behind*. What
+remains unknown about the gate is its results.
 
 ## Runs
 
