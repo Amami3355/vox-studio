@@ -97,6 +97,29 @@ export type TimedEvent = {
 export type ActionDef = {
   description: string;
   payload: z.ZodType | null;
+  /**
+   * The payload fields whose value is a word the narrator speaks, and which this event
+   * must therefore *land on* — deixis: the meaning depends on the moment of utterance.
+   *
+   * A `highlightBar` is a pointing gesture. It says "this one", and "this one" is only
+   * true while the narrator is saying the thing pointed at; the bar lighting up 150 frames
+   * after the word has passed is a defect visible to anyone watching and to nothing else in
+   * this repository. So it declares `['label']`, and the anchor to write for it is the word
+   * form: `b3.word:London`, not `b3.start`.
+   *
+   * `annotate` declares nothing, and the distinction is the reason this is a list of fields
+   * rather than a flag on the action. Its `label` names a spoken word too — it is the same
+   * bar — but the note's timing follows the sentence that *justifies* it, which may be a
+   * beat away. Holding it to the landing rule would be wrong rather than strict.
+   *
+   * Absent means "no field of this payload is deictic". That default is permissive on
+   * purpose — most actions point at nothing — but it is the residual risk here, and worth
+   * naming: a *new* pointing gesture that forgets to declare is unchecked and silent, which
+   * is the same shape as the defect the whole thing repairs, one level up. What is guarded
+   * is that a declaration made is a declaration that works: `catalog-contract` rejects a
+   * field the payload does not carry, since that would read undefined and check nothing.
+   */
+  deicticFields?: string[];
 };
 
 /* ------------------------------------------------------------------ layouts */

@@ -21,6 +21,7 @@ export const barChartActions = {
   },
   highlightBar: {
     description: 'Bring one bar forward and recede all the others.',
+    deicticFields: ['label'],
     payload: z.object({
       label: z.string().describe('Must match a `label` present in `data`.'),
     }),

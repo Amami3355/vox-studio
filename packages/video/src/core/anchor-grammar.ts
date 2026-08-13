@@ -43,13 +43,77 @@ const BEAT_ID = '[A-Za-z0-9_-]+';
 const BOUNDARY_RE = new RegExp(`^(${BEAT_ID})\\.(start|mid|end)(?:([+-])(short|long))?$`, 'u');
 const WORD_RE = new RegExp(`^(${BEAT_ID})\\.word:(${WORD_PATTERN})$`, 'u');
 
+/** One branch of the grammar, described once for every audience that needs it. */
+export type AnchorForm = {
+  /** The shape as written, with `<…>` placeholders. */
+  form: string;
+  /**
+   * Completes "Expected <form> …" in a rejection. Terse on purpose: it appears in compiler
+   * errors, where a paragraph buries the one thing that was wrong.
+   */
+  expectation: string;
+  /**
+   * The same branch for a reader who has never seen the grammar — the agent, which by
+   * rule 2 has only the manifest. Separate from `expectation` because they are read in
+   * different situations and neither length suits both, not because the grammar has two
+   * descriptions: both are generated from this one array.
+   */
+  means: string;
+  examples: readonly string[];
+};
+
+/**
+ * The grammar as data, so it can be *published* rather than only enforced.
+ *
+ * Rule 2 says the agent sees the manifest and never the code. Until this existed, every
+ * anchor an agent had to write was described exclusively in TypeScript it cannot read —
+ * `catalog.json` did not contain the word "anchor" — so the vocabulary was unlearnable by
+ * construction and the first gate measure was measuring a manifest with a hole in it.
+ *
+ * `ANCHOR_EXPECTATION` is derived below rather than written beside this, which is the same
+ * reason the two regexes are built from one `BEAT_ID`: a grammar that describes itself
+ * twice describes itself differently within a month. That already happened here — three
+ * copies, one of which rejected the first example to use a word anchor.
+ */
+export const ANCHOR_GRAMMAR = {
+  rule: 'The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.',
+  forms: [
+    {
+      form: '<beatId>.start|mid|end',
+      expectation: 'with an optional +short/-short/+long/-long offset',
+      means:
+        'A boundary or the midpoint of one beat, optionally nudged by a rhythm token. ' +
+        'Use it when the event follows the shape of the sentence rather than any ' +
+        'particular word in it. `scene` is a pseudo-beat meaning the scene’s own bounds.',
+      examples: ['b2.start', 'b4.end-short', 'scene.mid'],
+    },
+    {
+      form: '<beatId>.word:<word>',
+      expectation: 'naming a word the beat actually speaks (no offset)',
+      means:
+        'The frame the narrator begins that word. Use it when the event must land on ' +
+        'what is being said — an action listing `deicticFields` is saying exactly that ' +
+        'about those payload fields, so anchor it to the word it names. The word must ' +
+        'appear in that beat’s text exactly once — ' +
+        'twice is an error, not a first match — and takes no offset, because an offset ' +
+        'from a word onset is the arithmetic this form exists to avoid: if the event ' +
+        'belongs slightly later, name the next word. `scene` has no text, so it cannot ' +
+        'carry this form.',
+      examples: ['b2.word:London'],
+    },
+  ] as const satisfies readonly AnchorForm[],
+  offsets: ['short', 'long'],
+  sceneBeatId: 'scene',
+} as const;
+
 /**
  * The one sentence describing the grammar, so a rejection from the validator and a
- * rejection from the resolver cannot describe different languages.
+ * rejection from the resolver cannot describe different languages — and now so that
+ * neither can describe a different language from the manifest the agent read.
  */
-export const ANCHOR_EXPECTATION =
-  '<beatId>.start|mid|end with an optional +short/-short/+long/-long offset, ' +
-  'or <beatId>.word:<word> naming a word the beat actually speaks (no offset).';
+export const ANCHOR_EXPECTATION = `${ANCHOR_GRAMMAR.forms
+  .map((form) => `${form.form} ${form.expectation}`)
+  .join(', or ')}.`;
 
 export const parseAnchor = (anchor: string): ParsedAnchor | null => {
   const trimmed = anchor.trim();

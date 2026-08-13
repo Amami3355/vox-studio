@@ -6,9 +6,41 @@
  * that fails a build instead of something someone remembers to read.
  */
 import { describe, expect, it } from 'vitest';
+import { buildCatalog, buildCatalogEntry } from '../src/catalog/build';
 import { validateScene } from '../src/catalog/tools';
 import { parseAnchor } from '../src/core/anchor-grammar';
 import { registry } from '../src/scenes/registry';
+
+/**
+ * What the manifest must publish before any capability in it is usable.
+ *
+ * Rule 2 says the agent sees the manifest and never the code, which makes anything the
+ * agent must write and the manifest does not mention unlearnable by construction. The
+ * anchor grammar was exactly that: `catalog.json` contained no mention of anchors at all
+ * while every event in every example is anchored.
+ */
+describe('the manifest', () => {
+  /**
+   * Asked through `parseAnchor` rather than compared against the grammar's own string,
+   * which would recompute the expectation the way the code does and pass by construction.
+   * The parser is the independent source of truth here — it is what will actually reject
+   * the agent's anchor — so a published form the parser does not accept is the defect this
+   * catches, and it is a live one: the grammar has already existed in three drifting copies
+   * in this repository.
+   */
+  it('publishes an anchor grammar whose own examples parse, covering both branches', () => {
+    const { time } = buildCatalog();
+    const examples = time.forms.flatMap((form) => form.examples);
+
+    expect(examples.length).toBeGreaterThan(0);
+    for (const example of examples) {
+      expect(parseAnchor(example), `manifest publishes "${example}"`).not.toBeNull();
+    }
+
+    const kinds = new Set(examples.map((example) => parseAnchor(example)?.target.kind));
+    expect(kinds).toEqual(new Set(['boundary', 'word']));
+  });
+});
 
 describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_id, capability) => {
   it('declares selection metadata with explicit redirections', () => {
@@ -41,6 +73,39 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
     expect(actions.length).toBeGreaterThan(0);
     for (const [, action] of actions) {
       expect(action.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * A declaration the manifest drops is a declaration only the test suite can act on, and
+   * the whole argument for moving this off a hardcoded list in `plans.test.ts` was that the
+   * agent could use it as well as the test can. Rule 2: the agent sees the manifest.
+   */
+  it('publishes each action’s deictic fields, not only the code’s copy of them', () => {
+    const published = new Map(
+      buildCatalogEntry(capability).actions.map((action) => [action.id, action.deicticFields]),
+    );
+
+    for (const [id, action] of Object.entries(capability.actions)) {
+      expect(published.get(id), `action "${id}"`).toEqual(action.deicticFields);
+    }
+  });
+
+  /**
+   * The declaration is a set of field *names*, so it can name a field that does not exist —
+   * and the failure is silent in the worst way. `deicticFields: ['labell']` reads a payload
+   * key that is never there, produces no word to check, and the landing gate goes green by
+   * finding nothing to look at. That is the same "renders fine, animates nothing" species
+   * the closed action vocabulary exists to kill, one level up.
+   */
+  it('names deictic fields the payload actually carries', () => {
+    for (const action of buildCatalogEntry(capability).actions) {
+      if (!action.deicticFields) continue;
+      const carried = Object.keys((action.payloadSchema?.properties ?? {}) as object);
+      expect(action.deicticFields.length, `action "${action.id}"`).toBeGreaterThan(0);
+      for (const field of action.deicticFields) {
+        expect(carried, `action "${action.id}"`).toContain(field);
+      }
     }
   });
 

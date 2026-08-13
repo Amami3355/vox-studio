@@ -51,7 +51,10 @@ the compiler crosses the second seam. Avoid: calling any of the three just "beat
 
 **Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`,
 `b2.word:London`. The agent writes anchors. The compiler writes frames. An agent that
-writes a frame is a bug.
+writes a frame is a bug. The grammar has one definition, `ANCHOR_GRAMMAR` in
+`core/anchor-grammar.ts`, and both the compiler's rejection message and the manifest's
+`time` block are generated from it — an anchor vocabulary the manifest does not publish is
+one rule 2 makes unlearnable.
 
 **Word anchor** — The one anchor form that names a word instead of arithmetic:
 `b2.word:London` resolves to the frame the narrator begins that word. For events that must
@@ -91,6 +94,15 @@ composition, held for the scene's duration. See ADR-0003.
 
 **Action** — A member of a capability's *closed* event vocabulary (`highlightBar`,
 `annotate`). An action outside the vocabulary is a compilation error, never a silence.
+
+**Deictic field** — A payload field of an action whose value is a word the narrator speaks
+and which the event must therefore *land on*: `highlightBar` declares `deicticFields:
+['label']`, because "this one" is only true while the narrator is saying the thing pointed
+at. Declared on the action and published in the manifest, so the rule reaches every
+capability rather than the ones a test remembered. `annotate` declares none — its label
+names the same bar, but the note's timing follows the sentence that justifies it. The
+anchor to write for a deictic field is a Word anchor. Avoid: treating it as "the payload
+mentions a word", which is what `annotate` also does.
 
 **Hard constraint** — Expressed in the Zod schema. Violating it rejects the plan.
 

@@ -10,6 +10,7 @@
  * reading the diff that matters.
  */
 import { z } from 'zod';
+import { ANCHOR_GRAMMAR } from '../core/anchor-grammar';
 import type { SceneCapability, SceneExample, SceneMeta, SoftConstraints } from '../core/types';
 import { registry } from '../scenes/registry';
 
@@ -19,6 +20,13 @@ export type CatalogAction = {
   id: string;
   description: string;
   payloadSchema: JsonSchemaObject | null;
+  /**
+   * Omitted rather than emitted empty when the action declares none, so the manifest says
+   * "this action is not a pointing gesture" by silence — the same way it already omits a
+   * `payloadSchema` for an action that takes no payload — instead of carrying an empty
+   * array on every action in the catalog for the few that need one.
+   */
+  deicticFields?: string[];
 };
 
 export type CatalogLayout = {
@@ -37,7 +45,17 @@ export type CatalogEntry = SceneMeta & {
 
 export type Catalog = {
   /** Bumped by hand when the shape of this file changes, not on every regeneration. */
-  manifestVersion: 1;
+  manifestVersion: 2;
+  /**
+   * Rule 3's vocabulary, which is not a property of any one capability.
+   *
+   * Every capability publishes the events it accepts, and every event is placed with an
+   * anchor — so a manifest listing the actions but not the grammar publishes half of what
+   * an event is. It sits beside `capabilities` rather than inside each of them because
+   * repeating it per capability would be the fourth copy of a grammar that has already
+   * drifted in three.
+   */
+  time: typeof ANCHOR_GRAMMAR;
   capabilities: CatalogEntry[];
 };
 
@@ -62,12 +80,14 @@ export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => 
     id,
     description: action.description,
     payloadSchema: action.payload ? toJsonSchema(action.payload) : null,
+    ...(action.deicticFields ? { deicticFields: [...action.deicticFields] } : {}),
   })),
   examples: capability.examples,
 });
 
 export const buildCatalog = (): Catalog => ({
-  manifestVersion: 1,
+  manifestVersion: 2,
+  time: ANCHOR_GRAMMAR,
   capabilities: registry.map(buildCatalogEntry),
 });
 

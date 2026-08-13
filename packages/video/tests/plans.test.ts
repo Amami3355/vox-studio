@@ -13,25 +13,25 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { slotRect } from '../src/core/slots';
-import { NO_SAFE_AREA } from '../src/core/types';
+import { NO_SAFE_AREA, type TimedEvent } from '../src/core/types';
 import { type ShippedPlan, compileShippedPlan, shippedPlans } from '../src/plans';
 import { requireCapability } from '../src/scenes/registry';
 
 /**
- * The actions whose payload names a word *and* whose whole meaning is "this one, now".
+ * The words an event claims to be pointing at, asked of the capability that defines it.
  *
- * A highlight is a pointing gesture: it refers to a datum at the moment the narrator does,
- * and landing it elsewhere is the §12 defect. An `annotate` names the bar its note attaches
- * to and takes its timing from the sentence that justifies the note, which may be a beat
- * away — so holding it to the same rule would be wrong rather than strict.
- *
- * Written here as a list because the catalog does not say which of an action's payload
- * fields refer to something spoken. That belongs on the capability eventually — it is the
- * kind of fact the manifest exists to publish, and the agent could use it as well as this
- * test can. Until then, one list, in the open, rather than a gate that quietly checks less
- * than it appears to.
+ * This was a hardcoded `['highlightBar']` at the top of this file, because nothing in the
+ * catalog said which of an action's payload fields refer to something spoken. A gate over a
+ * list written here is exemplary rather than general: it holds for the one action someone
+ * remembered, and the second capability to ship a pointing gesture joins the exclusion by
+ * default and silently. The declaration now lives on the action — see `deicticFields` in
+ * `core/types.ts` — so this reads the vocabulary instead of restating a slice of it.
  */
-const DEICTIC_ACTIONS = ['highlightBar'];
+const deicticWordsOf = (capabilityId: string, event: TimedEvent): string[] => {
+  const fields = requireCapability(capabilityId).actions[event.action]?.deicticFields ?? [];
+  const payload = (event.payload ?? {}) as Record<string, unknown>;
+  return fields.map((field) => payload[field]).filter((value) => typeof value === 'string');
+};
 
 const sliceOf = (id: string): ShippedPlan => {
   const found = shippedPlans.find((plan) => plan.id === id);
@@ -232,29 +232,27 @@ describe('the vertical slice', () => {
     const spoken = document.beats.flatMap((beat) => beat.words);
 
     const late = (document.sections[0]?.scenes ?? []).flatMap((scene) =>
-      scene.events.flatMap((event) => {
-        if (!DEICTIC_ACTIONS.includes(event.action)) return [];
-        const label = (event.payload as { label?: string } | undefined)?.label;
-        if (label === undefined) return [];
+      scene.events.flatMap((event) =>
+        deicticWordsOf(scene.capabilityId, event).flatMap((label) => {
+          /**
+           * Every utterance of the word, not the first. A script may say "London" twice and
+           * an event is early or late relative to whichever one it was written for — taking
+           * the nearest is what keeps this a test of landing rather than of word choice.
+           */
+          const utterances = spoken.filter((word) => word.text === label);
+          if (utterances.length === 0) return [];
 
-        /**
-         * Every utterance of the word, not the first. A script may say "London" twice and
-         * an event is early or late relative to whichever one it was written for — taking
-         * the nearest is what keeps this a test of landing rather than of word choice.
-         */
-        const utterances = spoken.filter((word) => word.text === label);
-        if (utterances.length === 0) return [];
+          const at = scene.from + event.frame;
+          const distances = utterances.map((word) => Math.abs(at - word.frame));
+          const nearest = Math.min(...distances);
 
-        const at = scene.from + event.frame;
-        const distances = utterances.map((word) => Math.abs(at - word.frame));
-        const nearest = Math.min(...distances);
-
-        return nearest <= TOLERANCE_FRAMES
-          ? []
-          : [
-              `${event.action}("${label}") fires at frame ${at}, ${nearest} frames from the nearest time "${label}" is spoken (${utterances.map((w) => w.frame).join(', ')})`,
-            ];
-      }),
+          return nearest <= TOLERANCE_FRAMES
+            ? []
+            : [
+                `${event.action}("${label}") fires at frame ${at}, ${nearest} frames from the nearest time "${label}" is spoken (${utterances.map((w) => w.frame).join(', ')})`,
+              ];
+        }),
+      ),
     );
 
     expect(late).toEqual([]);
@@ -269,13 +267,9 @@ describe('the vertical slice', () => {
   it('has words to check against, and a deictic event that names one', () => {
     expect(document.beats.every((beat) => beat.words.length > 0)).toBe(true);
 
-    const checked = (document.sections[0]?.scenes ?? [])
-      .flatMap((scene) => scene.events)
-      .filter(
-        (event) =>
-          DEICTIC_ACTIONS.includes(event.action) &&
-          (event.payload as { label?: string } | undefined)?.label !== undefined,
-      );
+    const checked = (document.sections[0]?.scenes ?? []).flatMap((scene) =>
+      scene.events.flatMap((event) => deicticWordsOf(scene.capabilityId, event)),
+    );
 
     expect(checked.length).toBeGreaterThan(0);
   });

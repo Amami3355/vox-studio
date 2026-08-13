@@ -1,5 +1,33 @@
 {
-  "manifestVersion": 1,
+  "manifestVersion": 2,
+  "time": {
+    "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
+    "forms": [
+      {
+        "form": "<beatId>.start|mid|end",
+        "expectation": "with an optional +short/-short/+long/-long offset",
+        "means": "A boundary or the midpoint of one beat, optionally nudged by a rhythm token. Use it when the event follows the shape of the sentence rather than any particular word in it. `scene` is a pseudo-beat meaning the scene’s own bounds.",
+        "examples": [
+          "b2.start",
+          "b4.end-short",
+          "scene.mid"
+        ]
+      },
+      {
+        "form": "<beatId>.word:<word>",
+        "expectation": "naming a word the beat actually speaks (no offset)",
+        "means": "The frame the narrator begins that word. Use it when the event must land on what is being said — an action listing `deicticFields` is saying exactly that about those payload fields, so anchor it to the word it names. The word must appear in that beat’s text exactly once — twice is an error, not a first match — and takes no offset, because an offset from a word onset is the arithmetic this form exists to avoid: if the event belongs slightly later, name the next word. `scene` has no text, so it cannot carry this form.",
+        "examples": [
+          "b2.word:London"
+        ]
+      }
+    ],
+    "offsets": [
+      "short",
+      "long"
+    ],
+    "sceneBeatId": "scene"
+  },
   "capabilities": [
     {
       "id": "bar_chart",
@@ -154,7 +182,10 @@
             "required": [
               "label"
             ]
-          }
+          },
+          "deicticFields": [
+            "label"
+          ]
         },
         {
           "id": "annotate",
