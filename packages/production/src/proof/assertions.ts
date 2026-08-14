@@ -95,16 +95,37 @@ const between =
     typeof value === 'number' && value >= minimum && value <= maximum;
 
 /**
- * The duration window the Take and preview must land in. It defaults to the frozen short
- * proof's 20..30 so every existing caller and every existing evidence bundle keeps its exact
- * meaning; the long-form variant passes its own window instead.
+ * How many validate→Preflight repair cycles a Brief of this length is allowed before recording.
+ *
+ * Ticket 09 froze the short proof's budget as three Preflight calls, five `validate` calls and
+ * five submitted plan versions. Those are absolute counts, and absolute counts do not survive a
+ * Brief six times longer: the 3-minute run converged cleanly in four cycles and failed a budget
+ * calibrated for 25 seconds. Expressing the budget per unit of the content the Brief asks for
+ * keeps it binding at every length instead of moving the wall each time.
+ *
+ * The input is the Brief's own target duration, never anything the agent chooses. A budget keyed
+ * on scene or beat count would let an agent buy itself repair attempts by splitting its plan.
+ *
+ * At 25 s this returns 3, so the short proof's 3/5/5 is reproduced exactly and the two paid
+ * bundles keep the semantics they were judged under.
+ */
+export const repairCycleBudget = (targetSeconds: number): number =>
+  2 + Math.ceil(targetSeconds / 60);
+
+/**
+ * `durationBounds` is the window the Take and preview must land in; `targetSeconds` is the
+ * duration the Brief asks for, which sets the repair budget. Both default to the frozen short
+ * proof's values so every existing caller and every existing evidence bundle keeps its exact
+ * meaning; the long-form variant passes its own.
  */
 export const evaluateNorthbridgeAssertions = (
   observed: NorthbridgeObservations,
-  options: { durationBounds?: readonly [number, number] } = {},
+  options: { durationBounds?: readonly [number, number]; targetSeconds?: number } = {},
 ): ProofAssertion[] => {
   const [minimumSeconds, maximumSeconds] = options.durationBounds ?? [20, 30];
   const durationWindow = `${minimumSeconds}..${maximumSeconds}`;
+  const cycles = repairCycleBudget(options.targetSeconds ?? 25);
+  const authoringVersions = cycles + 2;
   return [
   item('agent.unscripted-generalist', true, observed.authorship.unscripted, ['environment.json']),
   item(
@@ -155,20 +176,24 @@ export const evaluateNorthbridgeAssertions = (
   ]),
   item(
     'limits.plan-versions',
-    '<=5',
+    `<=${authoringVersions}`,
     observed.limits.planVersions,
     ['agent-transcript.jsonl'],
-    (value) => between(1, 5)(value),
+    (value) => between(1, authoringVersions)(value),
   ),
-  item('limits.validate-calls', '<=5', observed.limits.validateCalls, ['commands.jsonl'], (value) =>
-    between(1, 5)(value),
+  item(
+    'limits.validate-calls',
+    `<=${authoringVersions}`,
+    observed.limits.validateCalls,
+    ['commands.jsonl'],
+    (value) => between(1, authoringVersions)(value),
   ),
   item(
     'limits.preflight-calls',
-    '<=3',
+    `<=${cycles}`,
     observed.limits.preflightCalls,
     ['commands.jsonl'],
-    (value) => between(1, 3)(value),
+    (value) => between(1, cycles)(value),
   ),
   item(
     'limits.post-record-plan-versions',

@@ -3,6 +3,7 @@ import {
   type NorthbridgeObservations,
   evaluateNorthbridgeAssertions,
   machineVerdict,
+  repairCycleBudget,
 } from '../src/proof/assertions';
 
 const passingObservations = (): NorthbridgeObservations => ({
@@ -112,6 +113,56 @@ describe('Northbridge machine assertions', () => {
     expect(
       assertions.find((assertion) => assertion.id === 'leaks.agent-readable-files')?.pass,
     ).toBe(true);
+    expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('reproduces the frozen short budget of 3 Preflight and 5 validate/plan versions', () => {
+    const assertions = evaluateNorthbridgeAssertions(passingObservations());
+    const expectedOf = (id: string) => assertions.find((assertion) => assertion.id === id)?.expected;
+    expect(expectedOf('limits.preflight-calls')).toBe('<=3');
+    expect(expectedOf('limits.validate-calls')).toBe('<=5');
+    expect(expectedOf('limits.plan-versions')).toBe('<=5');
+  });
+
+  it('scales the repair budget with the Brief duration instead of moving a constant', () => {
+    expect(repairCycleBudget(25)).toBe(3);
+    expect(repairCycleBudget(180)).toBe(5);
+
+    // The 3-minute run that failed the old constant: 4 cycles, 4 validate calls, 4 versions.
+    const observations = passingObservations();
+    observations.limits = {
+      planVersions: 4,
+      validateCalls: 4,
+      preflightCalls: 4,
+      postRecordPlanVersions: 0,
+      humanHints: 0,
+    };
+    observations.media.takeDurationSeconds = 183.181;
+    observations.media.previewDurationSeconds = 183.21;
+
+    expect(machineVerdict(evaluateNorthbridgeAssertions(observations))).toBe('fail');
+    expect(
+      machineVerdict(
+        evaluateNorthbridgeAssertions(observations, {
+          durationBounds: [150, 210],
+          targetSeconds: 180,
+        }),
+      ),
+    ).toBe('pass');
+  });
+
+  it('keeps the long-form repair budget binding rather than merely larger', () => {
+    const observations = passingObservations();
+    observations.limits.preflightCalls = 6;
+    observations.media.takeDurationSeconds = 183.181;
+    observations.media.previewDurationSeconds = 183.21;
+    const assertions = evaluateNorthbridgeAssertions(observations, {
+      durationBounds: [150, 210],
+      targetSeconds: 180,
+    });
+    expect(assertions.find((assertion) => assertion.id === 'limits.preflight-calls')?.pass).toBe(
+      false,
+    );
     expect(machineVerdict(assertions)).toBe('fail');
   });
 

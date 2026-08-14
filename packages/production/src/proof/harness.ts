@@ -426,8 +426,15 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
   const long = options.length === 'long';
   const proofRequest = long ? NORTHBRIDGE_LONG_REQUEST : NORTHBRIDGE_REQUEST;
   const proofId = long ? NORTHBRIDGE_LONG_PROOF_ID : NORTHBRIDGE_PROOF_ID;
-  /** The long Brief asks for 170–190 s; allow the same proportional slack the short one gets. */
-  const durationBounds: readonly [number, number] = long ? [150, 210] : [20, 30];
+  /**
+   * `durationBounds` is the acceptance window — the long Brief asks for 170–190 s and gets the
+   * same proportional slack the short one gets. `targetSeconds` is what the Brief actually asks
+   * for, and it sets the repair budget; the two are kept separate so widening the window for
+   * slack never silently buys the agent more repair attempts.
+   */
+  const { durationBounds, targetSeconds } = long
+    ? { durationBounds: [150, 210] as readonly [number, number], targetSeconds: 180 }
+    : { durationBounds: [20, 30] as readonly [number, number], targetSeconds: 25 };
   const workingParent = await mkdtemp(join(tmpdir(), 'vox-northbridge-proof-'));
   const workRoot = join(workingParent, 'agent');
   const trustedRoot = join(workingParent, 'trusted');
@@ -1021,7 +1028,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         preservedMainRun: Buffer.compare(mainBeforeInvalid, mainAfterInvalid) === 0,
       },
       evidence: { transcriptRecords: transcript.length, commandRecords: commands.length },
-    }, { durationBounds });
+    }, { durationBounds, targetSeconds });
     const verdict = machineVerdict(assertions);
 
     await cp(mainRunRoot, join(stagedEvidence, 'main-run'), { recursive: true });

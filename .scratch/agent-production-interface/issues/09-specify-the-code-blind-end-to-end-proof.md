@@ -287,6 +287,50 @@ a procedure and evidence contract, so it does not warrant another ADR.
 
 User confirmed all four recommendations on 2026-08-13: `Q5 oui, Q6 oui, Q7 oui, Q8 oui`.
 
+### Amendment 2026-08-14 — the repair budget is per unit of content
+
+Round 2's budget (five plan versions, five `validate`, three Preflight) was calibrated against a
+20–30-second Brief. The long-form variant — a separate proof id,
+`northbridge-night-bus-interface-proof-long-v1`, asking for 170–190 seconds — met that budget as
+a wall. A free code-blind fixture run on 2026-08-14
+(`proofs/2026-08-14T000821-480Z-northbridge-night-bus`) converged cleanly and unaided in **four**
+validate→Preflight cycles across an 8-scene plan and failed one assertion of 56:
+`limits.preflight-calls | expected: <=3 | observed: 4`. Plan versions and `validate` each stood at
+4 of 5, one call from the same wall.
+
+That is not an agent failure and not a case for a bigger constant, which would only move the wall
+for the next length. The budget is now expressed **per unit of the content the Brief asks for**:
+
+```text
+cycles = 2 + ceil(targetSeconds / 60)
+
+limits.preflight-calls          <= cycles
+limits.validate-calls           <= cycles + 2
+limits.plan-versions            <= cycles + 2
+limits.post-record-plan-versions <= 2      (unchanged, and not length-scaled)
+limits.no-human-hints            = 0       (unchanged)
+```
+
+The input is `targetSeconds`, the duration **the Brief asks for** — never the scene count, beat
+count or any other value the agent chooses, because a budget keyed on those would let an agent buy
+itself repair attempts by splitting its plan. It is kept distinct from the duration *acceptance*
+window, so widening that window for slack never silently widens the budget.
+
+At the short proof's 25 seconds this yields exactly **3 / 5 / 5**. The frozen short Brief, its
+proof id and its budget are therefore unchanged in both number and meaning, and the two paid
+bundles of 2026-08-14 remain judged under the semantics they were run against. At the long
+variant's 180 seconds it yields **5 / 7 / 7**, which the observed 4 / 4 / 4 passes with slack while
+the assertion stays binding — six Preflight calls at three minutes still fails.
+
+The user confirmed this form on 2026-08-14, choosing it over scaling Preflight alone and over a
+flat long-variant constant.
+
+The **hard ceiling** this budget cannot reach past: `packages/voice/src/synthesise.ts` caps a
+script at 5,000 characters and cannot split one across two synthesis calls, because beat
+boundaries are offsets into a single alignment array. At the calibrated 66.25 ms per UTF-16 unit
+that is roughly **331 seconds ≈ 5 min 31 s**. Briefs beyond that need multi-call synthesis and a
+reworked beat-to-alignment mapping — an architectural change, not a larger budget.
+
 ## Answer
 
 The implementation effort must run the following proof exactly. This ticket specifies the
@@ -350,10 +394,13 @@ above.
 
 ### Authoring and repair limits
 
-Contract discovery and `status` are unlimited. Before recording, the agent may submit at most
-five plan versions, call validation at most five times and Preflight at most three times, with
-no human hint. It must clear every minimum-duration `point_below` and `margin_crosses` before
-recording; recommended-duration quality risk may remain visible.
+Contract discovery and `status` are unlimited. Before recording, the agent is allowed
+`cycles = 2 + ceil(targetSeconds / 60)` Preflight calls and `cycles + 2` each of submitted plan
+versions and `validate` calls, with no human hint — **3 Preflight and 5/5 for the frozen 25-second
+short Brief**, 5 Preflight and 7/7 for the 180-second long variant. See the 2026-08-14 amendment
+above for why the budget is expressed this way and what it may not be keyed on. The agent must
+clear every minimum-duration `point_below` and `margin_crosses` before recording;
+recommended-duration quality risk may remain visible.
 
 After recording, at most two additional plan versions are allowed. Each must preserve the
 Recording input: visual, asset, event, Section, SceneInstance or Beat-span changes and Beat-id
