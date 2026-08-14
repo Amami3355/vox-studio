@@ -74,15 +74,34 @@ fade — the clip is what makes it read as typography being set. `SceneTitle` an
 the two named roles built on it.
 
 **The composition rule that lives here.** `titleStep(length)` is a hard ladder: ≤40 chars → step
-5, ≤70 → step 4, else step 3, and it reads *string length only*. Since `f60a6e1` that ladder is
-explicitly a **ceiling** rather than the answer: `useTitleStep` measures the widest word against
-the column it was handed and steps down the scale until it fits. Length decides how loud a
-headline should be, the box decides how loud it may be, and the box wins. Both now live in
-`primitives/titleFit.ts`, split out of `AnimatedText.tsx` so the decision is testable without a
-browser.
+5, ≤70 → step 4, else step 3, and it reads *string length only*. Since `f60a6e1` that ladder is a
+**ceiling** rather than the answer: `useTitleStep` (`primitives/titleFit.ts`) measures the widest
+word and steps down the scale until it fits. Length decides how loud a headline should be, the
+box decides how loud it may be, and the box wins.
 
-**Cost of intervening.** Cheap. Three files, no geometry, every scene picks it up. The one
-dependency in the whole render surface lives here — `@remotion/layout-utils`, for `measureText`.
+**Three degradations, in order, and nothing below them cuts.** Since `c328a6d` this is automatic
+rather than wired per scene:
+
+1. **Shrink** — display type steps down the scale until its widest word fits its column.
+2. **Break** — `AnimatedText` sets `overflowWrap: break-word`, so anything still too wide breaks
+   across lines. Body type has no fit and goes straight here, which is what a caption should do.
+3. **Never clip** — the `overflow: hidden` that produces the clipped rise can no longer cut a
+   string, because nothing reaches it.
+
+**The seam that makes it automatic** is `ColumnProvider` / `useColumnWidth`
+(`primitives/Column.tsx`), which publishes a column width down the tree exactly as `SlotFrame`
+publishes the frame box and the density. A layout declares its columns once; `SceneTitle` fits
+itself. The default is the frame box, so a header spanning the canvas declares nothing — this is
+why `bar_chart` has no provider and `image_context` has one around its copy column. The `maxStep`
+prop is a ceiling on top of the fit, never a replacement for it.
+
+**Cost of intervening.** Cheap. Four files, no geometry, every scene picks it up. The only
+third-party dependency in the whole render surface lives here — `@remotion/layout-utils`, for
+`measureText`.
+
+**The trap worth knowing.** `overflowWrap` alone does not save a **flex item**: its minimum size
+defaults to min-content, which for an unbreakable word is the whole word, so it overflows before
+the wrap can act. `minWidth: 0` is the other half. The asset plate subject needed both.
 
 ## Z3 — Frame physics
 
@@ -276,13 +295,12 @@ comment already names — "a caption lost its last word in `section--vertical-sl
 suite stayed green" — reached by a different route. The `image_context` examples do not exercise
 it either: `example-long-context` has only short words, so it wraps correctly.
 
-**Repaired by measuring.** `titleStep` is demoted to a ceiling — how loud a headline of that
-length *should* be — and `useTitleStep` (`primitives/titleFit.ts`) decides how loud it is
-*allowed* to be, stepping down the scale until the widest word fits its column.
-`@remotion/layout-utils`'s `measureText` reads the real advance width of the real loaded font,
-so nothing here is estimated. Hyphenation was rejected — the anchors do not hyphenate display
-headlines — and so was `fitText`, which fits exactly by returning an arbitrary size and would
-have abandoned the type scale to do it.
+**Repaired by measuring** (`f60a6e1`), **then made automatic** (`c328a6d`). `titleStep` is
+demoted to a ceiling and `useTitleStep` decides what actually fits, using `measureText` on the
+real loaded font so nothing is estimated. Hyphenation was rejected — the anchors do not hyphenate
+display headlines — and so was `fitText`, which fits exactly by returning an arbitrary size and
+would have abandoned the type scale to do it. See Z2 for the three-step degradation and the
+column seam that now applies it without a scene asking.
 
 **The lesson for this map is about Z8, not Z2.** The render suite was green before the fix and
 green after it, and the accepted key frames never moved: the three `image_context` examples all
