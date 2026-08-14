@@ -233,7 +233,15 @@ and the choice between them is a design decision, not a repair:
   layout is innocent. Cost: `compile/timings.ts` derives that frame from a word anchor in the
   narration, so the annotation would have to detach from the word it names.
 
-Neither is chosen here.
+**Chosen 2026-08-14: the Z6 reading, in `9036a9a`.** The column is now a width and not a slot —
+it grows from nothing on the annotation's own entrance, so the chart holds the whole row until
+there is something to yield to. Z7 was rejected because the annotate frame is derived from a word
+anchor in the narration, and the anchor landing on its word is one of the five rows that *passed*
+the same human verdict; moving the event would spend it. The losing alternative is recorded in
+`BarChartScene/layouts.ts` beside the geometry.
+
+What this does **not** claim: that ticket 22's row now passes. One offending element is repaired.
+The row is a human verdict on a whole preview, and no named evaluator has watched a rebuilt one.
 
 ## What this map deliberately does not do
 
