@@ -154,3 +154,43 @@ itself was not faulted by any row. Gap 8 remains open and `verticalSliceReviewed
 A third paid dispatch would not change this. The preview is the correct output of the current
 design system, so the verdict can only turn once that system changes and a rebuilt preview is
 re-watched.
+
+### 2026-08-14 — the long-form variant reaches machineVerdict: pass, free
+
+Against commit `2752486`, which replaced ticket 09's absolute repair budget with one derived from
+the Brief's duration (see the ticket-09 amendment of the same date). **Zero credit spent.**
+
+Evidence: `proofs/2026-08-14T005824-631Z-northbridge-night-bus`
+
+- `proofId: northbridge-night-bus-interface-proof-long-v1`, `provider: fixture` →
+  **`claimEligible: false`**, permanently, exactly like every other fixture bundle.
+- `agent: fresh-generalist`, `gpt-5.6-sol` via `codex-cli 0.147.0`, genuinely sandboxed.
+- **`machineVerdict: pass`, 56/56 assertions, no failures.** `humanVerdict: pending`.
+- Limits: 2 plan versions, 2 `validate`, 2 Preflight, 0 post-record versions, 0 human hints —
+  against the derived long budget of 7 / 7 / 5.
+- Exactly one provider dispatch; direct network denied with zero direct events.
+- Scenario: both capabilities, `highlightBar` on `March`, unique Word anchor, honest
+  `placeholder`, green compilation.
+- Media: H.264/AAC, Take **180.465 s**, preview **180.522667 s**, inside the long window
+  `150..210`. Non-silent at −5.8 dB preview / −2.8 dB Take. Preview 25,731,856 bytes,
+  SHA-256 `a7f9a2f91e1b77c7e92c26523331b7b23f999d0c99be1bde8c49b2b2a0044668`,
+  `takeId` `8d2161619f6f`. Plan: 8 beats, 7 scenes, 2,724 characters of narration.
+
+**What this run does not demonstrate.** This agent converged in two cycles, so it would have
+passed the old `<=3` Preflight budget unchanged. The budget amendment was required by the
+*previous* long run's four cycles, not by this one; this bundle confirms the new budget admits a
+clean 3-minute run without hiding a failure, and nothing more. Two long runs converging at four
+and at two cycles is also too small a sample to characterise convergence at this length.
+
+`verify:proof` exits 1 with `PROOF_VERDICT_NOT_PASS`, the correct fail-closed result while the
+human verdict is pending. `verifyProofBundle` with `requirePass: false` returns
+`{ machineVerdict: 'pass', humanVerdict: 'pending' }` without throwing, so the hash index is
+complete, every indexed hash matches its bytes, every assertion is well-formed with present
+evidence, the machine verdict matches its derivation, and the pending form is bound to the
+correct preview and Take.
+
+**Still claim-ineligible and still not a code-blind pass.** The provider is `fixture`: the audio
+is the 27.8-second vertical-slice clip looped to the alignment length, so narration does not match
+the visuals and no row of the human form can be judged on sound. The visuals are the agent's real
+3-minute plan and remain free material for ticket 22. No paid long-form dispatch has been
+authorised or spent.
