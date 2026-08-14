@@ -22,8 +22,9 @@ export const barChartLayouts = {
   withCallout: {
     slots: ['title', 'chart', 'annotation'],
     description:
-      'Chart on the left, a reserved annotation column on the right. Use when the scene ' +
-      'carries an `annotate` event.',
+      'Chart on the left, with an annotation column on the right that opens when an ' +
+      '`annotate` event lands and stays closed before it. Use when the scene carries an ' +
+      '`annotate` event.',
   },
 } as const satisfies Record<string, LayoutDef>;
 
@@ -77,4 +78,26 @@ export const barChartGeometry = {
    * the aggregation stops here and `Others` carries the rest.
    */
   minCategories: 3,
+
+  /**
+   * The `withCallout` split, as flex shares of the row. They do not sum to 100: the
+   * remainder is the gap.
+   *
+   * Reached only when the annotation is actually on screen. `withCallout` used to mount
+   * the right-hand column unconditionally and fill it only once an `annotate` event had
+   * fired, which cost the chart 34% of its width for the entire scene. On the shipped
+   * Northbridge run that was 799 frames of empty canvas out of 833 in `weekday-boardings`
+   * and 694 out of 728 in `pilot-budget` — a third of the frame held in reserve for
+   * roughly one second of use, and the first named offending element behind ticket 22's
+   * refused system-premium row.
+   *
+   * The rejected alternative was to move the event instead: an annotation anchored 96%
+   * into a 28-second scene is arguably a timing defect, not a layout one. It was not
+   * taken because `compile/timings.ts` derives that frame from a word anchor in the
+   * narration, so moving it detaches the annotation from the word it names — and the
+   * anchor landing on its word is one of the five rows that *passed* the same human
+   * verdict. Repairing the layout keeps that intact; repairing the timing would spend it.
+   */
+  calloutColumns: 34,
+  chartColumns: 62,
 } as const;

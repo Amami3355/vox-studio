@@ -43,7 +43,7 @@ export const barChartExamples: SceneExample[] = [
   {
     id: 'example-annotated-comparison',
     title: 'Annotated comparison',
-    note: 'Uses the withCallout layout so the annotation has a reserved column.',
+    note: 'Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it.',
     component: 'bar_chart',
     layout: 'withCallout',
     motionProfile: 'pushIn',

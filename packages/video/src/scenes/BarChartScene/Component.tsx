@@ -120,6 +120,32 @@ const ChartFrame: React.FC<{
   const annotation = state.annotation.value;
   const isEmpty = data.length === 0;
 
+  /**
+   * How far the annotation column is open, 0 → 1, on the annotation's own entrance.
+   *
+   * `Infinity` and not `0` for the untouched case: `resolveEvents` reports `since: 0` for a
+   * field no event has reached yet, and a spring started at frame 0 is already open at
+   * frame 0 — the column would spend the scene open and empty, which is the defect this
+   * replaces. `touched` is the only field that distinguishes "annotated at the top of the
+   * scene" from "never annotated".
+   */
+  const annotationEntrance = useEntrance(
+    state.annotation.touched ? state.annotation.since : Number.POSITIVE_INFINITY,
+    profile,
+  );
+  const open = Math.min(1, annotationEntrance);
+
+  /**
+   * The width the column settles at, in canvas px, computed from the box rather than left
+   * to flex. The transition needs a fixed target on both ends: an animated `flexBasis`
+   * resolves against the row, and the row is what is changing.
+   */
+  const { calloutColumns, chartColumns } = barChartGeometry;
+  const calloutWidth = Math.max(
+    0,
+    ((box.width - columnGap) * calloutColumns) / (chartColumns + calloutColumns),
+  );
+
   const chart = (
     <BarGroup
       data={data}
@@ -140,26 +166,42 @@ const ChartFrame: React.FC<{
       {isEmpty ? (
         <EmptyState startFrame={6} profile={profile} />
       ) : variant === 'withCallout' ? (
-        <div style={{ flex: 1, display: 'flex', gap: columnGap, minHeight: 0 }}>
-          <div style={{ flex: 62, display: 'flex', minWidth: 0 }}>{chart}</div>
+        <div style={{ flex: 1, display: 'flex', gap: columnGap * open, minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>{chart}</div>
+          {/*
+           * The column is a width, not a slot: it grows from nothing on the annotation's
+           * own entrance, so the chart holds the whole row until there is something to
+           * yield to. `flexBasis` and not `flex`, because a share of the row is only
+           * meaningful once the row has two occupants.
+           */}
           <div
             style={{
-              flex: 34,
+              flexGrow: 0,
+              flexShrink: 0,
+              flexBasis: calloutWidth * open,
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              minWidth: 0,
             }}
           >
-            {annotation ? (
-              <Callout
-                text={annotation.text}
-                label={annotation.label}
-                startFrame={state.annotation.since}
-                profile={profile}
-                accent={theme.color.accentAlt}
-              />
-            ) : null}
+            {/*
+             * Fixed at its settled width and clipped by the column, rather than laid out
+             * inside it. A callout sized by a box that is still opening re-wraps its own
+             * text on every frame of the transition, which reads as a glitch and not as a
+             * reveal — the text has to be set once and then uncovered.
+             */}
+            <div style={{ width: calloutWidth }}>
+              {annotation ? (
+                <Callout
+                  text={annotation.text}
+                  label={annotation.label}
+                  startFrame={state.annotation.since}
+                  profile={profile}
+                  accent={theme.color.accentAlt}
+                />
+              ) : null}
+            </div>
           </div>
         </div>
       ) : (

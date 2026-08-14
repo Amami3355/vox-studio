@@ -343,7 +343,7 @@
           },
           {
             "id": "withCallout",
-            "description": "Chart on the left, a reserved annotation column on the right. Use when the scene carries an `annotate` event.",
+            "description": "Chart on the left, with an annotation column on the right that opens when an `annotate` event lands and stays closed before it. Use when the scene carries an `annotate` event.",
             "slots": [
               "title",
               "chart",
@@ -466,7 +466,7 @@
           {
             "id": "example-annotated-comparison",
             "title": "Annotated comparison",
-            "note": "Uses the withCallout layout so the annotation has a reserved column.",
+            "note": "Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it.",
             "component": "bar_chart",
             "layout": "withCallout",
             "motionProfile": "pushIn",
