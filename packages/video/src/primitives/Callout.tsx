@@ -66,6 +66,8 @@ export const Callout: React.FC<{
           background: mix(theme.color.surface, theme.color.bg, 0.2),
           padding: `${pad * 0.5}px ${pad * 0.75}px`,
           borderRadius: theme.radius[2],
+          // The annotation column clips while it is opening, and this text is agent-written.
+          overflowWrap: 'break-word',
         }}
       >
         {text}

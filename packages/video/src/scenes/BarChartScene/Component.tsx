@@ -17,7 +17,6 @@ import {
   useEntrance,
   useFrameBox,
   useSpace,
-  useTitleStep,
   useTypeSize,
 } from '../../primitives';
 import { barChartConstraints } from './constraints';
@@ -148,15 +147,14 @@ const ChartFrame: React.FC<{
   );
 
   /**
-   * The title's step, fitted to the box.
+   * In a portrait box the title labels the chart rather than declaiming over it.
    *
-   * In a portrait box the title labels the chart rather than declaiming over it, and that
-   * judgement is a *ceiling* rather than the answer: it says this frame should not shout,
-   * while `useTitleStep` says what actually fits. The header spans the whole box, so the
-   * width it is fitted against is the box itself.
+   * A ceiling and not the answer: it says this frame should not shout, and `SceneTitle`
+   * still fits whatever it is given to the column underneath. The header spans the whole
+   * box and declares no column of its own, so the width it fits against is the frame box —
+   * which is exactly what `useColumnWidth` falls back to.
    */
   const titleCeiling = composed ? Math.max(2, titleStep(props.title.length) - 1) : undefined;
-  const titleFitStep = useTitleStep(props.title, box.width, titleCeiling);
 
   const chart = (
     <BarGroup
@@ -173,7 +171,7 @@ const ChartFrame: React.FC<{
 
   return (
     <>
-      <Header title={props.title} accent={primary} profile={profile} step={titleFitStep} />
+      <Header title={props.title} accent={primary} profile={profile} maxStep={titleCeiling} />
 
       {isEmpty ? (
         <EmptyState startFrame={6} profile={profile} />
@@ -243,9 +241,9 @@ const Header: React.FC<{
   title: string;
   accent: string;
   profile: MotionProfile;
-  /** Already fitted to the box by `ChartFrame`, which is where the box is known. */
-  step: number;
-}> = ({ title, accent, profile, step }) => {
+  /** Ceiling only; `SceneTitle` does the fitting. Undefined on the full canvas. */
+  maxStep?: number;
+}> = ({ title, accent, profile, maxStep }) => {
   const gap = useSpace(3);
   const bottom = useSpace(5);
   const draw = useEntrance(0, profile);
@@ -260,7 +258,7 @@ const Header: React.FC<{
           borderRadius: 2,
         }}
       />
-      <SceneTitle startFrame={2} profile={profile} step={step}>
+      <SceneTitle startFrame={2} profile={profile} maxStep={maxStep}>
         {title}
       </SceneTitle>
     </div>

@@ -1,6 +1,7 @@
 export * from './ThemeContext';
 export * from './SlotFrame';
 export * from './CameraRig';
+export * from './Column';
 export * from './AnimatedText';
 export * from './titleFit';
 export * from './Reveal';

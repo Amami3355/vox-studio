@@ -1,7 +1,8 @@
 import type React from 'react';
 import type { MotionProfile } from '../design/motion';
+import { useColumnWidth } from './Column';
 import { useTheme, useTypeSize } from './ThemeContext';
-import { TITLE_MAX_WIDTH, titleStep } from './titleFit';
+import { TITLE_MAX_WIDTH, useTitleStep } from './titleFit';
 import { useEntrance } from './useEntrance';
 
 export type TextRole = 'display' | 'body' | 'mono';
@@ -55,6 +56,19 @@ export const AnimatedText: React.FC<{
           transform: `translateY(${rise}px)`,
           opacity: Math.min(1, progress * 1.6),
           fontVariantNumeric: 'tabular-nums',
+          /**
+           * The last resort under the clip, and the reason no string can ever be cut.
+           *
+           * `overflow: hidden` above is what makes the entrance read as a rise, and it
+           * cuts anything wider than the box as a side effect. A word that cannot fit
+           * should break, which is ordinary editorial typography; being sliced mid-glyph
+           * is not. `break-word` and not `anywhere` — it breaks only when a word genuinely
+           * does not fit, and leaves intrinsic sizing alone, so no existing layout moves.
+           *
+           * For display type this sits *below* `useTitleStep`: a headline shrinks down the
+           * scale first, and only breaks if it is still too wide at the floor.
+           */
+          overflowWrap: 'break-word',
           ...style,
         }}
       >
@@ -64,27 +78,39 @@ export const AnimatedText: React.FC<{
   );
 };
 
+/**
+ * A headline, sized to fit the column it is in.
+ *
+ * The fit is not optional and not the caller's job. A scene declares its columns with
+ * `ColumnProvider` — or declares nothing, and gets the whole frame box — and the title
+ * reads that and steps down the scale until its widest word fits. Passing the fitted step
+ * in from outside used to work and was the wrong shape: it made correctness something each
+ * new capability had to remember, and the one that forgot would clip silently.
+ */
 export const SceneTitle: React.FC<{
   children: string;
   startFrame: number;
   profile: MotionProfile;
   color?: string;
   /**
-   * Override the step the string would have chosen, for a scene whose *box* has the
-   * stronger claim. `titleStep` reads length only, which is the whole story on the full
-   * canvas and half of it in a composed frame: the same 68 characters that take two lines
-   * across 1497px take five down a 537px column, and five lines of display type is a
-   * header that has eaten its own scene.
+   * A ceiling on the step, for a scene whose *box* has the stronger claim — a composed
+   * frame where the same 68 characters that take two lines across 1497px take five down a
+   * 537px column, and five lines of display type is a header that has eaten its own scene.
+   *
+   * A ceiling and never the answer: the fit still applies underneath it. Raising it cannot
+   * make a title overflow, and omitting it cannot make one clip.
    */
-  step?: number;
-}> = ({ children, startFrame, profile, color, step }) => {
+  maxStep?: number;
+}> = ({ children, startFrame, profile, color, maxStep }) => {
   const theme = useTheme();
+  const step = useTitleStep(children, useColumnWidth(), maxStep);
+
   return (
     <AnimatedText
       startFrame={startFrame}
       profile={profile}
       font="display"
-      step={step ?? titleStep(children.length)}
+      step={step}
       weight={theme.type.weight.bold}
       tracking={theme.type.tracking.tight}
       color={color}

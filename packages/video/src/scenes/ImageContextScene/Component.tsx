@@ -8,13 +8,13 @@ import {
   AnimatedText,
   Backdrop,
   CameraRig,
+  ColumnProvider,
   Eyebrow,
   Reveal,
   SceneTitle,
   SlotFrame,
   useFrameBox,
   useSpace,
-  useTitleStep,
 } from '../../primitives';
 import { splitLeftGeometry } from './layouts';
 import type { ImageContextProps } from './schema';
@@ -84,11 +84,14 @@ const SplitLayout: React.FC<{
    * layout owns it: the grid's own padding on both sides, then the gap, then the copy's
    * share of the split. Stacked, the copy spans the full inner width instead of a column —
    * the same reason the wipe changes direction.
+   *
+   * Declared to the subtree rather than applied to a component. Everything in the copy
+   * column is bound by it, so the headline sizes itself and a caption added later inherits
+   * the same fact without anyone remembering to wire it.
    */
   const { imageColumns, copyColumns } = splitLeftGeometry;
   const inner = Math.max(0, box.width - outer * 2);
   const copyWidth = stacked ? inner : ((inner - gap) * copyColumns) / (imageColumns + copyColumns);
-  const headlineStep = useTitleStep(headline, copyWidth);
 
   return (
     <div
@@ -133,24 +136,26 @@ const SplitLayout: React.FC<{
           gap: copyGap,
         }}
       >
-        <Eyebrow startFrame={stagger} profile={profile}>
-          Visual context
-        </Eyebrow>
-        {headline ? (
-          <SceneTitle startFrame={stagger * 2} profile={profile} step={headlineStep}>
-            {headline}
-          </SceneTitle>
-        ) : null}
-        {caption ? (
-          <AnimatedText
-            startFrame={stagger * 3}
-            profile={profile}
-            step={1}
-            color={theme.color.inkMuted}
-          >
-            {caption}
-          </AnimatedText>
-        ) : null}
+        <ColumnProvider width={copyWidth}>
+          <Eyebrow startFrame={stagger} profile={profile}>
+            Visual context
+          </Eyebrow>
+          {headline ? (
+            <SceneTitle startFrame={stagger * 2} profile={profile}>
+              {headline}
+            </SceneTitle>
+          ) : null}
+          {caption ? (
+            <AnimatedText
+              startFrame={stagger * 3}
+              profile={profile}
+              step={1}
+              color={theme.color.inkMuted}
+            >
+              {caption}
+            </AnimatedText>
+          ) : null}
+        </ColumnProvider>
       </div>
     </div>
   );
@@ -195,6 +200,15 @@ const AssetPlate: React.FC<{
           fontSize: subjectSize,
           fontWeight: theme.type.weight.bold,
           letterSpacing: `${theme.type.tracking.tight * subjectSize}px`,
+          /**
+           * The plate clips — it is inside `Reveal` — and the subject is agent-written.
+           *
+           * `minWidth: 0` is the load-bearing half. A flex item's minimum size defaults to
+           * its min-content width, which for an unbreakable word is the whole word, so it
+           * simply overflowed the plate and `break-word` never got the chance to act.
+           */
+          minWidth: 0,
+          overflowWrap: 'break-word',
         }}
       >
         {subject}
