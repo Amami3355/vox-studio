@@ -94,9 +94,18 @@ const between =
   (value: unknown): boolean =>
     typeof value === 'number' && value >= minimum && value <= maximum;
 
+/**
+ * The duration window the Take and preview must land in. It defaults to the frozen short
+ * proof's 20..30 so every existing caller and every existing evidence bundle keeps its exact
+ * meaning; the long-form variant passes its own window instead.
+ */
 export const evaluateNorthbridgeAssertions = (
   observed: NorthbridgeObservations,
-): ProofAssertion[] => [
+  options: { durationBounds?: readonly [number, number] } = {},
+): ProofAssertion[] => {
+  const [minimumSeconds, maximumSeconds] = options.durationBounds ?? [20, 30];
+  const durationWindow = `${minimumSeconds}..${maximumSeconds}`;
+  return [
   item('agent.unscripted-generalist', true, observed.authorship.unscripted, ['environment.json']),
   item(
     'isolation.initial-two-files',
@@ -219,17 +228,17 @@ export const evaluateNorthbridgeAssertions = (
   item('media.take-audio-non-silent', true, observed.media.takeAudioNonSilent, ['ffprobe.json']),
   item(
     'media.take-duration',
-    '20..30',
+    durationWindow,
     observed.media.takeDurationSeconds,
     ['ffprobe.json'],
-    between(20, 30),
+    between(minimumSeconds, maximumSeconds),
   ),
   item(
     'media.preview-duration',
-    '20..30',
+    durationWindow,
     observed.media.previewDurationSeconds,
     ['ffprobe.json'],
-    between(20, 30),
+    between(minimumSeconds, maximumSeconds),
   ),
   item('probe.status-read-only', true, observed.probes.statusReadOnly, ['commands.jsonl']),
   item('probe.zero-budget-paused', true, observed.probes.paused, ['commands.jsonl']),
@@ -249,7 +258,8 @@ export const evaluateNorthbridgeAssertions = (
     ['commands.jsonl'],
     (value) => typeof value === 'number' && value > 0,
   ),
-];
+  ];
+};
 
 export const machineVerdict = (assertions: ProofAssertion[]): 'pass' | 'fail' =>
   assertions.length > 0 && assertions.every((assertion) => assertion.pass) ? 'pass' : 'fail';

@@ -36,6 +36,8 @@ import {
 } from './evidence';
 import {
   NORTHBRIDGE_FIXTURE_PLAN,
+  NORTHBRIDGE_LONG_PROOF_ID,
+  NORTHBRIDGE_LONG_REQUEST,
   NORTHBRIDGE_NON_CLAIMS,
   NORTHBRIDGE_PROOF_ID,
   NORTHBRIDGE_REQUEST,
@@ -91,6 +93,12 @@ export type AgentDriver = (input: {
 
 export type NorthbridgeProofOptions = {
   provider: 'fixture' | 'elevenlabs';
+  /**
+   * Which frozen Brief to put in front of the agent. `short` is the 20–30 s Brief the paid
+   * proofs ran; `long` is the ~3 minute variant. Defaults to `short` so no existing caller
+   * changes behaviour.
+   */
+  length?: 'short' | 'long';
   evidenceRoot?: string;
   renderer?: RenderAdapter;
   mediaProbe?: MediaProbe;
@@ -142,10 +150,54 @@ const alignmentFor = (text: string): Alignment => {
   };
 };
 
-const fixtureSynthesis = async (text: string): Promise<ProviderSynthesisResponse> => ({
-  audio: await readFile(resolve(repositoryRoot, 'packages/video/public/vertical-slice.vo.mp3')),
-  alignment: alignmentFor(text),
-});
+/**
+ * The fixture clip is one fixed recording of about 27.8 s. A long Brief produces an alignment
+ * running minutes past that, and a Take whose audio stops two minutes before its own alignment
+ * ends is not a usable stand-in — it would render as a long silence and tell us nothing about
+ * whether the pipeline survives the duration. So loop the clip up to the alignment's own length
+ * whenever the alignment is longer.
+ *
+ * Briefs that already fit inside the clip return its exact bytes, so every existing fixture run
+ * stays byte-identical.
+ */
+const fixtureSynthesis = async (text: string): Promise<ProviderSynthesisResponse> => {
+  const alignment = alignmentFor(text);
+  const clipPath = resolve(repositoryRoot, 'packages/video/public/vertical-slice.vo.mp3');
+  const targetSeconds = alignment.character_end_times_seconds.at(-1) ?? 0;
+  const probed = await execFileAsync('ffprobe', [
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'default=nw=1:nk=1',
+    clipPath,
+  ]);
+  if (targetSeconds <= Number(probed.stdout.trim())) {
+    return { audio: await readFile(clipPath), alignment };
+  }
+  const directory = await mkdtemp(join(tmpdir(), 'vox-fixture-audio-'));
+  try {
+    const output = join(directory, 'looped.mp3');
+    await execFileAsync('ffmpeg', [
+      '-hide_banner',
+      '-nostats',
+      '-y',
+      '-stream_loop',
+      '-1',
+      '-i',
+      clipPath,
+      '-t',
+      targetSeconds.toFixed(3),
+      '-c',
+      'copy',
+      output,
+    ]);
+    return { audio: await readFile(output), alignment };
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+};
 
 /**
  * Peak level in dBFS, or null when the file has no decodable audio at all. Digital silence
@@ -371,6 +423,11 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     throw new Error('PROOF_FRESH_GENERALIST_REQUIRED');
   }
   const seeded = new Set(options.seededViolations ?? []);
+  const long = options.length === 'long';
+  const proofRequest = long ? NORTHBRIDGE_LONG_REQUEST : NORTHBRIDGE_REQUEST;
+  const proofId = long ? NORTHBRIDGE_LONG_PROOF_ID : NORTHBRIDGE_PROOF_ID;
+  /** The long Brief asks for 170–190 s; allow the same proportional slack the short one gets. */
+  const durationBounds: readonly [number, number] = long ? [150, 210] : [20, 30];
   const workingParent = await mkdtemp(join(tmpdir(), 'vox-northbridge-proof-'));
   const workRoot = join(workingParent, 'agent');
   const trustedRoot = join(workingParent, 'trusted');
@@ -398,7 +455,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     await cp(resolve(packageRoot, 'dist/agent/vox.exe'), launcher);
     await compileCSharp(runner, resolve(packageRoot, 'tests/fixtures/RestrictedRunner.cs'));
     await compileCSharp(pipeBridgeExecutable, resolve(packageRoot, 'service/PipeBridge.cs'));
-    await writeJson(join(workRoot, 'request.json'), NORTHBRIDGE_REQUEST);
+    await writeJson(join(workRoot, 'request.json'), proofRequest);
     const initialInventory = await inventoryFiles(workRoot);
 
     const acl = await execFileAsync('icacls.exe', [
@@ -596,8 +653,8 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     await invoke(['production', 'run', 'status', '--run', mainRun.argument]);
     const mainAfterStatus = await readFile(join(mainRun.root, 'run.json'));
     const pausedRequest = {
-      ...NORTHBRIDGE_REQUEST,
-      production: { ...NORTHBRIDGE_REQUEST.production, maxNewTakes: 0 },
+      ...proofRequest,
+      production: { ...proofRequest.production, maxNewTakes: 0 },
     };
     await writeJson(join(workRoot, 'request-paused.json'), pausedRequest);
     await invoke([
@@ -711,7 +768,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
           takeManifest,
           takeArtifacts,
           plan.beats,
-          NORTHBRIDGE_REQUEST.production.voice,
+          proofRequest.production.voice,
         );
         takeVerified = true;
         if (fold) {
@@ -964,14 +1021,14 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         preservedMainRun: Buffer.compare(mainBeforeInvalid, mainAfterInvalid) === 0,
       },
       evidence: { transcriptRecords: transcript.length, commandRecords: commands.length },
-    });
+    }, { durationBounds });
     const verdict = machineVerdict(assertions);
 
     await cp(mainRunRoot, join(stagedEvidence, 'main-run'), { recursive: true });
     await cp(pausedRunRoot, join(stagedEvidence, 'paused-run'), { recursive: true });
     await cp(join(workRoot, 'invalid-grant.json'), join(stagedEvidence, 'invalid-grant.json'));
     await writeJson(join(stagedEvidence, 'environment.json'), {
-      proofId: NORTHBRIDGE_PROOF_ID,
+      proofId,
       executedAt: new Date().toISOString(),
       provider: options.provider,
       agent: authoring.unscripted ? 'fresh-generalist' : 'fixture-scripted-v1',
@@ -1038,7 +1095,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     );
     const summary = `# Northbridge production-interface proof evidence
 
-- Proof id: ${NORTHBRIDGE_PROOF_ID}
+- Proof id: ${proofId}
 - Provider: ${options.provider}
 - Agent mode: ${authoring.unscripted ? 'fresh-generalist' : 'fixture-scripted (regression only)'}
 - Machine verdict: ${verdict}
@@ -1071,7 +1128,7 @@ ${NORTHBRIDGE_NON_CLAIMS.map((claim) => `- ${claim}`).join('\n')}
     if (options.keepWorkingRoots) {
       const failure = error instanceof Error ? error : new Error(String(error));
       await writeJson(join(stagedEvidence, 'failure.json'), {
-        proofId: NORTHBRIDGE_PROOF_ID,
+        proofId,
         failedAt: new Date().toISOString(),
         provider: options.provider,
         error: { name: failure.name, message: failure.message },

@@ -17,8 +17,15 @@ if (provider === 'elevenlabs' && selectedAgent !== 'codex') {
   throw new TypeError('The elevenlabs proof requires --agent codex.');
 }
 
+const lengthIndex = process.argv.indexOf('--length');
+const length = lengthIndex >= 0 ? process.argv[lengthIndex + 1] : undefined;
+if (length !== undefined && length !== 'short' && length !== 'long') {
+  throw new TypeError('proof:northbridge accepts --length short|long.');
+}
+
 const result = await runNorthbridgeProof({
   provider,
+  length,
   agentDriver: selectedAgent === 'codex' ? createCodexAgentDriver() : undefined,
   keepWorkingRoots: provider === 'elevenlabs' || selectedAgent === 'codex',
 });

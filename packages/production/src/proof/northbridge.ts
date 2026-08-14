@@ -9,6 +9,35 @@ export const NORTHBRIDGE_BRIEF =
 export const NORTHBRIDGE_TASK_MESSAGE =
   'Using vox and request.json, create a valid VideoPlan and produce the narrated preview MP4. Use the public contract discovery commands; do not seek external help.';
 
+/**
+ * The long-form variant. It is a **separate** proof id on purpose: the short Brief above and
+ * its id are frozen evidence, hashed into the paid bundles, and must never move. This variant
+ * keeps every scenario requirement the short one carries — both capabilities, a `highlightBar`,
+ * the unique spoken `March` anchor and a semantic image that resolves as `placeholder` — and
+ * only supplies enough extra fictional data to justify roughly three minutes of narration.
+ *
+ * It inherits the short Brief's permanent measurement-gate ineligibility for the same reason:
+ * it was authored with the catalogue in view.
+ */
+export const NORTHBRIDGE_LONG_PROOF_ID = 'northbridge-night-bus-interface-proof-long-v1';
+
+export const NORTHBRIDGE_LONG_BRIEF =
+  "Create a 170–190-second English editorial explainer about the fictional city of Northbridge's overnight-bus pilot, using only the supplied test facts. Open on a documentary image of a rain-soaked Northbridge bus stop before dawn. Then work through the pilot in order. Weekday boardings rose from 12,000 before the pilot to 15,000 in January, 16,400 in February and 18,000 in March. The narration must say “March” exactly once and the 18,000 March result must be singled out precisely when that word is spoken. Next, break the service down by its four night routes: N1 carried 3,200 riders, N2 carried 4,800, N3 carried 6,100 and N4 carried 3,900. Then explain who rode: 5,400 healthcare workers, 4,700 hospitality workers, 3,800 cleaning and facilities staff, and 4,100 other riders. Then cover the service quality change: the average wait fell from 22 minutes to 11 minutes, and rider satisfaction rose from 61 percent to 78 percent. Then cover the money: a 2.4 million budget against 1.9 million spent. End by explaining that the extra 6,000 trips widened access for late-shift workers. Treat Northbridge and all figures as fictional test data, not real-world claims.";
+
+export const NORTHBRIDGE_LONG_REQUEST: ProductionRequest = {
+  protocolVersion: 1,
+  brief: { id: NORTHBRIDGE_LONG_PROOF_ID, text: NORTHBRIDGE_LONG_BRIEF },
+  production: {
+    voice: {
+      provider: 'elevenlabs',
+      voiceId: 'JBFqnCBsd6RMkjVDRZzb',
+      modelId: 'eleven_v3',
+      seed: 7,
+    },
+    maxNewTakes: 1,
+  },
+};
+
 export const NORTHBRIDGE_REQUEST: ProductionRequest = {
   protocolVersion: 1,
   brief: { id: NORTHBRIDGE_PROOF_ID, text: NORTHBRIDGE_BRIEF },
