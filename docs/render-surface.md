@@ -73,13 +73,16 @@ wrong value is least visible in review, because nothing local looks wrong.
 fade — the clip is what makes it read as typography being set. `SceneTitle` and `Eyebrow` are
 the two named roles built on it.
 
-**The composition rule hidden here.** `titleStep(length)` is a hard ladder: ≤40 chars → step 5,
-≤70 → step 4, else step 3. It reads *string length only*. Its own comment concedes this is the
-whole story on the full canvas and half of it in a composed frame, which is why `SceneTitle`
-accepts a `step` override that `BarChartScene` passes. A typographic hierarchy decided by
-`String.length` is a candidate the premium anchors would not recognise.
+**The composition rule that lives here.** `titleStep(length)` is a hard ladder: ≤40 chars → step
+5, ≤70 → step 4, else step 3, and it reads *string length only*. Since `f60a6e1` that ladder is
+explicitly a **ceiling** rather than the answer: `useTitleStep` measures the widest word against
+the column it was handed and steps down the scale until it fits. Length decides how loud a
+headline should be, the box decides how loud it may be, and the box wins. Both now live in
+`primitives/titleFit.ts`, split out of `AnimatedText.tsx` so the decision is testable without a
+browser.
 
-**Cost of intervening.** Cheap. Two files, no geometry, every scene picks it up.
+**Cost of intervening.** Cheap. Three files, no geometry, every scene picks it up. The one
+dependency in the whole render surface lives here — `@remotion/layout-utils`, for `measureText`.
 
 ## Z3 — Frame physics
 
@@ -249,18 +252,18 @@ the same human verdict; moving the event would spend it. The losing alternative 
 What this does **not** claim: that ticket 22's row now passes. One offending element is repaired.
 The row is a human verdict on a whole preview, and no named evaluator has watched a rebuilt one.
 
-## Second finding, open: a headline is clipped in the opening scene
+## Second finding, fixed in `f60a6e1`: a headline was clipped in the opening scene
 
 Seen 2026-08-14 while reviewing the paper render, at frame 420 of the shipped paid run
 (`rainy-opener`, `image_context`, `splitLeft`). The headline **"Northbridge before dawn"**
-renders as **"Northbridg"** — the final `e` is cut off mid-glyph.
+rendered as **"Northbridg"** — the final `e` cut off mid-glyph.
 
-**Mechanism, Z2.** `titleStep` reads string length only: 23 characters → step 5 → 120px display
-type. `SceneTitle` caps the block at `maxWidth: '86%'` of the copy column, and `AnimatedText`
-wraps everything in `overflow: hidden` so the clipped rise reads as typography being set.
-"Northbridge" is a single unbreakable word wider than that box, so it is cut rather than wrapped.
-This is Z2's stated weakness reaching a frame: a typographic hierarchy decided by `String.length`
-cannot know the width of the box it landed in.
+**Mechanism, Z2.** `titleStep` read string length only: 23 characters → step 5 → 120px display
+type. `SceneTitle` caps the block at 86% of the copy column, and `AnimatedText` wraps everything
+in `overflow: hidden` so the clipped rise reads as typography being set. "Northbridge" is a
+single unbreakable word wider than that box, so it was cut rather than wrapped. Z2's stated
+weakness reaching a frame: a typographic hierarchy decided by `String.length` cannot know the
+width of the box it landed in.
 
 **Not caused by the theme.** `editorial-paper` overrides `color` only — `type` is spread from
 `editorialCold`, so family, weight and size are byte-identical and the geometry cannot have
@@ -273,9 +276,20 @@ comment already names — "a caption lost its last word in `section--vertical-sl
 suite stayed green" — reached by a different route. The `image_context` examples do not exercise
 it either: `example-long-context` has only short words, so it wraps correctly.
 
-Unfixed and unscoped. The repair is a Z2 decision — measure the box, or hyphenate, or let the
-title shrink to fit — and each answers a different question about what a headline is allowed to
-do.
+**Repaired by measuring.** `titleStep` is demoted to a ceiling — how loud a headline of that
+length *should* be — and `useTitleStep` (`primitives/titleFit.ts`) decides how loud it is
+*allowed* to be, stepping down the scale until the widest word fits its column.
+`@remotion/layout-utils`'s `measureText` reads the real advance width of the real loaded font,
+so nothing here is estimated. Hyphenation was rejected — the anchors do not hyphenate display
+headlines — and so was `fitText`, which fits exactly by returning an arbitrary size and would
+have abandoned the type scale to do it.
+
+**The lesson for this map is about Z8, not Z2.** The render suite was green before the fix and
+green after it, and the accepted key frames never moved: the three `image_context` examples all
+happen to have short words, and a clip that happens *inside* a scene's own box is invisible to
+every probe that measures against the safe area. A defect reached the flagship artifact and no
+automated check could have told anyone. The guard is now a unit test over the decision
+(`tests/title-fit.test.ts`), because the pixels were never going to give one.
 
 ## What this map deliberately does not do
 
