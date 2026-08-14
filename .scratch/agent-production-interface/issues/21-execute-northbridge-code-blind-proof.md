@@ -192,5 +192,50 @@ correct preview and Take.
 **Still claim-ineligible and still not a code-blind pass.** The provider is `fixture`: the audio
 is the 27.8-second vertical-slice clip looped to the alignment length, so narration does not match
 the visuals and no row of the human form can be judged on sound. The visuals are the agent's real
-3-minute plan and remain free material for ticket 22. No paid long-form dispatch has been
-authorised or spent.
+3-minute plan and remain free material for ticket 22.
+
+### 2026-08-14 — third paid dispatch, long form, machineVerdict: pass
+
+The user authorised one paid long-form dispatch directly, after the free run went green. It ran to
+completion against commit `8bf4434` with a clean worktree. **A third ElevenLabs dispatch is now
+spent** — the two earlier ones were the short proof; this is the first paid long-form run.
+
+Evidence: `proofs/2026-08-14T012547-734Z-northbridge-night-bus`, `provider: elevenlabs`,
+`claimEligible: true`, agent `fresh-generalist` (`gpt-5.6-sol` via `codex-cli 0.147.0`).
+
+- **`machineVerdict: pass`, 56/56 assertions, no failures.** `humanVerdict: pending`.
+- Exactly one provider dispatch; direct network denied with zero direct events;
+  `isolation.credentials-environment-denied` passes.
+- Limits: 3 plan versions, 3 `validate`, 3 Preflight, 0 post-record versions, 0 human hints,
+  against the derived long budget of 7 / 7 / 5. **Three Preflight calls would have passed the old
+  `<=3` budget too**, so this run does not demonstrate the amendment was load-bearing either.
+- Scenario: both capabilities, `highlightBar` on `March`, unique Word anchor, Northbridge asset
+  exactly `placeholder`, green compilation with zero errors.
+- Media: H.264/AAC, Take **183.360 s**, preview **183.402667 s**, inside `150..210`. Non-silent at
+  −4.5 dB preview / −1.5 dB Take. Preview 25,803,062 bytes, SHA-256
+  `3b13a8e5234c015493806871a5b42b1ef7e6a0029498a8b49c360b9d4d23547c`, `takeId` `a06aa339894c`.
+  Take audio 2,934,953 bytes. Stage `rendered`, `newTakesUsed: 1`.
+
+**What this run establishes that no earlier one did.** The real long-form synthesis path. Every
+prior long run used the fixture provider, which loops a 27.8-second clip and never calls
+ElevenLabs. Here **2,580 characters were synthesised in a single call** — 7 beats, 7 scenes — and
+the returned alignment carried 2,580 characters ending at 183.36 s, which the 7-entry TimedBeat
+fold reproduced exactly at 183,360 ms. So single-call synthesis, the beat-to-alignment offset
+mapping and the fold all hold at three minutes with real provider audio.
+
+**A correction to the estimated ceiling.** The handoff projected ~331 s from the fixture's
+calibrated 66.25 ms per UTF-16 unit. This run measured **71.07 ms per character** from the real
+provider, which puts the 5,000-character cap at roughly **355 s ≈ 5 min 55 s**. It is one sample
+at one voice, model and seed, so treat it as a measured estimate, not a guarantee — but the
+architectural limit stands where it did: past the cap, Briefs need multi-call synthesis and a
+reworked beat-to-alignment mapping.
+
+`verify:proof` exits 1 with `PROOF_VERDICT_NOT_PASS`, correct while the human verdict is pending.
+`verifyProofBundle` with `requirePass: false` returns
+`{ machineVerdict: 'pass', humanVerdict: 'pending' }` without throwing, so hash index, assertion
+form, evidence presence, verdict derivation and the form's binding to preview and Take all hold.
+
+**Not a code-blind end-to-end pass.** Ticket 09 requires both verdicts, and this one carries no
+human verdict at all. It was run and recorded as a synthesis test, so no evaluator was asked and
+no row was filled; `pending` means incomplete, never pass. The long-form preview is now real
+material for ticket 22 — the first 3-minute preview whose narration actually matches its visuals.
