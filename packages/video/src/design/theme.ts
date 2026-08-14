@@ -77,13 +77,66 @@ export const editorialCold: Theme = {
   radius: [0, 4, 8, 16, 999],
 };
 
+/**
+ * `editorial-paper` — Ember on Paper.
+ *
+ * The same system on a light ground. Composition anchors on The Economist and the FT, both
+ * of which build their identity on a warm off-white rather than pure white, and that is the
+ * reason this is `#F7F4EE` and not `#FFFFFF`: a full-canvas white at 1920×1080, held for
+ * three minutes, is a brightness a printed page never has to answer for.
+ *
+ * Only the palette differs, so it is written as one — the type scale, the spacing, the grid
+ * and the radii are structural decisions that do not change with the ground, and spreading
+ * them is what keeps that true. A theme that forked the scale would be a second design
+ * system wearing the first one's interface.
+ *
+ * **Every value below clears 4.5:1 against the ground**, which the dark theme gets for free
+ * and a light one does not: `#FF5A1F` is 6.20:1 on slate and 2.60:1 on paper, so the warm
+ * accent had to be deepened rather than reused. `Eyebrow` and the `Callout` label draw
+ * *text* in `accent` and `accentAlt`, which is why those two are held to a text ratio and
+ * not to the 3:1 a bar fill would justify.
+ *
+ * The ramp inverts its direction, not its order. On slate a recessive series member sinks by
+ * getting darker; on paper it sinks by getting lighter and less saturated. Warm to cold is
+ * preserved, so `rampColor` and the highlight recede in `Bar` behave identically.
+ */
+export const editorialPaper: Theme = {
+  ...editorialCold,
+  id: 'editorial-paper',
+  name: 'Editorial Paper',
+  color: {
+    bg: '#F7F4EE',
+    surface: '#EDE8DF',
+    ink: '#14171C',
+    inkMuted: '#626A78',
+    accent: '#C23C0A',
+    accentAlt: '#9C6200',
+    positive: '#157F4A',
+    negative: '#C0342B',
+    dataSeries: ['#C23C0A', '#B05A16', '#9C7431', '#8C8355', '#7C8477', '#6E7F96'],
+  },
+};
+
 export const themes = {
   'editorial-cold': editorialCold,
+  'editorial-paper': editorialPaper,
 } as const;
 
 export type ThemeId = keyof typeof themes;
 
-export const defaultTheme = editorialCold;
+/**
+ * Paper is the default as of 2026-08-14.
+ *
+ * `editorial-cold` is kept rather than replaced, and not out of sentiment: until this commit
+ * the theme seam had exactly one adapter, which made it a hypothetical seam — every call
+ * site took the default and nothing proved a second palette could reach the frame at all.
+ * Two adapters is what turns `ThemeId` into a type with something to say.
+ *
+ * It is also the palette the frozen Northbridge preview on disk was rendered in. That
+ * artifact cannot be regenerated — the paid dispatches are spent — so the theme it was shot
+ * in has to remain reachable for it to stay reproducible from source.
+ */
+export const defaultTheme = editorialPaper;
 
 /** Resolve a semantic emphasis role to a concrete colour from the theme. */
 export const emphasisColor = (theme: Theme, role: EmphasisRole): string => {

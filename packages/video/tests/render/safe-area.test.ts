@@ -50,7 +50,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Rect, slotRect } from '../../src/core/slots';
 import type { SafeArea, Slot } from '../../src/core/types';
-import { HEIGHT, WIDTH, editorialCold } from '../../src/design/theme';
+import { HEIGHT, WIDTH, defaultTheme } from '../../src/design/theme';
 import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
 import { compositionIdFor } from '../../src/runtime/ExampleScene';
 import { registry } from '../../src/scenes/registry';
@@ -240,7 +240,11 @@ describe('a declared composition renders into the rectangle it declared', () => 
    */
   it('renders a control that is the canvas the design system says it is', () => {
     expect([control.width, control.height]).toEqual([WIDTH, HEIGHT]);
-    expect(pixelAt(control, 4, HEIGHT - 5)).toBe(editorialCold.color.bg.toLowerCase());
+    // The default, not a named theme: `BackdropControl` mounts `ThemeProvider` with no
+    // theme, so the control is whatever the system currently ships. Pinning it to
+    // `editorialCold` made this assertion pass for the wrong reason the moment the default
+    // moved to paper — it would have been testing a palette nothing renders in.
+    expect(pixelAt(control, 4, HEIGHT - 5)).toBe(defaultTheme.color.bg.toLowerCase());
   });
 
   describe.each(cases.map((one) => [one.label, one] as const))('%s', (_label, testCase) => {

@@ -17,17 +17,28 @@ import {
   type MotionProfileId,
   type SceneCapability,
   type Slot,
+  type ThemeId,
   WIDTH,
   defaultTheme,
   motionProfileIds,
   registry,
   slotRect,
+  themes,
 } from '@vox/video';
 import { useMemo, useState } from 'react';
 
 type Mode = 'grid' | 'filmstrip' | 'matrix';
 
 const FILMSTRIP_POSITIONS = [0, 0.2, 0.4, 0.6, 0.8, 1];
+const themeIds = Object.keys(themes) as ThemeId[];
+
+/**
+ * The chrome stays on the default palette while the *scenes* follow the picker.
+ *
+ * Deliberate: the point of the control is to compare one palette against another on the
+ * thing being judged, and chrome that moved with it would change the surround at the same
+ * time — which is the one condition under which two colours cannot be compared.
+ */
 const t = defaultTheme;
 
 /**
@@ -59,6 +70,7 @@ export const App = () => {
   const [layoutOverride, setLayoutOverride] = useState<string>('');
   const [profileOverride, setProfileOverride] = useState<string>('');
   const [compositionOverride, setCompositionOverride] = useState<string>('');
+  const [themeOverride, setThemeOverride] = useState<string>('');
 
   /**
    * Every composition any capability declares, not just the selected one's: in grid mode
@@ -133,6 +145,13 @@ export const App = () => {
               options={['', ...motionProfileIds]}
             />
             <Select
+              label="theme"
+              value={themeOverride}
+              onChange={setThemeOverride}
+              options={['', ...themeIds]}
+              emptyLabel="default"
+            />
+            <Select
               label="composition"
               value={compositionOverride}
               onChange={setCompositionOverride}
@@ -154,6 +173,7 @@ export const App = () => {
                     layout: layoutOverride || null,
                     motionProfile: (profileOverride as MotionProfileId) || null,
                     safeArea: safeAreaFor(capability, compositionOverride),
+                    themeId: (themeOverride as ThemeId) || null,
                   }}
                   durationInFrames={capability.meta.recommendedDurationFrames}
                   fps={FPS}
@@ -203,6 +223,7 @@ export const App = () => {
                         layout: layoutOverride || null,
                         motionProfile: (profileOverride as MotionProfileId) || null,
                         safeArea: safeAreaFor(selected.capability, compositionOverride),
+                        themeId: (themeOverride as ThemeId) || null,
                       }}
                       durationInFrames={duration}
                       frameToDisplay={frame}
@@ -246,6 +267,7 @@ export const App = () => {
                             layout: layoutId,
                             motionProfile: profileId,
                             safeArea: safeAreaFor(selected.capability, compositionOverride),
+                            themeId: (themeOverride as ThemeId) || null,
                           }}
                           durationInFrames={duration}
                           frameToDisplay={Math.round(duration * 0.6)}

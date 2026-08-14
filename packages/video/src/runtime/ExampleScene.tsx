@@ -7,6 +7,7 @@ import { resolveEventTimings, syntheticBeats } from '../core/anchors';
 import type { ResolvedSceneAssets } from '../core/assets';
 import type { SafeArea } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
+import { type ThemeId, themes } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
 
@@ -28,6 +29,15 @@ export type ExampleSceneProps = {
    * carried a safe area would be publishing percentages to an agent that speaks slots.
    */
   safeArea?: SafeArea;
+  /**
+   * Which palette to draw the example in. Runtime-only, like `assets` and `safeArea`: a
+   * published example that named a theme would be teaching the agent a vocabulary it does
+   * not author — the theme belongs to the production, not to the scene.
+   *
+   * Named by id rather than passed as a `Theme` so the Remotion props panel and the studio
+   * can offer it as a list of the palettes that exist.
+   */
+  themeId?: ThemeId | null;
 };
 
 /**
@@ -44,6 +54,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   motionProfile,
   assets,
   safeArea,
+  themeId,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const capability = requireCapability(capabilityId);
@@ -82,6 +93,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
       layout={layout ?? example.layout}
       motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}
       {...(safeArea ? { safeArea } : {})}
+      {...(themeId && themes[themeId] ? { theme: themes[themeId] } : {})}
     />
   );
 };

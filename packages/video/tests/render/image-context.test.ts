@@ -121,12 +121,18 @@ describe('ImageContextScene runtime', () => {
     ]);
 
     expect({ canonical, empty, longCopy }).toEqual({
-      // Re-accepted when SlotFrame stopped letting a scene decline the camera allowance.
-      // `empty` is unchanged, and that is the corroboration: it renders `editorialStatic`,
-      // which has no camera, so there was no allowance for it to have been missing.
-      canonical: '0aad7bf2baef39a0d235b1c34cd4108c',
-      empty: '9a1370a788be0fdb8c6abdc37bbfff2c',
-      longCopy: '34d4762b05fbc5e340b6ce317f14edc2',
+      // Re-accepted 2026-08-14 when `editorial-paper` became the default theme. All three
+      // moved, and this time *that* is the corroboration: a palette reaches every pixel of
+      // every frame, so an unchanged hash would have meant the theme had not arrived. The
+      // previous acceptance is the mirror of it — a camera-allowance change left `empty`
+      // alone precisely because `editorialStatic` has no camera. A baseline that moves for
+      // the whole reason and not part of it is the thing being checked here.
+      //
+      // Reviewed before accepting, per this file's header: the ready asset, the placeholder
+      // plate, the eyebrow, the title and the caption were each read on paper at frame 120.
+      canonical: 'deeb7727f43aac8958e2e4fb6e163369',
+      empty: '5c23bdadca1da65d59564540b73bd4b9',
+      longCopy: 'e26133541a06a7ec683d2915f506b5c8',
     });
   });
 });
