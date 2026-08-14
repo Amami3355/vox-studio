@@ -15,6 +15,7 @@
     "studio": "remotion studio src/remotion-entry.ts",
     "render": "remotion render src/remotion-entry.ts",
     "still": "remotion still src/remotion-entry.ts",
+    "measure:stills": "node scripts/measure-still-cost.mjs",
     "catalog": "tsx scripts/build-catalog.ts",
     "catalog:check": "tsx scripts/build-catalog.ts --check",
     "typecheck": "tsc --noEmit"

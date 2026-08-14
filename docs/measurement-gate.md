@@ -281,10 +281,41 @@ reader needs in order to reopen one honestly.
 
 ## Open
 
-Nothing. The three questions this file opened with — how many capabilities, who judges 3 and
-4 without the user, and whether a run reuses the previous model — were closed the same day,
-and the answers are in *When the gate may be run* and *What a run leaves behind*. What
-remains unknown about the gate is its results.
+The three questions this file opened with — how many capabilities, who judges 3 and 4 without
+the user, and whether a run reuses the previous model — were closed the same day, and the
+answers are in *When the gate may be run* and *What a run leaves behind*. What remains unknown
+about the gate is its results.
+
+**One question was opened from outside, on 2026-08-14. It is recorded, not ruled on.**
+
+`.scratch/agent-production-interface/issues/25-add-a-cheap-visual-check-between-compile-and-render.md`
+proposes a still-frame contact sheet between `compile` and `render`, and asks whether it becomes
+a public command the agent may call. Measured the same day, a fourteen-frame sheet costs 11.1 s
+against 333.7 s for the video, so the cheapness that makes it attractive is real.
+
+That collides with two settled lines in this file. *The harness* says **"Blind on render during
+the measured run. No stills, no video, no frame of feedback."** *What voids a run* lists **"a
+render was seen during the cold pass."** Both were written before a still was cheap enough for
+anyone to reach for casually, and neither anticipated a still the agent could request itself.
+
+The question this leaves is narrow and belongs here rather than in the ticket: **is a contact
+sheet withheld in the cold pass the way `validate` is, or does it void a run outright?** The two
+are not the same remedy — `validate` is switched off and the run proceeds, whereas a seen render
+is unrecoverable. Nothing here decides it.
+
+The ticket's objective was corrected the same day, and it sharpens this question rather than
+retiring it. The check is for **coherence** — did the renderer execute what the document decided —
+and never for design judgement, which stays upstream with the user. So what a cold-pass agent
+would receive is not an image but a **predicate**: "the region this scene declares is non-empty",
+"nothing was drawn outside the safe area". That is objective, and it is still feedback derived
+from a render. Whether the blindness rule is about *pixels reaching the agent* or about *any
+observation of the rendered artifact* is the thing to settle, and the two readings give different
+answers here. The rule was written when only the first was possible.
+
+What is already settled and needs no reopening: measure 4 is judged **after** the measured run,
+in Component Studio, and the *Premium* anchors — Bloomberg/Economist/FT for composition, Vox and
+Johnny Harris for pace — are the operational definition of the system-premium row that ticket 22
+reports as missing. A reader arriving at ticket 22 looking for the bar should be sent here first.
 
 ## Runs
 
