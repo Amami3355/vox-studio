@@ -14,6 +14,7 @@ import {
   SlotFrame,
   useFrameBox,
   useSpace,
+  useTitleStep,
 } from '../../primitives';
 import { splitLeftGeometry } from './layouts';
 import type { ImageContextProps } from './schema';
@@ -76,6 +77,19 @@ const SplitLayout: React.FC<{
   const box = useFrameBox();
   const stacked = box.width / box.height < splitLeftGeometry.stackBelowAspect;
 
+  /**
+   * The width the copy actually gets, which is what the headline has to fit inside.
+   *
+   * Derived here rather than in the primitive because it is layout arithmetic, and this
+   * layout owns it: the grid's own padding on both sides, then the gap, then the copy's
+   * share of the split. Stacked, the copy spans the full inner width instead of a column —
+   * the same reason the wipe changes direction.
+   */
+  const { imageColumns, copyColumns } = splitLeftGeometry;
+  const inner = Math.max(0, box.width - outer * 2);
+  const copyWidth = stacked ? inner : ((inner - gap) * copyColumns) / (imageColumns + copyColumns);
+  const headlineStep = useTitleStep(headline, copyWidth);
+
   return (
     <div
       style={{
@@ -123,7 +137,7 @@ const SplitLayout: React.FC<{
           Visual context
         </Eyebrow>
         {headline ? (
-          <SceneTitle startFrame={stagger * 2} profile={profile}>
+          <SceneTitle startFrame={stagger * 2} profile={profile} step={headlineStep}>
             {headline}
           </SceneTitle>
         ) : null}

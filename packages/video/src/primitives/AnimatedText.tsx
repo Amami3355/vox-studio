@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { MotionProfile } from '../design/motion';
 import { useTheme, useTypeSize } from './ThemeContext';
+import { TITLE_MAX_WIDTH, titleStep } from './titleFit';
 import { useEntrance } from './useEntrance';
 
 export type TextRole = 'display' | 'body' | 'mono';
@@ -63,18 +64,6 @@ export const AnimatedText: React.FC<{
   );
 };
 
-/**
- * Title step, degrading silently on long strings.
- *
- * The soft limit is 40 characters. Beyond it the scale drops a step rather than
- * letting the title wrap into the chart or overflow the frame.
- */
-export const titleStep = (length: number): number => {
-  if (length <= 40) return 5;
-  if (length <= 70) return 4;
-  return 3;
-};
-
 export const SceneTitle: React.FC<{
   children: string;
   startFrame: number;
@@ -99,7 +88,7 @@ export const SceneTitle: React.FC<{
       weight={theme.type.weight.bold}
       tracking={theme.type.tracking.tight}
       color={color}
-      maxWidth="86%"
+      maxWidth={`${TITLE_MAX_WIDTH * 100}%`}
       lineHeight={1.02}
     >
       {children}

@@ -59,7 +59,7 @@ importers:
     dependencies:
       '@remotion/bundler':
         specifier: 4.0.508
-        version: 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/renderer':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -87,10 +87,13 @@ importers:
     dependencies:
       '@remotion/cli':
         specifier: 4.0.508
-        version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+        version: 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
       '@remotion/google-fonts':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@remotion/layout-utils':
+        specifier: 4.0.508
+        version: 4.0.508
       '@remotion/player':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -109,7 +112,7 @@ importers:
     devDependencies:
       '@remotion/bundler':
         specifier: 4.0.508
-        version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/renderer':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -1015,6 +1018,9 @@ packages:
 
   '@remotion/google-fonts@4.0.508':
     resolution: {integrity: sha512-j6fW/hQNcBsDz//aBh4igUKCYKYdr14Gwl0AEhagUJyf8NmD6wit/0XMY5/sN9AVSCwURirMymkqHNg+AiVbJQ==}
+
+  '@remotion/layout-utils@4.0.508':
+    resolution: {integrity: sha512-87oXx1vpU3IlZNyGs7jJGxV04xH8me2sHR9e/w6FE5lUJ3+OEkCAgjlLPEO+l8PfP5x4tTcIf/oHtgtnGKnODQ==}
 
   '@remotion/licensing@4.0.508':
     resolution: {integrity: sha512-S9w6lckixF0tYc3wcnh1zLACPl0AgG9v/QGOYqkkaZX/p+F86202+YMWKAHdMiCQPEYntTfCgIfnqucGuLoWeA==}
@@ -2957,15 +2963,15 @@ snapshots:
 
   '@remotion/captions@4.0.508': {}
 
-  '@remotion/cli@4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)':
+  '@remotion/cli@4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)':
     dependencies:
       '@babel/parser': 7.24.1
-      '@remotion/bundler': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@remotion/bundler': 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/media-utils': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/player': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/renderer': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/studio': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@remotion/studio-server': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      '@remotion/studio-server': 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
       '@remotion/studio-shared': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       dotenv: 17.3.1
       minimist: 1.2.6
@@ -3022,6 +3028,8 @@ snapshots:
       - react
       - react-dom
 
+  '@remotion/layout-utils@4.0.508': {}
+
   '@remotion/licensing@4.0.508': {}
 
   '@remotion/media-parser@4.0.508': {}
@@ -3077,11 +3085,11 @@ snapshots:
 
   '@remotion/studio-protocol@4.0.508': {}
 
-  '@remotion/studio-server@4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)':
+  '@remotion/studio-server@4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)':
     dependencies:
       '@babel/parser': 7.24.1
       '@babel/types': 7.24.0
-      '@remotion/bundler': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@remotion/bundler': 4.0.508(postcss@8.5.26)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/renderer': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/studio-codemods': 4.0.508(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@remotion/studio-protocol': 4.0.508

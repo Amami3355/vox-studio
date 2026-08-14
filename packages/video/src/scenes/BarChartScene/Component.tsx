@@ -17,6 +17,7 @@ import {
   useEntrance,
   useFrameBox,
   useSpace,
+  useTitleStep,
   useTypeSize,
 } from '../../primitives';
 import { barChartConstraints } from './constraints';
@@ -146,6 +147,17 @@ const ChartFrame: React.FC<{
     ((box.width - columnGap) * calloutColumns) / (chartColumns + calloutColumns),
   );
 
+  /**
+   * The title's step, fitted to the box.
+   *
+   * In a portrait box the title labels the chart rather than declaiming over it, and that
+   * judgement is a *ceiling* rather than the answer: it says this frame should not shout,
+   * while `useTitleStep` says what actually fits. The header spans the whole box, so the
+   * width it is fitted against is the box itself.
+   */
+  const titleCeiling = composed ? Math.max(2, titleStep(props.title.length) - 1) : undefined;
+  const titleFitStep = useTitleStep(props.title, box.width, titleCeiling);
+
   const chart = (
     <BarGroup
       data={data}
@@ -161,7 +173,7 @@ const ChartFrame: React.FC<{
 
   return (
     <>
-      <Header title={props.title} accent={primary} profile={profile} composed={composed} />
+      <Header title={props.title} accent={primary} profile={profile} step={titleFitStep} />
 
       {isEmpty ? (
         <EmptyState startFrame={6} profile={profile} />
@@ -231,9 +243,9 @@ const Header: React.FC<{
   title: string;
   accent: string;
   profile: MotionProfile;
-  /** In a portrait box the title labels the chart; it does not declaim over it. */
-  composed: boolean;
-}> = ({ title, accent, profile, composed }) => {
+  /** Already fitted to the box by `ChartFrame`, which is where the box is known. */
+  step: number;
+}> = ({ title, accent, profile, step }) => {
   const gap = useSpace(3);
   const bottom = useSpace(5);
   const draw = useEntrance(0, profile);
@@ -248,11 +260,7 @@ const Header: React.FC<{
           borderRadius: 2,
         }}
       />
-      <SceneTitle
-        startFrame={2}
-        profile={profile}
-        step={composed ? Math.max(2, titleStep(title.length) - 1) : undefined}
-      >
+      <SceneTitle startFrame={2} profile={profile} step={step}>
         {title}
       </SceneTitle>
     </div>
