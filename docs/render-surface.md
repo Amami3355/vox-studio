@@ -43,8 +43,12 @@ appearance of every frame.
 
 **What is actually in it today.**
 
-- **One theme: `editorial-cold`.** `themes` has a single entry. `ThemeId` is therefore a
-  one-member union, and `defaultTheme` is the only theme any render has ever used.
+- **Two themes as of `3d039df`: `editorial-paper` (default) and `editorial-cold`.** Until that
+  commit there was one, which made the theme seam hypothetical — every call site took the
+  default and nothing established that a second palette could reach a frame. It can: no
+  primitive or scene changed, because there are no hardcoded colours outside `design/theme.ts`.
+  A light ground costs contrast that a dark one gets free, so `editorial-paper` deepens the warm
+  accent — `#FF5A1F` is 6.20:1 on slate and 2.60:1 on paper.
 - **A 7-step type scale** `[28, 36, 48, 64, 88, 120, 168]` and an 8-step space scale
   `[0, 8, 16, 24, 40, 64, 96, 144]`.
 - **A 12-column grid with a 96px margin** — `grid.columns` is declared and, as of `b5cc56e`,
@@ -189,7 +193,9 @@ told, the defect is here.
 
 - **`pnpm grid`** — Component Studio (`apps/component-studio`): every capability × layout ×
   motion profile side by side, plus a six-frame filmstrip. `docs/measurement-gate.md` names it as
-  where measure 4 is judged. This is the design iteration loop.
+  where measure 4 is judged. This is the design iteration loop. Since `3d039df` it also carries a
+  **theme** picker, which drives the scenes and deliberately not the chrome — moving the surround
+  while comparing two palettes is the one condition under which they cannot be compared.
 - **`pnpm --filter @vox/video measure:stills`** — a fourteen-frame contact sheet of the real paid
   run in **11.1–11.4 s**, against 333.7 s for the video. Output in `.scratch/still-cost/`.
 - **`pnpm studio`** — Remotion Studio; accepts a real Run's `document.json` via `--props`.
@@ -242,6 +248,34 @@ the same human verdict; moving the event would spend it. The losing alternative 
 
 What this does **not** claim: that ticket 22's row now passes. One offending element is repaired.
 The row is a human verdict on a whole preview, and no named evaluator has watched a rebuilt one.
+
+## Second finding, open: a headline is clipped in the opening scene
+
+Seen 2026-08-14 while reviewing the paper render, at frame 420 of the shipped paid run
+(`rainy-opener`, `image_context`, `splitLeft`). The headline **"Northbridge before dawn"**
+renders as **"Northbridg"** — the final `e` is cut off mid-glyph.
+
+**Mechanism, Z2.** `titleStep` reads string length only: 23 characters → step 5 → 120px display
+type. `SceneTitle` caps the block at `maxWidth: '86%'` of the copy column, and `AnimatedText`
+wraps everything in `overflow: hidden` so the clipped rise reads as typography being set.
+"Northbridge" is a single unbreakable word wider than that box, so it is cut rather than wrapped.
+This is Z2's stated weakness reaching a frame: a typographic hierarchy decided by `String.length`
+cannot know the width of the box it landed in.
+
+**Not caused by the theme.** `editorial-paper` overrides `color` only — `type` is spread from
+`editorialCold`, so family, weight and size are byte-identical and the geometry cannot have
+moved.
+
+**Why no test caught it.** `safe-area.test.ts` asks whether ink reaches the *rectangle's* edge.
+Here the text never gets there: it is clipped by its own `overflow: hidden` well inside the safe
+area, so the quiet-border probe reads clean backdrop and passes. It is the same blind spot that
+comment already names — "a caption lost its last word in `section--vertical-slice` while this
+suite stayed green" — reached by a different route. The `image_context` examples do not exercise
+it either: `example-long-context` has only short words, so it wraps correctly.
+
+Unfixed and unscoped. The repair is a Z2 decision — measure the box, or hyphenate, or let the
+title shrink to fit — and each answers a different question about what a headline is allowed to
+do.
 
 ## What this map deliberately does not do
 
