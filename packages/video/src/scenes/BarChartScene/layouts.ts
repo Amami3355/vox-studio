@@ -92,11 +92,23 @@ export const barChartGeometry = {
    * refused system-premium row.
    *
    * The rejected alternative was to move the event instead: an annotation anchored 96%
-   * into a 28-second scene is arguably a timing defect, not a layout one. It was not
-   * taken because `compile/timings.ts` derives that frame from a word anchor in the
-   * narration, so moving it detaches the annotation from the word it names — and the
-   * anchor landing on its word is one of the five rows that *passed* the same human
-   * verdict. Repairing the layout keeps that intact; repairing the timing would spend it.
+   * into a 28-second scene is arguably a timing defect, not a layout one.
+   *
+   * **The reason first recorded here for rejecting it was wrong, and is corrected
+   * 2026-08-15.** It said the frame came from a word anchor, so moving the event would
+   * detach the annotation from the word it names. It does not. Both plans write
+   * `annotate` at `<beat>.end-long`, which is a boundary anchor — the end of the beat
+   * less `motion.duration.slow`, 34 frames, 1.13 s — and 799 = 833 − 34 and 694 = 728 − 34
+   * are that arithmetic and nothing else. There is no word to detach from. Word anchors
+   * are used in the same scene, for `revealAll` (`b2.word:January`) and `highlightBar`
+   * (`b2.word:March`), which is where the mistake came from.
+   *
+   * The layout repair still stands on its own: a column reserved before it is occupied is
+   * wrong whatever the timing does. What changes is that **the timing is reopenable**, and
+   * that the interesting half of it is upstream of both — from `end` the agent's entire
+   * vocabulary is `-short` (0.4 s) and `-long` (1.13 s), so "well before the end of this
+   * beat" is a sentence the grammar cannot say. The agent took the latest-but-one option
+   * it had.
    */
   calloutColumns: 34,
   chartColumns: 62,

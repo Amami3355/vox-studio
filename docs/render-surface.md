@@ -228,7 +228,13 @@ decides at which frame every event lands. A scene cannot move an event, and it c
 box it was handed.
 
 The trap to name early: if a frame looks wrong and the component is drawing exactly what it was
-told, the defect is here.
+told, the defect is here — or one level further up, in the plan, which is not ours.
+
+**Worked example, 2026-08-15.** `pilot-budget` draws only one of its two bars for the first half
+of its scene. Nothing is broken: the plan writes `revealAll` at `b6.mid`, the compiler resolves
+that to frame 364 of 728, and the renderer obeys. The agent chose it. Read the anchors in
+`inputs/plans/*.json` before reading any timing as a defect — three of the five bar scenes in this
+run reveal at `mid`.
 
 ## Z8 — Where a change is judged
 
@@ -277,15 +283,26 @@ and the choice between them is a design decision, not a repair:
 - **Z6 reading** — the column should not be reserved before it is occupied, and the chart should
   reflow when it is. Cost: the reflow is motion the system currently never performs.
 - **Z7 reading** — an annotation anchored 96% into a 28-second scene is a timing defect, and the
-  layout is innocent. Cost: `compile/timings.ts` derives that frame from a word anchor in the
-  narration, so the annotation would have to detach from the word it names.
+  layout is innocent.
 
 **Chosen 2026-08-14: the Z6 reading, in `9036a9a`.** The column is now a width and not a slot —
 it grows from nothing on the annotation's own entrance, so the chart holds the whole row until
-there is something to yield to. Z7 was rejected because the annotate frame is derived from a word
-anchor in the narration, and the anchor landing on its word is one of the five rows that *passed*
-the same human verdict; moving the event would spend it. The losing alternative is recorded in
-`BarChartScene/layouts.ts` beside the geometry.
+there is something to yield to. That repair stands on its own: a column reserved before it is
+occupied is wrong whatever the timing does.
+
+**Correction, 2026-08-15 — the reason recorded for rejecting the Z7 reading was false.** This map
+and `BarChartScene/layouts.ts` both said the annotate frame came from a word anchor, so moving it
+would detach the annotation from the word it names. It does not. Both plans write `annotate` at
+`<beat>.end-long`, a *boundary* anchor: the end of the beat less `motion.duration.slow` — 34
+frames, 1.13 s. 799 = 833 − 34 and 694 = 728 − 34 are that arithmetic and nothing else. Word
+anchors do appear in the same scene, on `revealAll` (`b2.word:January`) and `highlightBar`
+(`b2.word:March`), which is where the error came from.
+
+**So the callout timing is reopenable, and the interesting half of it is upstream of Z7.** From
+`end` the agent's whole vocabulary is `-short` (0.4 s) and `-long` (1.13 s):
+`core/anchor-grammar.ts` offers no way to say *well* before the end of a beat. The agent took the
+latest-but-one option it had. Widening that grammar changes what an agent is allowed to write and
+wants an ADR, not a commit.
 
 What this does **not** claim: that ticket 22's row now passes. One offending element is repaired.
 The row is a human verdict on a whole preview, and no named evaluator has watched a rebuilt one.
