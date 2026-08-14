@@ -6,6 +6,7 @@ export * from './AnimatedText';
 export * from './titleFit';
 export * from './Reveal';
 export * from './Bar';
+export * from './Gridlines';
 export * from './Callout';
 export * from './EmptyState';
 export * from './Backdrop';

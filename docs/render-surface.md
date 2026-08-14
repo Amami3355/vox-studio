@@ -1,6 +1,6 @@
 # The render surface — zones of intervention
 
-**Status:** map · 2026-08-14 · verified against `b5cc56e`
+**Status:** map · 2026-08-15 · verified against `229700c` and the value-axis work on top of it
 **Scope:** everything that decides what a viewer sees, from tokens to composed frame, named as
 *zones you can intervene in* rather than as a file listing. Written to open the design work of
 ticket 22 (`raise the design system to system-premium`).
@@ -95,9 +95,9 @@ itself. The default is the frame box, so a header spanning the canvas declares n
 why `bar_chart` has no provider and `image_context` has one around its copy column. The `maxStep`
 prop is a ceiling on top of the fit, never a replacement for it.
 
-**Cost of intervening.** Cheap. Four files, no geometry, every scene picks it up. The only
-third-party dependency in the whole render surface lives here — `@remotion/layout-utils`, for
-`measureText`.
+**Cost of intervening.** Cheap. Four files, no geometry, every scene picks it up.
+`@remotion/layout-utils` entered the package here, for `measureText`; Z4 is now its second
+caller, and `d3-scale` is the only other third-party dependency in the render surface.
 
 **The trap worth knowing.** `overflowWrap` alone does not save a **flex item**: its minimum size
 defaults to min-content, which for an unbreakable word is the whole word, so it overflows before
@@ -129,7 +129,7 @@ tests, and `Backdrop` is the control frame those tests compare to — change it 
 
 ## Z4 — Data marks
 
-`primitives/Bar.tsx` (267)
+`primitives/Bar.tsx` (264) · `primitives/Gridlines.tsx` (120) · `core/scale.ts` (90)
 
 The largest single design object in the package, and the one a data-editorial reference judges
 hardest. Not exposed to the agent; `BarChartScene` composes it.
@@ -137,22 +137,41 @@ hardest. Not exposed to the agent; `BarChartScene` composes it.
 **Owns.** Both orientations, the axis, the reveal spring per bar, the highlight, the recede,
 the value labels and the category labels.
 
+**`Bar.tsx` no longer decides what the top of the plot is.** `core/scale.ts` does, through one
+function, `valueAxis(values)`, which returns the domain, where zero sits, and the round values
+a gridline can use. It is arithmetic and testable without a browser (`tests/scale.test.ts`),
+which is the same split `titleFit` made in Z2 for the same reason.
+
 **The decisions living as constants here.**
 
-| constant | value | what it decides |
-| --- | --- | --- |
-| `RECEDE` | `0.62` | how far a non-highlighted bar sinks toward the background |
-| `HIGHLIGHT_FRAMES` | `14` | how long the desaturation takes (~0.47 s) |
-| `AXIS_HEADROOM` | `0.14` | clearance the axis gives the extreme value label |
-| `maxWidth` | `200` | hard cap on a vertical column's width |
+| constant | where | value | what it decides |
+| --- | --- | --- | --- |
+| `RECEDE` | `Bar.tsx` | `0.62` | how far a non-highlighted bar sinks toward the background |
+| `HIGHLIGHT_FRAMES` | `Bar.tsx` | `14` | how long the desaturation takes (~0.47 s) |
+| `maxWidth` | `Bar.tsx` | `200` | hard cap on a vertical column's width |
+| `AXIS_HEADROOM` | `core/scale.ts` | `0.14` | clearance the axis gives the extreme value label |
+| `AXIS_TICKS` | `core/scale.ts` | `4` | how many gridlines a shot can carry |
+| `AXIS_ROUNDING` | `core/scale.ts` | `10` | how finely the domain rounds — **not** the same number |
+| `GRID_RECEDE` | `Gridlines.tsx` | `0.86` | how far a gridline sits behind the bars |
 
-**Two published behaviours worth knowing before editing.** With a highlight active, every other
+`AXIS_TICKS` and `AXIS_ROUNDING` are deliberately different, and that is the one thing to read
+before touching either. Round the domain as coarsely as the gridlines and a series topping out
+at 5 743 pushes the plot to 8 000, costing the tallest bar a quarter of its height; round it
+finely and the top lands on 7 000 with the gridlines still sparse.
+
+**Three published behaviours worth knowing before editing.** With a highlight active, every other
 bar collapses onto **one** cold neutral rather than a dimmed version of its own hue — five
-differently-muted hues read as mud. And category labels are uppercase, `tracking.wide`, truncated
-at 14 chars vertical / 22 horizontal.
+differently-muted hues read as mud. Category labels are uppercase, `tracking.wide`, truncated
+at 14 chars vertical / 22 horizontal. And in the vertical orientation **only the highlighted bar
+carries its number** — the axis states the rest, and printing both is the same fact twice.
 
-**Cost of intervening.** Medium-high. One file, but it is half of what the human evaluator was
-looking at, and the render contract tests measure its frames.
+**Gridlines are vertical-only, by decision.** A horizontal bar chart in this system is a ranking:
+the value sits at the end of its own bar where the eye already is, and an axis underneath asks
+the reader to travel for a number they were just handed. The losing alternative — both
+orientations, for consistency — is argued in `Gridlines.tsx`'s header.
+
+**Cost of intervening.** Medium-high. Three files, and it is half of what the human evaluator
+was looking at, and the render contract tests measure its frames.
 
 ## Z5 — Editorial marks
 

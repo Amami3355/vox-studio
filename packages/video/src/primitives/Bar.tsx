@@ -9,8 +9,10 @@
 import type React from 'react';
 import { spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { countTo, formatValue, truncate } from '../core/format';
+import { valueAxis } from '../core/scale';
 import { type MotionProfile, springConfig } from '../design/motion';
 import { mix, rampColor } from '../design/theme';
+import { Gridlines, useAxisGutter } from './Gridlines';
 import { useSpace, useTheme, useTypeSize } from './ThemeContext';
 
 export type Datum = { label: string; value: number };
@@ -31,8 +33,6 @@ export type BarGroupProps = {
 /** How far a non-highlighted bar recedes toward the background. */
 const RECEDE = 0.62;
 const HIGHLIGHT_FRAMES = 14;
-/** Share of the value range kept clear at each end the data reaches, for value labels. */
-const AXIS_HEADROOM = 0.14;
 
 export const BarGroup: React.FC<BarGroupProps> = ({
   data,
@@ -51,22 +51,16 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   const labelSize = useTypeSize(0);
   const valueSize = useTypeSize(orientation === 'vertical' ? 2 : 1);
 
-  const values = data.map((d) => d.value);
-  const rawMin = Math.min(0, ...values);
-  const rawMax = Math.max(0, ...values);
-
   /**
-   * Headroom on whichever side the data actually reaches.
-   *
-   * Without it the extreme bar fills the plot edge to edge and its value label has
-   * nowhere to sit: at the top it collides with the headline, at the bottom with the
-   * category row. The axis, not the label, is what has to make room.
+   * The domain, its headroom and its round numbers all come from `core/scale`, which owns
+   * the reasoning. A bar here is a ratio against `span`, and nothing in this file decides
+   * what the top of the plot is any more.
    */
-  const headroom = (rawMax - rawMin || 1) * AXIS_HEADROOM;
-  const min = rawMin < 0 ? rawMin - headroom : 0;
-  const max = rawMax > 0 ? rawMax + headroom : 0;
-  const range = max - min || 1;
-  const zeroRatio = (0 - min) / range;
+  const axis = valueAxis(data.map((d) => d.value));
+  const { span, zeroRatio } = axis;
+  // Measured unconditionally because it is a hook, and used only by the vertical branch:
+  // the horizontal one is a ranking and draws no axis. `Gridlines` argues that decision.
+  const gutter = useAxisGutter(axis, unit);
 
   const highlightProgress =
     highlighted === null
@@ -116,7 +110,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
       >
         {data.map((d, i) => {
           const p = progressFor(i);
-          const widthRatio = (Math.abs(d.value) / range) * p;
+          const widthRatio = (Math.abs(d.value) / span) * p;
           return (
             <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: gap }}>
               <div
@@ -169,11 +163,21 @@ export const BarGroup: React.FC<BarGroupProps> = ({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'stretch', gap, position: 'relative' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'stretch',
+          gap,
+          position: 'relative',
+          paddingLeft: gutter,
+        }}
+      >
+        <Gridlines axis={axis} unit={unit} gutter={gutter} />
         <div
           style={{
             position: 'absolute',
-            left: 0,
+            left: gutter,
             right: 0,
             bottom: `${zeroRatio * 100}%`,
             height: 1,
@@ -182,37 +186,42 @@ export const BarGroup: React.FC<BarGroupProps> = ({
         />
         {data.map((d, i) => {
           const p = progressFor(i);
-          const heightRatio = (Math.abs(d.value) / range) * p;
+          const heightRatio = (Math.abs(d.value) / span) * p;
           const bottomRatio = d.value >= 0 ? zeroRatio : zeroRatio - heightRatio;
           const topRatio = bottomRatio + heightRatio;
           return (
             <div key={d.label} style={{ flex: 1, position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  // Always on the outer end of the bar, so a negative value is labelled
-                  // below where it lands rather than back up at the zero line.
-                  ...(d.value >= 0
-                    ? { bottom: `calc(${topRatio * 100}% + ${valueSize * 0.34}px)` }
-                    : { top: `calc(${(1 - bottomRatio) * 100}% + ${valueSize * 0.34}px)` }),
-                  textAlign: 'center',
-                  fontFamily: theme.type.display,
-                  fontSize: valueSize,
-                  fontWeight: theme.type.weight.bold,
-                  color:
-                    highlighted === null || d.label === highlighted
-                      ? theme.color.ink
-                      : inkFor(d.label),
-                  fontVariantNumeric: 'tabular-nums',
-                  letterSpacing: `${theme.type.tracking.tight * valueSize}px`,
-                  opacity: Math.min(1, p * 2),
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {formatValue(countTo(d.value, p), unit)}
-              </div>
+              {/*
+                Only the bar the narration named carries its number. The axis already
+                states every other value, and printing all of them over a ruler that says
+                the same thing is the clutter the gridlines were drawn to remove. With no
+                highlight the chart is a shape and an axis, which is the anchors' default.
+              */}
+              {d.label === highlighted ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    // Always on the outer end of the bar, so a negative value is labelled
+                    // below where it lands rather than back up at the zero line.
+                    ...(d.value >= 0
+                      ? { bottom: `calc(${topRatio * 100}% + ${valueSize * 0.34}px)` }
+                      : { top: `calc(${(1 - bottomRatio) * 100}% + ${valueSize * 0.34}px)` }),
+                    textAlign: 'center',
+                    fontFamily: theme.type.display,
+                    fontSize: valueSize,
+                    fontWeight: theme.type.weight.bold,
+                    color: theme.color.ink,
+                    fontVariantNumeric: 'tabular-nums',
+                    letterSpacing: `${theme.type.tracking.tight * valueSize}px`,
+                    opacity: Math.min(1, p * 2),
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {formatValue(countTo(d.value, p), unit)}
+                </div>
+              ) : null}
               <div
                 style={{
                   position: 'absolute',
@@ -235,7 +244,8 @@ export const BarGroup: React.FC<BarGroupProps> = ({
         })}
       </div>
 
-      <div style={{ display: 'flex', gap, marginTop: spaceStep(theme, 2) }}>
+      {/* Indented with the plot, or a category stops sitting under its own bar. */}
+      <div style={{ display: 'flex', gap, marginTop: spaceStep(theme, 2), paddingLeft: gutter }}>
         {data.map((d, i) => {
           const p = progressFor(i);
           return (
