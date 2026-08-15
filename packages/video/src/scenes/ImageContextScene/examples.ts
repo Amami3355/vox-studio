@@ -66,11 +66,19 @@ export const imageContextExamples: SceneExample[] = [
    * from, and the Teaching surface entry in `CONTEXT.md`. `bar_chart` makes the opposite
    * choice with the same constraint and illustrates `highlightBar` at a boundary; both are
    * legal under that ADR and neither is a defect.
+   *
+   * It deliberately requests the **same picture as the canonical example** — the same
+   * `identityKey`, resolving to the same committed media. Two examples that differ only in
+   * their events isolate what the events did: an agent comparing them sees one variable and
+   * not three. It also makes this the only driven example that can be *looked at*, which
+   * matters more than it sounds. Written first with copy of its own and no `identityKey`,
+   * it could resolve to nothing but the subject placeholder — so the one example whose
+   * behaviour was new was the one example no still could show.
    */
   {
     id: 'example-driven-context',
     title: 'Plan-driven reveal — the image lands before the copy',
-    note: 'The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject.',
+    note: 'The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject. Same media as the canonical example; only the events differ.',
     component: 'image_context',
     layout: 'splitLeft',
     motionProfile: 'subtleDrift',
@@ -80,13 +88,14 @@ export const imageContextExamples: SceneExample[] = [
       { at: 'b2.start', action: 'revealCopy' },
     ],
     props: {
-      headline: 'A city built for cars, retrofitted for people',
-      caption: 'The rebuild took eleven years and two referendums.',
+      headline: 'Rent takes its share before anything else',
+      caption: 'For a growing number of households, the month is already spoken for.',
       assetRequirement: {
         type: 'image',
-        subject: 'Wide boulevard being narrowed for a tram line, seen from above',
+        subject: 'Dense apartment buildings in a European city at dusk',
         treatment: 'photo',
         orientation: 'landscape',
+        identityKey: 'housing-city-context',
       },
     },
   },

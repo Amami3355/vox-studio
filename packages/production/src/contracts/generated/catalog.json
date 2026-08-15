@@ -931,7 +931,7 @@
           {
             "id": "example-driven-context",
             "title": "Plan-driven reveal — the image lands before the copy",
-            "note": "The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject.",
+            "note": "The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject. Same media as the canonical example; only the events differ.",
             "component": "image_context",
             "layout": "splitLeft",
             "motionProfile": "subtleDrift",
@@ -950,13 +950,14 @@
               }
             ],
             "props": {
-              "headline": "A city built for cars, retrofitted for people",
-              "caption": "The rebuild took eleven years and two referendums.",
+              "headline": "Rent takes its share before anything else",
+              "caption": "For a growing number of households, the month is already spoken for.",
               "assetRequirement": {
                 "type": "image",
-                "subject": "Wide boulevard being narrowed for a tram line, seen from above",
+                "subject": "Dense apartment buildings in a European city at dusk",
                 "treatment": "photo",
-                "orientation": "landscape"
+                "orientation": "landscape",
+                "identityKey": "housing-city-context"
               }
             }
           },
