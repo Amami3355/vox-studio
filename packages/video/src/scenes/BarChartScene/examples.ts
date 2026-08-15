@@ -156,7 +156,7 @@ export const barChartExamples: SceneExample[] = [
     },
     events: [
       { at: 'b1.start', action: 'revealAll' },
-      { at: 'b2.mid', action: 'highlightBar', payload: { label: 'Spain' } },
+      { at: 'b2.start+long', action: 'highlightBar', payload: { label: 'Spain' } },
     ],
   },
 ];

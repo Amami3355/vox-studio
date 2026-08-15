@@ -1,7 +1,7 @@
 /**
  * Semantic anchor resolution.
  *
- * The agent expresses time symbolically — `b4.start`, `b5.mid`, `b6.end-short` — and
+ * The agent expresses time symbolically — `b4.start`, `b6.end-short`, `b2.word:March` — and
  * never in frames. This module turns anchors into frames.
  *
  * STUB NOTICE: the real beat timings come from the TTS timepoints of ADR-0002 (step 7
@@ -117,12 +117,7 @@ export const resolveAnchor = (
     return clamp(wordFrame(anchor, beat, target.word), sceneBounds.from, sceneBounds.to);
   }
 
-  const base =
-    target.position === 'start'
-      ? beat.from
-      : target.position === 'end'
-        ? beat.to
-        : beat.from + Math.round((beat.to - beat.from) / 2);
+  const base = target.position === 'start' ? beat.from : beat.to;
 
   const delta = target.offset ? OFFSET_FRAMES[target.offset] * target.sign : 0;
 
@@ -147,7 +142,7 @@ const wordFrame = (anchor: string, beat: FrameBeat, word: string): number => {
   if (beat.words.length === 0) {
     throw new UnresolvableWordError(
       anchor,
-      `Anchor "${anchor}" names a word, but beat "${beat.id}" carries no word timings. Word anchors resolve against a recorded take; a synthetic or hand-written one can only answer .start, .mid and .end.`,
+      `Anchor "${anchor}" names a word, but beat "${beat.id}" carries no word timings. Word anchors resolve against a recorded take; a synthetic or hand-written one can only answer .start and .end.`,
     );
   }
 
@@ -163,7 +158,7 @@ const wordFrame = (anchor: string, beat: FrameBeat, word: string): number => {
   if (matches.length > 1) {
     throw new UnresolvableWordError(
       anchor,
-      `Anchor "${anchor}" is ambiguous: "${word}" appears ${matches.length} times in beat "${beat.id}". Name a word that appears once, or use ${beat.id}.start, ${beat.id}.mid or ${beat.id}.end.`,
+      `Anchor "${anchor}" is ambiguous: "${word}" appears ${matches.length} times in beat "${beat.id}". Name a word that appears once, or use ${beat.id}.start or ${beat.id}.end.`,
     );
   }
 

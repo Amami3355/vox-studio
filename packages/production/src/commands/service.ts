@@ -190,7 +190,7 @@ export class ProductionCommandService {
       const report = validateVideoPlan(raw as VideoPlan);
       const validationInputSha256 = validationInputIdentity({
         planSha256,
-        catalogManifestVersion: 3,
+        catalogManifestVersion: 4,
         videoPlanContractVersion: 1,
       });
 
@@ -526,7 +526,7 @@ export class ProductionCommandService {
         takeSha256: take.takeSha256,
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
-        catalogManifestVersion: 3,
+        catalogManifestVersion: 4,
       });
       const previous = checkpoint.bindings;
       const existing = previous.compilation;
@@ -690,7 +690,7 @@ export class ProductionCommandService {
         takeSha256: take.takeSha256,
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
-        catalogManifestVersion: 3,
+        catalogManifestVersion: 4,
       });
       if (compilation.compileInputSha256 !== expectedCompileInputSha256) {
         throw new RunStoreError(
@@ -1214,7 +1214,7 @@ export class ProductionCommandService {
     }
     const validationInputSha256 = validationInputIdentity({
       planSha256: bindings.planBinding.planSha256,
-      catalogManifestVersion: 3,
+      catalogManifestVersion: 4,
       videoPlanContractVersion: 1,
     });
     const expectedValidation = compileReportSchema.parse(validateVideoPlan(plan));

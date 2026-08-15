@@ -546,7 +546,7 @@ const checkWordAnchors = (
       errors.push({
         ...base,
         code: 'AMBIGUOUS_ANCHOR',
-        message: `Anchor "${at}" is ambiguous: "${named}" appears ${matches.length} times in beat "${parsed.beatId}". Name a word that appears once, or use ${parsed.beatId}.start, ${parsed.beatId}.mid or ${parsed.beatId}.end.`,
+        message: `Anchor "${at}" is ambiguous: "${named}" appears ${matches.length} times in beat "${parsed.beatId}". Name a word that appears once, or use ${parsed.beatId}.start or ${parsed.beatId}.end.`,
       });
     }
   };

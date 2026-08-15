@@ -24,7 +24,7 @@ describe('the manifest', () => {
   it('publishes the canonical compiler-check registry once in catalog v3', () => {
     const catalog = buildCatalog();
 
-    expect(catalog.manifestVersion).toBe(3);
+    expect(catalog.manifestVersion).toBe(4);
     expect(catalog.checks).toBe(COMPILER_CHECKS);
 
     const entries = [

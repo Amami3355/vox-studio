@@ -26,7 +26,7 @@ export type AnchorOffset = 'short' | 'long';
 
 /** What an anchor points at inside its beat. */
 export type AnchorTarget =
-  | { kind: 'boundary'; position: 'start' | 'mid' | 'end'; offset?: AnchorOffset; sign: 1 | -1 }
+  | { kind: 'boundary'; position: 'start' | 'end'; offset?: AnchorOffset; sign: 1 | -1 }
   | { kind: 'word'; word: string };
 
 export type ParsedAnchor = { beatId: string; target: AnchorTarget };
@@ -40,7 +40,7 @@ const BEAT_ID = '[A-Za-z0-9_-]+';
  * `b2.word:London` stops parsing and the failure looks like bad syntax rather than a bad
  * flag. Both expressions carry it so the two branches cannot drift apart.
  */
-const BOUNDARY_RE = new RegExp(`^(${BEAT_ID})\\.(start|mid|end)(?:([+-])(short|long))?$`, 'u');
+const BOUNDARY_RE = new RegExp(`^(${BEAT_ID})\\.(start|end)(?:([+-])(short|long))?$`, 'u');
 const WORD_RE = new RegExp(`^(${BEAT_ID})\\.word:(${WORD_PATTERN})$`, 'u');
 
 /** One branch of the grammar, described once for every audience that needs it. */
@@ -79,16 +79,18 @@ export const ANCHOR_GRAMMAR = {
   rule: 'The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.',
   forms: [
     {
-      form: '<beatId>.start|mid|end',
+      form: '<beatId>.start|end',
       expectation: 'with an optional +short/-short/+long/-long offset',
       means:
-        'A boundary or the midpoint of one beat, optionally nudged by a rhythm token. ' +
-        'Use it when the moment follows the shape of the beat as a whole, and no ' +
-        'particular word justifies it. Rhythm tokens are absolute frame counts, not ' +
-        'fractions of the beat, so from `end` this form reaches only about a second ' +
-        'back; if a sentence is the reason the event happens when it does, name a word ' +
-        'of that sentence instead. `scene` is a pseudo-beat meaning the scene’s own bounds.',
-      examples: ['b2.start', 'b4.end-short', 'scene.mid'],
+        'An edge of one beat, optionally nudged by a rhythm token. Use it for the two ' +
+        'moments a beat genuinely has: where it begins and where it ends. There is no ' +
+        'midpoint form, because the middle of a beat is a fraction of a duration rather ' +
+        'than a moment anyone wrote, and which word it falls on cannot be known until ' +
+        'the take is recorded. Rhythm tokens are absolute frame counts, not fractions of ' +
+        'the beat, so this form reaches about a second in from either edge; anywhere ' +
+        'else inside the beat, name a word. `scene` is a pseudo-beat meaning the ' +
+        'scene’s own bounds.',
+      examples: ['b2.start', 'b4.end-short', 'scene.end'],
     },
     {
       form: '<beatId>.word:<word>',
@@ -98,7 +100,9 @@ export const ANCHOR_GRAMMAR = {
         'justified by a sentence: name the word that opens the justifying clause. An ' +
         'action listing `deicticFields` must use this form for those payload fields — ' +
         'that is an obligation on pointing gestures, never a permission gate on every ' +
-        'other event. The word must ' +
+        'other event. Two events that both name a word fire in the order their words are ' +
+        'spoken, which you can read off the beat text you wrote — so when the events of a ' +
+        'scene must not overtake one another, anchor all of them by word. The word must ' +
         'appear in that beat’s text exactly once — ' +
         'twice is an error, not a first match — and takes no offset, because an offset ' +
         'from a word onset is the arithmetic this form exists to avoid: if the event ' +
@@ -128,7 +132,7 @@ export const parseAnchor = (anchor: string): ParsedAnchor | null => {
     const [, beatId, position, sign, offset] = boundary as unknown as [
       string,
       string,
-      'start' | 'mid' | 'end',
+      'start' | 'end',
       '+' | '-' | undefined,
       AnchorOffset | undefined,
     ];

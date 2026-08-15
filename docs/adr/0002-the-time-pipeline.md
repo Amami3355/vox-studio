@@ -319,6 +319,12 @@ rule now would move every existing anchor in the catalog to serve a case that ha
 grammar. What changed is that an event with a word in mind is no longer forced to express
 itself in arithmetic.
 
+> **Superseded for `.mid` on 2026-08-15 by ADR-0010.** "They were never broken" held while
+> an anchor was judged alone. It fails as soon as two events share a scene: a midpoint cannot
+> be ordered against a word until the take exists, and in the shipped run that put a callout
+> 2.4 s ahead of the bar it described. `.mid` is removed from the grammar. The offsets are
+> untouched and this paragraph still describes them.
+
 And the vocabulary only reaches events that *name* something spoken. `annotate` names the
 bar its note attaches to, and takes its timing from the sentence that justifies the note,
 which may be a beat away — the slice's annotation reads "Twenty points above Berlin" and

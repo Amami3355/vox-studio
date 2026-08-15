@@ -248,10 +248,18 @@ The trap to name early: if a frame looks wrong and the component is drawing exac
 told, the defect is here — or one level further up, in the plan, which is not ours.
 
 **Worked example, 2026-08-15.** `pilot-budget` draws only one of its two bars for the first half
-of its scene. Nothing is broken: the plan writes `revealAll` at `b6.mid`, the compiler resolves
-that to frame 364 of 728, and the renderer obeys. The agent chose it. Read the anchors in
+of its scene. Nothing is broken in the renderer: the plan writes `revealAll` at `b6.mid`, the
+compiler resolves that to frame 364 of 728, and the renderer obeys. Read the anchors in
 `inputs/plans/*.json` before reading any timing as a defect — three of the five bar scenes in this
 run reveal at `mid`.
+
+**Amended the same day.** The agent chose it, but it could not have chosen well. Re-rendering the
+run with ADR-0009's word anchors put the `pilot-budget` callout at frame 292 and left `revealAll`
+at 364, so the note about spending arrived 2.4 s *before* the spending bar. `mid` is a fraction of
+a duration that does not exist until the take is recorded, and it cannot be ordered against a
+word. **ADR-0010 retires it**; `manifestVersion` is 4 and this plan no longer compiles. The repair
+is to name the word each `revealAll` was waiting for — `b6.word:spent`, which the narration speaks
+just before "leaving".
 
 ## Z8 — Where a change is judged
 

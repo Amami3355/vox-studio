@@ -55,12 +55,20 @@ are the Remotion domain; the compiler is the one place they meet.
 a beat travels through: `Beat` narrative → `TimedBeat` audio → `FrameBeat` Remotion. Only
 the compiler crosses the second seam. Avoid: calling any of the three just "beat" in code.
 
-**Anchor** — A symbolic point in time: `b4.start`, `b5.mid`, `scene.end-short`,
-`b2.word:London`. The agent writes anchors. The compiler writes frames. An agent that
-writes a frame is a bug. The grammar has one definition, `ANCHOR_GRAMMAR` in
-`core/anchor-grammar.ts`, and both the compiler's rejection message and the manifest's
-`time` block are generated from it — an anchor vocabulary the manifest does not publish is
-one rule 2 makes unlearnable.
+**Anchor** — A symbolic point in time: `b4.start`, `scene.end-short`, `b2.word:London`. The
+agent writes anchors. The compiler writes frames. An agent that writes a frame is a bug. The
+grammar has one definition, `ANCHOR_GRAMMAR` in `core/anchor-grammar.ts`, and both the
+compiler's rejection message and the manifest's `time` block are generated from it — an
+anchor vocabulary the manifest does not publish is one rule 2 makes unlearnable.
+
+**Boundary anchor** — The arithmetic form: an **edge** of a beat, optionally nudged by a
+rhythm token. Two edges only. `b5.mid` was legal through `manifestVersion` 3 and was retired
+by ADR-0010: the middle of a beat is a fraction of a duration rather than a moment anyone
+wrote, and no one can say which word it lands on until the take exists. Offsets are absolute
+frame counts, so this form reaches about a second in from either edge and no further. `scene`
+is the pseudo-beat for a scene's own bounds and carries this form only. Avoid: "the default
+anchor" — it is the form for the two moments a beat genuinely has, not the one to reach for
+first.
 
 **Word anchor** — The one anchor form that names a word instead of arithmetic:
 `b2.word:London` resolves to the frame the narrator begins that word. Available to **any**
@@ -68,10 +76,12 @@ event, not only to a pointing gesture: a Deictic field makes this form an obliga
 a permission, and any event whose moment is justified by a sentence may name a word of that
 sentence. The word must appear **exactly once** in that beat: twice is `AMBIGUOUS_ANCHOR`,
 since picking one silently is the defect this form exists to repair. No offset is allowed.
-Resolvable only against a real take, never `syntheticBeats`. See ADR-0002's last amendment,
-and ADR-0009 for why the narrower reading cost the shipped run two late callouts. Avoid:
-"snapping", which was measured and rejected; and "the word anchor is for highlights", which
-is the narrowing itself.
+Resolvable only against a real take, never `syntheticBeats`. Two events that both name a word
+fire in the order their words are spoken, which the agent can read off the beat text it
+wrote — the property ADR-0010 retired the midpoint to protect, since a word cannot be ordered
+against a fraction. See ADR-0002's last amendment, and ADR-0009 for why the narrower reading
+cost the shipped run two late callouts. Avoid: "snapping", which was measured and rejected;
+and "the word anchor is for highlights", which is the narrowing itself.
 
 **Timed word** — One word of a beat and the moment it begins, in milliseconds. Carried on
 the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information

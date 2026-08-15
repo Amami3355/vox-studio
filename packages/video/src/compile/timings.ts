@@ -190,7 +190,7 @@ const checkAnchoredWords = (plan: VideoPlan, beats: TimedBeat[]): CompilerError[
       errors.push({
         code: 'INVALID_TIMING_INPUT',
         field: `beats.${parsed.beatId}.words`,
-        message: `Anchor "${at}" names a word of beat "${parsed.beatId}", but this take carries no word timings for it. A word anchor resolves against a recorded take; this one was assembled without folding an alignment, so there is no measured onset to cut on. Record the take, or anchor to ${parsed.beatId}.start, ${parsed.beatId}.mid or ${parsed.beatId}.end.`,
+        message: `Anchor "${at}" names a word of beat "${parsed.beatId}", but this take carries no word timings for it. A word anchor resolves against a recorded take; this one was assembled without folding an alignment, so there is no measured onset to cut on. Record the take, or anchor to ${parsed.beatId}.start or ${parsed.beatId}.end.`,
       });
     }
   }

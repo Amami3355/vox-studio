@@ -29,10 +29,22 @@ describe('syntheticBeats', () => {
 });
 
 describe('resolveAnchor', () => {
-  it('resolves start, mid and end', () => {
+  it('resolves start and end', () => {
     expect(resolveAnchor('b2.start', beats, bounds)).toBe(100);
-    expect(resolveAnchor('b2.mid', beats, bounds)).toBe(150);
     expect(resolveAnchor('b2.end', beats, bounds)).toBe(200);
+  });
+
+  /**
+   * The decision of ADR-0010, guarded where it is cheapest to guard. `mid` parsed and
+   * resolved for two manifest versions, so its absence is a deliberate narrowing and not
+   * an oversight — and an agent trained on `manifestVersion: 3` will still write it.
+   * A rejection is the only thing that tells such an agent the form is gone; resolving it
+   * to the halfway frame is what made a callout overtake its own bar.
+   */
+  it('rejects the retired midpoint form rather than resolving it', () => {
+    expect(() => resolveAnchor('b2.mid', beats, bounds)).toThrow(UnknownAnchorError);
+    expect(() => resolveAnchor('b2.mid-short', beats, bounds)).toThrow(UnknownAnchorError);
+    expect(() => resolveAnchor('scene.mid', beats, bounds)).toThrow(UnknownAnchorError);
   });
 
   it('applies symbolic offsets in both directions', () => {
@@ -109,17 +121,18 @@ describe('word anchors', () => {
 
   /**
    * The assertion that says why this vocabulary exists rather than a snapping rule. `b2`'s
-   * boundaries and midpoint are 100, 150 and 200; "London" is at 121, which is not the
-   * nearest anything. No arithmetic over this beat produces it.
+   * edges are 100 and 200; "London" is at 121, which is not the nearest anything. No
+   * arithmetic over this beat produces it — and since ADR-0010 retired the midpoint, the
+   * arithmetic branch reaches even less of the beat than when this test was written.
    */
-  it('reaches a frame no boundary, midpoint or offset of that beat can', () => {
+  it('reaches a frame no boundary or offset of that beat can', () => {
     const arithmetic = [
       resolveAnchor('b2.start', spoken, bounds),
-      resolveAnchor('b2.mid', spoken, bounds),
       resolveAnchor('b2.end', spoken, bounds),
       resolveAnchor('b2.start+short', spoken, bounds),
       resolveAnchor('b2.start+long', spoken, bounds),
-      resolveAnchor('b2.mid-short', spoken, bounds),
+      resolveAnchor('b2.end-short', spoken, bounds),
+      resolveAnchor('b2.end-long', spoken, bounds),
     ];
 
     expect(arithmetic).not.toContain(121);

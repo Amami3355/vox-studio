@@ -219,7 +219,7 @@ const movingElementPlan = withPersistent([
     assetRequirement: narratorRequirement,
     placements: [
       { at: 'b1.start', slot: 'cornerBR' },
-      { at: 'b1.mid', slot: 'cornerBL' },
+      { at: 'b1.end-long', slot: 'cornerBL' },
       { at: 'b2.start', slot: 'cornerTR' },
     ],
   },

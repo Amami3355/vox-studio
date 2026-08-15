@@ -49,7 +49,7 @@ export type CatalogEntry = SceneMeta & {
 
 export type Catalog = {
   /** Bumped by hand when the shape of this file changes, not on every regeneration. */
-  manifestVersion: 3;
+  manifestVersion: 4;
   /**
    * Rule 3's vocabulary, which is not a property of any one capability.
    *
@@ -98,7 +98,7 @@ export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => 
 });
 
 export const buildCatalog = (): Catalog => ({
-  manifestVersion: 3,
+  manifestVersion: 4,
   time: ANCHOR_GRAMMAR,
   checks: COMPILER_CHECKS,
   capabilities: registry.map(buildCatalogEntry),
