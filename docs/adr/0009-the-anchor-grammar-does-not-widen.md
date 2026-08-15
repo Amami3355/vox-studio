@@ -1,6 +1,6 @@
 # ADR-0009 — The anchor grammar does not widen
 
-**Status:** proposed · 2026-08-15
+**Status:** accepted · 2026-08-15
 **Scope:** the vocabulary an agent may write for a point in time inside one beat. Extends
 ADR-0002, which built the grammar and its two branches; nothing in that document is
 superseded.
@@ -121,8 +121,10 @@ branch was built to end.
 - The 84% hole in the boundary branch is real and stays open. It is now written down with
   its arithmetic, so the next reader meets a measured gap and a rejected repair rather than
   the false claim that the grammar cannot reach past `end-long`.
-- `docs/render-surface.md` §Z7 and `BarChartScene/layouts.ts` both still carry that false
-  claim and want the same correction they received on 2026-08-15 for the previous one.
+- `docs/render-surface.md` §Z7, `BarChartScene/layouts.ts` and `CONTEXT.md`'s **Word anchor**
+  entry all carried that false claim and were corrected on 2026-08-15, alongside this
+  document. Each records the correction rather than overwriting the error, so a reader who
+  met the old claim elsewhere finds out it was retracted.
 - Word anchors need a recorded take. Catalog examples run on `syntheticBeats` with
   `words: []` and cannot illustrate the guidance this document sharpens — the same
   constraint ADR-0002 accepted when it put deictic landing on plans rather than instances.
