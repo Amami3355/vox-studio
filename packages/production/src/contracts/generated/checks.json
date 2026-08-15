@@ -51,6 +51,12 @@
         "means": "A pointing action does not land while the narration says the value it identifies.",
         "repair": "Move the event to one of the word anchors listed in expected."
       },
+      "EVENTS_OUT_OF_ORDER": {
+        "code": "EVENTS_OUT_OF_ORDER",
+        "regime": "error",
+        "means": "A scene lists its events in one order and they resolve to frames in another.",
+        "repair": "Move the overtaking event to a later anchor, or reorder the list so it reads in the order it plays."
+      },
       "UNKNOWN_SLOT": {
         "code": "UNKNOWN_SLOT",
         "regime": "error",

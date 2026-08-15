@@ -74,6 +74,11 @@
         "avoid": "\"snapping\", which was measured and rejected; and \"the word anchor is for highlights\", which is the narrowing itself."
       },
       {
+        "term": "Event order",
+        "definition": "A scene's `events` array is a script: the order the events are written is the order they play. Equal frames are legal — two events on one moment fold in written order — so each event must land *at or after* the one above it, never strictly later. Judged on the **resolved** frames and therefore at compile time, never in the schema: an anchor is a string until a Take turns it into a moment. Violating it is `EVENTS_OUT_OF_ORDER`. See ADR-0011, and ADR-0010 for the shipped callout that arrived 72 frames before the bar it described.",
+        "avoid": "reading it as \"events are sorted for you\" — the runtime does sort by frame (the canonical implementation source), and that sort is exactly what turned an out-of-order list into a silent defect instead of a visible one."
+      },
+      {
         "term": "Timed word",
         "definition": "One word of a beat and the moment it begins, in milliseconds. Carried on the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information beside the beat, the same information the alignment always had. Empty means \"this take was never recorded\", which is legal; a word anchor against it is not, and it is a property of the *take* — a take with words on some beats and not others is refused.",
         "avoid": null

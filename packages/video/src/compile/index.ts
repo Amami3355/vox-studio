@@ -18,7 +18,9 @@ import {
   NO_SAFE_AREA,
   type ResolvedSceneAssets,
   type SceneCapability,
+  type SemanticEvent,
   type TimedBeat,
+  type TimedEvent,
 } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
 import { FPS } from '../design/theme';
@@ -123,6 +125,9 @@ export const compile = ({
       const assets = resolveSceneAssets(scene, resolver);
       reportDegradedAssets(assets, scene.id, section.id, warnings);
 
+      const events = resolveEventTimings(scene.events ?? [], frameBeats, sceneBounds);
+      checkEventOrder(scene.events ?? [], events, scene.id, section.id, errors);
+
       return {
         id: scene.id,
         capabilityId: scene.component,
@@ -136,7 +141,7 @@ export const compile = ({
         motionProfile: scene.motionProfile ?? 'subtleDrift',
         assets,
         ...sceneBounds,
-        events: resolveEventTimings(scene.events ?? [], frameBeats, sceneBounds),
+        events,
         safeArea: NO_SAFE_AREA,
       };
     });
@@ -322,6 +327,47 @@ const checkDuration = (
       suggestion:
         'It will read as hurried rather than broken. Let it span another beat, or move some ' +
         'of what it says into the scene next to it.',
+    });
+  }
+};
+
+/**
+ * ADR-0011: the events array is a script, and the compiler holds it to that.
+ *
+ * The second check a plan alone cannot answer, and for the same reason as the first. An
+ * anchor is a string until a Take exists — `b6.mid` and `b6.word:leaving` have no order
+ * between them until someone has spoken "leaving" — so this cannot live in the schema or in
+ * `validateVideoPlan`, and runs here on the frames `resolveEventTimings` has just produced.
+ *
+ * Reported against the *later-written* event, because that is the one whose anchor has to
+ * move, and the message names both frames rather than only the breach: an author looking at
+ * two word anchors needs to know which of the two words the take put first.
+ *
+ * `>=` and not `>`. Two events on one moment is ordinary authoring, `resolveEvents` folds
+ * them in written order because `Array.prototype.sort` is stable, and a strict rule would
+ * refuse plans that were never wrong.
+ */
+const checkEventOrder = (
+  authored: SemanticEvent[],
+  timed: TimedEvent[],
+  sceneId: string,
+  sectionId: string,
+  errors: CompilerError[],
+): void => {
+  for (let i = 1; i < timed.length; i++) {
+    const previous = timed[i - 1] as TimedEvent;
+    const current = timed[i] as TimedEvent;
+    if (current.frame >= previous.frame) continue;
+
+    const before = authored[i - 1] as SemanticEvent;
+    const after = authored[i] as SemanticEvent;
+
+    errors.push({
+      code: 'EVENTS_OUT_OF_ORDER',
+      sceneId,
+      sectionId,
+      field: `events[${i}].at`,
+      message: `Event ${i + 1} ("${after.action}" at "${after.at}", frame ${current.frame}) is written after event ${i} ("${before.action}" at "${before.at}", frame ${previous.frame}) but lands ${previous.frame - current.frame} frames earlier. A scene's events play in the order they are written. An event that overtakes the one above it means the anchors disagree with the script. Re-anchor one of them, or swap the two lines.`,
     });
   }
 };

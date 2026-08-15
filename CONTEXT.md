@@ -83,6 +83,16 @@ against a fraction. See ADR-0002's last amendment, and ADR-0009 for why the narr
 cost the shipped run two late callouts. Avoid: "snapping", which was measured and rejected;
 and "the word anchor is for highlights", which is the narrowing itself.
 
+**Event order** — A scene's `events` array is a script: the order the events are written is
+the order they play. Equal frames are legal — two events on one moment fold in written order
+— so each event must land *at or after* the one above it, never strictly later. Judged on the
+**resolved** frames and therefore at compile time, never in the schema: an anchor is a string
+until a Take turns it into a moment. Violating it is `EVENTS_OUT_OF_ORDER`. See ADR-0011, and
+ADR-0010 for the shipped callout that arrived 72 frames before the bar it described. Avoid:
+reading it as "events are sorted for you" — the runtime does sort by frame
+(`core/events.ts`), and that sort is exactly what turned an out-of-order list into a silent
+defect instead of a visible one.
+
 **Timed word** — One word of a beat and the moment it begins, in milliseconds. Carried on
 the `TimedBeat`, and required to be exactly the beat's own text tokenised — not information
 beside the beat, the same information the alignment always had. Empty means "this take was

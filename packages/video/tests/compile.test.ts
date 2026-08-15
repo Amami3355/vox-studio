@@ -596,6 +596,87 @@ describe('compile', () => {
     );
   });
 
+  /**
+   * ADR-0011. The second gate the plan alone could never answer, and for the same reason as
+   * the first: two anchors have no order between them until a take says when their words
+   * were spoken. `b1.start` before `b2.start` is arithmetic; `b2.word:London` before
+   * `b2.word:extreme` is a fact about a recording.
+   */
+  describe('holds a scene to the order its events are written in', () => {
+    const note = { label: 'London', text: 'the extreme case' };
+
+    const withEvents = (events: SceneInstance['events']): VideoPlan => ({
+      ...onePlan,
+      sections: [
+        {
+          ...(onePlan.sections[0] as VideoPlanSection),
+          scenes: [{ ...(onePlan.sections[0]?.scenes[0] as SceneInstance), events }],
+        },
+      ],
+    });
+
+    it('refuses a plan whose events compile out of the order they are written in', () => {
+      const result = compile({
+        plan: withEvents([
+          { at: 'b2.start', action: 'showBaseline' },
+          { at: 'b1.start', action: 'annotate', payload: note },
+        ]),
+        beats: timedBeats,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.document).toBeNull();
+      expect(result.report.errors).toContainEqual(
+        expect.objectContaining({
+          code: 'EVENTS_OUT_OF_ORDER',
+          sceneId: 'scene1',
+          field: 'events[1].at',
+        }),
+      );
+    });
+
+    /**
+     * The `at or after` half of the rule, and the reason it is not `strictly after`: two
+     * events on one moment is ordinary authoring, and `resolveEvents` folds such a pair in
+     * written order because `Array.prototype.sort` is stable. A strict rule would refuse
+     * this plan, which was never wrong.
+     */
+    it('accepts two events that land on the same frame', () => {
+      const result = compile({
+        plan: withEvents([
+          { at: 'b1.start', action: 'showBaseline' },
+          { at: 'b1.start', action: 'annotate', payload: note },
+        ]),
+        beats: timedBeats,
+      });
+
+      if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+      expect(result.report.errors).toEqual([]);
+    });
+
+    /**
+     * Both frames in the message, not only the breach. Two word anchors are the case
+     * ADR-0010 kept the word form for, and an author staring at two words needs to be told
+     * which of them the take put first — the rejection is the only place that is known.
+     */
+    it('names both frames when two word anchors overtake', () => {
+      const result = compile({
+        plan: withEvents([
+          { at: 'b2.word:extreme', action: 'showBaseline' },
+          { at: 'b2.word:London', action: 'annotate', payload: note },
+        ]),
+        beats: timedBeats,
+      });
+
+      expect(result.ok).toBe(false);
+      const error = result.report.errors.find((e) => e.code === 'EVENTS_OUT_OF_ORDER');
+      // "extreme" is 6000ms and frame 180; "London" is 3000ms and frame 90.
+      expect(error?.message).toContain('frame 180');
+      expect(error?.message).toContain('frame 90');
+      expect(error?.message).toContain('90 frames earlier');
+    });
+  });
+
   it('warns about a scene that plays, but plays hurried', () => {
     const result = compile({ plan: continuityPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
