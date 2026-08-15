@@ -105,10 +105,19 @@ export const barChartGeometry = {
    *
    * The layout repair still stands on its own: a column reserved before it is occupied is
    * wrong whatever the timing does. What changes is that **the timing is reopenable**, and
-   * that the interesting half of it is upstream of both — from `end` the agent's entire
-   * vocabulary is `-short` (0.4 s) and `-long` (1.13 s), so "well before the end of this
-   * beat" is a sentence the grammar cannot say. The agent took the latest-but-one option
-   * it had.
+   * that the interesting half of it is upstream of both.
+   *
+   * **Second correction, 2026-08-15.** This comment then said "from `end` the agent's
+   * entire vocabulary is `-short` and `-long`, so 'well before the end of this beat' is a
+   * sentence the grammar cannot say". Also false. It is true of the *boundary* branch —
+   * whose offsets are absolute frame counts, so in b2's 833 frames it reaches eleven frames
+   * in three knots and leaves 84% of the beat out of range — but word anchors reach any
+   * word onset and are open to any event, `deicticFields` being an obligation rather than a
+   * permission. `b2.word:steady` is frame 584 and `b6.word:leaving` is 292, each the onset
+   * of the sentence justifying its own annotation, 7.2 s and 13.4 s earlier than what was
+   * written. The same plan anchors `revealAll` at `b2.word:January` with no deictic field
+   * declared. See ADR-0009: the grammar does not widen, and the repair is two anchor
+   * strings in a plan we do not own.
    */
   calloutColumns: 34,
   chartColumns: 62,

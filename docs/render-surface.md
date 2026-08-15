@@ -316,10 +316,19 @@ anchors do appear in the same scene, on `revealAll` (`b2.word:January`) and `hig
 (`b2.word:March`), which is where the error came from.
 
 **So the callout timing is reopenable, and the interesting half of it is upstream of Z7.** From
-`end` the agent's whole vocabulary is `-short` (0.4 s) and `-long` (1.13 s):
-`core/anchor-grammar.ts` offers no way to say *well* before the end of a beat. The agent took the
-latest-but-one option it had. Widening that grammar changes what an agent is allowed to write and
-wants an ADR, not a commit.
+`end` the *boundary* branch offers only `-short` (0.4 s) and `-long` (1.13 s), and those are
+absolute frame counts rather than fractions of a beat — in b2's 833 frames the whole branch
+reaches eleven frames in three knots, leaving two holes of 11.6 s each, 84% of the beat.
+
+**Correction, 2026-08-15 — the grammar was never the constraint.** This paragraph used to end
+"`core/anchor-grammar.ts` offers no way to say *well* before the end of a beat", and that is
+false. Word anchors reach any word onset in the beat and are available to any event —
+`deicticFields` is an obligation, not a permission. `b2.word:steady` resolves to frame 584 (70%
+in) and `b6.word:leaving` to 292 (40% in), each the onset of the sentence that justifies its own
+annotation: 7.2 s and 13.4 s earlier than what was written. The same plan already uses the branch
+for `revealAll` at `b2.word:January`, which declares no deictic field. **ADR-0009** records the
+decision not to widen the grammar, the 84% hole it leaves open on purpose, and the manifest
+wording that taught the narrow reading.
 
 What this does **not** claim: that ticket 22's row now passes. One offending element is repaired.
 The row is a human verdict on a whole preview, and no named evaluator has watched a rebuilt one.

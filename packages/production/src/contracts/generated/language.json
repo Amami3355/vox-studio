@@ -65,8 +65,8 @@
       },
       {
         "term": "Word anchor",
-        "definition": "The one anchor form that names a word instead of arithmetic: `b2.word:London` resolves to the frame the narrator begins that word. For events that must land on what is being said — a highlight is a pointing gesture — because no boundary, midpoint or offset of a beat lands on a particular word. The word must appear **exactly once** in that beat: twice is `AMBIGUOUS_ANCHOR`, since picking one silently is the defect this form exists to repair. No offset is allowed. Resolvable only against a real take, never `syntheticBeats`. See ADR-0002's last amendment.",
-        "avoid": "\"snapping\", which was measured and rejected."
+        "definition": "The one anchor form that names a word instead of arithmetic: `b2.word:London` resolves to the frame the narrator begins that word. Available to **any** event, not only to a pointing gesture: a Deictic field makes this form an obligation, never a permission, and any event whose moment is justified by a sentence may name a word of that sentence. The word must appear **exactly once** in that beat: twice is `AMBIGUOUS_ANCHOR`, since picking one silently is the defect this form exists to repair. No offset is allowed. Resolvable only against a real take, never `syntheticBeats`. See ADR-0002's last amendment, and ADR-0009 for why the narrower reading cost the shipped run two late callouts.",
+        "avoid": "\"snapping\", which was measured and rejected; and \"the word anchor is for highlights\", which is the narrowing itself."
       },
       {
         "term": "Timed word",
