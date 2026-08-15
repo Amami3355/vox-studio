@@ -7,6 +7,7 @@ import {
   validateVideoPlan,
 } from '../src/catalog/tools';
 import type { PersistentElement, Placement, SceneInstance } from '../src/core/types';
+import { barChartSchema } from '../src/scenes/BarChartScene';
 import { registry } from '../src/scenes/registry';
 
 /** The three-beat plan most partition tests vary one section of. */
@@ -729,6 +730,39 @@ describe('validateVideoPlan — the structural gate', () => {
     expect(validateVideoPlan(withScenes([sound('s1', ['b1', 'b2']), sound('s2', ['b3'])])).ok).toBe(
       true,
     );
+  });
+});
+
+/**
+ * The value axis is a choice the agent makes, and this is the decision worth pinning:
+ * which way it falls when the agent says nothing. Every plan written before the field
+ * existed omits it, so a default of `false` would silently strip the axis off work that
+ * was already reviewed with one. The rendered result is a frame and a human's job; that
+ * the omission means "keep the axis" is arithmetic and belongs here.
+ */
+describe('the value axis is optional', () => {
+  it('defaults to on, so a plan that never mentions it keeps its axis', () => {
+    const parsed = barChartSchema.parse({
+      title: 'Share of income spent on rent',
+      data: [{ label: 'London', value: 47 }],
+    });
+
+    expect(parsed.gridlines).toBe(true);
+  });
+
+  it('accepts an axis the agent turned off', () => {
+    const report = validateScene(base({ props: { ...base().props, gridlines: false } }));
+
+    expect(report.ok).toBe(true);
+    expect(report.errors).toEqual([]);
+  });
+
+  it('rejects anything that is not a yes or a no', () => {
+    const report = validateScene(base({ props: { ...base().props, gridlines: 'off' } }));
+
+    expect(report.ok).toBe(false);
+    expect(report.errors[0]?.code).toBe('INVALID_PROPS');
+    expect(report.errors[0]?.field).toBe('gridlines');
   });
 });
 

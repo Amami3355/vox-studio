@@ -165,10 +165,27 @@ differently-muted hues read as mud. Category labels are uppercase, `tracking.wid
 at 14 chars vertical / 22 horizontal. And in the vertical orientation **only the highlighted bar
 carries its number** — the axis states the rest, and printing both is the same fact twice.
 
+**The axis is the agent's choice, through `gridlines` in the schema, and it defaults to on.**
+The switch does not add or remove a decoration; it moves where the reader gets a number from,
+and the two settings are one design each:
+
+| `gridlines` | the plot | the numbers |
+| --- | --- | --- |
+| `true` (default) | axis drawn, plot indented by a measured gutter | only the highlighted bar prints one |
+| `false` | no axis, no gutter, zero line still drawn | every bar prints its own, receding with its bar |
+
+A plot with neither an axis nor per-bar numbers states no quantity at all, so the second column
+is not a separate switch and must not become one. The default is `true` and not `false` for a
+migration reason as much as a design one: every plan authored before the field existed omits it,
+and a default of `false` would strip the axis off work that had already been reviewed with one.
+The zero line is unaffected either way — it is a fact about the data, not part of the ruler.
+
 **Gridlines are vertical-only, by decision.** A horizontal bar chart in this system is a ranking:
 the value sits at the end of its own bar where the eye already is, and an axis underneath asks
 the reader to travel for a number they were just handed. The losing alternative — both
-orientations, for consistency — is argued in `Gridlines.tsx`'s header.
+orientations, for consistency — is argued in `Gridlines.tsx`'s header. The horizontal branch
+therefore ignores `gridlines` entirely, and the compiler stays silent about it rather than
+warning: the value it is ignoring is usually the default, which the agent never wrote.
 
 **Cost of intervening.** Medium-high. Three files, and it is half of what the human evaluator
 was looking at, and the render contract tests measure its frames.

@@ -290,6 +290,11 @@
               "type": "string",
               "maxLength": 8
             },
+            "gridlines": {
+              "default": true,
+              "description": "Draw the value axis behind the bars. On, the axis states every value and only the highlighted bar prints its own number. Off, the axis disappears and every bar prints its number instead — choose that when the shot is short, when the chart shares the row with a callout, or when the exact figures are the point. Ignored by the horizontal layout, which is a ranking and never draws an axis.",
+              "type": "boolean"
+            },
             "highlight": {
               "description": "The `label` of the bar to bring forward. Every other bar recedes toward the background. Must match a label present in `data`.",
               "type": "string"
@@ -422,6 +427,7 @@
               "title": "Share of income spent on rent",
               "unit": "%",
               "emphasis": "negative",
+              "gridlines": true,
               "data": [
                 {
                   "label": "Berlin",
@@ -466,7 +472,7 @@
           {
             "id": "example-annotated-comparison",
             "title": "Annotated comparison",
-            "note": "Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it.",
+            "note": "Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it. Also the axis-down case — the chart gives up a third of the row, so five printed figures cost less width than a ruler plus its number column.",
             "component": "bar_chart",
             "layout": "withCallout",
             "motionProfile": "pushIn",
@@ -481,6 +487,7 @@
               "title": "Median deposit needed for a first home",
               "unit": "k",
               "emphasis": "neutral",
+              "gridlines": false,
               "highlight": "2025",
               "data": [
                 {

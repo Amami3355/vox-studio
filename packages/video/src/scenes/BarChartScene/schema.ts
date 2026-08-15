@@ -41,6 +41,17 @@ export const barChartSchema = z.object({
     .default('')
     .describe("Suffix appended to every value, e.g. '%' or '€'. Empty for bare numbers."),
 
+  gridlines: z
+    .boolean()
+    .default(true)
+    .describe(
+      'Draw the value axis behind the bars. On, the axis states every value and only the ' +
+        'highlighted bar prints its own number. Off, the axis disappears and every bar ' +
+        'prints its number instead — choose that when the shot is short, when the chart ' +
+        'shares the row with a callout, or when the exact figures are the point. Ignored ' +
+        'by the horizontal layout, which is a ranking and never draws an axis.',
+    ),
+
   highlight: z
     .string()
     .optional()

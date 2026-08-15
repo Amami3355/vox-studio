@@ -166,6 +166,7 @@ const ChartFrame: React.FC<{
       unit={props.unit}
       profile={profile}
       orientation={variant === 'horizontal' ? 'horizontal' : 'vertical'}
+      gridlines={props.gridlines}
     />
   );
 

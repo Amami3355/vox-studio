@@ -28,6 +28,15 @@ export type BarGroupProps = {
   unit: string;
   profile: MotionProfile;
   orientation: 'vertical' | 'horizontal';
+  /**
+   * Whether the vertical plot carries a value axis.
+   *
+   * Not a decoration switch: it decides *where the reader gets a number from*. With the
+   * axis the chart is a shape against a ruler and only the named bar prints its figure;
+   * without it every bar prints its own, because a plot with neither states no quantity
+   * at all. The horizontal branch ignores it — a ranking never had an axis.
+   */
+  gridlines: boolean;
 };
 
 /** How far a non-highlighted bar recedes toward the background. */
@@ -43,6 +52,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   unit,
   profile,
   orientation,
+  gridlines,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -58,9 +68,12 @@ export const BarGroup: React.FC<BarGroupProps> = ({
    */
   const axis = valueAxis(data.map((d) => d.value));
   const { span, zeroRatio } = axis;
-  // Measured unconditionally because it is a hook, and used only by the vertical branch:
-  // the horizontal one is a ranking and draws no axis. `Gridlines` argues that decision.
-  const gutter = useAxisGutter(axis, unit);
+  // Measured unconditionally because it is a hook, and spent only where an axis is drawn:
+  // the horizontal branch is a ranking and never draws one, and the vertical branch draws
+  // one only when asked. `Gridlines` argues the first decision, `gridlines` carries the
+  // second. Reserving the indent with no numbers in it would be a margin, not a gutter.
+  const measuredGutter = useAxisGutter(axis, unit);
+  const gutter = gridlines ? measuredGutter : 0;
 
   const highlightProgress =
     highlighted === null
@@ -173,7 +186,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
           paddingLeft: gutter,
         }}
       >
-        <Gridlines axis={axis} unit={unit} gutter={gutter} />
+        {gridlines ? <Gridlines axis={axis} unit={unit} gutter={gutter} /> : null}
         <div
           style={{
             position: 'absolute',
@@ -192,12 +205,18 @@ export const BarGroup: React.FC<BarGroupProps> = ({
           return (
             <div key={d.label} style={{ flex: 1, position: 'relative' }}>
               {/*
-                Only the bar the narration named carries its number. The axis already
-                states every other value, and printing all of them over a ruler that says
-                the same thing is the clutter the gridlines were drawn to remove. With no
-                highlight the chart is a shape and an axis, which is the anchors' default.
+                With the axis up, only the bar the narration named carries its number: the
+                axis already states every other value, and printing all of them over a ruler
+                that says the same thing is the clutter the gridlines were drawn to remove.
+                With no highlight the chart is then a shape and an axis, which is the
+                anchors' default.
+
+                With the axis down, every bar carries its own — the numbers are the only
+                quantity left in the frame. This is the pre-axis behaviour, kept reachable
+                rather than deleted, because a short shot or a chart squeezed beside a
+                callout can read four figures faster than it can read a ruler.
               */}
-              {d.label === highlighted ? (
+              {d.label === highlighted || !gridlines ? (
                 <div
                   style={{
                     position: 'absolute',
@@ -212,7 +231,13 @@ export const BarGroup: React.FC<BarGroupProps> = ({
                     fontFamily: theme.type.display,
                     fontSize: valueSize,
                     fontWeight: theme.type.weight.bold,
-                    color: theme.color.ink,
+                    // Only the axis-down branch can reach a number on an unnamed bar, and
+                    // that number has to recede with the bar it belongs to or the highlight
+                    // stops being a highlight. Same rule the horizontal branch already uses.
+                    color:
+                      d.label === highlighted || highlighted === null
+                        ? theme.color.ink
+                        : inkFor(d.label),
                     fontVariantNumeric: 'tabular-nums',
                     letterSpacing: `${theme.type.tracking.tight * valueSize}px`,
                     opacity: Math.min(1, p * 2),

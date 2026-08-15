@@ -25,6 +25,7 @@ export const barChartExamples: SceneExample[] = [
       title: 'Share of income spent on rent',
       unit: '%',
       emphasis: 'negative',
+      gridlines: true,
       data: [
         { label: 'Berlin', value: 27 },
         { label: 'Paris', value: 33 },
@@ -43,7 +44,7 @@ export const barChartExamples: SceneExample[] = [
   {
     id: 'example-annotated-comparison',
     title: 'Annotated comparison',
-    note: 'Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it.',
+    note: 'Uses the withCallout layout: the chart holds the full row until the annotate event lands, then yields a column to it. Also the axis-down case — the chart gives up a third of the row, so five printed figures cost less width than a ruler plus its number column.',
     component: 'bar_chart',
     layout: 'withCallout',
     motionProfile: 'pushIn',
@@ -53,6 +54,7 @@ export const barChartExamples: SceneExample[] = [
       title: 'Median deposit needed for a first home',
       unit: 'k',
       emphasis: 'neutral',
+      gridlines: false,
       highlight: '2025',
       data: [
         { label: '2005', value: 18 },
