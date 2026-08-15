@@ -43,7 +43,7 @@ export const imageContextMeta: SceneMeta = {
     'presenting a typography-only statement → typographic_statement',
     'making a character carry the explanation → character_explainer',
   ],
-  supportsEvents: false,
+  supportsEvents: true,
   requiresAssets: true,
   occupiesRegions: ['full'],
   supportedCompositions: ['full', 'left', 'right'],

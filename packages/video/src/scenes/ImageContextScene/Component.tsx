@@ -1,6 +1,7 @@
 import type React from 'react';
-import { Img } from 'remotion';
+import { Img, useCurrentFrame } from 'remotion';
 import { ASSET_REQUIREMENT_FIELD } from '../../core/assets';
+import { resolveEvents } from '../../core/events';
 import type { AssetRef, SceneProps } from '../../core/types';
 import { type MotionProfile, staggerFrames } from '../../design/motion';
 import { type Theme, scaleStep } from '../../design/theme';
@@ -13,11 +14,13 @@ import {
   Reveal,
   SceneTitle,
   SlotFrame,
+  Stamp,
   useFrameBox,
   useSpace,
 } from '../../primitives';
 import { splitLeftGeometry } from './layouts';
 import type { ImageContextProps } from './schema';
+import { imageContextReducer, initialImageContextState } from './state';
 
 /**
  * The image half is the composition; the copy half supports it. Everything visual comes
@@ -36,6 +39,7 @@ import type { ImageContextProps } from './schema';
 export const ImageContextScene: React.FC<SceneProps<ImageContextProps>> = ({
   props,
   assets,
+  events,
   safeArea,
   theme,
   profile,
@@ -52,6 +56,7 @@ export const ImageContextScene: React.FC<SceneProps<ImageContextProps>> = ({
             caption={props.caption}
             subject={props.assetRequirement.subject}
             asset={asset}
+            events={events}
             profile={profile}
             theme={theme}
           />
@@ -66,13 +71,30 @@ const SplitLayout: React.FC<{
   caption: string;
   subject: string;
   asset: AssetRef | undefined;
+  events: SceneProps<ImageContextProps>['events'];
   profile: MotionProfile;
   theme: Theme;
-}> = ({ headline, caption, subject, asset, profile, theme }) => {
+}> = ({ headline, caption, subject, asset, events, profile, theme }) => {
   const outer = useSpace(5);
   const gap = useSpace(5);
   const copyGap = useSpace(3);
+  const stampPad = useSpace(4);
   const stagger = staggerFrames(profile);
+
+  /**
+   * The fold. Every frame below is read off it rather than written here, which is what
+   * lets a plan hold the plate back until the narration reaches its subject.
+   *
+   * `null` on either frame means the plan drove that reveal and it has not landed yet, so
+   * the half stays off the frame entirely — an empty column is the plan's choice, not a
+   * defect. With no events at all both are 0 and this renders exactly as it did before the
+   * action vocabulary existed.
+   */
+  const frame = useCurrentFrame();
+  const state = resolveEvents(events, frame, initialImageContextState(events), imageContextReducer);
+  const imageFrame = state.imageFrame.value;
+  const copyFrame = state.copyFrame.value;
+  const emphasis = state.emphasis.value;
 
   const box = useFrameBox();
   const stacked = box.width / box.height < splitLeftGeometry.stackBelowAspect;
@@ -111,20 +133,45 @@ const SplitLayout: React.FC<{
       }}
     >
       {/* The wipe follows the split: across the frame when the plate is a column, up out
-          of the copy when it is a band above it. */}
-      <Reveal
-        startFrame={0}
-        profile={profile}
-        direction={stacked ? 'up' : 'right'}
-        style={{
-          minWidth: 0,
-          minHeight: 0,
-          borderRadius: theme.radius[3],
-          overflow: 'hidden',
-        }}
-      >
-        <AssetPlate asset={asset} subject={subject} theme={theme} />
-      </Reveal>
+          of the copy when it is a band above it.
+
+          An empty cell while `imageFrame` is null. The grid keeps its shape, so the copy
+          does not jump sideways when the plate arrives — the plan asked for a held frame,
+          not for a different layout. */}
+      {imageFrame === null ? (
+        <div style={{ minWidth: 0, minHeight: 0 }} />
+      ) : (
+        <Reveal
+          startFrame={imageFrame}
+          profile={profile}
+          direction={stacked ? 'up' : 'right'}
+          style={{
+            minWidth: 0,
+            minHeight: 0,
+            borderRadius: theme.radius[3],
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <AssetPlate asset={asset} subject={subject} theme={theme} />
+          {/* Top of the plate, because the placeholder's subject label sits at the bottom
+              of it and the two would otherwise stack on the same corner. */}
+          {emphasis ? (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                padding: stampPad,
+                display: 'flex',
+              }}
+            >
+              <Stamp text={emphasis} startFrame={state.emphasis.since} profile={profile} />
+            </div>
+          ) : null}
+        </Reveal>
+      )}
 
       <div
         style={{
@@ -136,26 +183,31 @@ const SplitLayout: React.FC<{
           gap: copyGap,
         }}
       >
-        <ColumnProvider width={copyWidth}>
-          <Eyebrow startFrame={stagger} profile={profile}>
-            Visual context
-          </Eyebrow>
-          {headline ? (
-            <SceneTitle startFrame={stagger * 2} profile={profile}>
-              {headline}
-            </SceneTitle>
-          ) : null}
-          {caption ? (
-            <AnimatedText
-              startFrame={stagger * 3}
-              profile={profile}
-              step={1}
-              color={theme.color.inkMuted}
-            >
-              {caption}
-            </AnimatedText>
-          ) : null}
-        </ColumnProvider>
+        {/* The stagger is unchanged; only its origin moved. At `copyFrame` 0 — every
+            instance that carries no `revealCopy` — these are the same three frames the
+            scene has always used. */}
+        {copyFrame === null ? null : (
+          <ColumnProvider width={copyWidth}>
+            <Eyebrow startFrame={copyFrame + stagger} profile={profile}>
+              Visual context
+            </Eyebrow>
+            {headline ? (
+              <SceneTitle startFrame={copyFrame + stagger * 2} profile={profile}>
+                {headline}
+              </SceneTitle>
+            ) : null}
+            {caption ? (
+              <AnimatedText
+                startFrame={copyFrame + stagger * 3}
+                profile={profile}
+                step={1}
+                color={theme.color.inkMuted}
+              >
+                {caption}
+              </AnimatedText>
+            ) : null}
+          </ColumnProvider>
+        )}
       </div>
     </div>
   );

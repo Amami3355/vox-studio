@@ -53,6 +53,43 @@ export const imageContextExamples: SceneExample[] = [
       },
     },
   },
+  /**
+   * The only example that drives the scene from the plan, and it drives exactly two of the
+   * three verbs.
+   *
+   * `emphasize` is absent because it *cannot* be here: it declares a deictic field, so the
+   * compiler requires a word anchor for it, and a scene example has no take —
+   * `syntheticBeats` gives it `words: []`, against which a word anchor throws by design.
+   *
+   * Nothing is lost by the absence, and no example was invented elsewhere to compensate —
+   * one was, and it was removed. See ADR-0012, which is the decision this omission follows
+   * from, and the Teaching surface entry in `CONTEXT.md`. `bar_chart` makes the opposite
+   * choice with the same constraint and illustrates `highlightBar` at a boundary; both are
+   * legal under that ADR and neither is a defect.
+   */
+  {
+    id: 'example-driven-context',
+    title: 'Plan-driven reveal — the image lands before the copy',
+    note: 'The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject.',
+    component: 'image_context',
+    layout: 'splitLeft',
+    motionProfile: 'subtleDrift',
+    spansBeats: ['b1', 'b2'],
+    events: [
+      { at: 'b1.start', action: 'revealImage' },
+      { at: 'b2.start', action: 'revealCopy' },
+    ],
+    props: {
+      headline: 'A city built for cars, retrofitted for people',
+      caption: 'The rebuild took eleven years and two referendums.',
+      assetRequirement: {
+        type: 'image',
+        subject: 'Wide boulevard being narrowed for a tram line, seen from above',
+        treatment: 'photo',
+        orientation: 'landscape',
+      },
+    },
+  },
   {
     id: 'example-empty-context',
     title: 'Empty case — unresolved image and copy',

@@ -8,6 +8,15 @@
  * frames, and the whole symbolic-time contract collapses.
  *
  * At least three per capability, including one edge case and one empty case.
+ *
+ * **`highlightBar` is anchored to `b3.start` below, and that is deliberate. Do not
+ * "fix" it.** It declares a deictic field, so inside a real plan that anchor is refused by
+ * `DEICTIC_ANCHOR_REQUIRED` and the honest form is `b3.word:London`. An example cannot
+ * write it: it has no take, `syntheticBeats` gives it `words: []`, and a word anchor
+ * against that table throws — so the choice here is a boundary anchor or no illustration
+ * of the gesture at all. Editing these to word anchors stops both examples rendering and
+ * repairs nothing, because the agent is already handed the exact replacement string in the
+ * refusal's `expected`. See ADR-0012, and the Teaching surface entry in `CONTEXT.md`.
  */
 import type { SceneExample } from '../../core/types';
 

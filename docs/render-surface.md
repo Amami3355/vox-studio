@@ -192,16 +192,26 @@ was looking at, and the render contract tests measure its frames.
 
 ## Z5 — Editorial marks
 
-`primitives/Callout.tsx` (75) · `primitives/EmptyState.tsx` (44) · `primitives/Reveal.tsx` (43)
+`primitives/Callout.tsx` (75) · `primitives/EmptyState.tsx` (44) · `primitives/Reveal.tsx` (43) ·
+`primitives/Stamp.tsx` (70)
 
-**Owns.** The annotation, the honest empty frame, and the generic clipped wipe.
+**Owns.** The annotation, the honest empty frame, the generic clipped wipe, and the spoken-word
+stamp.
 
 `Callout` draws a rule and not an arrow — at documentary scale an arrowhead reads as a diagram.
 It is capped at `maxWidth: 520`. `EmptyState` degrades a no-data scene into a typographic frame,
 never a black screen.
 
-**Cost of intervening.** Cheap. Small, well-isolated, and `Callout` is currently the weakest-used
-element in the system — see the finding below.
+`Stamp` is deliberately not a `Callout` variant, and the distinction is what keeps this zone from
+collapsing into one component. A callout *explains* — body type, a rule, read alongside the thing
+it annotates. A stamp *is* the thing: it repeats a word the narrator is saying at the frame they
+say it, so it arrives at display scale on a solid ink plate, because the image underneath is one
+the scene cannot know and contrast that survives any photograph is worth more than show-through.
+Reusing `Callout` was tried first and read as a small label in a corner.
+
+**Cost of intervening.** Cheap. Small and well-isolated. `Callout` was long the weakest-used
+element here; `Stamp` is now the newest and the least proven — it has no accepted key frame, and
+has not been seen against a real photograph or in the `left`/`right` compositions.
 
 ## Z6 — Capability composition
 
@@ -373,7 +383,8 @@ would have abandoned the type scale to do it. See Z2 for the three-step degradat
 column seam that now applies it without a scene asking.
 
 **The lesson for this map is about Z8, not Z2.** The render suite was green before the fix and
-green after it, and the accepted key frames never moved: the three `image_context` examples all
+green after it, and the accepted key frames never moved: the `image_context` examples that carry
+accepted key frames all
 happen to have short words, and a clip that happens *inside* a scene's own box is invisible to
 every probe that measures against the safe area. A defect reached the flagship artifact and no
 automated check could have told anyone. The guard is now a unit test over the decision

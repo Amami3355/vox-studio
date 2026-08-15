@@ -143,6 +143,16 @@ instance with no take cannot carry a word anchor, and every catalog example is o
 multi-word value lands on any one of its tokens. Avoid: treating it as "the payload mentions
 a word", which is what `annotate` also does.
 
+**Teaching surface** — Everything an agent learns what to write from, taken together: the
+manifest it reads before writing — grammar forms and their examples, action descriptions,
+soft constraints, scene examples — and the compiler's refusals afterwards, each carrying
+`means`, `repair`, and an `expected` list computed against that plan. Examples illustrate
+the shape of a plan; they carry no obligation to exercise every action or to be a plan the
+compiler would accept in every context, because a refusal names the exact repair. This is
+why a Deictic field is never anchored correctly in a scene example and why that is not a
+defect. See ADR-0012. Avoid: treating examples as the only teacher, and adding one to cover
+a case a refusal already names.
+
 **Hard constraint** — Expressed in the Zod schema. Violating it rejects the plan.
 
 **Soft constraint** — Expressed in `constraints.ts` and published to the manifest.

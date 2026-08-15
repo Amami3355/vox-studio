@@ -51,6 +51,12 @@
         "means": "A pointing action does not land while the narration says the value it identifies.",
         "repair": "Move the event to one of the word anchors listed in expected."
       },
+      "EVENT_BEFORE_ELEMENT_REVEALED": {
+        "code": "EVENT_BEFORE_ELEMENT_REVEALED",
+        "regime": "error",
+        "means": "An event acts on an element the plan has not brought onto the frame yet.",
+        "repair": "Move the reveal to an earlier anchor, or move this event to one at or after it."
+      },
       "EVENTS_OUT_OF_ORDER": {
         "code": "EVENTS_OUT_OF_ORDER",
         "regime": "error",

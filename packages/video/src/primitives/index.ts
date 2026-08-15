@@ -8,6 +8,7 @@ export * from './Reveal';
 export * from './Bar';
 export * from './Gridlines';
 export * from './Callout';
+export * from './Stamp';
 export * from './EmptyState';
 export * from './Backdrop';
 export * from './useEntrance';

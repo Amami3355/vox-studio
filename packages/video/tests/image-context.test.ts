@@ -10,10 +10,34 @@ describe('ImageContextScene catalog contract', () => {
       name: 'ImageContextScene',
       family: 'context',
       requiresAssets: true,
-      supportsEvents: false,
+      supportsEvents: true,
     });
     expect(spec.layouts.map((layout) => layout.id)).toEqual(['splitLeft']);
-    expect(spec.actions).toEqual([]);
+  });
+
+  /**
+   * The action vocabulary, and the reason the empty object it replaces had to go.
+   *
+   * `architecture-evolutions.md` records that "actions inventées" is one of the four things
+   * the step 9 harness measures, and that a capability with no actions cannot fail that
+   * measure — which means it cannot pass it either. Two of the three drive an entrance the
+   * motion profile used to own unconditionally; the third is a pointing gesture and is held
+   * to a word by `DEICTIC_ANCHOR_REQUIRED`, tested over a plan in `validate.test.ts`.
+   */
+  it('publishes a closed action vocabulary the plan can drive the scene with', () => {
+    const spec = getSceneSpec('image_context');
+
+    expect(spec.actions.map((action) => action.id)).toEqual([
+      'revealImage',
+      'revealCopy',
+      'emphasize',
+    ]);
+  });
+
+  it('declares the emphasis text deictic, so the compiler holds it to the spoken word', () => {
+    const emphasize = getSceneSpec('image_context').actions.find((a) => a.id === 'emphasize');
+
+    expect(emphasize?.deicticFields).toEqual(['text']);
   });
 
   it('ranks image context first for a documentary establishing shot', () => {

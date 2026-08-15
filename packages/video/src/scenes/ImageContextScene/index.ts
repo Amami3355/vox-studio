@@ -1,6 +1,7 @@
 import type { SceneCapability, SceneProps } from '../../core/types';
 import { ImageContextScene } from './Component';
 import { imageContextActions } from './actions';
+import { imageContextChecks } from './checks';
 import { imageContextConstraints } from './constraints';
 import { imageContextExamples } from './examples';
 import { imageContextLayouts } from './layouts';
@@ -15,6 +16,7 @@ export const imageContextCapability: SceneCapability = {
   layouts: imageContextLayouts,
   examples: imageContextExamples,
   component: ImageContextScene as unknown as React.ComponentType<SceneProps<never>>,
+  checks: imageContextChecks,
 };
 
 export { ImageContextScene } from './Component';

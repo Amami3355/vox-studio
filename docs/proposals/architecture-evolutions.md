@@ -185,6 +185,37 @@ Order: compositions (`full`, `left`, `right`), then layouts, then prop slots, th
 Compositions and actions are the two the measures cannot do without; the middle two are
 volume, and are the first things to cut if the schedule slips.
 
+**Progress, 2026-08-15.** Both ends of that order are now done, and the two paragraphs
+above are stale where they describe the code.
+
+- **Compositions** — `supportedCompositions` has read `['full', 'left', 'right']` since the
+  half-frame layout landed, and `tests/render/safe-area.test.ts` renders all three. The
+  sentence above saying it ships `full` alone describes a state that no longer exists.
+- **Actions** — `image_context` publishes `revealImage`, `revealCopy` and `emphasize`.
+  `supportsEvents` is `true`. So "a capability with zero actions cannot fail that measure,
+  which means it cannot pass it either" is closed: the harness now has something to
+  measure invention against on both capabilities.
+
+`emphasize` declares `deicticFields: ['text']`, which makes it the second action in the
+catalogue held to a word by `DEICTIC_ANCHOR_REQUIRED` — and the first whose deictic value
+is copy the agent invents rather than a key that must already appear in `props`. There is
+no referential check standing behind it, so the landing rule is the whole of its guard.
+
+One consequence worth recording, because it is a limit of the catalogue rather than of
+this capability. **A scene example cannot demonstrate a deictic action.** An example has
+no take, `syntheticBeats` gives it `words: []` (`core/anchors.ts`), and a word anchor
+against it throws by design. So `image_context`'s scene examples demonstrate the two
+reveals and not the stamp, exactly as `bar_chart`'s anchor `highlightBar` at `b3.start`.
+
+**This is not a hole, and an earlier draft of this entry wrongly called it one.** It is now
+**ADR-0012**, which decides that examples illustrate and refusals teach, records the three
+channels that already publish the word form, and records the structural plan example that
+was written to "fix" this and then removed. `CONTEXT.md` gained a **Teaching surface**
+entry. Nothing further belongs in this file — the argument has a home.
+
+**Still open from the order above:** layouts and prop slots — the two this entry already
+called volume.
+
 `Map` is the one worth naming separately, because it is also what the essayistic reference
 films are made of. What those films contribute here is *pace* — cut rhythm, push-ins — and
 that lives in motion profiles and a `cameraPush` action, not in a capability. If maps are

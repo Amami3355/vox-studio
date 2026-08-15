@@ -81,6 +81,12 @@
           "means": "A pointing action does not land while the narration says the value it identifies.",
           "repair": "Move the event to one of the word anchors listed in expected."
         },
+        "EVENT_BEFORE_ELEMENT_REVEALED": {
+          "code": "EVENT_BEFORE_ELEMENT_REVEALED",
+          "regime": "error",
+          "means": "An event acts on an element the plan has not brought onto the frame yet.",
+          "repair": "Move the reveal to an earlier anchor, or move this event to one at or after it."
+        },
         "EVENTS_OUT_OF_ORDER": {
           "code": "EVENTS_OUT_OF_ORDER",
           "regime": "error",
@@ -734,7 +740,7 @@
           "presenting a typography-only statement → typographic_statement",
           "making a character carry the explanation → character_explainer"
         ],
-        "supportsEvents": false,
+        "supportsEvents": true,
         "requiresAssets": true,
         "occupiesRegions": [
           "full"
@@ -845,7 +851,39 @@
             ]
           }
         ],
-        "actions": [],
+        "actions": [
+          {
+            "id": "revealImage",
+            "description": "Bring the image plate onto the frame. Use it to hold the image back until the narration reaches its subject.",
+            "payloadSchema": null
+          },
+          {
+            "id": "revealCopy",
+            "description": "Bring the headline and caption in, one after the other, after the image.",
+            "payloadSchema": null
+          },
+          {
+            "id": "emphasize",
+            "description": "Stamp one spoken word or short phrase over the image, as the narrator says it. It holds until the scene ends, or until a later emphasis replaces it.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "A word or short phrase the narrator speaks in this beat. Keep it under 40 characters."
+                }
+              },
+              "required": [
+                "text"
+              ]
+            },
+            "deicticFields": [
+              "text"
+            ]
+          }
+        ],
         "examples": [
           {
             "id": "example-housing-context",
@@ -887,6 +925,38 @@
                 "subject": "Young renter looking through an apartment window above a crowded city street",
                 "treatment": "illustration",
                 "orientation": "portrait"
+              }
+            }
+          },
+          {
+            "id": "example-driven-context",
+            "title": "Plan-driven reveal — the image lands before the copy",
+            "note": "The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject.",
+            "component": "image_context",
+            "layout": "splitLeft",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "revealImage"
+              },
+              {
+                "at": "b2.start",
+                "action": "revealCopy"
+              }
+            ],
+            "props": {
+              "headline": "A city built for cars, retrofitted for people",
+              "caption": "The rebuild took eleven years and two referendums.",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Wide boulevard being narrowed for a tram line, seen from above",
+                "treatment": "photo",
+                "orientation": "landscape"
               }
             }
           },

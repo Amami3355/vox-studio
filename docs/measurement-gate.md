@@ -173,9 +173,16 @@ one is how a catalog acquires a scene it does not need.
 The gate measures reach across a library. Run against today's catalog it would measure
 almost nothing, and that is worth stating precisely rather than as an intuition:
 
-- **`image_context` publishes zero actions**, so measure 2 — the hard-fail one — is
+- ~~**`image_context` publishes zero actions**, so measure 2 — the hard-fail one — is
   untestable on half the catalog. This is the stated reason group 4 (`annotate`,
-  `cameraPush`, `recontextCrop`) comes before groups 2 and 3.
+  `cameraPush`, `recontextCrop`) comes before groups 2 and 3.~~ **No longer true.**
+  `image_context` publishes `revealImage`, `revealCopy` and `emphasize`, so measure 2 is
+  testable across the whole catalog and this blocker is closed. Two things the original
+  sentence got wrong are worth keeping rather than deleting: the unblocking verbs are not
+  the three it named — `cameraPush` was refused outright, because `CameraRig` publishes the
+  bounds `SlotFrame` inflates its safe margin against and an event-driven push changes that
+  contract rather than using it — and the order it asserted was wrong too, since group 4 did
+  not have to come before groups 2 and 3 to close this. Only actions did.
 - **With two capabilities, measure 3 has almost nothing to be wrong about.** Selection
   relevance needs briefs for which at least two capabilities are plausible; otherwise it
   scores the absence of alternatives.
@@ -185,9 +192,11 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
   that `catalog:check` proves the committed projection has not drifted.
 
 Entry conditions, therefore: catalog v3 remains aligned with ADR-0006; every capability publishes at least
-one action; every capability meets §15's checklist including its three examples with an edge
+one action — **met**, and it was the last of the three the build plan was expected to close;
+every capability meets §15's checklist including its three examples with an edge
 case and an empty case; and the majority of the ten briefs admit more than one plausible
-capability.
+capability. **Measure 3 remains the open one**, and nothing in the catalog can close it:
+it needs a third capability, which §13 has deferred.
 
 **Depth and breadth are not the same preparation, and the build plan only buys one.** §14's
 strategy is 8–12 capabilities × many variants, and groups 2, 3 and 4 are all variants of

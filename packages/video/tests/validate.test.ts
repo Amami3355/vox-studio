@@ -362,6 +362,108 @@ describe('validateVideoPlan — an action lands on the word it points at', () =>
       false,
     );
   });
+
+  /**
+   * The same rule, asked of the second capability to declare a deictic field.
+   *
+   * `image_context` reaches the gate by a different route: its `emphasize` payload carries
+   * free copy the agent invents, where `highlightBar` carries a label that must already be
+   * in `data`. So the referential check that would otherwise catch a nonsense value does
+   * not exist here, and the landing rule is the only thing standing between a stamped word
+   * and a frame where it is not being spoken. Written against a plan whose beat text really
+   * contains the word, so a pass means the anchor landed and not that the word was absent.
+   */
+  const stamping = (at: string, text = 'squeeze'): VideoPlan => ({
+    beats: [
+      { id: 'b1', text: 'Rents rose faster than wages.' },
+      { id: 'b2', text: 'The squeeze is reshaping how cities live.' },
+    ],
+    sections: [
+      {
+        id: 'sec1',
+        spansBeats: ['b1', 'b2'],
+        scenes: [
+          base({ id: 's1', spansBeats: ['b1'], events: [] }),
+          {
+            id: 's2',
+            component: 'image_context',
+            layout: 'splitLeft',
+            motionProfile: 'cinematic',
+            spansBeats: ['b2'],
+            props: {
+              headline: 'The rent squeeze is reshaping city life',
+              caption: '',
+              assetRequirement: {
+                type: 'image',
+                subject: 'Dense apartment buildings at dusk',
+                treatment: 'photo',
+                orientation: 'landscape',
+              },
+            },
+            events: [{ at, action: 'emphasize', payload: { text } }],
+          },
+        ],
+      },
+    ],
+  });
+
+  it('accepts an emphasis anchored to the word it stamps', () => {
+    expect(validateVideoPlan(stamping('b2.word:squeeze')).ok).toBe(true);
+  });
+
+  it('rejects an emphasis anchored to a boundary, which stamps a word nobody is saying', () => {
+    const report = validateVideoPlan(stamping('b2.start'));
+    const error = report.errors.find((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED');
+
+    expect(error).toBeDefined();
+    expect(error?.expected).toContain('b2.word:squeeze');
+  });
+
+  it('rejects an emphasis anchored to a different word in the same beat', () => {
+    const report = validateVideoPlan(stamping('b2.word:cities'));
+
+    expect(report.errors.some((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED')).toBe(true);
+  });
+
+  /**
+   * The stamp with nothing to be stamped onto.
+   *
+   * Written against the *anchor landing* suite on purpose: both these plans satisfy the
+   * deictic rule completely, which is what makes the failure interesting. An emphasis can
+   * land exactly on the word the narrator says and still render nothing, because the plate
+   * it is drawn on has not arrived. Only `imageContextChecks` sees that.
+   */
+  const withReveal = (revealAt: string, emphasisFirst: boolean): VideoPlan => {
+    const plan = stamping('b2.word:squeeze');
+    const scene = plan.sections[0]?.scenes[1] as SceneInstance;
+    const reveal = { at: revealAt, action: 'revealImage' };
+    const emphasis = { at: 'b2.word:squeeze', action: 'emphasize', payload: { text: 'squeeze' } };
+    scene.events = emphasisFirst ? [emphasis, reveal] : [reveal, emphasis];
+    return plan;
+  };
+
+  it('rejects an emphasis written before the reveal that puts its plate on the frame', () => {
+    const report = validateVideoPlan(withReveal('b2.end', true));
+    const error = report.errors.find((e) => e.code === 'EVENT_BEFORE_ELEMENT_REVEALED');
+
+    expect(error).toBeDefined();
+    expect(error?.expected).toContain('b2.end');
+  });
+
+  it('accepts an emphasis written after its reveal', () => {
+    expect(validateVideoPlan(withReveal('b2.start', false)).ok).toBe(true);
+  });
+
+  /**
+   * The falsification for this pair. With no `revealImage` at all the plate opens with the
+   * scene, so there is no held frame and nothing to report — if this fires, the check is
+   * reading "the scene has an emphasis" rather than "the emphasis precedes its plate".
+   */
+  it('leaves an emphasis alone when the scene never holds its image back', () => {
+    const report = validateVideoPlan(stamping('b2.word:squeeze'));
+
+    expect(report.errors.some((e) => e.code === 'EVENT_BEFORE_ELEMENT_REVEALED')).toBe(false);
+  });
 });
 
 describe('validateVideoPlan — the beat partition over scenes', () => {

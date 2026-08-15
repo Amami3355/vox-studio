@@ -3,6 +3,21 @@
  *
  * This is both the source of the report-code types and the data published in catalog.json.
  * A check therefore cannot join a report without explaining itself to a code-blind author.
+ *
+ * These strings are a **teaching channel and not only a diagnostic one**, which is what
+ * makes the bar for writing one higher than it looks. ADR-0012 decides that the catalog's
+ * examples need not cover every case an agent must write, precisely because a refusal
+ * carries `means`, `repair`, and — where the check can compute it — an `expected` list of
+ * the values that would have satisfied it. That decision is only sound while these two
+ * fields actually say what to do next: a `repair` that restates the `code` in a sentence
+ * moves the lesson nowhere.
+ *
+ * `tests/catalog-contract.test.ts` holds the floor and not the bar. It rejects an empty or
+ * near-empty string and a field that is the code shouted back, which catches the shapes a
+ * generated or hurried entry actually takes. It cannot judge whether a sentence teaches,
+ * so a repair that paraphrases its own code passes — writing one that does not is a
+ * review responsibility, and saying otherwise here would make this comment the same kind
+ * of untrue claim it warns about.
  */
 
 export type CompilerWarningSeverity = 'info' | 'quality' | 'important';
@@ -78,6 +93,12 @@ export const COMPILER_CHECKS = {
       regime: 'error',
       means: 'A pointing action does not land while the narration says the value it identifies.',
       repair: 'Move the event to one of the word anchors listed in expected.',
+    },
+    EVENT_BEFORE_ELEMENT_REVEALED: {
+      code: 'EVENT_BEFORE_ELEMENT_REVEALED',
+      regime: 'error',
+      means: 'An event acts on an element the plan has not brought onto the frame yet.',
+      repair: 'Move the reveal to an earlier anchor, or move this event to one at or after it.',
     },
     EVENTS_OUT_OF_ORDER: {
       code: 'EVENTS_OUT_OF_ORDER',
