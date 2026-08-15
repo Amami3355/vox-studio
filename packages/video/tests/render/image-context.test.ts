@@ -114,13 +114,14 @@ describe('ImageContextScene runtime', () => {
   });
 
   it('keeps the accepted key frames stable', async () => {
-    const [canonical, empty, longCopy] = await Promise.all([
+    const [canonical, empty, longCopy, driven] = await Promise.all([
       renderHash(CANONICAL_EXAMPLE_ID),
       renderHash('example-empty-context'),
       renderHash('example-long-context'),
+      renderHash('example-driven-context'),
     ]);
 
-    expect({ canonical, empty, longCopy }).toEqual({
+    expect({ canonical, empty, longCopy, driven }).toEqual({
       // Re-accepted 2026-08-14 when `editorial-paper` became the default theme. All three
       // moved, and this time *that* is the corroboration: a palette reaches every pixel of
       // every frame, so an unchanged hash would have meant the theme had not arrived. The
@@ -133,6 +134,13 @@ describe('ImageContextScene runtime', () => {
       canonical: 'deeb7727f43aac8958e2e4fb6e163369',
       empty: '5c23bdadca1da65d59564540b73bd4b9',
       longCopy: 'e26133541a06a7ec683d2915f506b5c8',
+      // Accepted 2026-08-15, the first key frame for the only example carrying events.
+      // It shares `identityKey` with `canonical` and still hashes differently, which is the
+      // corroboration here: same media, same layout, same theme, and the only variable left
+      // is the plan holding the copy back. An equal hash would have meant the events were
+      // not reaching the frame at all. Reviewed on stills before accepting: at frame 120 the
+      // plate carries the resolved photograph and the copy column is deliberately empty.
+      driven: '58a8bc4c5e1883d54d48844b2488700d',
     });
   });
 });
