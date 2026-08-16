@@ -159,6 +159,34 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
     expect(Object.keys(capability.constraints).length).toBeGreaterThan(0);
   });
 
+  /**
+   * Nothing the agent reads may still be asking to be written.
+   *
+   * `_TemplateScene` is a whole capability's worth of placeholder prose that someone is
+   * meant to copy and overwrite, and the failure it invites is not forgetting the copy but
+   * forgetting one field of it. Rule 2 says the agent sees the manifest and never the code,
+   * so a `summary` reading "TODO one sentence an agent can choose on" is not a note to a
+   * developer — it is published documentation, and the agent will select against it.
+   *
+   * Asked of the built entry rather than the capability, because the manifest is the thing
+   * that ships and its `examples` are copied through verbatim.
+   */
+  it('publishes no placeholder prose left over from the template', () => {
+    const entry = buildCatalogEntry(capability);
+    const prose = [
+      entry.summary,
+      ...entry.useWhen,
+      ...entry.avoidWhen,
+      ...entry.layouts.map((layout) => layout.description),
+      ...entry.actions.map((action) => action.description),
+      ...entry.examples.flatMap((example) => [example.title, example.note]),
+    ];
+
+    for (const text of prose) {
+      expect(text.toUpperCase(), `"${text}"`).not.toContain('TODO');
+    }
+  });
+
   it('ships at least three examples, including an edge case and an empty case', () => {
     expect(capability.examples.length).toBeGreaterThanOrEqual(3);
     const notes = capability.examples.map((e) => `${e.title} ${e.note}`.toLowerCase());

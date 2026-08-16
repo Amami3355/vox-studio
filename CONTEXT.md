@@ -263,7 +263,7 @@ packages/video/           the scene library — everything Remotion renders
   src/core/               shared vocabulary: anchors and their grammar, words, slots, types
   src/design/             L0 tokens: theme, motion profiles, fonts
   src/primitives/         L1, not exposed to the agent
-  src/scenes/             L2, the catalog; one folder per capability
+  src/scenes/             L2, the catalog; one folder per capability, plus _TemplateScene
   src/compile/            the compiler: plan + timed beats → the compiled document
   src/runtime/            scene rendering, example playback, the Section runtime
   src/catalog/            manifest generation, the four tools, validation

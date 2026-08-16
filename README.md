@@ -82,7 +82,7 @@ packages/video/           the scene library — everything Remotion renders
   src/assets/             minimal Asset Resolver
   src/design/             L0 tokens
   src/primitives/         L1, never exposed to the agent
-  src/scenes/             L2, the catalog; one folder per capability
+  src/scenes/             L2, the catalog; one folder per capability, plus _TemplateScene
   src/catalog/            manifest generation, the four tools, validation
   src/compile/            plan + beat timings → the compiled document
   src/runtime/            scene rendering, example playback, the Section runtime
@@ -97,10 +97,14 @@ architecture.
 
 ## Adding a capability
 
-One entry in `packages/video/src/scenes/registry.ts`. The manifest, the Remotion
-compositions, the Component Studio and the contract tests all follow from it. The
-contract tests in `tests/catalog-contract.test.ts` enforce the catalog checklist, so a
-capability missing its edge case or its `avoidWhen` redirections fails the build.
+Copy `packages/video/src/scenes/_TemplateScene/`, then add one entry in
+`packages/video/src/scenes/registry.ts`. The manifest, the Remotion compositions, the
+Component Studio and the contract tests all follow from it. The contract tests in
+`tests/catalog-contract.test.ts` enforce the catalog checklist, so a capability missing
+its edge case or its `avoidWhen` redirections fails the build.
+
+The full procedure, including what it costs to *change* a capability that already exists,
+is in [`docs/adding-a-capability.md`](./docs/adding-a-capability.md).
 
 Regenerate `catalog.json` in the same commit — CI fails on drift.
 
