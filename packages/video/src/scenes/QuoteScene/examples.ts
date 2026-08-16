@@ -47,10 +47,10 @@ export const quoteExamples: SceneExample[] = [
   {
     id: 'example-quote-driven',
     title: 'Plan-driven reveal — the words land a beat after the eyebrow',
-    note: 'The plan holds the quote back, so the eyebrow stands alone on the frame while the narration hands over. Same props as the canonical example; only the events differ.',
+    note: 'The plan holds the quote back, so the eyebrow stands alone on the frame while the narration hands over. Same props and profile as the canonical example; only the events differ.',
     component: 'quote',
     layout: 'centered',
-    motionProfile: 'subtleDrift',
+    motionProfile: 'editorialStatic',
     spansBeats: ['b1', 'b2'],
     events: [{ at: 'b2.start', action: 'revealQuote' }],
     props: {

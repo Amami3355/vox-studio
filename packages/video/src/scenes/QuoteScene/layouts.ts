@@ -25,8 +25,20 @@ export const quoteLayouts = {
  * with. Both steps stay inside the scale the theme actually carries.
  */
 export const centeredGeometry = {
-  /** Share of the frame box the quote column gets. The mark hangs inside this width. */
+  /**
+   * Share of the frame box the quote column gets. The mark hangs inside this width.
+   *
+   * Same number the template ships, kept deliberately: a measure near 0.72 is what puts a
+   * display-scale sentence at a readable line length on a 1920 frame. It is a decision
+   * here, not an unedited placeholder.
+   */
   columnRatio: 0.72,
   /** The mark's ceiling — always one louder than the quote, never louder than this. */
   markStep: 6,
+  /**
+   * The mark sits tighter than body leading so the glyph reads as a device set above the
+   * quote rather than as a line of its own. It lives here with `markStep` because it is
+   * the same piece of geometry: how loud the mark is, and how much room it takes.
+   */
+  markLineHeight: 0.8,
 } as const;

@@ -4,6 +4,7 @@ import { resolveEvents } from '../../core/events';
 import type { SceneProps } from '../../core/types';
 import type { MotionProfile } from '../../design/motion';
 import { staggerFrames } from '../../design/motion';
+import type { Theme } from '../../design/theme';
 import {
   AnimatedText,
   Backdrop,
@@ -15,8 +16,8 @@ import {
   SlotFrame,
   useFrameBox,
   useSpace,
-  useTheme,
   useTitleStep,
+  useTypeSize,
 } from '../../primitives';
 import { centeredGeometry } from './layouts';
 import type { QuoteSceneProps } from './schema';
@@ -42,6 +43,7 @@ export const QuoteScene: React.FC<SceneProps<QuoteSceneProps>> = ({
   events,
   safeArea,
   profile,
+  theme,
   durationInFrames,
 }) => (
   <Backdrop>
@@ -54,6 +56,7 @@ export const QuoteScene: React.FC<SceneProps<QuoteSceneProps>> = ({
           eyebrow={props.eyebrow}
           events={events}
           profile={profile}
+          theme={theme}
         />
       </SlotFrame>
     </CameraRig>
@@ -67,8 +70,8 @@ const QuoteFrame: React.FC<{
   eyebrow: string;
   events: SceneProps<QuoteSceneProps>['events'];
   profile: SceneProps<QuoteSceneProps>['profile'];
-}> = ({ quote, attribution, role, eyebrow, events, profile }) => {
-  const theme = useTheme();
+  theme: Theme;
+}> = ({ quote, attribution, role, eyebrow, events, profile, theme }) => {
   const gap = useSpace(3);
   const stagger = staggerFrames(profile);
   const box = useFrameBox();
@@ -121,43 +124,47 @@ const QuoteFrame: React.FC<{
           frame box and the quote would render wider than the column it was fitted to. */}
       <div style={{ width: columnWidth, display: 'flex', flexDirection: 'column', gap }}>
         <ColumnProvider width={columnWidth}>
-          {quote === '' ? (
-            <EmptyState message="Quote pending" startFrame={start} profile={profile} />
-          ) : (
-            <>
-              {eyebrow ? (
-                <Eyebrow startFrame={0} profile={profile}>
-                  {eyebrow}
-                </Eyebrow>
-              ) : null}
-              {revealed ? (
-                <>
-                  <AnimatedText
-                    startFrame={start + stagger}
+          {/* The eyebrow is outside every other branch on purpose: it is what the frame
+              stands on while the plan holds the quote back, and an empty quote does not
+              take it away. Only what the gate covers waits for the gate. */}
+          {eyebrow ? (
+            <Eyebrow startFrame={0} profile={profile}>
+              {eyebrow}
+            </Eyebrow>
+          ) : null}
+          {revealed ? (
+            quote === '' ? (
+              /* The empty state is a reveal like any other: it lands when the plan says
+                 the quote lands, never at frame 0 ahead of its own gate. */
+              <EmptyState message="Quote pending" startFrame={start} profile={profile} />
+            ) : (
+              <>
+                <AnimatedText
+                  startFrame={start + stagger}
+                  profile={profile}
+                  font="display"
+                  step={markStep}
+                  weight={theme.type.weight.bold}
+                  color={theme.color.accent}
+                  lineHeight={centeredGeometry.markLineHeight}
+                >
+                  {'\u201C'}
+                </AnimatedText>
+                <SceneTitle startFrame={start + stagger * 2} profile={profile}>
+                  {quote}
+                </SceneTitle>
+                {attribution || role ? (
+                  <Attribution
+                    attribution={attribution}
+                    role={role}
+                    startFrame={start + stagger * 3}
                     profile={profile}
-                    font="display"
-                    step={markStep}
-                    weight={theme.type.weight.bold}
-                    color={theme.color.accent}
-                    lineHeight={0.8}
-                  >
-                    {'\u201C'}
-                  </AnimatedText>
-                  <SceneTitle startFrame={start + stagger * 2} profile={profile}>
-                    {quote}
-                  </SceneTitle>
-                  {attribution || role ? (
-                    <Attribution
-                      attribution={attribution}
-                      role={role}
-                      startFrame={start + stagger * 3}
-                      profile={profile}
-                    />
-                  ) : null}
-                </>
-              ) : null}
-            </>
-          )}
+                    theme={theme}
+                  />
+                ) : null}
+              </>
+            )
+          ) : null}
         </ColumnProvider>
       </div>
     </div>
@@ -165,44 +172,48 @@ const QuoteFrame: React.FC<{
 };
 
 /**
- * Name in ink, role in muted — read as one signature rather than two labels. The role
- * entering one stagger after the name is the designed choreography, not a plan decision.
+ * Name in ink, role in muted — read as one signature rather than two labels, which is why
+ * it is one `AnimatedText` and not two. The composition has four entrances (eyebrow →
+ * mark → quote → attribution); a fifth for the role would be a beat nothing asked for,
+ * and it would make the signature arrive in pieces.
+ *
+ * The role is a nested block rather than its own primitive so it enters on the same clip.
+ * It carries its own size, weight and colour; tracking comes from the block, which is the
+ * price of the single entrance and is not visible at this size difference.
  */
 const Attribution: React.FC<{
   attribution: string;
   role: string;
   startFrame: number;
   profile: MotionProfile;
-}> = ({ attribution, role, startFrame, profile }) => {
-  const theme = useTheme();
-  const stagger = staggerFrames(profile);
+  theme: Theme;
+}> = ({ attribution, role, startFrame, profile, theme }) => {
+  const roleSize = useTypeSize(0);
   const gap = useSpace(1);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap }}>
-      {attribution ? (
-        <AnimatedText
-          startFrame={startFrame}
-          profile={profile}
-          font="body"
-          step={1}
-          weight={theme.type.weight.medium}
-          color={theme.color.ink}
-        >
-          {attribution}
-        </AnimatedText>
-      ) : null}
+    <AnimatedText
+      startFrame={startFrame}
+      profile={profile}
+      font="body"
+      step={1}
+      weight={theme.type.weight.medium}
+      color={theme.color.ink}
+    >
+      {attribution}
       {role ? (
-        <AnimatedText
-          startFrame={startFrame + stagger}
-          profile={profile}
-          font="body"
-          step={0}
-          color={theme.color.inkMuted}
+        <span
+          style={{
+            display: 'block',
+            marginTop: attribution ? gap : 0,
+            fontSize: roleSize,
+            fontWeight: theme.type.weight.regular,
+            color: theme.color.inkMuted,
+          }}
         >
           {role}
-        </AnimatedText>
+        </span>
       ) : null}
-    </div>
+    </AnimatedText>
   );
 };

@@ -1,12 +1,15 @@
 # Adding a capability
 
-**Status:** procedure · 2026-08-16 · verified against `1e976ec`
+**Status:** procedure · 2026-08-16 · verified against `bfac867`, the `quote` capability
 **Scope:** what it costs to add a scene capability to the catalog, and what it costs to change
 one that already exists. Written because the knowledge lived only in session handoffs.
 
-The short version: **one folder of ten files, one line in `src/scenes/registry.ts`, then
+The short version: **one folder of up to ten files, one line in `src/scenes/registry.ts`, then
 `pnpm catalog`.** Copy `packages/video/src/scenes/_TemplateScene/`, which is a compiling stub
 of exactly that shape. It is deliberately not registered, so it publishes nothing.
+
+Two of the ten are optional — see the table below. Delete one only when the capability
+genuinely has nothing to put in it; a stub file teaches the agent a rule that is not true.
 
 ## What you do not have to do
 
@@ -61,21 +64,26 @@ capability with placeholder prose still in it fails `catalog-contract.test.ts`.
 
 ## The ten files
 
-Every live capability folder carries the same ten. `tests/template-scene.test.ts` fails if the
-template ever stops carrying one of them.
+The template carries all ten, and `tests/template-scene.test.ts` fails if it ever stops
+carrying one. A **live** folder carries eight to ten: the two marked optional below go when
+the capability has nothing true to put in them.
 
-| file | records |
-| --- | --- |
-| `meta.ts` | how the agent **chooses** the scene, before it reads the schema |
-| `schema.ts` | HARD constraints; the one source of truth for props, manifest and validation |
-| `constraints.ts` | SOFT constraints; the band that actually shapes what the agent writes |
-| `layouts.ts` | at least one layout with typed slots, plus the geometry the layout owns |
-| `actions.ts` | the closed action vocabulary — an empty object is a legitimate answer |
-| `state.ts` | the event reducer; delete it if there are no actions |
-| `checks.ts` | referential checks the generic validator cannot express; optional |
-| `Component.tsx` | the render, built only from L0/L1 primitives |
-| `examples.ts` | at least three, and they are normative |
-| `index.ts` | the assembly point — the whole surface the capability has |
+| file | records | |
+| --- | --- | --- |
+| `meta.ts` | how the agent **chooses** the scene, before it reads the schema | |
+| `schema.ts` | HARD constraints; the one source of truth for props, manifest and validation | |
+| `constraints.ts` | SOFT constraints; the band that actually shapes what the agent writes | |
+| `layouts.ts` | at least one layout with typed slots, plus the geometry the layout owns | |
+| `actions.ts` | the closed action vocabulary — an empty object is a legitimate answer | |
+| `state.ts` | the event reducer | optional — drop it when the action vocabulary is empty |
+| `checks.ts` | referential checks the generic validator cannot express | optional — drop it when nothing in the vocabulary needs one |
+| `Component.tsx` | the render, built only from L0/L1 primitives | |
+| `examples.ts` | at least three, and they are normative | |
+| `index.ts` | the assembly point — the whole surface the capability has | |
+
+What the live folders actually carry today: `BarChartScene/` and `ImageContextScene/` ten
+each, `QuoteScene/` nine — `revealQuote` is its only verb and nothing in the vocabulary
+references the gated element, so a `QuoteScene/checks.ts` would state a rule that is not true.
 
 ## The order to write them in
 

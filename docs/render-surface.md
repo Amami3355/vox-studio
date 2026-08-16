@@ -216,11 +216,14 @@ has not been seen against a real photograph or in the `left`/`right` composition
 ## Z6 — Capability composition
 
 `scenes/BarChartScene/` (Component 218 + layouts 80) · `scenes/ImageContextScene/` (Component 190
-+ layouts 51)
++ layouts 51) · `scenes/QuoteScene/` (Component 219 + layouts 44, as of `bfac867`; the first
+two figures are as of `229700c` and have since grown)
 
-**Two capabilities. This is the load-bearing fact of any breadth judgement**, and
-`docs/measurement-gate.md` already says so: with two, measure 3 has almost nothing to be wrong
-about.
+**Three capabilities. The count is still the load-bearing fact of any breadth judgement**,
+and it has just moved: `quote` is the third, and it is the first that composes into `full`
+only and carries no assets. `docs/measurement-gate.md` recorded two as the reason measure 3
+had almost nothing to be wrong about; that particular blocker is now cleared, though the
+measure itself is unrun.
 
 **Owns.** How the frame is divided. This is where composition actually happens, and it is the
 zone the premium anchors speak to most directly.

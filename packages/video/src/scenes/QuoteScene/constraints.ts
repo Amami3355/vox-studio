@@ -12,7 +12,7 @@ export const quoteConstraints: SoftConstraints = {
   quote: {
     recommendedMin: 1,
     recommendedMax: 110,
-    onEmpty: 'Typographic empty state; the frame shows a “quote pending” label.',
+    onEmpty: 'Typographic empty state; the frame shows a "quote pending" label.',
     onExceed: 'The quote drops one step of the type scale.',
     /** This capability's heading, so density is the failure it suffers from. */
     onExceedCode: 'TITLE_DENSITY',

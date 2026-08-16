@@ -183,9 +183,12 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
   bounds `SlotFrame` inflates its safe margin against and an event-driven push changes that
   contract rather than using it — and the order it asserted was wrong too, since group 4 did
   not have to come before groups 2 and 3 to close this. Only actions did.
-- **With two capabilities, measure 3 has almost nothing to be wrong about.** Selection
-  relevance needs briefs for which at least two capabilities are plausible; otherwise it
-  scores the absence of alternatives.
+- **The two-capability blocker on measure 3 is cleared; the measure is not.** Selection
+  relevance needs briefs for which at least two capabilities are plausible; with two in the
+  catalog it scored the absence of alternatives. `quote` (`bfac867`) is the third, and
+  typography-only, so a brief about a speaker now has a real rival to `image_context`. What
+  is still missing is evidence: the ten briefs have not been run against three. Measure 3 is
+  open on an unrun measurement, no longer on a missing capability.
 - **Catalog v3 now publishes the complete check vocabulary.** The canonical registry owns
   every code, regime, allowed warning severity, meaning and repair, and the report-code types
   derive from it. This ADR-0006 entry condition is met; it remains a release precondition
@@ -195,13 +198,15 @@ Entry conditions, therefore: catalog v3 remains aligned with ADR-0006; every cap
 one action — **met**, and it was the last of the three the build plan was expected to close;
 every capability meets §15's checklist including its three examples with an edge
 case and an empty case; and the majority of the ten briefs admit more than one plausible
-capability. **Measure 3 remains the open one**, and nothing in the catalog can close it:
-it needs a third capability, which §13 has deferred.
+capability. **Measure 3 remains the open one**, but for a different reason than
+before: the third capability it was waiting on has landed (`quote`, `bfac867`), so what is
+left is to run the ten briefs and read the result.
 
 **Depth and breadth are not the same preparation, and the build plan only buys one.** §14's
 strategy is 8–12 capabilities × many variants, and groups 2, 3 and 4 are all variants of
-`ImageContextScene` — after all three the catalog still holds **two** capabilities. Group 4
-unblocks measure 2. *Nothing on the plan unblocks measure 3.*
+`ImageContextScene` — after all three the catalog would still hold **two** capabilities. Group 4
+unblocks measure 2. *Nothing on the plan unblocks measure 3* — `quote` did, off the plan, which
+is the point: breadth had to be bought deliberately because no group on §14 was going to buy it.
 
 **The gate runs at four capabilities**: `bar_chart`, `image_context`, then
 TypographicStatement — the cheapest, being pure type with no assets and no resolver — and
