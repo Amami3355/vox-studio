@@ -283,5 +283,5 @@ The Asset Resolver beyond identity cache/local library/placeholder, the remainin
 capabilities, the agents, and the product Studio UI. See the build order in
 `vox-studio-architecture-figee.md` §13, ADR-0002 for the time pipeline, ADR-0003 for slot
 conflicts and ADR-0004 for the voice. Step 9 of that build order is specified in
-`docs/measurement-gate.md`, which tracks its entry conditions against today's three
+`docs/measurement-gate.md`, which tracks its entry conditions against today's four
 capabilities.

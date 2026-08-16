@@ -1,6 +1,6 @@
 # Adding a capability
 
-**Status:** procedure · 2026-08-16 · verified against `bfac867`, the `quote` capability
+**Status:** procedure · 2026-08-16 · verified against `stat_counter`, the fourth capability
 **Scope:** what it costs to add a scene capability to the catalog, and what it costs to change
 one that already exists. Written because the knowledge lived only in session handoffs.
 
@@ -82,8 +82,9 @@ the capability has nothing true to put in them.
 | `index.ts` | the assembly point — the whole surface the capability has | |
 
 What the live folders actually carry today: `BarChartScene/` and `ImageContextScene/` ten
-each, `QuoteScene/` nine — `revealQuote` is its only verb and nothing in the vocabulary
-references the gated element, so a `QuoteScene/checks.ts` would state a rule that is not true.
+each, `QuoteScene/` and `StatCounterScene/` nine — each has a single reveal verb and nothing
+in its vocabulary references the gated element, so a `QuoteScene/checks.ts` would state a rule
+that is not true.
 
 ## The order to write them in
 

@@ -186,8 +186,9 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
 - **The two-capability blocker on measure 3 is cleared; the measure is not.** Selection
   relevance needs briefs for which at least two capabilities are plausible; with two in the
   catalog it scored the absence of alternatives. `quote` (`bfac867`) is the third, and
-  typography-only, so a brief about a speaker now has a real rival to `image_context`. What
-  is still missing is evidence: the ten briefs have not been run against three. Measure 3 is
+  typography-only, so a brief about a speaker now has a real rival to `image_context`;
+  `stat_counter` is the fourth, so a brief about a single figure now has one too. What
+  is still missing is evidence: the ten briefs have not been run against the catalog. Measure 3 is
   open on an unrun measurement, no longer on a missing capability.
 - **Catalog v3 now publishes the complete check vocabulary.** The canonical registry owns
   every code, regime, allowed warning severity, meaning and repair, and the report-code types

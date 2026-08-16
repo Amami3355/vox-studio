@@ -2,6 +2,7 @@ import type { SceneCapability } from '../core/types';
 import { barChartCapability } from './BarChartScene';
 import { imageContextCapability } from './ImageContextScene';
 import { quoteCapability } from './QuoteScene';
+import { statCounterCapability } from './StatCounterScene';
 
 /**
  * The catalog, in code. Everything downstream — the manifest, the four tools, the
@@ -12,6 +13,7 @@ export const registry: SceneCapability[] = [
   barChartCapability,
   imageContextCapability,
   quoteCapability,
+  statCounterCapability,
 ];
 
 export const capabilityIds = (): string[] => registry.map((c) => c.meta.id);
