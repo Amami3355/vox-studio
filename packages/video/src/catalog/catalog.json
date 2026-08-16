@@ -980,6 +980,181 @@
           }
         }
       ]
+    },
+    {
+      "id": "quote",
+      "name": "QuoteScene",
+      "family": "typography",
+      "summary": "A single quotation set large, with who said it. The words are the frame.",
+      "useWhen": [
+        "letting a person's own words carry the frame",
+        "handing the narration over to a testimony, verdict or declaration",
+        "slowing the film down for one sentence that deserves to stand alone"
+      ],
+      "avoidWhen": [
+        "comparing quantities between categories → bar_chart",
+        "pairing a claim with a photograph → image_context",
+        "making one number the story → stat_counter"
+      ],
+      "supportsEvents": true,
+      "requiresAssets": false,
+      "occupiesRegions": [
+        "full"
+      ],
+      "supportedCompositions": [
+        "full"
+      ],
+      "minDurationFrames": 90,
+      "recommendedDurationFrames": 180,
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "quote": {
+            "type": "string",
+            "maxLength": 240,
+            "description": "The quoted words, without quotation marks — the scene draws its own mark. Best under 110 characters; beyond that the type scale drops a step automatically. An empty string renders a typographic empty state."
+          },
+          "attribution": {
+            "default": "",
+            "description": "Who said it, as a name or short identifier. Empty makes the quote anonymous — use that only when the narration itself names the speaker.",
+            "type": "string",
+            "maxLength": 60
+          },
+          "role": {
+            "default": "",
+            "description": "One line of context under the attribution, e.g. 'Housing minister, 2021–2024'. Empty for none.",
+            "type": "string",
+            "maxLength": 60
+          },
+          "eyebrow": {
+            "default": "",
+            "description": "Optional small label above the mark, e.g. 'The testimony'. Carries section context while the quote is held back.",
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "quote"
+        ],
+        "additionalProperties": false
+      },
+      "softConstraints": {
+        "quote": {
+          "recommendedMin": 1,
+          "recommendedMax": 110,
+          "onEmpty": "Typographic empty state; the frame shows a “quote pending” label.",
+          "onExceed": "The quote drops one step of the type scale.",
+          "onExceedCode": "TITLE_DENSITY"
+        },
+        "attribution": {
+          "recommendedMax": 40,
+          "onExceed": "Shorten the attribution; it is a signature, not a bio."
+        },
+        "role": {
+          "recommendedMax": 40,
+          "onExceed": "Shorten the role line; it is context, not a second quote."
+        },
+        "eyebrow": {
+          "recommendedMax": 24,
+          "onExceed": "Shorten the eyebrow; it is a label, not copy."
+        }
+      },
+      "layouts": [
+        {
+          "id": "centered",
+          "description": "Eyebrow over an oversized quotation mark, the quote at display scale, and the attribution below — centred, nothing else on the frame.",
+          "slots": [
+            "eyebrow",
+            "mark",
+            "quote",
+            "attribution"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "revealQuote",
+          "description": "Bring the quote onto the frame, with its mark and attribution. Use it to hold the words back until the narration hands over to them; until then the eyebrow carries the frame.",
+          "payloadSchema": null
+        }
+      ],
+      "examples": [
+        {
+          "id": "example-quote-canonical",
+          "title": "Canonical quotation",
+          "note": "The shot this capability exists for: a speaker’s words set large, alone, with the attribution beneath.",
+          "component": "quote",
+          "layout": "centered",
+          "motionProfile": "editorialStatic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "eyebrow": "The testimony",
+            "quote": "Rents doubled in two years while wages barely moved",
+            "attribution": "Maria Alvarez",
+            "role": "Housing economist"
+          }
+        },
+        {
+          "id": "example-quote-long",
+          "title": "Edge case — long quotation",
+          "note": "Edge case for quote density: copy past the recommended band drops the type scale and the column still holds it.",
+          "component": "quote",
+          "layout": "centered",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "eyebrow": "The testimony",
+            "quote": "For young households the hardest thing is not that rents are high — it is that they have kept climbing, year after year, far faster than anything else in a budget, and that no one is left to absorb the difference.",
+            "attribution": "Maria Alvarez",
+            "role": "Housing economist"
+          }
+        },
+        {
+          "id": "example-quote-driven",
+          "title": "Plan-driven reveal — the words land a beat after the eyebrow",
+          "note": "The plan holds the quote back, so the eyebrow stands alone on the frame while the narration hands over. Same props as the canonical example; only the events differ.",
+          "component": "quote",
+          "layout": "centered",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1",
+            "b2"
+          ],
+          "events": [
+            {
+              "at": "b2.start",
+              "action": "revealQuote"
+            }
+          ],
+          "props": {
+            "eyebrow": "The testimony",
+            "quote": "Rents doubled in two years while wages barely moved",
+            "attribution": "Maria Alvarez",
+            "role": "Housing economist"
+          }
+        },
+        {
+          "id": "example-quote-empty",
+          "title": "Empty case — no quote",
+          "note": "Empty copy remains renderable and falls back to a typographic pending state.",
+          "component": "quote",
+          "layout": "centered",
+          "motionProfile": "editorialStatic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "eyebrow": "",
+            "quote": "",
+            "attribution": "",
+            "role": ""
+          }
+        }
+      ]
     }
   ]
 }
