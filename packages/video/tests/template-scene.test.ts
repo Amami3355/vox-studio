@@ -23,13 +23,15 @@
  * made knowingly. If it ever stops holding, the fix is to extract the contract's per-
  * capability block into one exported helper both files call — not to copy its assertions.
  */
-import { readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capabilityIds, registry } from '../src/scenes/registry';
 
 const SCENES_DIR = join(import.meta.dirname, '..', 'src', 'scenes');
 const TEMPLATE_DIR = '_TemplateScene';
+const DOC_PATH = join(import.meta.dirname, '..', '..', '..', 'docs', 'adding-a-capability.md');
+const DOC_FILE_TABLE_HEADING = '## The ten files';
 
 const foldersIn = (dir: string): string[] =>
   readdirSync(dir).filter((entry) => statSync(join(dir, entry)).isDirectory());
@@ -38,6 +40,26 @@ const filesIn = (folder: string): string[] =>
   readdirSync(join(SCENES_DIR, folder))
     .filter((entry) => statSync(join(SCENES_DIR, folder, entry)).isFile())
     .sort();
+
+/**
+ * The backticked bare filenames in the doc's file table. Anything containing `/` is a path to
+ * somewhere else — `tests/template-scene.test.ts` names itself in that section's prose — and
+ * is not a claim about the folder's contents.
+ */
+const filenamesInDocTable = (): string[] => {
+  const doc = readFileSync(DOC_PATH, 'utf8');
+  const start = doc.indexOf(DOC_FILE_TABLE_HEADING);
+  expect(start, `${DOC_PATH} no longer has a "${DOC_FILE_TABLE_HEADING}" section`).toBeGreaterThan(
+    -1,
+  );
+  const rest = doc.slice(start + DOC_FILE_TABLE_HEADING.length);
+  const end = rest.indexOf('\n## ');
+  const section = end === -1 ? rest : rest.slice(0, end);
+
+  return [...section.matchAll(/`([^`]+\.tsx?)`/g)]
+    .flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
+    .filter((name) => !name.includes('/'));
+};
 
 describe('the capability template', () => {
   /**
@@ -70,5 +92,20 @@ describe('the capability template', () => {
     for (const file of universal) {
       expect(template, `template is missing ${file}`).toContain(file);
     }
+  });
+
+  /**
+   * The procedure doc is the only place the ten files are described, and a doc nobody can
+   * fail is a doc that rots. This is an equality assertion, unlike the one above: the table
+   * is a promise about *this* folder, so a file the template carries and the table omits is
+   * a copier reading an incomplete list, and a row naming a file that no longer exists is a
+   * copier looking for something that is not there.
+   *
+   * It compares names only. Whether each row still describes what its file records is prose,
+   * and prose is not testable — see `AGENTS.md`, which asks for the doc to move in the same
+   * change as the shape.
+   */
+  it('matches the file table in docs/adding-a-capability.md', () => {
+    expect(filenamesInDocTable().sort()).toEqual(filesIn(TEMPLATE_DIR));
   });
 });
