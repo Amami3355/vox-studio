@@ -206,6 +206,17 @@ npx vitest run --config vitest.render.config.ts packages/video/tests/render/imag
 Vitest's diff prints the real hash. Prefer this over a scratch render script: the hash then
 comes from the exact code path the assertion measures rather than from a parallel one.
 
+Getting the hash is the easy half. **Look at the frame before you paste it in**, which is what
+`scripts/still.mts` is for — one still, one frame, to `.scratch/stills/`:
+
+```
+packages/video/node_modules/.bin/tsx packages/video/scripts/still.mts \
+  stat_counter example-stat-driven 60 held-after
+```
+
+Then say in the accepted block what changed in the picture and why, next to the hash. A hash
+with no sentence beside it is a number nobody can re-check.
+
 ## Gates
 
 Run all five. Compare numbers, not exit codes.

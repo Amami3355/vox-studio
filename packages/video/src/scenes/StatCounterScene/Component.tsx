@@ -146,8 +146,30 @@ const StatFrame: React.FC<{
           ) : (
             <EmptyState message="Stat pending" startFrame={0} profile={profile} />
           )}
-          {revealed && label !== '' ? (
-            <>
+          {/* Hidden rather than unmounted, which is the whole of the "nothing jumps" rule.
+              The column is centred, so a block that arrives on the reveal grows it and
+              shoves the label upward — the label moved on the frame the number landed, and
+              a hash of the whole still cannot see it because the still is *supposed* to
+              differ there. `visibility` keeps the box in the layout and takes the ink off
+              it, so the space the number will occupy is held from frame 0.
+
+              The reserve is the real block, not a proportion in `layouts.ts`. A reserved
+              height stated as a number is a second claim about how tall the value is, and
+              it would be wrong the first time the fit dropped a step; the element that will
+              stand there measures itself.
+
+              Nothing to reserve when `label === ''` — the empty state replaces the whole
+              column, so the frame has no held-back element and reserving would push the
+              pending state off centre. */}
+          {label !== '' ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap,
+                visibility: revealed ? 'visible' : 'hidden',
+              }}
+            >
               <ValueLine
                 valueText={valueText}
                 unit={unit}
@@ -169,7 +191,7 @@ const StatFrame: React.FC<{
                   {sublabel}
                 </AnimatedText>
               ) : null}
-            </>
+            </div>
           ) : null}
         </ColumnProvider>
       </div>
