@@ -42,6 +42,29 @@ export const statGeometry = {
    */
   columnRatio: 0.72,
   /**
+   * Below this ratio of box width to height, the scene draws its composed form.
+   *
+   * Same number and the same reasoning as `barChartGeometry.composeBelowAspect`: it sits
+   * in the gap between the two shapes a scene actually meets, the full frame above it and
+   * any half of it below. A shape, never a slot — the scene is told the box it got and
+   * never the composition the compiler chose (ADR-0003 decision 4).
+   */
+  composeBelowAspect: 1.2,
+  /**
+   * In a composed box the column is the box. `columnRatio` is a measure for a 1920
+   * canvas; applying it inside a half-frame box narrows the column a second time, and an
+   * 80-character label wraps into a header that has eaten its own scene — ten lines of
+   * display type over the figure, measured at the schema ceiling under `pushIn`.
+   */
+  composedColumnRatio: 1,
+  /**
+   * …and the label's step ceiling sits this many rungs below the length ladder, the same
+   * move `BarChartScene` makes for its title. The value keeps `valueStep` as its ceiling
+   * in both forms: a figure does not wrap, and the widest-value fit already answers the
+   * narrower column.
+   */
+  composedStepDrop: 1,
+  /**
    * The value's step on the type scale — the top step. A lone figure is the one element
    * that may go this loud: it is the frame, and there is nothing else to shout over.
    */

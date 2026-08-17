@@ -13,6 +13,7 @@ import {
   EmptyState,
   SceneTitle,
   SlotFrame,
+  titleStep,
   useFrameBox,
   useSpace,
   useTitleStep,
@@ -76,7 +77,17 @@ const StatFrame: React.FC<{
   const gap = useSpace(3);
   const stagger = staggerFrames(profile);
   const box = useFrameBox();
-  const columnWidth = box.width * statGeometry.columnRatio;
+
+  /**
+   * The composed form. A portrait box means the figure is sharing the frame — a
+   * persistent element is standing in the other half — so the column takes the box's
+   * full width and the label sets a rung quieter than the length ladder would give it on
+   * its own. Both numbers are the layout's (`layouts.ts`); the full frame is untouched,
+   * which is what keeps every accepted key frame stable.
+   */
+  const composed = box.width / box.height < statGeometry.composeBelowAspect;
+  const columnWidth =
+    box.width * (composed ? statGeometry.composedColumnRatio : statGeometry.columnRatio);
 
   /**
    * The fold. Every frame below is read off it rather than written here, which is what
@@ -140,7 +151,16 @@ const StatFrame: React.FC<{
               eyebrow keeps standing. Here the empty prop is the standing one, so nothing
               would be left behind the gate. */}
           {label !== '' ? (
-            <SceneTitle startFrame={0} profile={profile} color={theme.color.ink}>
+            <SceneTitle
+              startFrame={0}
+              profile={profile}
+              color={theme.color.ink}
+              maxStep={
+                composed
+                  ? Math.max(2, titleStep(label.length) - statGeometry.composedStepDrop)
+                  : undefined
+              }
+            >
               {label}
             </SceneTitle>
           ) : (

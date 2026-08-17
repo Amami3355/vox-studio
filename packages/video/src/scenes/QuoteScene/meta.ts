@@ -31,7 +31,7 @@ export const quoteMeta: SceneMeta = {
   supportsEvents: true,
   requiresAssets: false,
   occupiesRegions: ['full'],
-  supportedCompositions: ['full'],
+  supportedCompositions: ['full', 'left', 'right'],
   minDurationFrames: 90,
   recommendedDurationFrames: 180,
 };

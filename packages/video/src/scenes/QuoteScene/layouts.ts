@@ -33,6 +33,30 @@ export const centeredGeometry = {
    * here, not an unedited placeholder.
    */
   columnRatio: 0.72,
+  /**
+   * Below this ratio of box width to height, the scene draws its composed form.
+   *
+   * Same number and the same reasoning as `barChartGeometry.composeBelowAspect`: it sits
+   * in the gap between the two shapes a scene actually meets, the full frame above it and
+   * any half of it below. A shape, never a slot — the scene is told the box it got and
+   * never the composition the compiler chose (ADR-0003 decision 4).
+   */
+  composeBelowAspect: 1.2,
+  /**
+   * In a composed box the column is the box. `columnRatio` is a measure for a 1920
+   * canvas; applying it inside a half-frame box narrows the column a second time and the
+   * quote wraps into more lines than the box is tall — the failure
+   * `tests/render/safe-area.test.ts` caught on `example-quote-long` under `pushIn`, where
+   * the column outgrew the box and the camera spent the whole margin.
+   */
+  composedColumnRatio: 1,
+  /**
+   * …and the quote's step ceiling sits this many rungs below the length ladder, the same
+   * move `BarChartScene` makes for its title. A ceiling, never the answer: the width fit
+   * still applies underneath it. The ladder alone was written for a frame the quote has
+   * to itself; composed, the quote shares the frame and sets quieter.
+   */
+  composedStepDrop: 1,
   /** The mark's ceiling — always one louder than the quote, never louder than this. */
   markStep: 6,
   /**

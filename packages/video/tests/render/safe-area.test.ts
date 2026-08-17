@@ -230,8 +230,16 @@ describe('a declared composition renders into the rectangle it declared', () => 
       'image_context composed into right under pushIn',
       'quote composed into full under cinematic',
       'quote composed into full under pushIn',
+      'quote composed into left under cinematic',
+      'quote composed into left under pushIn',
+      'quote composed into right under cinematic',
+      'quote composed into right under pushIn',
       'stat_counter composed into full under cinematic',
       'stat_counter composed into full under pushIn',
+      'stat_counter composed into left under cinematic',
+      'stat_counter composed into left under pushIn',
+      'stat_counter composed into right under cinematic',
+      'stat_counter composed into right under pushIn',
     ]);
     for (const one of cases) expect(one.examples.length).toBeGreaterThan(1);
   });

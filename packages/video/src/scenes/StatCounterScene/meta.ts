@@ -31,7 +31,7 @@ export const statCounterMeta: SceneMeta = {
   supportsEvents: true,
   requiresAssets: false,
   occupiesRegions: ['full'],
-  supportedCompositions: ['full'],
+  supportedCompositions: ['full', 'left', 'right'],
   minDurationFrames: 60,
   recommendedDurationFrames: 150,
 };

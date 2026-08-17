@@ -14,6 +14,7 @@ import {
   Eyebrow,
   SceneTitle,
   SlotFrame,
+  titleStep,
   useFrameBox,
   useSpace,
   useTitleStep,
@@ -75,7 +76,17 @@ const QuoteFrame: React.FC<{
   const gap = useSpace(3);
   const stagger = staggerFrames(profile);
   const box = useFrameBox();
-  const columnWidth = box.width * centeredGeometry.columnRatio;
+
+  /**
+   * The composed form. A portrait box means the quote is sharing the frame — a
+   * persistent element is standing in the other half — so the column takes the box's
+   * full width and the quote sets a rung quieter than the length ladder would give it
+   * on its own. Both numbers are the layout's (`layouts.ts`); the full frame is
+   * untouched, which is what keeps every accepted key frame stable.
+   */
+  const composed = box.width / box.height < centeredGeometry.composeBelowAspect;
+  const columnWidth =
+    box.width * (composed ? centeredGeometry.composedColumnRatio : centeredGeometry.columnRatio);
 
   /**
    * The fold. Every frame below is read off it rather than written here, which is what
@@ -98,14 +109,19 @@ const QuoteFrame: React.FC<{
    * the theme's top step. A quote at the top of the scale gets a mark at the same size,
    * which is the proportion an oversized pull-quote mark actually uses.
    *
-   * No ceiling is passed to `useTitleStep`: the length ladder in `titleFit.ts` is what
+   * No ceiling is passed on the full frame: the length ladder in `titleFit.ts` is what
    * keeps a paragraph from becoming a wall of 168px type. The fit guards the widest
    * *word* (a string wraps, a word does not), so a ceiling by itself would let a long
    * quote render at the top of the scale across a dozen lines and overflow the frame —
    * the exact failure the safe-area quiet border exists to catch. Length is the lever
-   * that keeps a quote a quote.
+   * that keeps a quote a quote. In a composed box the ladder still runs, one rung down:
+   * see the composed form above.
    */
-  const quoteStep = useTitleStep(quote, columnWidth);
+  const quoteStep = useTitleStep(
+    quote,
+    columnWidth,
+    composed ? Math.max(2, titleStep(quote.length) - centeredGeometry.composedStepDrop) : undefined,
+  );
   const markStep = Math.min(centeredGeometry.markStep, quoteStep + 1);
 
   return (
