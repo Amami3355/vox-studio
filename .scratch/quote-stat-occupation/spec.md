@@ -92,11 +92,37 @@ the same bundle as every other render test, measured against the `Backdrop` cont
   its header spans the full box width, so a ceiling title may well put ink in `cornerTR`.
   Measuring that is its own work, not this branch's.
 
+## What B actually cost (addendum, written after the gate ran)
+
+The handoff's premise — "the frames reflow correctly with no design work" — was measured
+with the throwaway probe, which renders `editorialStatic` only. `editorialStatic` has no
+camera. The safe-area gate, run before declaring as this spec orders, falsified the
+premise the first time it rendered a half under one: `example-quote-long` composed into
+`left`/`right` under `pushIn` put the column taller than its box, and the 1.12 scale at
+the last frame spent the whole margin — ink 10px from the canvas edge at both ends, the
+attribution clipped mid-glyph. Squeezed, silently and legally; the probe just could not
+see it.
+
+So B was paid the way `bar_chart` paid its own (ADR-0003, 2026-08-12 amendment — drawing
+was chosen over withdrawing then, and the reasoning transfers verbatim): a **composed
+form**, drawn for both capabilities. In a portrait box (`width/height < 1.2`, the same
+gap the other capabilities use) the column takes the box's full width — `columnRatio` is
+a measure for a 1920 canvas and applying it inside a half narrows the column twice — and
+the quote (or the stat's label) sets one rung below the length ladder. The stat's value
+keeps `valueStep`: a figure does not wrap, and the width fit already answers the narrower
+column. The full frame is untouched and every accepted key frame held byte-identical.
+
+Measured after, at the schema ceiling under `pushIn`: quote's ink band y 0.3%..99.9% →
+9.0%..90.7%; stat's 8.4%..91.9% → 25.9%..74.1%. Stills reviewed:
+`.scratch/stills/probe-half-*.png`, `look-example-*.png`.
+
 ## Order of work
 
-1. **B first** — nearly free; the guard already exists. Run the safe-area file; look at
-   the composed frames (`BarChartScene/meta.ts`'s house rule: only a person can say
-   whether the result is worth watching).
+1. **B first** — its guard already exists. It was not nearly free: the gate falsified
+   the "no design work" premise and the composed form had to be drawn — see the addendum
+   above. Run the safe-area file; look at the composed frames
+   (`BarChartScene/meta.ts`'s house rule: only a person can say whether the result is
+   worth watching).
 2. **A second, red-first** — controls + override + the new suite watched red against the
    `['full']` declaration, then the declaration flips and it goes green.
 3. **Rewrite both `meta.ts` headers.** They currently argue *against* these declarations;
