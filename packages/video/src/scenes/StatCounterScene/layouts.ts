@@ -7,6 +7,15 @@
  */
 import type { LayoutDef } from '../../core/types';
 
+/**
+ * Three slots, in the order the frame draws them.
+ *
+ * The approved spec listed a fourth, `eyebrow`, carried over from `quote`'s block. It is
+ * dropped on purpose: this capability has no `eyebrow` prop and the component draws none,
+ * and a slot published for an element that is never on the frame is a placement the agent
+ * can anchor a persistent element to and get nothing back. The label is this scene's
+ * standing element — the role `quote` gives its eyebrow — so nothing is lost.
+ */
 export const statCounterLayouts = {
   centered: {
     slots: ['label', 'value', 'sublabel'],
@@ -42,4 +51,10 @@ export const statGeometry = {
    * rather than a second number. `%` beside `47` is annotation, not a rival.
    */
   unitStepDrop: 3,
+  /**
+   * The gap between the figure and its unit, as a share of the *unit's* own size. It is a
+   * proportion rather than a spacing token because the pair has to read as one word at any
+   * step: a fixed token that looks right at step 3 is a chasm at step 6.
+   */
+  unitGap: 0.18,
 } as const;

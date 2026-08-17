@@ -197,7 +197,7 @@ One layout. A second arrangement with its own rhythm would be a different scene.
 ```ts
 export const statCounterLayouts = {
   centered: {
-    slots: ['eyebrow', 'value', 'label', 'sublabel'],
+    slots: ['eyebrow', 'value', 'label', 'sublabel'], // shipped as ['label', 'value', 'sublabel'] — see below
     description:
       'The value at display scale, its unit beside it, and what it counts beneath — ' +
       'centred, nothing else on the frame.',
@@ -217,6 +217,17 @@ export const statGeometry = {
 The value is one big number, so it does not use the length ladder in `titleFit.ts` (that
 ladder is for prose that wraps). It is set at a fixed display step and the widest-*value*
 fit is what guards it; the geometry above is the open question the stills answer.
+
+**Deviation, recorded after review.** The `eyebrow` slot in the block above was carried over
+from `quote`'s and is **not shipped**. This capability has no `eyebrow` prop and the component
+draws none, so publishing the slot would give the agent a placement that resolves to nothing.
+The shipped list is `['label', 'value', 'sublabel']`, in draw order. The label is this scene's
+standing element — the role `quote` gives its eyebrow — so the arrangement the spec described
+is unchanged; only the published slot name is.
+
+`statGeometry` also ships one member the block above does not name: `unitGap: 0.18`, the space
+between the figure and its unit as a share of the unit's own size. It was a bare constant in
+`Component.tsx` at first review and moved here, where the rest of the geometry lives.
 
 ### 5. `actions.ts`
 

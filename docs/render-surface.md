@@ -216,9 +216,11 @@ has not been seen against a real photograph or in the `left`/`right` composition
 ## Z6 — Capability composition
 
 `scenes/BarChartScene/` (Component 218 + layouts 80) · `scenes/ImageContextScene/` (Component 190
-+ layouts 51) · `scenes/QuoteScene/` (Component 219 + layouts 44, as of `bfac867`) ·
-`scenes/StatCounterScene/` (as of this change; the first two figures are as of `229700c` and have
-since grown)
++ layouts 51) · `scenes/QuoteScene/` (Component 219 + layouts 44) ·
+`scenes/StatCounterScene/` (Component 234 + layouts 60)
+
+The first two pairs are as of `229700c` and have since grown; `QuoteScene`'s are as of `bfac867`
+and `StatCounterScene`'s as of this change.
 
 **Four capabilities. The count is still the load-bearing fact of any breadth judgement**,
 and it has just moved: `stat_counter` is the fourth, the second that composes into `full`

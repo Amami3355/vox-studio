@@ -105,8 +105,13 @@ const StatFrame: React.FC<{
    *
    * The label, by contrast, is prose and *does* wrap, so it goes through `useTitleStep`
    * and the length ladder like any other heading.
+   *
+   * The figure is set in its plain string form — no grouping, no forced decimals. A value
+   * needing precision past an integer already carries it (`12.5`). There is no formatter
+   * seam here because there is no formatting rule yet, and an empty one would be a hook
+   * the spec never asked for.
    */
-  const valueText = formatStatValue(value);
+  const valueText = `${value}`;
   const valueStep = useTitleStep(valueText, columnWidth, statGeometry.valueStep);
   const unitStep = Math.max(0, valueStep - statGeometry.unitStepDrop);
 
@@ -124,45 +129,47 @@ const StatFrame: React.FC<{
       {/* The real binding is the column width; the provider only publishes it to the fit. */}
       <div style={{ width: columnWidth, display: 'flex', flexDirection: 'column', gap }}>
         <ColumnProvider width={columnWidth}>
-          {/* The label stands outside the gate on purpose: it is what the frame stands on
-              while the plan holds the number back, and the empty state does not take it
-              away — it *is* the empty state's replacement. Only the value and its support
-              wait for the reveal. */}
+          {/* The standing element, outside the gate on purpose: it is what the frame
+              stands on while the plan holds the number back. The empty state is its
+              replacement and not a reveal of its own, so it stands at frame 0 too —
+              gating it behind `revealStat` would leave a driven instance with an empty
+              label drawing nothing at all until the reveal landed.
+
+              This is where `stat_counter` and `quote` legitimately differ: `quote` gates
+              its empty state because there the empty prop is the *gated* one and the
+              eyebrow keeps standing. Here the empty prop is the standing one, so nothing
+              would be left behind the gate. */}
           {label !== '' ? (
             <SceneTitle startFrame={0} profile={profile} color={theme.color.ink}>
               {label}
             </SceneTitle>
-          ) : null}
-          {revealed ? (
-            label === '' ? (
-              /* The empty state is a reveal like any other: it lands when the plan says
-                 the stat lands, never at frame 0 ahead of its own gate. */
-              <EmptyState message="Stat pending" startFrame={start} profile={profile} />
-            ) : (
-              <>
-                <ValueLine
-                  valueText={valueText}
-                  unit={unit}
-                  valueStep={valueStep}
-                  unitStep={unitStep}
-                  color={emphasisColor(theme, emphasis)}
-                  startFrame={start + stagger}
+          ) : (
+            <EmptyState message="Stat pending" startFrame={0} profile={profile} />
+          )}
+          {revealed && label !== '' ? (
+            <>
+              <ValueLine
+                valueText={valueText}
+                unit={unit}
+                valueStep={valueStep}
+                unitStep={unitStep}
+                color={emphasisColor(theme, emphasis)}
+                startFrame={start + stagger}
+                profile={profile}
+                theme={theme}
+              />
+              {sublabel !== '' ? (
+                <AnimatedText
+                  startFrame={start + stagger * 2}
                   profile={profile}
-                  theme={theme}
-                />
-                {sublabel !== '' ? (
-                  <AnimatedText
-                    startFrame={start + stagger * 2}
-                    profile={profile}
-                    font="body"
-                    step={1}
-                    color={theme.color.inkMuted}
-                  >
-                    {sublabel}
-                  </AnimatedText>
-                ) : null}
-              </>
-            )
+                  font="body"
+                  step={1}
+                  color={theme.color.inkMuted}
+                >
+                  {sublabel}
+                </AnimatedText>
+              ) : null}
+            </>
           ) : null}
         </ColumnProvider>
       </div>
@@ -204,13 +211,19 @@ const ValueLine: React.FC<{
   </AnimatedText>
 );
 
-/** The unit, appended at a smaller step and a lighter weight so it reads as a suffix. */
+/**
+ * The unit, appended at a smaller step and a lighter weight so it reads as a suffix.
+ *
+ * The gap is proportional to the unit's own size rather than a spacing token, and the
+ * proportion lives in `layouts.ts` with the rest of the geometry — a scene that invents its
+ * own number is a scene the layout can no longer answer for.
+ */
 const Unit: React.FC<{ text: string; step: number; theme: Theme }> = ({ text, step, theme }) => {
   const size = useTypeSize(step);
   return (
     <span
       style={{
-        marginLeft: size * 0.18,
+        marginLeft: size * statGeometry.unitGap,
         fontSize: size,
         fontWeight: theme.type.weight.medium,
       }}
@@ -219,11 +232,3 @@ const Unit: React.FC<{ text: string; step: number; theme: Theme }> = ({ text, st
     </span>
   );
 };
-
-/**
- * The figure as it appears on the frame. Kept deliberately small: thousands separators,
- * no forced decimals. A figure that needs precision past an integer carries it in the
- * string form already (`12.5`); a count gets grouped (`1 240 000` renders as `1240000`
- * until a separator rule is wanted — see the spec's open question on formatting).
- */
-const formatStatValue = (value: number): string => `${value}`;

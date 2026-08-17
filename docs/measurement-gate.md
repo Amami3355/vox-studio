@@ -188,7 +188,7 @@ almost nothing, and that is worth stating precisely rather than as an intuition:
   catalog it scored the absence of alternatives. `quote` (`bfac867`) is the third, and
   typography-only, so a brief about a speaker now has a real rival to `image_context`;
   `stat_counter` is the fourth, so a brief about a single figure now has one too. What
-  is still missing is evidence: the ten briefs have not been run against the catalog. Measure 3 is
+  is still missing is evidence: the ten briefs have not been run against the four. Measure 3 is
   open on an unrun measurement, no longer on a missing capability.
 - **Catalog v3 now publishes the complete check vocabulary.** The canonical registry owns
   every code, regime, allowed warning severity, meaning and repair, and the report-code types
@@ -200,33 +200,42 @@ one action — **met**, and it was the last of the three the build plan was expe
 every capability meets §15's checklist including its three examples with an edge
 case and an empty case; and the majority of the ten briefs admit more than one plausible
 capability. **Measure 3 remains the open one**, but for a different reason than
-before: the third capability it was waiting on has landed (`quote`, `bfac867`), so what is
-left is to run the ten briefs and read the result.
+before: the count it was waiting on has landed — `quote` (`bfac867`) made three and
+`stat_counter` makes four — so what is left is to run the ten briefs and read the result.
 
 **Depth and breadth are not the same preparation, and the build plan only buys one.** §14's
 strategy is 8–12 capabilities × many variants, and groups 2, 3 and 4 are all variants of
-`ImageContextScene` — after all three the catalog would still hold **two** capabilities. Group 4
-unblocks measure 2. *Nothing on the plan unblocks measure 3* — `quote` did, off the plan, which
+`ImageContextScene` — after all three the catalog would still have held the **two** it had when
+this was written. Group 4
+unblocks measure 2. *Nothing on the plan unblocks measure 3* — `quote` and `stat_counter` did,
+both off the plan, which
 is the point: breadth had to be bought deliberately because no group on §14 was going to buy it.
 
-**The gate runs at four capabilities**: `bar_chart`, `image_context`, then
-TypographicStatement — the cheapest, being pure type with no assets and no resolver — and
-Comparison. Four is enough for a brief to admit a wrong answer, which is all measure 3 needs
+**The gate runs at four capabilities**, and the four are now in the catalog: `bar_chart`,
+`image_context`, `quote` and `stat_counter`. The threshold is **met**. The two this paragraph
+originally named — TypographicStatement, the cheapest being pure type with no assets and no
+resolver, and Comparison — were never built; `quote` and `stat_counter` filled the same role,
+and both are likewise pure type with no assets and no resolver. Four is enough for a brief to
+admit a wrong answer, which is all measure 3 needs
 in order to stop being decorative. It is a weaker read than eight would give, and **the
 capability count is recorded on the scorecard as a caveat on measure 3** rather than left for
 a reader in September to reconstruct.
 
-**Order:** ADR-0006 → group 4 → TypographicStatement → Comparison → run the gate.
+**Order:** ADR-0006 → group 4 → ~~TypographicStatement → Comparison~~ (superseded by `quote`
+and `stat_counter`, both landed) → run the gate.
 
-**The cut line, revised.** The pre-agreed order was set when nothing but depth was on the
-plan. Both depth items now cut before either breadth capability, because measure 3 is
-decorative without breadth while depth only sharpens measures 1 and 4, which are already
-measurable:
+**The cut line, revised — and now largely spent.** The pre-agreed order was set when nothing
+but depth was on the plan. Both depth items cut before either breadth capability, because
+measure 3 is decorative without breadth while depth only sharpens measures 1 and 4, which are
+already measurable:
 
-> group 3 → `cutoutOnFlat` → Comparison → repair-pass scoring.
+> group 3 → `cutoutOnFlat` → ~~Comparison~~ → repair-pass scoring.
 
-**Never cut:** group 1, group 4, TypographicStatement, the contract tests, and the
-content-stress suite of ADR-0003's last amendment.
+Breadth is no longer on the line at all: `quote` and `stat_counter` have landed, so the only
+cuts left are group 3, `cutoutOnFlat` and repair-pass scoring, in that order.
+
+**Never cut:** group 1, group 4, the fourth capability (bought by `stat_counter`), the contract
+tests, and the content-stress suite of ADR-0003's last amendment.
 
 ## What a run leaves behind — specified here
 

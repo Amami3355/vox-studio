@@ -31,9 +31,21 @@ export const statCounterConstraints: SoftConstraints = {
 };
 
 /**
- * Resulting regime for `label`:
+ * Resulting regime for `label`. Two ladders run at once and they do not share a rung, so
+ * they are listed apart rather than merged into one misleading column.
+ *
+ * The *warning* ladder is the band above — `recommendedMax: 60`.
+ * The *type* ladder is `titleStep` in `titleFit.ts` — ≤ 40 → 5, ≤ 70 → 4, > 70 → 3 — and
+ * it drops at 41 and at 71, neither of which is 60. A label can therefore be a step down
+ * while still inside the recommended band, and can cross the band without dropping.
+ *
  *   0 characters   → empty state, plus an info warning
- *   1–60           → optimal band
- *   61–80          → renders one type step down, plus a TITLE_DENSITY warning
+ *   1–40           → recommended, set at step 5
+ *   41–60          → recommended, already one step down at 4
+ *   61–70          → still step 4, plus a TITLE_DENSITY warning
+ *   71–80          → step 3, plus a TITLE_DENSITY warning
  *   > 80           → validation error, rejected
+ *
+ * All of it is a ceiling, never a guarantee: `fitTitleStep` measures the widest word and
+ * may take the label lower still in a narrow column.
  */
