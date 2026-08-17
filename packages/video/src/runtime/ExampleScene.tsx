@@ -97,7 +97,3 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
     />
   );
 };
-
-/** Remotion composition ids allow letters, digits and dashes only. */
-export const compositionIdFor = (capabilityId: string, exampleId: string): string =>
-  `${capabilityId}--${exampleId}`.replace(/[^a-zA-Z0-9-]/g, '-');

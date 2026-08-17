@@ -26,8 +26,7 @@ import {
   selectComposition,
 } from '@remotion/renderer';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { compositionIdFor } from '../../src/runtime/ExampleScene';
-import { controlIdFor } from '../../src/runtime/SceneControl';
+import { compositionIdFor, controlIdFor } from '../../src/runtime/compositionIds';
 
 /** Everything has landed and settled here; all four examples run 150 frames. */
 const SETTLED_FRAME = 120;

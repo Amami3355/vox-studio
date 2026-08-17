@@ -6,14 +6,10 @@ import { FPS, HEIGHT, WIDTH } from './design/theme';
 import { announceShippedPlan, compileShippedPlan, shippedPlans } from './plans';
 import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';
 import { CompiledVideo } from './runtime/CompiledVideo';
-import { ExampleScene, compositionIdFor } from './runtime/ExampleScene';
-import {
-  ControlScene,
-  controlDurationFrames,
-  controlIdFor,
-  sceneControls,
-} from './runtime/SceneControl';
-import { registry } from './scenes/registry';
+import { ExampleScene } from './runtime/ExampleScene';
+import { ControlScene, sceneControls } from './runtime/SceneControl';
+import { compositionIdFor, controlIdFor } from './runtime/compositionIds';
+import { registry, requireCapability } from './scenes/registry';
 
 /**
  * A document with nothing in it, so the composition can be registered before anyone has
@@ -123,7 +119,7 @@ export const RemotionRoot: React.FC = () => (
         key={controlIdFor(control.id)}
         id={controlIdFor(control.id)}
         component={ControlScene}
-        durationInFrames={controlDurationFrames(control)}
+        durationInFrames={requireCapability(control.component).meta.recommendedDurationFrames}
         fps={FPS}
         width={WIDTH}
         height={HEIGHT}

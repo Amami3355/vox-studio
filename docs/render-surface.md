@@ -23,9 +23,9 @@ Vox and Johnny Harris for pace only.** Pace never becomes a capability.
 | Z3 | Frame physics | `SlotFrame`, `CameraRig`, `Backdrop` | margin, density, camera, ground |
 | Z4 | Data marks | `BarGroup` | every chart |
 | Z5 | Editorial marks | `Callout`, `EmptyState`, `Reveal` | annotation and degradation |
-| Z6 | Capability composition | the two `Component.tsx` + `layouts.ts` pairs | one capability each |
+| Z6 | Capability composition | the four `Component.tsx` + `layouts.ts` pairs | one capability each |
 | Z7 | Upstream deciders | `compile/`, `core/slots.ts` | which box a scene gets, and when |
-| Z8 | The judging loop | `pnpm grid`, `.scratch/still-cost/`, `BackdropControl` | nothing — it is where you look |
+| Z8 | The judging loop | `pnpm grid`, `.scratch/still-cost/`, the controls | nothing — it is where you look |
 
 ---
 
@@ -287,7 +287,10 @@ just before "leaving".
 - **`pnpm --filter @vox/video measure:stills`** — a fourteen-frame contact sheet of the real paid
   run in **11.1–11.4 s**, against 333.7 s for the video. Output in `.scratch/still-cost/`.
 - **`pnpm studio`** — Remotion Studio; accepts a real Run's `document.json` via `--props`.
-- **`runtime/BackdropControl.tsx`** — the control frame the render contract tests measure against.
+- **The controls** — reference renders the tests measure against, never shown to the agent.
+  `runtime/BackdropControl.tsx` is the ground with nothing on it; `runtime/SceneControl.tsx` is
+  the general form, a whole scene the examples deliberately do not cover. The bar for adding one
+  is in `docs/adding-a-capability.md` §"Controls: the instances the agent never sees".
 
 **Not a judge:** an agent. Ticket 25's corrected objective binds here — a machine visual check is
 for **coherence** (did the renderer execute what the document decided) and never for judging

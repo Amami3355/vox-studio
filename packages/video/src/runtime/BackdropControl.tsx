@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Backdrop, ThemeProvider } from '../primitives';
+import { controlIdFor } from './compositionIds';
 
 /**
  * The ground with nothing standing on it — the reference frame the render contract tests
@@ -33,4 +34,4 @@ export const BackdropControl: React.FC = () => (
   </ThemeProvider>
 );
 
-export const BACKDROP_CONTROL_ID = 'control--backdrop';
+export const BACKDROP_CONTROL_ID = controlIdFor('backdrop');

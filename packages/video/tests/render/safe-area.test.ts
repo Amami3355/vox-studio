@@ -52,7 +52,7 @@ import { type Rect, slotRect } from '../../src/core/slots';
 import type { SafeArea, Slot } from '../../src/core/types';
 import { HEIGHT, WIDTH, defaultTheme } from '../../src/design/theme';
 import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
-import { compositionIdFor } from '../../src/runtime/ExampleScene';
+import { compositionIdFor } from '../../src/runtime/compositionIds';
 import { registry } from '../../src/scenes/registry';
 import {
   type Bitmap,
