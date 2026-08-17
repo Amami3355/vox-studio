@@ -19,6 +19,7 @@ import type React from 'react';
 import { useVideoConfig } from 'remotion';
 import { resolveEventTimings, syntheticBeats } from '../core/anchors';
 import type { SceneInstance } from '../core/types';
+import type { MotionProfileId } from '../design/motion';
 import { SceneRenderer } from './SceneRenderer';
 
 export const sceneControls: SceneInstance[] = [
@@ -50,6 +51,50 @@ export const sceneControls: SceneInstance[] = [
       emphasis: 'neutral',
     },
   },
+  /**
+   * Both ceiling controls exist for `tests/render/occupies-regions.test.ts`, which checks
+   * the one claim no other suite reads: that `occupiesRegions` is true of the pixels. The
+   * claim is worst where the copy is longest, so every string sits at its schema ceiling —
+   * in multi-word prose, because a one-token ceiling string exercises no wrapping and
+   * wrapping is the whole question.
+   *
+   * Controls rather than examples: every prop here is past the recommended band
+   * `constraints.ts` steers the agent under, so publishing the shape would teach copy the
+   * catalog exists to discourage. The suite sweeps them across all six motion profiles
+   * through the `motionProfile` override below.
+   */
+  {
+    id: 'quote-ceiling',
+    component: 'quote',
+    layout: 'centered',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1'],
+    props: {
+      // 40, 240, 60 and 60 characters — the schema's hard ceilings, exactly.
+      eyebrow: 'The testimony, given under oath, in full',
+      quote:
+        "For younger households the hardest thing is not that rents are high, it is that they still climb year after year, far faster than anything else in a budget, and there's nobody left who can absorb the difference for them when the bill lands.",
+      attribution: "Maria Alvarez, housing economist, and the tenants' organiser",
+      role: 'Speaking before the housing select committee, in March 2026.',
+    },
+  },
+  {
+    id: 'stat-ceiling',
+    component: 'stat_counter',
+    layout: 'centered',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1'],
+    props: {
+      // A signed seven-digit value, a 12-character unit, an 80-character label and a
+      // 120-character sublabel — the schema's hard ceilings, exactly.
+      value: -9999999,
+      unit: 'per cent net',
+      label: "Share of a household's monthly income now spent on rent and on heating, all told",
+      sublabel:
+        'Up from a third a decade ago, and still climbing in every region the survey reached this year, in cities and towns alike',
+      emphasis: 'neutral',
+    },
+  },
 ];
 
 /**
@@ -61,7 +106,14 @@ export const sceneControls: SceneInstance[] = [
  * control is only ever driven by a test. Folding them together would make every future
  * catalog affordance a thing the controls also carry.
  */
-export const ControlScene: React.FC<{ controlId: string }> = ({ controlId }) => {
+export const ControlScene: React.FC<{
+  controlId: string;
+  /**
+   * Test-only override, mirroring `ExampleScene`'s: a sweep that needs one control under
+   * every profile renders it six ways instead of registering six copies.
+   */
+  motionProfile?: MotionProfileId | null;
+}> = ({ controlId, motionProfile }) => {
   const { durationInFrames } = useVideoConfig();
   const control = sceneControls.find((c) => c.id === controlId);
 
@@ -89,7 +141,7 @@ export const ControlScene: React.FC<{ controlId: string }> = ({ controlId }) => 
       props={control.props}
       events={events}
       layout={control.layout}
-      motionProfile={control.motionProfile}
+      motionProfile={motionProfile ?? control.motionProfile}
     />
   );
 };

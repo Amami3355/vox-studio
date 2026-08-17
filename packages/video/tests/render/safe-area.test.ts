@@ -2,12 +2,15 @@
  * ADR-0003's unpaid consequence: *"a declared composition is trusted, and nothing yet
  * checks that it renders"*.
  *
- * `supportedCompositions` is the only lever a capability has to keep a persistent element
- * alive over it, and the compiler takes an entry there as proof that a layout exists for
- * that half of the frame. Nothing verified it. A capability could declare `left`, get
- * squeezed into 960px with a layout drawn for 1920, and spill across the corner the
- * element was standing in — silently, legally, and only visible to whoever happened to
- * watch that section.
+ * `supportedCompositions` is the lever a capability pulls to keep a persistent element
+ * alive over it once the element contends — the quieter lever is an honest
+ * `occupiesRegions`, which keeps a clear element out of contention entirely, and
+ * `occupies-regions.test.ts` guards that claim. This suite guards the composition one:
+ * the compiler takes an entry here as proof that a layout exists for that half of the
+ * frame, and nothing verified it. A capability could declare `left`, get squeezed into
+ * 960px with a layout drawn for 1920, and spill across the corner the element was
+ * standing in — silently, legally, and only visible to whoever happened to watch that
+ * section.
  *
  * So this suite is generated from the declarations themselves: every capability × every
  * composition it claims × the two camera profiles that bound the risk. Adding a

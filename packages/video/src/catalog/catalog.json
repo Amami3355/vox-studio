@@ -999,10 +999,13 @@
       "supportsEvents": true,
       "requiresAssets": false,
       "occupiesRegions": [
-        "full"
+        "left",
+        "center"
       ],
       "supportedCompositions": [
-        "full"
+        "full",
+        "left",
+        "right"
       ],
       "minDurationFrames": 90,
       "recommendedDurationFrames": 180,
@@ -1174,10 +1177,13 @@
       "supportsEvents": true,
       "requiresAssets": false,
       "occupiesRegions": [
-        "full"
+        "left",
+        "center"
       ],
       "supportedCompositions": [
-        "full"
+        "full",
+        "left",
+        "right"
       ],
       "minDurationFrames": 60,
       "recommendedDurationFrames": 150,

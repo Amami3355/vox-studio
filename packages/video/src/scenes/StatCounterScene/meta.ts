@@ -7,11 +7,25 @@ import type { SceneMeta } from '../../core/types';
  * `avoidWhen` entries redirect explicitly and must contain `→`; the catalog contract
  * enforces the arrow. One line of redirection is worth three paragraphs of description.
  *
- * `occupiesRegions: ['full']` and `supportedCompositions: ['full']` are the honest
- * opening. A `left`/`right` composed form is a designed frame *plus* a safe-area render
- * test, not a free declaration — `BarChartScene/meta.ts`'s header records what an unpaid
- * claim costs. Declaring one here without drawing the frame would be `ADR-0003`'s
- * "squeezed, silently and legally" in the flesh.
+ * On `occupiesRegions: ['left', 'center']` — measured, not hoped. `centered` is not
+ * centred: it is a left-aligned column, vertically centred as a block, and at the
+ * schema ceiling (a signed seven-digit value, a 12-character unit, an 80-character
+ * label) the ink never passes x = 68.0% under any of the six motion profiles. `left`
+ * alone would free `right`, where the ink genuinely goes; adding `center` keeps
+ * `right`, `top` and `bottom` correctly taken and frees exactly `cornerTR` and
+ * `cornerBR` — a character in either corner is a rung-a `keep`, and the scene is never
+ * shrunk for it. The margin is undesigned, which is why
+ * `tests/render/occupies-regions.test.ts` exists: it renders the ceiling under every
+ * profile and fails if the ink ever crosses.
+ *
+ * On `supportedCompositions` — the halves are paid for. The composed form is drawn:
+ * in a portrait box the column takes the box's full width and the label sets a rung
+ * below the length ladder, while the value keeps `valueStep` — a figure does not wrap,
+ * and the width fit already answers the narrower column (`layouts.ts` holds the
+ * numbers). The claim's sibling failed its own gate before the form was drawn
+ * (`quote`'s long example under `pushIn` outgrew the half and the camera spent the
+ * whole margin); `safe-area.test.ts` renders every declared half now, and the stills
+ * were reviewed.
  */
 export const statCounterMeta: SceneMeta = {
   id: 'stat_counter',
@@ -30,7 +44,7 @@ export const statCounterMeta: SceneMeta = {
   ],
   supportsEvents: true,
   requiresAssets: false,
-  occupiesRegions: ['full'],
+  occupiesRegions: ['left', 'center'],
   supportedCompositions: ['full', 'left', 'right'],
   minDurationFrames: 60,
   recommendedDurationFrames: 150,

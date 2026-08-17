@@ -7,11 +7,23 @@ import type { SceneMeta } from '../../core/types';
  * `avoidWhen` entries redirect explicitly and must contain `→`; the catalog contract
  * enforces the arrow. One line of redirection is worth three paragraphs of description.
  *
- * `occupiesRegions: ['full']` and `supportedCompositions: ['full']` are the honest
- * opening. A `left`/`right` composed form is a designed frame *plus* a safe-area render
- * test, not a free declaration — `BarChartScene/meta.ts`'s header records what an unpaid
- * claim costs. Declaring one here without drawing the frame would be `ADR-0003`'s
- * "squeezed, silently and legally" in the flesh.
+ * On `occupiesRegions: ['left', 'center']` — measured, not hoped. `centered` is not
+ * centred: it is a left-aligned column, vertically centred as a block, and `SceneTitle`
+ * caps at 86% of it, so at the schema ceiling the ink never passes x = 71.9% under any
+ * of the six motion profiles. `left` alone would free `right`, where the ink genuinely
+ * goes; adding `center` keeps `right`, `top` and `bottom` correctly taken and frees
+ * exactly `cornerTR` and `cornerBR` — a character in either corner is a rung-a `keep`,
+ * and the scene is never shrunk for it. The margin is two points and undesigned, which
+ * is why `tests/render/occupies-regions.test.ts` exists: it renders the ceiling under
+ * every profile and fails if the ink ever crosses.
+ *
+ * On `supportedCompositions` — the halves are paid for. The composed form is drawn:
+ * in a portrait box the column takes the box's full width and the quote sets a rung
+ * below the length ladder (`layouts.ts` holds the numbers). It was not free. The first
+ * claim failed its own gate — `example-quote-long` composed into a half under `pushIn`
+ * outgrew the box and the camera spent the whole margin — which is what
+ * `BarChartScene/meta.ts`'s header means by an unpaid claim, caught one suite earlier.
+ * `safe-area.test.ts` renders every declared half now, and the stills were reviewed.
  */
 export const quoteMeta: SceneMeta = {
   id: 'quote',
@@ -30,7 +42,7 @@ export const quoteMeta: SceneMeta = {
   ],
   supportsEvents: true,
   requiresAssets: false,
-  occupiesRegions: ['full'],
+  occupiesRegions: ['left', 'center'],
   supportedCompositions: ['full', 'left', 'right'],
   minDurationFrames: 90,
   recommendedDurationFrames: 180,
