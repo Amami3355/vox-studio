@@ -7,6 +7,12 @@ import { announceShippedPlan, compileShippedPlan, shippedPlans } from './plans';
 import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';
 import { CompiledVideo } from './runtime/CompiledVideo';
 import { ExampleScene, compositionIdFor } from './runtime/ExampleScene';
+import {
+  ControlScene,
+  controlDurationFrames,
+  controlIdFor,
+  sceneControls,
+} from './runtime/SceneControl';
 import { registry } from './scenes/registry';
 
 /**
@@ -107,6 +113,23 @@ export const RemotionRoot: React.FC = () => (
       width={WIDTH}
       height={HEIGHT}
     />
+
+    {/*
+     * The scene controls — instances a render test needs and the agent must never see.
+     * `runtime/SceneControl.tsx` carries the reasoning, and the bar for adding one.
+     */}
+    {sceneControls.map((control) => (
+      <Composition
+        key={controlIdFor(control.id)}
+        id={controlIdFor(control.id)}
+        component={ControlScene}
+        durationInFrames={controlDurationFrames(control)}
+        fps={FPS}
+        width={WIDTH}
+        height={HEIGHT}
+        defaultProps={{ controlId: control.id }}
+      />
+    ))}
 
     {registry.flatMap((capability) =>
       capability.examples.map((example) => (

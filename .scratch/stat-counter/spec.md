@@ -292,6 +292,26 @@ draws a 1px rule via `mix()`, so a token-clean precedent exists. Decide from cap
 | `example-stat-driven` | Same props as canonical + `spansBeats: ['b1','b2']`, one event `revealStat @ b2.start`. Beat 1 stands on the label; the number lands when the narration says it |
 | `example-stat-empty` | **Empty case** — `label: ''`, renders the empty state |
 
+**Addition, recorded after review — and it is not a fifth example.** The review found that an
+empty `label` on a plan-driven instance drew a blank frame until `b2.start`: the label was
+suppressed for being empty *and* the empty state sat inside the `revealed` gate. The fix moves
+the empty state to frame 0, where it belongs — it replaces the *standing* element, so it is not
+a reveal of its own.
+
+No example crosses empty with driven, so nothing guarded it. The obvious repair was a fifth
+example, and it was rejected: examples are normative, and an empty label on a plan-driven scene
+is a plan the agent should never write. Publishing it to guard it would teach the defect.
+
+It ships instead as a **scene control** — `control--stat-empty-driven`, in
+`src/runtime/SceneControl.tsx`, registered as its own composition in `Root.tsx` and invisible to
+`capability.examples` and therefore to both catalog projections. `runtime/BackdropControl.tsx`
+set the precedent; this is its general form. The guard is a relation, not a new key frame:
+`tests/render/stat-counter.test.ts` asserts the control is pixel-identical to
+`example-stat-empty` at frame 60, which holds if and only if the empty state is ungated. It was
+confirmed red against the pre-fix component before being accepted.
+
+The example set is therefore still **four**, as specified above.
+
 ### 10. `index.ts` + `registry.ts`
 
 Assemble; drop `checks`. Add `statCounterCapability` to `src/scenes/registry.ts`. Then

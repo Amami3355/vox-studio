@@ -27,6 +27,7 @@ import {
 } from '@remotion/renderer';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { compositionIdFor } from '../../src/runtime/ExampleScene';
+import { controlIdFor } from '../../src/runtime/SceneControl';
 
 /** Everything has landed and settled here; all four examples run 150 frames. */
 const SETTLED_FRAME = 120;
@@ -51,16 +52,14 @@ afterAll(async () => {
   if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
 });
 
-const renderHash = async (exampleId: string, frame: number): Promise<string> => {
-  const inputProps = {
-    capabilityId: 'stat_counter',
-    exampleId,
-    layout: null,
-    motionProfile: null,
-  };
+const renderStillHash = async (
+  compositionId: string,
+  inputProps: Record<string, unknown>,
+  frame: number,
+): Promise<string> => {
   const composition = await selectComposition({
     serveUrl,
-    id: compositionIdFor('stat_counter', exampleId),
+    id: compositionId,
     inputProps,
     puppeteerInstance: browser,
     logLevel: 'error',
@@ -79,6 +78,16 @@ const renderHash = async (exampleId: string, frame: number): Promise<string> => 
   if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
   return createHash('md5').update(rendered.buffer).digest('hex');
 };
+
+const renderHash = (exampleId: string, frame: number): Promise<string> =>
+  renderStillHash(
+    compositionIdFor('stat_counter', exampleId),
+    { capabilityId: 'stat_counter', exampleId, layout: null, motionProfile: null },
+    frame,
+  );
+
+const renderControlHash = (controlId: string, frame: number): Promise<string> =>
+  renderStillHash(controlIdFor(controlId), { controlId }, frame);
 
 describe('StatCounterScene runtime', () => {
   /**
@@ -100,6 +109,30 @@ describe('StatCounterScene runtime', () => {
 
     expect(heldDriven).not.toBe(heldCanonical);
     expect(settledDriven).toBe(settledCanonical);
+  });
+
+  /**
+   * The pending state is not a reveal, stated as a relation against the undriven example.
+   *
+   * With `label === ''` there is nothing behind the gate at all — the value block is
+   * skipped either way — so `revealStat` must make no difference to any frame. Both run
+   * 150 frames on `editorialStatic`, which has no camera, so they are pixel-identical if
+   * and only if the empty state stands from frame 0.
+   *
+   * Equality is what makes this a guard rather than a second baseline: the control has no
+   * accepted key frame of its own, and wants none. It is the same picture as
+   * `example-stat-empty`, whose hash is accepted below, so a literal here would be a
+   * second baseline for one frame and would have to be re-accepted twice.
+   *
+   * `control--stat-empty-driven` rather than a fifth example: see `runtime/SceneControl.tsx`.
+   */
+  it('never gates the pending state behind the reveal', async () => {
+    const [drivenEmpty, undrivenEmpty] = await Promise.all([
+      renderControlHash('stat-empty-driven', HOLD_FRAME),
+      renderHash('example-stat-empty', HOLD_FRAME),
+    ]);
+
+    expect(drivenEmpty).toBe(undrivenEmpty);
   });
 
   it('keeps the accepted key frames stable', async () => {
