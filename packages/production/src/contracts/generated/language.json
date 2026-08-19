@@ -114,6 +114,11 @@
         "avoid": null
       },
       {
+        "term": "Transition",
+        "definition": "How a scene *arrives*: an optional `transitionIn` on the scene instance, naming an effect from a closed published vocabulary and a rhythm token for its length. Absence is the hard cut, which is the default and not a degradation. Self-anchoring by construction — it plays around the scene's own start and no anchor is written for it, so the anchor grammar does not widen. The overlap is carved from the incoming scene's head, so scene and composition durations stay pinned to the take. An anchored event must never resolve inside the window: `TRANSITION_COVERS_EVENT`. The compiler plays only an effect the incoming capability declared (`supportedTransitions` in its meta). See ADR-0013.",
+        "avoid": "\"transition\" as something a scene exits through — ownership lives with the arrival only; and treating the cut as something declared — it is the absence of a declaration."
+      },
+      {
         "term": "Action",
         "definition": "A member of a capability's *closed* event vocabulary (`highlightBar`, `annotate`). An action outside the vocabulary is a compilation error, never a silence.",
         "avoid": null
