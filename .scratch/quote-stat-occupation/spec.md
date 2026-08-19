@@ -29,6 +29,11 @@ cornerBL  4326 px worst      cornerBR  FREE in every still
 `centered` is not centred: it is a left-aligned column, vertically centred as a block, and
 `SceneTitle` caps at 86% of the column — ink never passed **x = 71.9%**.
 
+> **Corrected 2026-08-19 — see "What A's evidence actually says" below.** The `x = 71.9%`
+> bound holds for `quote` (re-measured: 70.7%), but the same sweep's `x = 68.0%` figure for
+> `stat_counter` is wrong by ~14 points, and horizontal extent is not what frees the corners
+> for either capability.
+
 **Sweep 2 — does the scene survive a half?** Composed into `left`, both reflow with no
 design work — same type step, more lines, nothing overflows or crops — and the `right`
 half is free. Confirmed by eye on the squeeze stills. That is the designed frame
@@ -138,10 +143,10 @@ Measured after, at the schema ceiling under `pushIn`: quote's ink band y 0.3%..9
 ## Known limits, stated rather than discovered
 
 - **Only the default theme was measured.** Both sweeps ran on it.
-- **The corner margin is thin:** ink reaches 71.9%, corners start at 70% — two points, a
-  consequence of `columnRatio: 0.72` plus `SceneTitle`'s 86% cap, not a designed margin.
-  That is precisely why A needs its own test, and why the test sweeps all six profiles at
-  the ceiling rather than one profile at the examples.
+- **The corner margin is thin** — and thin in a different direction for each capability
+  than this spec first recorded. See the correction addendum below. It stays the reason A
+  needs its own test, and why the test sweeps all six profiles at the ceiling rather than
+  one profile at the examples.
 - ADR-0003's consequences section also calls `supportedCompositions` "the only lever".
   That sentence predates this work; the repair lands in the test header and the meta
   headers, and the ADR echo is flagged in the final report rather than amended here.
@@ -149,6 +154,46 @@ Measured after, at the schema ceiling under `pushIn`: quote's ink band y 0.3%..9
   value; width fit ignores the unit) stay open and stay deliberate.
 - `docs/measurement-gate.md` is the plan of record and neither A nor B is on it. This work
   jumps the queue; the user chose that knowingly.
+
+## What A's evidence actually says (addendum, written 2026-08-19 during `/code-review`)
+
+Sweep 1 concluded the corners were free because *"ink never passed x = 71.9%"* (quote) and
+*"x = 68.0%"* (`stat_counter`), and both `meta.ts` headers plus the new suite's header
+repeated that reasoning: a two-point horizontal margin, owed to `columnRatio: 0.72` and
+`SceneTitle`'s 86% cap. Re-measured against the committed ceiling controls — worst case over
+all six motion profiles at frames 1/20/60/last, default theme:
+
+```
+               ink max x   ink y band     ink in the corner rows   the real margin
+quote          70.7%       23.5%..76.7%   stops at x = 65.5%       4.5 pts horizontal
+stat_counter   81.8%       32.0%..68.3%   none at all              1.7 pts vertical
+```
+
+Three things were wrong, none of which changes decision A itself:
+
+1. **`stat_counter`'s recorded figure is wrong by ~14 points.** Its ink reaches x = 81.8%,
+   not 68.0% — the seven-digit signed value is wide display type at the top step. It was not
+   a camera blind spot: `editorialStatic` alone already measures 80.1%, and the spread across
+   all six profiles is only 79.0%..81.8%. The original number simply did not measure the
+   value.
+2. **Horizontal extent frees neither capability's corners.** Both put ink past x = 70%, which
+   is the corners' own column (`cornerTR` is `{left: 70, bottom: 70}`). `quote` is clear
+   because the elements that reach the corners' *rows* — eyebrow, attribution, role — stop at
+   x = 65.5%; the ink that crosses 70% sits at y 48.3%..62.9%, mid-frame. `stat_counter` is
+   clear because it draws no ink at all outside y 32.0%..68.3%.
+3. **The named levers are the wrong ones to watch.** `columnRatio` and the 86% cap are not
+   what the margin rests on. For `stat_counter` it is the stack's height and vertical
+   centring — 1.7 points, about 18px at 1080. For `quote` it is the width of the corner-row
+   elements — 4.5 points.
+
+The declaration `['left', 'center']` is unaffected and still correct: `occupies-regions.test.ts`
+proves it against pixels under every profile, and that proof never depended on the stated
+reason. What was wrong was the *explanation* recorded beside it, in four places — this spec,
+both `meta.ts` headers, and the suite header. All four now carry the measured story.
+
+The lesson matches the one decision B already learned: a number nobody re-derives from the
+committed artefact drifts from it. B's premise came from a probe that could not see cameras;
+A's margin came from a sweep that did not measure the widest element.
 
 ## Rejected, with the reason
 

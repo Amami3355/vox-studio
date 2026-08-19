@@ -44,6 +44,23 @@ export const TITLE_MAX_WIDTH = 0.86;
 export const TITLE_MIN_STEP = 2;
 
 /**
+ * The step ceiling a title takes when its scene has been composed into half a frame.
+ *
+ * A composed scene shares the canvas with a persistent element, so it sets quieter than
+ * the length ladder would give it on a frame of its own: `drop` rungs below `titleStep`,
+ * floored at `TITLE_MIN_STEP` for the same reason `fitTitleStep` floors there — display
+ * type shrunk into a caption is not a better failure than a word that touches its margins.
+ *
+ * A ceiling and never the answer: the width fit still runs underneath it, which is what
+ * answers the narrower column. Three scenes make this move — `BarChartScene` for its
+ * title, `QuoteScene` for the quote, `StatCounterScene` for the label — each with its own
+ * `drop` in its `layouts.ts`, so the arithmetic and the floor live here once rather than
+ * three times over.
+ */
+export const composedStepCeiling = (length: number, drop: number): number =>
+  Math.max(TITLE_MIN_STEP, titleStep(length) - drop);
+
+/**
  * The largest step at or below `top` at which every word fits inside `available`.
  *
  * Only the widest word constrains the answer, because a string wraps and a word does not.

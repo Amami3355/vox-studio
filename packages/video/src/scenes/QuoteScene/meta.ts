@@ -9,13 +9,19 @@ import type { SceneMeta } from '../../core/types';
  *
  * On `occupiesRegions: ['left', 'center']` — measured, not hoped. `centered` is not
  * centred: it is a left-aligned column, vertically centred as a block, and `SceneTitle`
- * caps at 86% of it, so at the schema ceiling the ink never passes x = 71.9% under any
- * of the six motion profiles. `left` alone would free `right`, where the ink genuinely
- * goes; adding `center` keeps `right`, `top` and `bottom` correctly taken and frees
- * exactly `cornerTR` and `cornerBR` — a character in either corner is a rung-a `keep`,
- * and the scene is never shrunk for it. The margin is two points and undesigned, which
- * is why `tests/render/occupies-regions.test.ts` exists: it renders the ceiling under
- * every profile and fails if the ink ever crosses.
+ * caps at 86% of it. `left` alone would free `right`, where the ink genuinely goes;
+ * adding `center` keeps `right`, `top` and `bottom` correctly taken and frees exactly
+ * `cornerTR` and `cornerBR` — a character in either corner is a rung-a `keep`, and the
+ * scene is never shrunk for it.
+ *
+ * What keeps those two corners clear is *not* the column's width. At the schema ceiling
+ * the ink reaches x = 70.7%, which is already inside the corners' column — but that ink
+ * is the quote and its mark, sitting at y 48.3%..62.9%, mid-frame. The elements that do
+ * reach into the corners' rows (eyebrow above y = 30%, attribution and role below
+ * y = 70%) stop at x = 65.5%. That 4.5-point gap is the whole margin, it is undesigned,
+ * and widening any corner-row element spends it — which is why
+ * `tests/render/occupies-regions.test.ts` exists: it renders the ceiling under every
+ * profile and fails if the ink ever crosses.
  *
  * On `supportedCompositions` — the halves are paid for. The composed form is drawn:
  * in a portrait box the column takes the box's full width and the quote sets a rung

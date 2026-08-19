@@ -8,13 +8,19 @@ import type { SceneMeta } from '../../core/types';
  * enforces the arrow. One line of redirection is worth three paragraphs of description.
  *
  * On `occupiesRegions: ['left', 'center']` — measured, not hoped. `centered` is not
- * centred: it is a left-aligned column, vertically centred as a block, and at the
+ * centred: it is a left-aligned column, vertically centred as a block. `left` alone
+ * would free `right`, where the ink genuinely goes; adding `center` keeps `right`,
+ * `top` and `bottom` correctly taken and frees exactly `cornerTR` and `cornerBR` — a
+ * character in either corner is a rung-a `keep`, and the scene is never shrunk for it.
+ *
+ * What keeps those two corners clear is **vertical extent alone, by 1.7 points**. At the
  * schema ceiling (a signed seven-digit value, a 12-character unit, an 80-character
- * label) the ink never passes x = 68.0% under any of the six motion profiles. `left`
- * alone would free `right`, where the ink genuinely goes; adding `center` keeps
- * `right`, `top` and `bottom` correctly taken and frees exactly `cornerTR` and
- * `cornerBR` — a character in either corner is a rung-a `keep`, and the scene is never
- * shrunk for it. The margin is undesigned, which is why
+ * label) the value is wide display type and the ink runs to x = 81.8% — well inside the
+ * corners' column — so nothing horizontal protects them. What does is that the block
+ * draws no ink at all outside y 32.0%..68.3%: 2.0 points clear of the top corner row,
+ * 1.7 points clear of the bottom, roughly 18px at 1080. The stack's height and its
+ * vertical centring are therefore the fragile numbers here, not the column's width, and
+ * anything that adds a line or a gap spends the margin. That is why
  * `tests/render/occupies-regions.test.ts` exists: it renders the ceiling under every
  * profile and fails if the ink ever crosses.
  *

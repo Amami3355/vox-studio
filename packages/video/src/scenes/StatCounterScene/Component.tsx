@@ -13,7 +13,7 @@ import {
   EmptyState,
   SceneTitle,
   SlotFrame,
-  titleStep,
+  composedStepCeiling,
   useFrameBox,
   useSpace,
   useTitleStep,
@@ -157,7 +157,7 @@ const StatFrame: React.FC<{
               color={theme.color.ink}
               maxStep={
                 composed
-                  ? Math.max(2, titleStep(label.length) - statGeometry.composedStepDrop)
+                  ? composedStepCeiling(label.length, statGeometry.composedStepDrop)
                   : undefined
               }
             >

@@ -61,6 +61,14 @@ export const barChartGeometry = {
   composeBelowAspect: 1.2,
 
   /**
+   * …and in that composed box the title's step ceiling sits this many rungs below the
+   * length ladder. The same move `QuoteScene` and `StatCounterScene` make, through the
+   * shared `composedStepCeiling`; the number is each scene's own because what a rung costs
+   * depends on what else the frame is carrying.
+   */
+  composedStepDrop: 1,
+
+  /**
    * Share of a composed box the chart may count on when deciding how many categories it
    * can carry. The rest is the header — its rule, its title, and the margin under it —
    * plus any annotation the scene is holding.

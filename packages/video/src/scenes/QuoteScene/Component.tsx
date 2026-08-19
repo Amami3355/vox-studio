@@ -14,7 +14,7 @@ import {
   Eyebrow,
   SceneTitle,
   SlotFrame,
-  titleStep,
+  composedStepCeiling,
   useFrameBox,
   useSpace,
   useTitleStep,
@@ -120,7 +120,7 @@ const QuoteFrame: React.FC<{
   const quoteStep = useTitleStep(
     quote,
     columnWidth,
-    composed ? Math.max(2, titleStep(quote.length) - centeredGeometry.composedStepDrop) : undefined,
+    composed ? composedStepCeiling(quote.length, centeredGeometry.composedStepDrop) : undefined,
   );
   const markStep = Math.min(centeredGeometry.markStep, quoteStep + 1);
 

@@ -31,10 +31,31 @@
  * there is a real question, and it is not this suite's to answer — that declaration
  * predates any measurement and measuring it is its own work.
  *
- * The margin this guards is thin on purpose of record: at the ceiling the quote's ink
- * reaches x = 71.9% and the corners begin at x = 70% — two points, a consequence of
- * `columnRatio: 0.72` and `SceneTitle`'s 86% cap, not a designed margin. A change to
- * either number is exactly what this suite exists to catch.
+ * **What actually keeps the corners clear.** Measured worst-case over all six profiles
+ * at frames 1/20/60/last, at the schema ceiling, default theme:
+ *
+ * ```
+ *                ink max x   ink y band     ink in the corner rows   the real margin
+ * quote          70.7%       23.5%..76.7%   stops at x = 65.5%       4.5 pts horizontal
+ * stat_counter   81.8%       32.0%..68.3%   none at all              1.7 pts vertical
+ * ```
+ *
+ * Both capabilities put ink *past* x = 70%, so horizontal reach is not what frees the
+ * corners and `columnRatio`/`SceneTitle`'s 86% cap are not the fragile numbers. The two
+ * are clear for different reasons, and each margin is thin in a different direction:
+ *
+ * - `quote` clears them **horizontally, but only in the corner rows**. The elements that
+ *   reach above y = 30% or below y = 70% — eyebrow, attribution, role — stop at
+ *   x = 65.5%, 4.5 points short of the corner. The ink that does cross x = 70% is the
+ *   quote and its mark, at y 48.3%..62.9%: mid-frame, nowhere near a corner.
+ * - `stat_counter` clears them **vertically, and only just**. Its value runs to
+ *   x = 81.8%, deep inside the corner column, so nothing horizontal protects it. What
+ *   does is that the block draws no ink at all outside y 32.0%..68.3% — 2.0 points clear
+ *   of the top corner row and **1.7 points** clear of the bottom, about 18px at 1080.
+ *   Anything that grows the stack's height or moves its vertical centring spends that.
+ *
+ * So the numbers to watch are `stat_counter`'s vertical rhythm and `quote`'s corner-row
+ * widths. This suite is what catches either one moving.
  */
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

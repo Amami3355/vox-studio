@@ -13,7 +13,7 @@ import {
   EmptyState,
   SceneTitle,
   SlotFrame,
-  titleStep,
+  composedStepCeiling,
   useEntrance,
   useFrameBox,
   useSpace,
@@ -154,7 +154,9 @@ const ChartFrame: React.FC<{
    * box and declares no column of its own, so the width it fits against is the frame box —
    * which is exactly what `useColumnWidth` falls back to.
    */
-  const titleCeiling = composed ? Math.max(2, titleStep(props.title.length) - 1) : undefined;
+  const titleCeiling = composed
+    ? composedStepCeiling(props.title.length, barChartGeometry.composedStepDrop)
+    : undefined;
 
   const chart = (
     <BarGroup
