@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — vox-studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(140deg, #0f172a, #1e293b); }
+      .hatch {
+        background-image: repeating-linear-gradient(
+          45deg, transparent, transparent 5px, rgba(220,38,38,.13) 5px, rgba(220,38,38,.13) 10px
+        );
+      }
+      .lbl { font-size: .625rem; letter-spacing: .09em; text-transform: uppercase; }
+      pre.mermaid { background: transparent; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-14 space-y-14">
+
+      <!-- ─────────────────────────── HEADER ─────────────────────────── -->
+      <header class="space-y-6">
+        <div class="flex items-baseline justify-between flex-wrap gap-3">
+          <h1 class="font-serif text-4xl tracking-tight">Architecture review</h1>
+          <p class="font-mono text-xs text-slate-500">vox-studio · dev @ 68e9edf · 2026-08-19</p>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white px-5 py-4 text-sm leading-relaxed space-y-3">
+          <p class="text-slate-700">
+            Scoped to <span class="font-mono text-xs bg-stone-100 px-1.5 py-0.5 rounded">packages/video</span> —
+            the hot spot across the last 60 commits.
+            <span class="font-mono text-xs bg-stone-100 px-1.5 py-0.5 rounded">packages/production</span>
+            was checked and is <strong>not</strong> a candidate; see <a href="#fine" class="underline decoration-slate-300 underline-offset-2">Checked, and fine</a>.
+          </p>
+          <p class="text-slate-700">
+            Almost every module here is already deep. Two kinds of friction remain, and they are not module size:
+          </p>
+          <ul class="text-slate-700 list-disc list-inside space-y-1 pl-1">
+            <li>The catalog <em>publishes claims to the agent</em>, and the code proving those claims is hand-maintained.</li>
+            <li>Rules that belong to no capability are living in four capabilities at once — under two different names.</li>
+          </ul>
+        </div>
+
+        <div class="rounded-lg border-l-4 border-slate-800 bg-stone-100 px-5 py-4 text-sm leading-relaxed space-y-2">
+          <p class="lbl text-slate-500">Revision 2 · after an adversarial pass</p>
+          <p class="text-slate-700">Three corrections were applied. The findings all survived; two prescriptions and the ranking did not.</p>
+          <ul class="text-slate-700 space-y-1 pl-1">
+            <li>· <strong>Candidate 2's home was wrong.</strong> <span class="font-mono text-xs">core/slots.ts</span> is compiler-only by ADR-0003. Moved to <span class="font-mono text-xs">primitives/SlotFrame.tsx</span>.</li>
+            <li>· <strong>Candidate 1 costs more than claimed.</strong> Ceiling fixtures are hand-authored and can drift out of the ceiling silently.</li>
+            <li>· <strong>A cited incident was misread.</strong> The occupation claim never failed; only the explanation beside it was wrong.</li>
+            <li>· <strong>Top recommendation moved</strong> from candidate 1 to candidate 4.</li>
+          </ul>
+        </div>
+
+        <div class="flex flex-wrap gap-x-7 gap-y-2 text-xs text-slate-500 border-t border-slate-200 pt-4">
+          <span class="flex items-center gap-2"><span class="inline-block w-6 h-3 border border-slate-400 bg-white"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="26" height="10"><line class="seam" x1="0" y1="5" x2="26" y2="5" stroke="#64748b" stroke-width="1.5"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="26" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="#dc2626" stroke-width="2"/><path d="M20 1 L26 5 L20 9 Z" fill="#dc2626"/></svg> leakage</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-6 h-3 deep rounded-sm"></span> deep module</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-6 h-3 hatch border border-red-300"></span> unguarded</span>
+        </div>
+
+        <nav class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+          <a href="#c1" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">1 · Occupation guard → registry</a>
+          <a href="#c2" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">2 · A home for the composed-form rule</a>
+          <a href="#c3" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">3 · Test the half that broke</a>
+          <a href="#c4" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">4 · One render harness</a>
+          <a href="#c5" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">5 · Name the two frame domains</a>
+          <a href="#c6" class="rounded border border-slate-200 bg-white px-3 py-2 hover:border-emerald-400">6 · Build the stress suite</a>
+        </nav>
+      </header>
+
+      <section id="candidates" class="space-y-14">
+
+        <!-- ══════════════ CANDIDATE 1 ══════════════ -->
+        <article id="c1" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">1 · Bind the occupation guard to the registry</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-medium">Strong</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>tests/render/occupies-regions.test.ts:82 <span class="text-red-600">← hardcoded SWEPT, 2 of 4</span></li>
+              <li>tests/render/safe-area.test.ts:143 <span class="text-emerald-700">← already registry-driven</span></li>
+              <li>src/scenes/BarChartScene/meta.ts:39 <span class="text-red-600">← the unguarded claim</span></li>
+              <li>src/runtime/SceneControl.tsx:24</li>
+              <li>tests/catalog-contract.test.ts:91</li>
+            </ul>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200">
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">Before — the pair list is typed by hand</p>
+              <div class="space-y-2">
+                <div class="grid grid-cols-[1fr_auto] gap-2 items-center rounded border-2 border-red-300 bg-red-50/30 px-3 py-2">
+                  <div><span class="font-mono text-xs font-semibold">bar_chart</span><br><span class="text-[11px] text-slate-600">['bottom','left'] → frees cornerTR</span></div>
+                  <span class="lbl text-red-700 bg-red-100 border border-red-300 rounded px-2 py-1">never rendered</span>
+                </div>
+                <div class="grid grid-cols-[1fr_auto] gap-2 items-center rounded border border-slate-300 px-3 py-2">
+                  <div><span class="font-mono text-xs">image_context</span><br><span class="text-[11px] text-slate-500">['full'] → frees nothing</span></div>
+                  <span class="lbl text-slate-500 bg-stone-100 border border-slate-200 rounded px-2 py-1">exempt</span>
+                </div>
+                <div class="grid grid-cols-[1fr_auto] gap-2 items-center rounded border border-emerald-300 bg-emerald-50/40 px-3 py-2">
+                  <div><span class="font-mono text-xs">quote</span><br><span class="text-[11px] text-slate-500">['left','center']</span></div>
+                  <span class="lbl text-emerald-800 bg-emerald-100 border border-emerald-200 rounded px-2 py-1">guarded</span>
+                </div>
+                <div class="grid grid-cols-[1fr_auto] gap-2 items-center rounded border border-emerald-300 bg-emerald-50/40 px-3 py-2">
+                  <div><span class="font-mono text-xs">stat_counter</span><br><span class="text-[11px] text-slate-500">['left','center']</span></div>
+                  <span class="lbl text-emerald-800 bg-emerald-100 border border-emerald-200 rounded px-2 py-1">guarded</span>
+                </div>
+                <div class="mt-3 hatch rounded border border-red-300 px-3 py-2 text-[11px] text-red-900 leading-relaxed">
+                  The compiler <em>acts</em> on this claim: it places a persistent element into
+                  <span class="font-mono">cornerTR</span> because <span class="font-mono">bar_chart</span> says it is free.
+                  Nothing has rendered it.
+                </div>
+                <div class="mt-2 rounded border border-slate-300 bg-stone-50 px-3 py-2 text-[11px] text-slate-700 leading-relaxed">
+                  <span class="lbl text-slate-500">Corrected</span><br>
+                  An earlier revision said the repo had been "burned once by a wrong occupation claim." It had not.
+                  <span class="font-mono">.scratch/quote-stat-occupation/spec.md:187</span> is explicit: <em>"The declaration
+                  ['left','center'] is unaffected and still correct… What was wrong was the explanation recorded beside it."</em>
+                  The guard held. That is an argument <em>for</em> guards — not evidence of a failure.
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">After — the sweep is derived</p>
+              <div class="rounded-lg deep p-4 text-slate-200">
+                <p class="lbl text-slate-400">deep module · occupation guard</p>
+                <p class="font-mono text-xs mt-2 text-emerald-300">sweep = registry.filter(finerThanFull)</p>
+                <div class="mt-4 space-y-1.5 opacity-75">
+                  <div class="font-mono text-[11px] border-l-2 border-emerald-500 pl-2">bar_chart → bar-ceiling</div>
+                  <div class="font-mono text-[11px] border-l-2 border-slate-600 pl-2">quote → quote-ceiling</div>
+                  <div class="font-mono text-[11px] border-l-2 border-slate-600 pl-2">stat_counter → stat-ceiling</div>
+                  <div class="font-mono text-[11px] border-l-2 border-slate-700 pl-2 text-slate-500">image_context — exempt</div>
+                </div>
+              </div>
+              <div class="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900 leading-relaxed">
+                A capability that narrows its occupation without naming a ceiling control fails
+                <span class="font-mono">catalog-contract.test.ts</span> in ~100 s — at declaration, before a pixel is drawn —
+                instead of passing <span class="font-mono">test:render</span> in silence.
+              </div>
+              <div class="mt-3 rounded border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-900 leading-relaxed">
+                <span class="lbl text-amber-700">Not enough on its own</span><br>
+                Deriving the <em>list</em> does not derive the <em>fixtures</em>.
+                <span class="font-mono">SceneControl.tsx:66-97</span> hand-authors the ceiling props and a comment claims they
+                sit at the schema limit. Raise a <span class="font-mono">.max()</span> later and the control stays schema-valid
+                but stops exercising the worst case — both guards green, nothing proved.
+                <strong>The props must be generated from the schemas.</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 border-t border-slate-200 space-y-4">
+            <p><span class="lbl text-slate-400 mr-2">Problem</span>Which control proves which <span class="font-mono text-xs">occupiesRegions</span> claim has no home in code — it is a literal pair list inside one test file.</p>
+            <p><span class="lbl text-slate-400 mr-2">Solution</span>Hold the claim → control binding in a typed test-only map, derive the <em>required</em> capability list from the compiler's own free-slot calculation, assert the map covers it exactly, and generate the ceiling props from the schemas.</p>
+            <div>
+              <span class="lbl text-slate-400">Wins</span>
+              <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: obligation stated once</li>
+                <li>guard follows the registry</li>
+                <li>new capability cannot slip through</li>
+                <li>red in 100 s, not 4 min</li>
+                <li>closes bar_chart's live claim</li>
+                <li>pattern exists at safe-area.test.ts:143</li>
+              </ul>
+            </div>
+            <div class="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              No ADR conflict. ADR-0003's consequences already say <em>"a declared composition is trusted and nothing renders it to check."</em> This closes that sentence rather than reopening it.
+            </div>
+            <div class="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 leading-relaxed">
+              <strong>Do not put the binding on <span class="font-mono text-xs">meta</span>.</strong>
+              <span class="font-mono text-xs">build.ts:82</span> spreads <span class="font-mono text-xs">...capability.meta</span> into the
+              catalog entry, so a control id there would ship into <span class="font-mono text-xs">catalog.json</span> and teach the agent
+              about a test fixture. <span class="font-mono text-xs">docs/adding-a-capability.md:157</span> is explicit that a control
+              never reaches the manifest. A test-only map keeps the seam internal.
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CANDIDATE 2 ══════════════ -->
+        <article id="c2" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">2 · Give the composed-form rule a home</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-medium">Strong</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>src/scenes/BarChartScene/layouts.ts:56,61</li>
+              <li>src/scenes/QuoteScene/layouts.ts:39,44</li>
+              <li>src/scenes/StatCounterScene/layouts.ts:47,52</li>
+              <li>src/scenes/ImageContextScene/layouts.ts:50 <span class="text-red-600">← stackBelowAspect, same number</span></li>
+              <li>src/primitives/SlotFrame.tsx:23 <span class="text-emerald-700">← the home (FrameBox lives here)</span></li>
+              <li>src/core/slots.ts:8 <span class="text-red-600">← NOT the home. Compiler-only.</span></li>
+            </ul>
+          </div>
+
+          <!-- hand-built: rule with no home -->
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200">
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">Before — one rule, four copies, two names</p>
+              <div class="relative">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="rounded border border-red-300 bg-red-50/30 p-2.5">
+                    <p class="font-mono text-[10px] text-slate-500">BarChartScene</p>
+                    <p class="font-mono text-[11px] mt-1">composeBelowAspect: <span class="text-red-700 font-bold">1.2</span></p>
+                    <p class="text-[10px] text-slate-500 mt-1.5 italic">"same as the other two"</p>
+                  </div>
+                  <div class="rounded border border-red-300 bg-red-50/30 p-2.5">
+                    <p class="font-mono text-[10px] text-slate-500">QuoteScene</p>
+                    <p class="font-mono text-[11px] mt-1">composeBelowAspect: <span class="text-red-700 font-bold">1.2</span></p>
+                    <p class="text-[10px] text-slate-500 mt-1.5 italic">"same as barChartGeometry"</p>
+                  </div>
+                  <div class="rounded border border-red-300 bg-red-50/30 p-2.5">
+                    <p class="font-mono text-[10px] text-slate-500">StatCounterScene</p>
+                    <p class="font-mono text-[11px] mt-1">composeBelowAspect: <span class="text-red-700 font-bold">1.2</span></p>
+                    <p class="text-[10px] text-slate-500 mt-1.5 italic">"same as barChartGeometry"</p>
+                  </div>
+                  <div class="rounded border-2 border-red-500 hatch p-2.5">
+                    <p class="font-mono text-[10px] text-slate-500">ImageContextScene</p>
+                    <p class="font-mono text-[11px] mt-1"><span class="text-red-700">stackBelowAspect</span>: <span class="text-red-700 font-bold">1.2</span></p>
+                    <p class="text-[10px] text-red-800 mt-1.5 font-medium">different name — drift already happened</p>
+                  </div>
+                </div>
+                <div class="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2.5 text-[11px] text-red-900 leading-relaxed">
+                  Three files each say <em>"see the other two."</em> A rule that can only be found by following
+                  cross-references is a rule with no home. The fourth already renamed it.
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">After — the predicate moves, the constants stay</p>
+              <div class="rounded-lg deep p-4 text-slate-200">
+                <p class="lbl text-slate-400">primitives/SlotFrame.tsx · shared logic</p>
+                <p class="font-mono text-xs mt-2 text-emerald-300">isNarrowBox(box: FrameBox): boolean</p>
+                <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  "The box is portrait, so the scene has been handed less than the full frame."
+                  A fact about the <em>shape</em> a scene is given — never about a slot.
+                  <span class="font-mono">FrameBox</span> is already defined here, and all four scenes already call
+                  <span class="font-mono">useFrameBox()</span>.
+                </p>
+              </div>
+              <svg viewBox="0 0 300 40" class="w-full my-2"><line x1="150" y1="0" x2="150" y2="30" stroke="#059669" stroke-width="2"/><path d="M146 28 L150 38 L154 28 Z" fill="#059669"/></svg>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="rounded border border-slate-300 p-2.5">
+                  <p class="font-mono text-[10px] text-slate-500">each capability keeps</p>
+                  <p class="font-mono text-[11px] mt-1 text-slate-700">composedStepDrop</p>
+                  <p class="font-mono text-[11px] text-slate-700">composedColumnRatio</p>
+                </div>
+                <div class="rounded border border-slate-300 p-2.5 flex items-center">
+                  <p class="text-[11px] text-slate-600 leading-relaxed">These genuinely differ per capability. Locality here is deliberate — leave it.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 border-t border-slate-200 space-y-4">
+            <p><span class="lbl text-slate-400 mr-2">Problem</span>The predicate "this box is a composed half" is re-derived in four capabilities, under two names, with comments pointing at each other instead of at a definition.</p>
+            <p><span class="lbl text-slate-400 mr-2">Solution</span>Move the <em>predicate</em> next to <span class="font-mono text-xs">FrameBox</span> in <span class="font-mono text-xs">primitives/SlotFrame.tsx</span>. Leave every per-capability <em>constant</em> where it is.</p>
+            <div>
+              <span class="lbl text-slate-400">Wins</span>
+              <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                <li>locality: the rule has one definition</li>
+                <li>the two names collapse to one</li>
+                <li>leverage: 1 predicate, 4 call sites</li>
+                <li>a 5th capability inherits it</li>
+                <li>cross-reference comments become real</li>
+                <li>drift stops being silent</li>
+              </ul>
+            </div>
+            <div class="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 leading-relaxed">
+              <strong>Reads like a convention violation — it is not.</strong> The house rule is that per-scene
+              <em>geometry constants</em> stay local. This moves <em>shared logic</em>, which is the exact distinction
+              <span class="font-mono text-xs">primitives/titleFit.ts</span> was created for last session.
+            </div>
+            <div class="rounded border-2 border-red-400 bg-red-50 px-4 py-3 text-sm text-red-900 leading-relaxed">
+              <span class="lbl text-red-700">Corrected</span><br>
+              An earlier revision sent this predicate to <span class="font-mono text-xs">core/slots.ts</span>. That is wrong, and the file
+              says so at line 8: <em>"The compiler is the only consumer. A component that imports this file is reading a vocabulary it is
+              specified never to see."</em> ADR-0003 decision 4 is the reason — the component sees a
+              <span class="font-mono text-xs">safeArea</span>, never a slot. Keep slot vocabulary out of this entirely: the predicate
+              takes a <span class="font-mono text-xs">FrameBox</span> and answers a question about a shape.
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CANDIDATE 3 ══════════════ -->
+        <article id="c3" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">3 · Test the half that actually broke</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-medium">Strong</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>src/primitives/titleFit.ts:72 <span class="text-emerald-700">fitTitleStep — 6 tests</span></li>
+              <li>src/primitives/titleFit.ts:60 <span class="text-red-600">composedStepCeiling — 0 tests</span></li>
+              <li>src/primitives/titleFit.ts:135 <span class="text-red-600">useTitleStep — 0 tests</span></li>
+              <li>src/primitives/AnimatedText.tsx:106 · QuoteScene/Component.tsx:120 · StatCounterScene/Component.tsx:126</li>
+            </ul>
+          </div>
+
+          <!-- mass diagram: tested vs risk -->
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200">
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">Before — coverage sits away from the risk</p>
+              <div class="flex gap-4 items-end" style="height:260px">
+                <div class="flex-1 flex flex-col justify-end">
+                  <p class="text-[10px] text-slate-500 mb-1 font-mono">fitTitleStep</p>
+                  <div class="rounded-t border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-center px-2" style="height:70px">
+                    <span class="lbl text-emerald-800">pure · injected ruler</span>
+                  </div>
+                  <div class="border-2 border-t-0 border-emerald-500 bg-emerald-500 text-white flex items-center justify-center" style="height:44px">
+                    <span class="lbl">6 tests</span>
+                  </div>
+                </div>
+                <div class="flex-1 flex flex-col justify-end">
+                  <p class="text-[10px] text-slate-500 mb-1 font-mono">useTitleStep + composedStepCeiling</p>
+                  <div class="rounded-t border-2 border-red-400 hatch flex items-center justify-center text-center px-2" style="height:150px">
+                    <span class="lbl text-red-900">columnWidth from<br>ColumnProvider</span>
+                  </div>
+                  <div class="border-2 border-t-0 border-red-400 bg-red-50 flex items-center justify-center" style="height:26px">
+                    <span class="lbl text-red-700">0 tests</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2.5 text-[11px] text-red-900 leading-relaxed">
+                The bug the module was written for lives in the composition:
+                <em>"'Northbridge before dawn' is 23 characters, so the ladder returns step 5 — 120px — and set in the 5/12
+                copy column the first word alone is wider than the box."</em>
+                The tested half is not the half that was ever wrong.
+              </div>
+            </div>
+
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">After — the interface is the test surface</p>
+              <div class="rounded-lg deep p-5 text-slate-200" style="min-height:260px">
+                <p class="lbl text-slate-400">deep module · title fit</p>
+                <p class="font-mono text-xs mt-3 text-emerald-300">useTitleStep(text, columnWidth, ceiling)</p>
+                <div class="mt-4 space-y-1.5 opacity-60 text-[11px] font-mono border-l-2 border-slate-700 pl-3">
+                  <p>fitTitleStep</p>
+                  <p>composedStepCeiling</p>
+                  <p>titleStep ladder</p>
+                  <p>TITLE_MAX_WIDTH clamp</p>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-4 leading-relaxed border-t border-slate-700 pt-3">
+                  Tests cross the seam callers cross: a narrow column and a long headline, asserting the step that comes out.
+                  The internals become implementation.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 border-t border-slate-200 space-y-4">
+            <p><span class="lbl text-slate-400 mr-2">Problem</span>A pure function was extracted so it could be tested, and it was — but every real defect has been in the composition around it, which has no tests at all.</p>
+            <p><span class="lbl text-slate-400 mr-2">Solution</span>Move the test surface up to the interface callers actually use, and keep the pure cases as internal ones.</p>
+            <div>
+              <span class="lbl text-slate-400">Wins</span>
+              <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                <li>tests hit one interface</li>
+                <li>locality: the clipping bug gets a guard</li>
+                <li>covers the composed path 3 scenes share</li>
+                <li>cheap — no render needed</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CANDIDATE 4 ══════════════ -->
+        <article id="c4" class="scroll-mt-8 rounded-xl border-2 border-emerald-500 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">4 · One render harness behind one interface</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-emerald-600 text-white px-3 py-1 text-xs font-medium">Top pick</span>
+                <span class="rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-medium">Strong</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>tests/render/{compiled-video,image-context,occupies-regions,quote,safe-area,stat-counter}.test.ts</li>
+              <li>tests/render/safe-area.test.ts:163 ≡ occupies-regions.test.ts:114 <span class="text-red-600">byte-identical</span></li>
+              <li>tests/render/png.ts <span class="text-emerald-700">← the half that did move</span></li>
+            </ul>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200">
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">Before — six copies of the lifecycle</p>
+              <div class="rounded-lg border border-slate-200 bg-white p-3">
+                <pre class="mermaid">
+flowchart TB
+  subgraph S1["6 × test file"]
+    direction TB
+    A["mkdtemp()"] --> B["bundle()"]
+    B --> C["openBrowser()"]
+    C --> D["renderStillAt()"]
+  end
+  D --> P["png.ts"]
+  classDef dup fill:#fef2f2,stroke:#dc2626,stroke-width:2px;
+  classDef ok fill:#ecfdf5,stroke:#059669,stroke-width:2px;
+  class A,B,C,D dup
+  class P ok
+                </pre>
+              </div>
+              <div class="mt-3 hatch rounded border border-red-300 px-3 py-2 text-[11px] text-red-900 leading-relaxed">
+                Six Remotion bundles and six Chrome instances per <span class="font-mono">test:render</span>.
+                A suite must learn the whole lifecycle before it can ask one question.
+              </div>
+            </div>
+
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">After — one interface, one bundle</p>
+              <div class="rounded-lg border border-slate-200 bg-white p-3">
+                <pre class="mermaid">
+flowchart TB
+  T1["safe-area"] --> H
+  T2["occupies-regions"] --> H
+  T3["quote / stat / image"] --> H
+  T4["compiled-video"] --> H
+  T5["stress · ADR-0003"] -.not yet.-> H
+  H["renderHarness · stillAt(id, props, frame)"] --> I["one bundle, one browser"]
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a,stroke-width:3px;
+  classDef ok fill:#ecfdf5,stroke:#059669;
+  class H deep
+  class I ok
+                </pre>
+              </div>
+              <div class="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+                The bundle, the browser and the teardown stop being part of the interface.
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 border-t border-slate-200 space-y-4">
+            <p><span class="lbl text-slate-400 mr-2">Problem</span>Every render suite re-implements bundle, browser and still capture; the shared module stopped at <span class="font-mono text-xs">png.ts</span>.</p>
+            <p><span class="lbl text-slate-400 mr-2">Solution</span>Extract a render harness beside <span class="font-mono text-xs">png.ts</span> whose interface is one call, with the lifecycle as its implementation.</p>
+            <div>
+              <span class="lbl text-slate-400">Wins</span>
+              <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                <li>interface shrinks to one call</li>
+                <li>leverage: one implementation, 6 suites</li>
+                <li>one bundle per run, not six</li>
+                <li>deletes ~35 lines × 6</li>
+                <li>stress suite inherits it</li>
+                <li>locality: setup bugs land in one module</li>
+              </ul>
+            </div>
+            <div class="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Comments are load-bearing here. Each suite's header carries its own measurement record — those stay with the assertions, not with the lifecycle.
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CANDIDATE 5 ══════════════ -->
+        <article id="c5" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">5 · Name the two frame domains</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-medium">Worth exploring</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>src/core/anchors.ts:176 <span class="text-slate-500">→ scene-relative</span></li>
+              <li>src/compile/persistent.ts:174 <span class="text-slate-500">→ absolute</span></li>
+              <li>src/compile/document.ts:35 <span class="text-red-600">← LayoutState.from/to, no domain comment</span></li>
+            </ul>
+          </div>
+
+          <div class="px-7 py-6">
+            <div class="rounded-lg border border-slate-200 bg-white p-3">
+              <pre class="mermaid">
+flowchart LR
+  R["resolveAnchor()"] --> A["resolveEventTimings<br/>anchors.ts:176"]
+  R --> B["placementRuns<br/>persistent.ts:174"]
+  A --> C["EventTiming.at<br/><b>number</b> · scene-relative"]
+  B --> D["LayoutState.from/to<br/><b>number</b> · absolute"]
+  C -.same type.-> D
+  classDef leak fill:#fef2f2,stroke:#dc2626,stroke-width:2px;
+  class C,D leak
+              </pre>
+            </div>
+            <div class="mt-5 space-y-4">
+              <p><span class="lbl text-slate-400 mr-2">Problem</span>One resolver produces two different frame domains at two call sites. Both are <span class="font-mono text-xs">number</span>, and only <span class="font-mono text-xs">document.ts:62</span> says so — in prose.</p>
+              <p><span class="lbl text-slate-400 mr-2">Solution</span>Brand them — <span class="font-mono text-xs">SceneFrame</span> / <span class="font-mono text-xs">AbsoluteFrame</span> — or at minimum name the fields for their domain.</p>
+              <div>
+                <span class="lbl text-slate-400">Wins</span>
+                <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                  <li>the type carries the invariant</li>
+                  <li>an off-by-sceneBounds.from stops compiling</li>
+                  <li>prose comment becomes redundant</li>
+                  <li>smallest change on this page</li>
+                </ul>
+              </div>
+              <p class="text-sm text-slate-600 border-t border-slate-200 pt-3">
+                Nothing has mixed them yet. That is the only thing holding today.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════ CANDIDATE 6 ══════════════ -->
+        <article id="c6" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-slate-200 px-7 py-6">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <h2 class="font-serif text-2xl tracking-tight">6 · Build the stress suite ADR-0003 already decided</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="rounded-full bg-amber-100 text-amber-800 px-3 py-1 text-xs font-medium">Worth exploring</span>
+                <span class="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-medium">in-process</span>
+              </div>
+            </div>
+            <ul class="mt-4 font-mono text-xs text-slate-600 space-y-1">
+              <li>docs/adr/0003-slot-conflict-resolution.md:320-373 <span class="text-amber-700">← "Decided, not yet built"</span></li>
+              <li>package.json:11-21 <span class="text-red-600">← no test:stress</span></li>
+              <li>src/scenes/*/schema.ts <span class="text-slate-500">(the case generator's input)</span></li>
+            </ul>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-px bg-slate-200">
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">Before — an obligation with no machinery</p>
+              <div class="space-y-1">
+                <div class="h-11 border-l-4 border-emerald-500 bg-emerald-50/50 px-3 flex items-center justify-between">
+                  <span class="lbl text-slate-600">catalog:check</span><span class="text-[11px] text-emerald-800">green</span>
+                </div>
+                <div class="h-11 border-l-4 border-emerald-500 bg-emerald-50/50 px-3 flex items-center justify-between">
+                  <span class="lbl text-slate-600">typecheck · 4/4</span><span class="text-[11px] text-emerald-800">green</span>
+                </div>
+                <div class="h-11 border-l-4 border-emerald-500 bg-emerald-50/50 px-3 flex items-center justify-between">
+                  <span class="lbl text-slate-600">unit · 456/456</span><span class="text-[11px] text-emerald-800">green</span>
+                </div>
+                <div class="h-11 border-l-4 border-emerald-500 bg-emerald-50/50 px-3 flex items-center justify-between">
+                  <span class="lbl text-slate-600">render · 113/113</span><span class="text-[11px] text-emerald-800">green</span>
+                </div>
+                <div class="h-16 border-l-4 border-red-500 hatch px-3 flex items-center justify-between">
+                  <span class="lbl text-red-900">test:stress</span>
+                  <span class="text-[11px] text-red-900 text-right leading-tight">obligatory for any commit<br>touching schema / layout /<br>supportedCompositions</span>
+                </div>
+              </div>
+              <p class="mt-3 text-[11px] text-slate-500 leading-relaxed">Every capability commit since 2026-08-13 has been unable to meet a rule the repo published.</p>
+            </div>
+
+            <div class="bg-white p-6">
+              <p class="lbl text-slate-400 mb-4">After — cases generated from the schemas</p>
+              <div class="rounded-lg deep p-4 text-slate-200 space-y-3">
+                <p class="lbl text-slate-400">deep module · stress matrix</p>
+                <div class="font-mono text-[11px] space-y-1 text-slate-300">
+                  <p><span class="text-emerald-300">in </span>.max() ceilings + absent .min() floors</p>
+                  <p><span class="text-emerald-300">×  </span>every layout</p>
+                  <p><span class="text-emerald-300">×  </span>every supportedComposition</p>
+                  <p><span class="text-emerald-300">×  </span>both camera profiles</p>
+                  <p class="pt-2 mt-1 border-t border-slate-700"><span class="text-amber-300">out</span> contained · quiet border · nothing clipped · line ceiling</p>
+                </div>
+              </div>
+              <div class="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900 leading-relaxed">
+                Cost self-scales with the catalog: cut a composition, the suite shrinks.
+                Three accepted frames, no bulk hash baseline.
+              </div>
+            </div>
+          </div>
+
+          <div class="px-7 py-6 border-t border-slate-200 space-y-4">
+            <p><span class="lbl text-slate-400 mr-2">Problem</span>ADR-0003 makes the stress suite obligatory and it does not exist, so nobody who reads the rule can honour it.</p>
+            <p><span class="lbl text-slate-400 mr-2">Solution</span>Build it as specified — generated cases, own <span class="font-mono text-xs">pnpm test:stress</span>, sharing the harness from candidate 4.</p>
+            <div>
+              <span class="lbl text-slate-400">Wins</span>
+              <ul class="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-700 list-disc list-inside">
+                <li>catches clipping inside the safe area</li>
+                <li>proves bar_chart's left composition</li>
+                <li>cases derive from the registry</li>
+                <li>failure response pre-committed in the ADR</li>
+                <li>cost shrinks when scope is cut</li>
+                <li>closes the one unmeetable gate</li>
+              </ul>
+            </div>
+            <div class="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Largest item on this page. Do candidate 4 first, or this arrives as a seventh copy of the lifecycle.
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- ─────────────────────────── FREE WINS ─────────────────────────── -->
+      <section class="rounded-xl border border-slate-200 bg-white p-7 space-y-5">
+        <h2 class="font-serif text-xl tracking-tight">Free wins — not architecture, but true</h2>
+        <div class="grid md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+          <div class="space-y-1.5">
+            <p class="font-medium">Four stale "unreachable" comments</p>
+            <p class="font-mono text-[11px] text-slate-500">{Quote,StatCounter,BarChart,ImageContext}/state.ts</p>
+            <p class="text-slate-600 leading-relaxed">Each says unknown actions are rejected by <span class="font-mono text-xs">validateScene</span> before render. False on the studio path — <span class="font-mono text-xs">ExampleScene.tsx:87</span> and <span class="font-mono text-xs">SceneControl.tsx:138</span> go straight to <span class="font-mono text-xs">SceneRenderer</span>. Behaviour is fine; the claim is wrong in four files, and comments are load-bearing here.</p>
+          </div>
+          <div class="space-y-1.5">
+            <p class="font-medium"><span class="font-mono text-xs">sectionAnchors</span> sits in the wrong module</p>
+            <p class="font-mono text-[11px] text-slate-500">catalog/validate.ts:463 → compile/timings.ts:10</p>
+            <p class="text-slate-600 leading-relaxed">It is a fact about <span class="font-mono text-xs">VideoPlanSection</span>'s shape and belongs in <span class="font-mono text-xs">catalog/plan-shape.ts</span>, which already owns that type. Moving it deletes a compile → validate edge that exists for no other reason.</p>
+          </div>
+          <div class="space-y-1.5">
+            <p class="font-medium"><span class="font-mono text-xs">catalog/tools.ts:100 score</span> is untested</p>
+            <p class="text-slate-600 leading-relaxed">It orders what the agent reads, and <span class="font-mono text-xs">tools.ts:46</span> says the order biases which capability gets picked. Nothing asserts the ordering.</p>
+          </div>
+          <div class="space-y-1.5">
+            <p class="font-medium">The three from the last handoff</p>
+            <p class="text-slate-600 leading-relaxed">A wrong comment at <span class="font-mono text-xs">occupies-regions.test.ts:185</span>, stale prose at <span class="font-mono text-xs">docs/render-surface.md:226,238</span>, and a missing <span class="font-mono text-xs">motionProfile: null</span> at <span class="font-mono text-xs">Root.tsx:126</span>.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── NOT A CANDIDATE ─────────────────────────── -->
+      <section id="fine" class="scroll-mt-8 rounded-xl border border-slate-200 bg-white p-7 space-y-5">
+        <h2 class="font-serif text-xl tracking-tight">Checked, and fine — do not touch</h2>
+        <p class="text-sm text-slate-700 leading-relaxed">
+          The handoff proposed <span class="font-mono text-xs">packages/production</span> by line count. Line count measures
+          implementation; depth is a property of the interface. Measured that way, all of these are deep.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left lbl text-slate-400 border-b border-slate-200">
+                <th class="py-2 pr-4 font-medium">module</th>
+                <th class="py-2 pr-4 font-medium">implementation</th>
+                <th class="py-2 pr-4 font-medium">interface</th>
+                <th class="py-2 font-medium">verdict</th>
+              </tr>
+            </thead>
+            <tbody class="font-mono text-xs">
+              <tr class="border-b border-slate-100"><td class="py-2.5 pr-4">production/commands/service.ts</td><td class="py-2.5 pr-4">1448 loc</td><td class="py-2.5 pr-4">1 class · 8 methods</td><td class="py-2.5 text-emerald-700">deep</td></tr>
+              <tr class="border-b border-slate-100"><td class="py-2.5 pr-4">production/run-store/run-store.ts</td><td class="py-2.5 pr-4">1564 loc</td><td class="py-2.5 pr-4">1 class · ~12 methods over ~50 private</td><td class="py-2.5 text-emerald-700">deep</td></tr>
+              <tr class="border-b border-slate-100"><td class="py-2.5 pr-4">production/proof/harness.ts</td><td class="py-2.5 pr-4">1159 loc</td><td class="py-2.5 pr-4">1 function</td><td class="py-2.5 text-emerald-700">deep</td></tr>
+              <tr class="border-b border-slate-100"><td class="py-2.5 pr-4">video/catalog/validate.ts</td><td class="py-2.5 pr-4">713 loc</td><td class="py-2.5 pr-4">2 fns + 1 generator</td><td class="py-2.5 text-emerald-700">deep</td></tr>
+              <tr><td class="py-2.5 pr-4">video/compile/index.ts</td><td class="py-2.5 pr-4">373 loc</td><td class="py-2.5 pr-4">1 fn + a discriminated result</td><td class="py-2.5 text-emerald-700">deep</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="border-t border-slate-200 pt-4 space-y-2 text-sm text-slate-700">
+          <p class="font-medium">Also exemplary, and named so you do not "improve" them:</p>
+          <ul class="list-disc list-inside space-y-1 text-slate-600 leading-relaxed">
+            <li><span class="font-mono text-xs">scenes/registry.ts</span> — 30 lines, and its claim that one entry is the only registration is <em>true</em>. Best seam in the repo.</li>
+            <li><span class="font-mono text-xs">core/anchor-grammar.ts</span> — grammar as data, published into the manifest, so validator, resolver and manifest cannot describe different languages.</li>
+            <li><span class="font-mono text-xs">compile/conflict.ts</span> split from <span class="font-mono text-xs">persistent.ts</span> — rule vs frames. A real seam.</li>
+            <li><span class="font-mono text-xs">safe-area.test.ts</span>'s derive-then-pin pattern (lines 143 + 219). Copy it; do not change it.</li>
+            <li>Per-capability <span class="font-mono text-xs">meta / schema / constraints / actions / examples</span> — pure declaration, nothing to factor out. Narrow already.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── TOP RECOMMENDATION ─────────────────────────── -->
+      <section id="top-recommendation">
+        <div class="rounded-xl deep text-slate-100 px-8 py-9 space-y-5">
+          <p class="lbl text-slate-400">Top recommendation · revised</p>
+          <h2 class="font-serif text-3xl tracking-tight">
+            <a href="#c4" class="hover:underline decoration-emerald-400 underline-offset-4">4 · One render harness behind one interface</a>
+          </h2>
+          <p class="text-slate-300 leading-relaxed max-w-2xl">
+            It is the only candidate an adversarial pass could not dent. Six suites each carry the same bundle-and-browser
+            lifecycle; two of those copies are byte-identical. Collapsing them behind one call is a pure deepening with no
+            ADR to argue with, no published contract to move, and no fixture to keep honest.
+          </p>
+          <p class="text-slate-400 text-sm max-w-2xl border-t border-slate-700 pt-4 leading-relaxed">
+            It is also the prerequisite for candidate 6, the mandatory suite ADR-0003 already accepted. Build the harness and
+            the stress matrix inherits it instead of becoming a seventh copy.
+          </p>
+          <div class="rounded-lg border border-slate-700 bg-slate-900/60 px-5 py-4 text-sm text-slate-300 leading-relaxed">
+            <p class="lbl text-slate-500 mb-2">Why not candidate 1 any more</p>
+            It is still a real hole — <span class="font-mono text-xs text-emerald-300">bar_chart</span>'s claim is unproven and the compiler
+            acts on it. But its cost was understated: deriving the capability list does not derive the ceiling fixtures, and the props must
+            come from the schemas to stay honest. The history cited for ranking it first was also misread — the guard never failed.
+            Do it second, sized properly.
+          </div>
+          <div class="flex flex-wrap gap-3 pt-2 text-xs">
+            <a href="#c1" class="rounded-full border border-slate-600 px-4 py-1.5 text-slate-300 hover:border-emerald-400 hover:text-emerald-300">then 1 · occupation guard</a>
+            <a href="#c6" class="rounded-full border border-slate-600 px-4 py-1.5 text-slate-300 hover:border-emerald-400 hover:text-emerald-300">then 6 · stress suite</a>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>
