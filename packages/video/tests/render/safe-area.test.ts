@@ -39,24 +39,14 @@
  * two. What it still does not ask is whether content the schema accepts but no example
  * carries would fit — see `docs/adr/0003-slot-conflict-resolution.md`.
  */
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { type Rect, slotRect } from '../../src/core/slots';
 import type { SafeArea, Slot } from '../../src/core/types';
 import { HEIGHT, WIDTH, defaultTheme } from '../../src/design/theme';
 import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
 import { compositionIdFor } from '../../src/runtime/compositionIds';
 import { registry } from '../../src/scenes/registry';
+import { renderHarness } from './harness';
 import {
   type Bitmap,
   type Region,
@@ -154,9 +144,8 @@ const cases: Case[] = registry.flatMap((capability) =>
   ),
 );
 
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+const harness = renderHarness();
+
 /** Rendered once: the backdrop does not move, and every case measures against this frame. */
 let control: Bitmap;
 
@@ -164,28 +153,7 @@ const renderStillAt = async (
   compositionId: string,
   inputProps: Record<string, unknown>,
   frame: number,
-): Promise<Bitmap> => {
-  const composition = await selectComposition({
-    serveUrl,
-    id: compositionId,
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return decodePng(rendered.buffer);
-};
+): Promise<Bitmap> => decodePng(await harness.still(compositionId, inputProps, frame));
 
 const renderExample = (
   capabilityId: string,
@@ -201,19 +169,8 @@ const renderExample = (
   );
 
 beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-safe-area-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
   control = await renderStillAt(BACKDROP_CONTROL_ID, {}, 0);
 }, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
 
 describe('a declared composition renders into the rectangle it declared', () => {
   it('has a case for every composition in the catalog', () => {

@@ -13,21 +13,10 @@
  * cannot tell whether `revealStat` reaches the frame at all. Frame 60 is inside the hold,
  * before `b2.start`, and is the only place the verb is visible.
  */
-import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
 import { compositionIdFor, controlIdFor } from '../../src/runtime/compositionIds';
+import { hashStill, renderHarness } from './harness';
 import { type Bitmap, type Region, decodePng, hashRegions } from './png';
 
 /** Everything has landed and settled here; all four examples run 150 frames. */
@@ -35,53 +24,14 @@ const SETTLED_FRAME = 120;
 /** Inside the driven example's hold. `b2.start` is the reveal, and it has not arrived yet. */
 const HOLD_FRAME = 60;
 
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+const harness = renderHarness();
+
 /** The ground with nothing on it, so a row can be told from an empty one. */
 let backdrop: Bitmap;
 
 beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-stat-counter-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
-  backdrop = decodePng(await renderStillPng(BACKDROP_CONTROL_ID, {}, 0));
+  backdrop = decodePng(await harness.still(BACKDROP_CONTROL_ID, {}, 0));
 }, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
-
-const renderStillPng = async (
-  compositionId: string,
-  inputProps: Record<string, unknown>,
-  frame: number,
-): Promise<Buffer> => {
-  const composition = await selectComposition({
-    serveUrl,
-    id: compositionId,
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return rendered.buffer;
-};
 
 const exampleProps = (exampleId: string): Record<string, unknown> => ({
   capabilityId: 'stat_counter',
@@ -91,24 +41,20 @@ const exampleProps = (exampleId: string): Record<string, unknown> => ({
 });
 
 const renderHash = async (exampleId: string, frame: number): Promise<string> =>
-  createHash('md5')
-    .update(
-      await renderStillPng(
-        compositionIdFor('stat_counter', exampleId),
-        exampleProps(exampleId),
-        frame,
-      ),
-    )
-    .digest('hex');
+  hashStill(
+    await harness.still(
+      compositionIdFor('stat_counter', exampleId),
+      exampleProps(exampleId),
+      frame,
+    ),
+  );
 
 const renderControlHash = async (controlId: string, frame: number): Promise<string> =>
-  createHash('md5')
-    .update(await renderStillPng(controlIdFor(controlId), { controlId }, frame))
-    .digest('hex');
+  hashStill(await harness.still(controlIdFor(controlId), { controlId }, frame));
 
 const renderBitmap = async (exampleId: string, frame: number): Promise<Bitmap> =>
   decodePng(
-    await renderStillPng(
+    await harness.still(
       compositionIdFor('stat_counter', exampleId),
       exampleProps(exampleId),
       frame,

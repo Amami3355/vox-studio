@@ -17,23 +17,12 @@
  *
  * No assertion depends on a font, a hash baseline or this machine.
  */
-import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { VideoPlan } from '../../src/catalog/validate';
 import { compile } from '../../src/compile';
 import type { CompiledDocument } from '../../src/compile/document';
 import type { Slot, TimedBeat } from '../../src/core/types';
+import { hashStill, renderHarness } from './harness';
 
 /**
  * The narrator's picture is no longer written here, because a plan cannot write one:
@@ -123,47 +112,10 @@ const documentFor = (slot: Slot | null): CompiledDocument => {
 const OVER_CHART = 30;
 const OVER_CONTEXT = 150;
 
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+const harness = renderHarness();
 
-beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-compiled-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
-}, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
-
-const renderHash = async (document: CompiledDocument, frame: number): Promise<string> => {
-  const inputProps = { document };
-  const composition = await selectComposition({
-    serveUrl,
-    id: 'compiled-document',
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return createHash('md5').update(rendered.buffer).digest('hex');
-};
+const renderHash = async (document: CompiledDocument, frame: number): Promise<string> =>
+  hashStill(await harness.still('compiled-document', { document }, frame));
 
 describe('the Section runtime', () => {
   it('plays a compiled document as one video, section and scene windows included', async () => {

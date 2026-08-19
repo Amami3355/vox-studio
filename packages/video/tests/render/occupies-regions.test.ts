@@ -57,18 +57,7 @@
  * So the numbers to watch are `stat_counter`'s vertical rhythm and `quote`'s corner-row
  * widths. This suite is what catches either one moving.
  */
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { overlaps, slotRect } from '../../src/core/slots';
 import { ALL_SLOTS, type Slot } from '../../src/core/types';
 import { motionProfileIds } from '../../src/design/motion';
@@ -76,6 +65,7 @@ import { HEIGHT, WIDTH } from '../../src/design/theme';
 import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
 import { controlIdFor } from '../../src/runtime/compositionIds';
 import { requireCapability } from '../../src/scenes/registry';
+import { renderHarness } from './harness';
 import { type Bitmap, type Region, decodePng, hashRegions } from './png';
 
 /** The capabilities whose occupation this suite guards, and the control that carries each ceiling. */
@@ -105,9 +95,8 @@ const regionOf = (slot: Slot): Region => {
   };
 };
 
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+const harness = renderHarness();
+
 /** The ground with nothing on it; a free slot is one that still equals this frame. */
 let control: Bitmap;
 
@@ -115,43 +104,11 @@ const renderStillAt = async (
   compositionId: string,
   inputProps: Record<string, unknown>,
   frame: number,
-): Promise<Bitmap> => {
-  const composition = await selectComposition({
-    serveUrl,
-    id: compositionId,
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return decodePng(rendered.buffer);
-};
+): Promise<Bitmap> => decodePng(await harness.still(compositionId, inputProps, frame));
 
 beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-occupation-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
   control = await renderStillAt(BACKDROP_CONTROL_ID, {}, 0);
 }, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
 
 describe('an occupied region is one the ink actually crosses', () => {
   /**

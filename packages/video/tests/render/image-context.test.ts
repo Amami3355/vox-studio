@@ -8,21 +8,10 @@
  * baseline: literal hashes, accepted after visual review, and the suite that is expected
  * to fail when the design changes on purpose.
  */
-import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PLACEHOLDER_ASSET_URI } from '../../src/assets/resolver';
 import type { AssetRef, ResolvedSceneAssets } from '../../src/core/assets';
+import { hashStill, renderHarness } from './harness';
 
 const READY_ASSET: AssetRef = {
   status: 'ready',
@@ -43,53 +32,26 @@ const FAILED_ASSET: AssetRef = {
 };
 
 const CANONICAL_EXAMPLE_ID = 'example-housing-context';
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+/** Everything has landed and settled here; every example runs past it. */
+const SETTLED_FRAME = 120;
 
-beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-image-context-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
-}, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
+const harness = renderHarness();
 
 const renderHash = async (exampleId: string, asset?: AssetRef): Promise<string> => {
   const assets: ResolvedSceneAssets | undefined = asset ? { assetRequirement: asset } : undefined;
-  const inputProps = {
-    capabilityId: 'image_context',
-    exampleId,
-    layout: null,
-    motionProfile: null,
-    ...(assets ? { assets } : {}),
-  };
-  const composition = await selectComposition({
-    serveUrl,
-    id: `image-context--${exampleId}`,
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame: 120,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return createHash('md5').update(rendered.buffer).digest('hex');
+  return hashStill(
+    await harness.still(
+      `image-context--${exampleId}`,
+      {
+        capabilityId: 'image_context',
+        exampleId,
+        layout: null,
+        motionProfile: null,
+        ...(assets ? { assets } : {}),
+      },
+      SETTLED_FRAME,
+    ),
+  );
 };
 
 describe('ImageContextScene runtime', () => {

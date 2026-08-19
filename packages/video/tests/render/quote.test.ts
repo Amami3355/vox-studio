@@ -13,71 +13,24 @@
  * that cannot tell whether `revealQuote` reaches the frame at all. Frame 60 is inside the
  * hold, before `b2.start`, and is the only place the verb is visible.
  */
-import { createHash } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { bundle } from '@remotion/bundler';
-import {
-  type HeadlessBrowser,
-  openBrowser,
-  renderStill,
-  selectComposition,
-} from '@remotion/renderer';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { hashStill, renderHarness } from './harness';
 
 /** Everything has landed and settled here; all four examples run 180 frames. */
 const SETTLED_FRAME = 120;
 /** Inside the driven example's hold. `b2.start` is the reveal, and it has not arrived yet. */
 const HOLD_FRAME = 60;
 
-let bundleDirectory = '';
-let serveUrl = '';
-let browser: HeadlessBrowser | undefined;
+const harness = renderHarness();
 
-beforeAll(async () => {
-  bundleDirectory = await mkdtemp(join(tmpdir(), 'vox-quote-'));
-  serveUrl = await bundle({
-    entryPoint: fileURLToPath(new URL('../../src/remotion-entry.ts', import.meta.url)),
-    outDir: bundleDirectory,
-  });
-  browser = await openBrowser('chrome', { logLevel: 'error' });
-}, 180_000);
-
-afterAll(async () => {
-  if (browser) await browser.close({ silent: true });
-  if (bundleDirectory) await rm(bundleDirectory, { recursive: true, force: true });
-});
-
-const renderHash = async (exampleId: string, frame: number): Promise<string> => {
-  const inputProps = {
-    capabilityId: 'quote',
-    exampleId,
-    layout: null,
-    motionProfile: null,
-  };
-  const composition = await selectComposition({
-    serveUrl,
-    id: `quote--${exampleId}`,
-    inputProps,
-    puppeteerInstance: browser,
-    logLevel: 'error',
-  });
-  const rendered = await renderStill({
-    serveUrl,
-    composition,
-    inputProps,
-    puppeteerInstance: browser,
-    frame,
-    output: null,
-    imageFormat: 'png',
-    logLevel: 'error',
-  });
-
-  if (!rendered.buffer) throw new Error('Remotion returned no still buffer.');
-  return createHash('md5').update(rendered.buffer).digest('hex');
-};
+const renderHash = async (exampleId: string, frame: number): Promise<string> =>
+  hashStill(
+    await harness.still(
+      `quote--${exampleId}`,
+      { capabilityId: 'quote', exampleId, layout: null, motionProfile: null },
+      frame,
+    ),
+  );
 
 describe('QuoteScene runtime', () => {
   /**
