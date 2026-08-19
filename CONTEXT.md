@@ -128,6 +128,17 @@ for the scene. The compiler never invents a position. The **scene** is the unit 
 solved as a whole — one composition, every element crossing it resolved against that same
 composition, held for the scene's duration. See ADR-0003.
 
+**Transition** — How a scene *arrives*: an optional `transitionIn` on the scene instance,
+naming an effect from a closed published vocabulary and a rhythm token for its length.
+Absence is the hard cut, which is the default and not a degradation. Self-anchoring by
+construction — it plays around the scene's own start and no anchor is written for it, so
+the anchor grammar does not widen. The overlap is carved from the incoming scene's head,
+so scene and composition durations stay pinned to the take. An anchored event must never
+resolve inside the window: `TRANSITION_COVERS_EVENT`. The compiler plays only an effect
+the incoming capability declared (`supportedTransitions` in its meta). See ADR-0013.
+Avoid: "transition" as something a scene exits through — ownership lives with the arrival
+only; and treating the cut as something declared — it is the absence of a declaration.
+
 **Action** — A member of a capability's *closed* event vocabulary (`highlightBar`,
 `annotate`). An action outside the vocabulary is a compilation error, never a silence.
 
@@ -280,7 +291,7 @@ amendment. Avoid: "the voice-over" for the timings, or "regenerate" for what pro
 ## Not yet built
 
 The Asset Resolver beyond identity cache/local library/placeholder, the remaining
-capabilities, the agents, and the product Studio UI. See the build order in
+capabilities, entrance transitions (ADR-0013), the agents, and the product Studio UI. See the build order in
 `vox-studio-architecture-figee.md` §13, ADR-0002 for the time pipeline, ADR-0003 for slot
 conflicts and ADR-0004 for the voice. Step 9 of that build order is specified in
 `docs/measurement-gate.md`, which tracks its entry conditions against today's four
