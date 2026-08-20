@@ -215,3 +215,23 @@ export const bandsOutside = (inside: Region, width: number, height: number): Reg
       height: inside.height,
     },
   ].filter((band) => band.width > 0 && band.height > 0);
+
+/**
+ * A rectangle given as percentage insets from each edge, in pixels.
+ *
+ * `SafeArea` and `slotRect` speak the same shape with the same reading — a share of the
+ * canvas inset from each edge — and both render suites have to turn one into pixels before
+ * they can hash it. Insets in and a `Region` out, with the canvas passed rather than
+ * imported, so this stays the arithmetic and not a second opinion about how big the canvas
+ * is.
+ */
+export const regionOfInsets = (
+  insets: { top: number; right: number; bottom: number; left: number },
+  width: number,
+  height: number,
+): Region => ({
+  x: Math.round((insets.left / 100) * width),
+  y: Math.round((insets.top / 100) * height),
+  width: Math.round(((100 - insets.left - insets.right) / 100) * width),
+  height: Math.round(((100 - insets.top - insets.bottom) / 100) * height),
+});

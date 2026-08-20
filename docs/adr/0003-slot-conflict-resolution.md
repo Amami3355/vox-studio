@@ -370,5 +370,52 @@ the schema the single source of truth; lowering it moves the failure from the fr
 human sees it, to the plan, where the agent meets it as a rejection.
 
 *Decided, not yet built.* The suite does not exist. It comes after ADR-0006's publication
+
 work and after the action group, and nothing in this amendment is carried out in the commit
+
 that records it.
+
+
+**2026-08-20 — the suite is built, and the first run is red in one place only.**
+
+The amendment above is carried out. `packages/video/tests/stress/cases.ts` derives the
+content from the **published** projection of each schema — `buildCatalogEntry(…).propsSchema`,
+the JSON Schema that ships in `catalog.json` — so the ceiling being stressed is the ceiling
+the agent was told about, and a hand-written fixture never gets the chance to go stale
+against it. `content-stress.test.ts` renders it: seventy-two cases, every capability at its
+ceiling and at its floor, in every layout, in every composition it declares, under
+`cinematic` and `pushIn`. `pnpm test:stress`, its own config, 144 stills in 124 s.
+
+**Two of the four questions had to leave the pixels.** Containment and the quiet border are
+statements about regions and are asked exactly as `safe-area.test.ts` asks them, against the
+backdrop control. The other two are not in the bytes at all: a frame that has lost its tail
+and a frame that never had one are the same still, and a line box is a browser fact rather
+than a pixel one. So `runtime/StressControl.tsx` — a third kind of control, one with no
+content of its own, whose content arrives as input props — measures both in the DOM once the
+entrances have landed, and ends the render through `cancelRender` when it finds either. The
+test names the case; the render names the defect. The alternative, reading sharp cuts out of
+an ink profile, would have been a guess about typography dressed as a measurement.
+
+**Every floor passes. Twelve of the thirty-six ceilings pass. Twenty-four do not.** The
+floors are the first time the empty states these schemas keep reachable have been drawn in
+every composition, and all thirty-six are green on all four questions. Of the ceilings,
+`stat_counter` is green everywhere and `bar_chart` is green on the full canvas. The rest:
+
+- **`bar_chart`, all three layouts, both halves** — the 120-character title sets *five lines*
+  of display type. Exactly the sentence the ceiling was made out of.
+- **`quote`** — seven lines on the full canvas, twelve to thirteen in a half.
+- **`image_context`** — seven to eight lines on the full canvas, and in a half the copy is
+  *clipped*: 96 px off the headline, 48 px off the caption, and 4–7 px off the `Visual
+  context` eyebrow, which is fixed chrome and nothing to do with the content.
+
+**The clipping is what pays for the suite**, and it is the failure this amendment predicted
+in the abstract one week earlier. It happens inside the safe area, so containment has nothing
+to say about it and the quiet border has nothing to say about it; `image_context` has declared
+`left` and `right` since the amendment above, the compiler is entitled to choose them, and no
+still had ever shown what that copy column does at the schema's own ceiling.
+
+**Nothing is repaired here.** The response was pre-committed before any case existed
+precisely so that this moment could not be argued from the failure — draw the box so it fits,
+or extend the degradation, and lower a schema ceiling only where no content at that size is
+editorially defensible. Which of the three each of the twenty-four is remains open, and none
+of it is carried out in the commit that records the suite.

@@ -55,6 +55,7 @@ import {
   decodePng,
   hashRegions,
   pixelAt,
+  regionOfInsets,
 } from './png';
 
 /**
@@ -102,12 +103,7 @@ const framesFor = (duration: number): number[] => [Math.round(duration * 0.25), 
 const isPartial = (rect: Rect): boolean =>
   rect.top > 0 || rect.right > 0 || rect.bottom > 0 || rect.left > 0;
 
-const insideOf = (rect: Rect): Region => ({
-  x: Math.round((rect.left / 100) * WIDTH),
-  y: Math.round((rect.top / 100) * HEIGHT),
-  width: Math.round(((100 - rect.left - rect.right) / 100) * WIDTH),
-  height: Math.round(((100 - rect.top - rect.bottom) / 100) * HEIGHT),
-});
+const insideOf = (rect: Rect): Region => regionOfInsets(rect, WIDTH, HEIGHT);
 
 type Case = {
   label: string;

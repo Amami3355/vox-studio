@@ -219,15 +219,23 @@ with no sentence beside it is a number nobody can re-check.
 
 ## Gates
 
-Run all five. Compare numbers, not exit codes.
+Run all six. Compare numbers, not exit codes.
 
 ```
 pnpm catalog:check                     # both projections up to date
 pnpm -r typecheck                      # clean, 4 packages
 pnpm vitest run --no-file-parallelism   # unit tests, ~95 s
 pnpm test:render                       # render tests, ~110-280 s
+pnpm test:stress                       # the schemas' own ceilings, drawn; minutes
 npx biome check .                      # 9 errors is the pre-existing baseline, not zero
 ```
+
+`test:stress` is change-scoped rather than universal — ADR-0003 makes it obligatory for a
+commit that touches a schema, a layout or `supportedCompositions`, with `catalog:check` as
+the precedent. Adding a capability touches all three, so here it is always in the list. It
+renders every ceiling and every reachable empty state of every capability into every
+composition, which is the one thing `test:render` does not do: that suite renders the
+*examples*, and an example is copy a human wrote to be readable.
 
 `pnpm grid` opens the component studio, which is where a new capability's examples are
 actually looked at. `pnpm studio` opens Remotion Studio.

@@ -2,12 +2,14 @@ import type React from 'react';
 import { Composition } from 'remotion';
 import './design/fonts';
 import type { CompiledDocument } from './compile/document';
+import { NO_SAFE_AREA } from './core/types';
 import { FPS, HEIGHT, WIDTH } from './design/theme';
 import { announceShippedPlan, compileShippedPlan, shippedPlans } from './plans';
 import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';
 import { CompiledVideo } from './runtime/CompiledVideo';
 import { ExampleScene } from './runtime/ExampleScene';
 import { ControlScene, sceneControls } from './runtime/SceneControl';
+import { STRESS_CONTROL_DEFAULTS, STRESS_CONTROL_ID, StressScene } from './runtime/StressControl';
 import { compositionIdFor, controlIdFor } from './runtime/compositionIds';
 import { registry, requireCapability } from './scenes/registry';
 
@@ -108,6 +110,30 @@ export const RemotionRoot: React.FC = () => (
       fps={FPS}
       width={WIDTH}
       height={HEIGHT}
+    />
+
+    {/*
+     * The content-stress harness: one scene drawn from props a test generated, measured in
+     * the DOM before the still is taken. `runtime/StressControl.tsx` says why two of
+     * ADR-0003's four questions cannot be asked of the pixels.
+     *
+     * Its default props are the empty frame rather than a specimen, which is the honest
+     * default for a control with no content of its own — anything else here would be an
+     * example that never reached the catalog.
+     */}
+    <Composition
+      id={STRESS_CONTROL_ID}
+      component={StressScene}
+      durationInFrames={
+        requireCapability(STRESS_CONTROL_DEFAULTS.capabilityId).meta.recommendedDurationFrames
+      }
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+      defaultProps={STRESS_CONTROL_DEFAULTS}
+      calculateMetadata={({ props }) => ({
+        durationInFrames: requireCapability(props.capabilityId).meta.recommendedDurationFrames,
+      })}
     />
 
     {/*

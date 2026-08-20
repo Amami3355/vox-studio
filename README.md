@@ -64,6 +64,8 @@ Checks:
 pnpm typecheck
 pnpm test             # deterministic core: schemas, event folding, anchors, aggregation
 pnpm test:render      # headless-Chrome stills; minutes, not seconds
+pnpm test:stress      # the schemas' ceilings and empty states, drawn into every
+                      # composition — required when a schema or layout changes
 pnpm check            # Biome
 pnpm catalog:check    # fails if the manifest has drifted from the registry
 ```
