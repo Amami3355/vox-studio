@@ -19,6 +19,17 @@ import { DensityProvider, useTheme } from './ThemeContext';
  */
 const DENSITY_FLOOR = 0.72;
 
+/**
+ * The name of the attribute `SlotFrame` publishes its box height under.
+ *
+ * The same move `ColumnProvider` makes for a column's width, one level up and into the DOM
+ * rather than into a context: the box a scene was given is a fact only this component
+ * computes, and `runtime/StressControl.tsx` has to know it to say whether a header has
+ * taken more of the scene than a header may. It reads the attribute and derives the ceiling
+ * itself, rather than being told the answer by the thing it is checking.
+ */
+export const SCENE_BOX_ATTRIBUTE = 'data-scene-height';
+
 /** The box a scene was actually given, in canvas px. */
 export type FrameBox = { width: number; height: number };
 
@@ -82,6 +93,7 @@ export const SlotFrame: React.FC<{
 
   return (
     <AbsoluteFill
+      {...{ [SCENE_BOX_ATTRIBUTE]: box.height }}
       style={{
         paddingTop: top,
         paddingRight: right,

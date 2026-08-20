@@ -82,7 +82,14 @@ box decides how loud it may be, and the box wins.
 **Three degradations, in order, and nothing below them cuts.** Since `c328a6d` this is automatic
 rather than wired per scene:
 
-1. **Shrink** — display type steps down the scale until its widest word fits its column.
+1. **Shrink** — display type steps down the scale until its widest word fits its column *and*
+   the string wraps into a height its scene can carry. Both, at every rung: the two questions
+   do not fail at the same step, and width alone let a 120-character headline set eight lines
+   down a 5/12 column with nothing clipped and nothing outside its safe area. The height half
+   is a share of the box (`MAX_HEADER_SHARE`), not a count of lines — five lines is 39% of a
+   composed box at one step and 16% at the floor, and only the first has eaten its scene.
+   A header carries this budget; display type that *is* the scene (`displayRole="statement"`,
+   a pull-quote) is bounded by its box alone.
 2. **Break** — `AnimatedText` sets `overflowWrap: break-word`, so anything still too wide breaks
    across lines. Body type has no fit and goes straight here, which is what a caption should do.
 3. **Never clip** — the `overflow: hidden` that produces the clipped rise can no longer cut a

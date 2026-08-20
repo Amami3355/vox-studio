@@ -86,6 +86,13 @@ const ChartFrame: React.FC<{
   const rowPitch = useTypeSize(1) * 1.35 + useSpace(3);
 
   /**
+   * What one vertical column costs, on the same terms: the room its name needs, plus the
+   * gap that separates it from the next. `BarGroup` lays the columns out with exactly
+   * these two tokens.
+   */
+  const columnPitch = useTypeSize(0) * barChartGeometry.minLabelEms + useSpace(3);
+
+  /**
    * How many categories this box can carry at full size.
    *
    * On the full canvas that is the published soft constraint and nothing else — the
@@ -94,18 +101,25 @@ const ChartFrame: React.FC<{
    * degradation the capability already declares rather than a new one: the weakest values
    * collapse into `Others`, exactly as they do past the soft limit.
    *
-   * Vertical columns are bounded by width rather than height and are not capped here: at
-   * `maxWidth: 200` per column, eight of them ask for 1600px and a half frame gives 537,
-   * so they simply get narrower — legible, and the frame the shipped slice already plays.
+   * Vertical columns ask the same question of the box's *width*, because that is the axis
+   * they are laid out along. This used to exclude them by name — *"bounded by width rather
+   * than height and not capped here: at `maxWidth: 200` per column, eight of them ask for
+   * 1600px and a half frame gives 537, so they simply get narrower"* — which is true of the
+   * bars and false of the names underneath them. The bars did get narrower. The labels did
+   * not, and the content-stress suite drew the result: twenty categories at their
+   * forty-character ceiling put the plot 592px into the half the compiler had reserved.
+   * Nine columns in a 538px box is not nine narrow columns, it is a chart with no room to
+   * say what it is counting.
    */
   const recommendedMax = barChartConstraints.data?.recommendedMax ?? 8;
-  const capacity =
-    composed && variant === 'horizontal'
-      ? Math.max(
-          barChartGeometry.minCategories,
-          Math.floor((box.height * barChartGeometry.chartShare) / rowPitch),
-        )
-      : recommendedMax;
+  const capacity = !composed
+    ? recommendedMax
+    : Math.max(
+        barChartGeometry.minCategories,
+        variant === 'horizontal'
+          ? Math.floor((box.height * barChartGeometry.chartShare) / rowPitch)
+          : Math.floor((box.width * barChartGeometry.chartShare) / columnPitch),
+      );
 
   const data = aggregateBeyond(props.data, Math.min(recommendedMax, capacity), 'Others');
 
@@ -147,6 +161,17 @@ const ChartFrame: React.FC<{
   );
 
   /**
+   * The width the plot itself gets, which is the box less whatever the callout column is
+   * currently holding. Multiplied by `open` for the same reason `calloutWidth` is: the
+   * column grows on the annotation's own entrance, and a label cut against a column that
+   * is not there yet would be cut twice as short for the whole scene before it.
+   */
+  const plotWidth =
+    variant === 'withCallout'
+      ? Math.max(0, box.width - (calloutWidth + columnGap) * open)
+      : box.width;
+
+  /**
    * In a portrait box the title labels the chart rather than declaiming over it.
    *
    * A ceiling and not the answer: it says this frame should not shout, and `SceneTitle`
@@ -169,6 +194,7 @@ const ChartFrame: React.FC<{
       profile={profile}
       orientation={variant === 'horizontal' ? 'horizontal' : 'vertical'}
       gridlines={props.gridlines}
+      width={plotWidth}
     />
   );
 

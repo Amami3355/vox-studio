@@ -6,9 +6,10 @@
  * drawing below the frame, and a label longer than the column is truncated instead of
  * pushing its neighbours around.
  */
+import { measureText } from '@remotion/layout-utils';
 import type React from 'react';
 import { spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { countTo, formatValue, truncate } from '../core/format';
+import { countTo, formatValue, truncateToWidth } from '../core/format';
 import { valueAxis } from '../core/scale';
 import { type MotionProfile, springConfig } from '../design/motion';
 import { mix, rampColor } from '../design/theme';
@@ -37,7 +38,29 @@ export type BarGroupProps = {
    * at all. The horizontal branch ignores it — a ranking never had an axis.
    */
   gridlines: boolean;
+  /**
+   * The width of the box the plot was actually given, in canvas px.
+   *
+   * Declared by the layout rather than measured here, for the reason `ColumnProvider`
+   * gives: a CSS percentage resolves at layout time, which is too late for a component
+   * that has to decide how much of a category name it can draw while rendering. The
+   * scene is the only thing that knows whether an annotation column is open beside the
+   * chart, so the scene is what says.
+   */
+  width: number;
 };
+
+/**
+ * The share of a ranking's width its category names get.
+ *
+ * Named because two things have to agree on it: the row draws the column this wide, and
+ * the label is cut to fit it. They were separate numbers — a percentage in the style and a
+ * budget of 22 characters — and the second is a proxy for the first that is wrong whenever
+ * the box is small. In a composed box 22% is 118px and twenty-two characters is three lines
+ * of them, which made every row half again taller than `rowPitch` predicts, and a ranking
+ * sized from a pitch that is not the pitch overflows the box it was cut down to fit.
+ */
+const LABEL_COLUMN_SHARE = 0.22;
 
 /** How far a non-highlighted bar recedes toward the background. */
 const RECEDE = 0.62;
@@ -53,6 +76,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   profile,
   orientation,
   gridlines,
+  width,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -74,6 +98,51 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   // second. Reserving the indent with no numbers in it would be a margin, not a gutter.
   const measuredGutter = useAxisGutter(axis, unit);
   const gutter = gridlines ? measuredGutter : 0;
+
+  /**
+   * The room one category column has for its name, in canvas px.
+   *
+   * The columns divide what is left of the plot after the axis indent and the gaps
+   * between them, which is arithmetic the layout already does in CSS — restated here
+   * because a label has to be cut *before* it is laid out, and by then the column is
+   * whatever the label made it.
+   */
+  const columnWidth =
+    orientation === 'horizontal'
+      ? width * LABEL_COLUMN_SHARE
+      : data.length > 0
+        ? Math.max(0, (width - gutter - gap * (data.length - 1)) / data.length)
+        : 0;
+
+  /**
+   * A category name cut to the column that carries it, measured on the real loaded font.
+   *
+   * `truncate(label, 14)` used to do this by counting characters, and a character count
+   * is a proxy for a width that is wrong in exactly the case that matters: the same
+   * fourteen characters that sit comfortably under a 300px column are half again wider
+   * than a 60px one. A flex item's minimum size is its min-content width, so the row then
+   * sized itself to the labels rather than the other way round and carried the whole plot
+   * out of the box with it. Same argument, same remedy and the same `measureText` as
+   * `useAxisGutter` one file over: measured, not estimated.
+   *
+   * A ranking pays for the same mistake on the other axis. Its names sit in a column of
+   * their own, and a name that wraps to three lines makes the row three lines tall — so the
+   * `rowPitch` the scene aggregates against stops being the pitch, and the ranking it cut
+   * down to fit runs off the bottom of the box anyway.
+   */
+  const labelFor = (label: string): string =>
+    truncateToWidth(
+      label.toUpperCase(),
+      columnWidth,
+      (candidate) =>
+        measureText({
+          text: candidate,
+          fontFamily: theme.type.body,
+          fontSize: labelSize,
+          fontWeight: theme.type.weight.medium,
+          letterSpacing: `${theme.type.tracking.wide * labelSize}px`,
+        }).width,
+    );
 
   const highlightProgress =
     highlighted === null
@@ -128,7 +197,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
             <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: gap }}>
               <div
                 style={{
-                  width: '22%',
+                  width: `${LABEL_COLUMN_SHARE * 100}%`,
                   textAlign: 'right',
                   fontFamily: theme.type.body,
                   fontSize: labelSize,
@@ -139,7 +208,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
                   opacity: Math.min(1, p * 3),
                 }}
               >
-                {truncate(d.label, 22)}
+                {labelFor(d.label)}
               </div>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: gap * 0.6 }}>
                 <div
@@ -175,7 +244,11 @@ export const BarGroup: React.FC<BarGroupProps> = ({
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    /* `minWidth: 0` for the reason the horizontal branch above gives for its `minHeight`,
+       one axis over: without it a flex item's minimum size is its min-content width, so the
+       category row sized this container instead of the other way round and a chart too wide
+       for its box grew past the frame rather than being cut down to fit. */
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div
         style={{
           flex: 1,
@@ -278,6 +351,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
               key={d.label}
               style={{
                 flex: 1,
+                minWidth: 0,
                 textAlign: 'center',
                 fontFamily: theme.type.body,
                 fontSize: labelSize,
@@ -288,7 +362,7 @@ export const BarGroup: React.FC<BarGroupProps> = ({
                 opacity: Math.min(1, p * 3),
               }}
             >
-              {truncate(d.label, 14)}
+              {labelFor(d.label)}
             </div>
           );
         })}

@@ -22,9 +22,10 @@
  *   passes, and the sentence is gone. A frame that has lost its tail and a frame that never
  *   had one are the same bytes; the difference exists only in the DOM, as the gap between
  *   `scrollWidth` and `clientWidth`.
- * - **The line ceiling.** *"Five lines of display type is a header that has eaten its own
- *   scene"* is a sentence this repository already wrote (`primitives/titleFit.ts`). Counting
- *   those lines means counting line boxes, which is a browser fact and not a pixel one.
+ * - **A header that has eaten its own scene.** `primitives/titleFit.ts` bounds a header to
+ *   a share of the box its scene was given. Both halves of that are browser facts and
+ *   neither is a pixel one: what a run of display type actually cost is the height its line
+ *   boxes came to, and the box it is a share of is the rectangle `SlotFrame` computed.
  *
  * So the browser measures, and a violation ends the render through `cancelRender` with the
  * element and the numbers in the message. The test names the case; this names the defect.
@@ -47,6 +48,8 @@ import { NO_SAFE_AREA, type SafeArea } from '../core/types';
 import { waitForFonts } from '../design/fonts';
 import type { MotionProfileId } from '../design/motion';
 import { defaultTheme } from '../design/theme';
+import { SCENE_BOX_ATTRIBUTE } from '../primitives/SlotFrame';
+import { MAX_HEADER_SHARE } from '../primitives/titleFit';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
 import { controlIdFor } from './compositionIds';
@@ -61,17 +64,6 @@ export const STRESS_CONTROL_ID = controlIdFor('stress');
  * a viewer would call a cut sentence is two pixels wide.
  */
 const CLIP_TOLERANCE_PX = 2;
-
-/**
- * Lines of display type above which a header has eaten its own scene.
- *
- * The number is `primitives/titleFit.ts`'s own sentence made checkable: five lines is the
- * failure it names, so four is the ceiling. It is not a tuning knob. ADR-0003 pre-commits
- * the response to a breach *before* any case exists, for the same reason the measurement
- * gate pre-commits its own — after seeing the failure, "lower the ceiling" explains
- * everything. Draw the box so it fits, or extend the degradation.
- */
-const MAX_DISPLAY_LINES = 4;
 
 /** The display face, as the theme spells it before the fallbacks. */
 const DISPLAY_FAMILY = (defaultTheme.type.display.split(',')[0] as string).trim();
@@ -130,29 +122,54 @@ const clippedText = (): string[] =>
     });
 
 /**
- * Display type set over more lines than a frame can carry.
+ * Headers taking more of their scene than a header may.
  *
- * Only elements whose whole content is one run of text, because a line box is what is being
- * counted and a mixed element has more rects than it has lines — the figure and its unit in
- * `stat_counter` are two spans on one line, and counting their rects would report two.
+ * `MAX_HEADER_SHARE` is imported rather than restated. A `4` used to be written here, which
+ * made this file a second home for a rule that already had one, and a second copy of a rule
+ * is the copy that goes stale — the same argument `tests/stress/cases.ts` makes for deriving
+ * its cases from the schema rather than from a fixture. It is not a tuning knob either:
+ * ADR-0003 pre-commits the response to a breach *before* any case exists, because after
+ * seeing the failure "lower the ceiling" explains everything.
+ *
+ * Only elements whose whole content is one run of text, because a run of display type is
+ * what is being measured and a mixed element is several — the figure and its unit in
+ * `stat_counter` are two spans on one line.
+ *
+ * And only *headers*. A run of display type that is the scene rather than a label on it —
+ * a pull-quote — declares `data-display-role="statement"` and is bounded by its box, which
+ * the clipping and region checks measure directly. Anything unmarked counts as a header, so
+ * a scene that forgets to classify its type gets the stricter rule rather than a free pass.
+ *
+ * **Derived here rather than read off the element.** The scene publishes the box it was
+ * given and this computes the ceiling from it, so a header whose *own* budget was computed
+ * wrongly is still caught. Asking the element what it was allowed would be grading the fit
+ * against its own arithmetic, which is not a check.
  */
-const overLongDisplayText = (): string[] =>
+const oversizedHeaders = (): string[] =>
   [...document.querySelectorAll<HTMLElement>('*')]
     .filter((element) => {
       const only = element.childNodes.length === 1 ? element.firstChild : null;
       if (!only || only.nodeType !== Node.TEXT_NODE) return false;
       if ((only.textContent ?? '').trim() === '') return false;
+      if (element.dataset.displayRole === 'statement') return false;
       return getComputedStyle(element).fontFamily.includes(DISPLAY_FAMILY);
     })
     .flatMap((element) => {
+      const scene = element.closest<HTMLElement>(`[${SCENE_BOX_ATTRIBUTE}]`);
+      const sceneHeight = Number(scene?.dataset.sceneHeight ?? 0);
+      if (sceneHeight <= 0) return [];
+
+      const ceiling = sceneHeight * MAX_HEADER_SHARE;
+      const height = element.offsetHeight;
+      if (height <= ceiling) return [];
+
       const range = document.createRange();
       range.selectNodeContents(element);
-      const lines = range.getClientRects().length;
-      if (lines <= MAX_DISPLAY_LINES) return [];
       return [
-        `${lines} lines of display type, over a ceiling of ${MAX_DISPLAY_LINES}: "${excerpt(
-          (element.textContent ?? '').trim(),
-        )}"`,
+        `header takes ${height}px of a ${Math.round(sceneHeight)}px scene — ` +
+          `${Math.round((height / sceneHeight) * 100)}%, over a ceiling of ` +
+          `${Math.round(MAX_HEADER_SHARE * 100)}%, in ${range.getClientRects().length} lines: ` +
+          `"${excerpt((element.textContent ?? '').trim())}"`,
       ];
     });
 
@@ -184,7 +201,7 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
 
     waitForFonts()
       .then(() => {
-        const findings = [...clippedText(), ...overLongDisplayText()];
+        const findings = [...clippedText(), ...oversizedHeaders()];
         if (findings.length === 0) {
           continueRender(handle);
           return;

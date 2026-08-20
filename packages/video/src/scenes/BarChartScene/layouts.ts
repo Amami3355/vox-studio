@@ -88,6 +88,25 @@ export const barChartGeometry = {
   minCategories: 3,
 
   /**
+   * The room one vertical column needs for its name, as a multiple of the label size.
+   *
+   * `capacity` used to ask this question of height only, and excluded vertical columns by
+   * name: *"bounded by width rather than height and not capped here — at `maxWidth: 200`
+   * per column, eight of them ask for 1600px and a half frame gives 537, so they simply
+   * get narrower."* True of the bars and false of the labels. The bars did get narrower;
+   * the category names underneath them did not, and a flex item's minimum size is its
+   * min-content width, so the row sized itself to the names and carried the plot 592px
+   * into the half the compiler had reserved for something else.
+   *
+   * Four ems is roughly six uppercase characters at the wide tracking the labels are set
+   * in — enough to name a category, and the point below which a name is an abbreviation
+   * of an abbreviation. A box that cannot give every column that much is a box with too
+   * many columns in it, and the answer is the aggregation the capability already
+   * publishes rather than a new degradation.
+   */
+  minLabelEms: 4,
+
+  /**
    * The `withCallout` split, as flex shares of the row. They do not sum to 100: the
    * remainder is the gap.
    *

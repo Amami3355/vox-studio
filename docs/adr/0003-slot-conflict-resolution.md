@@ -419,3 +419,113 @@ precisely so that this moment could not be argued from the failure — draw the 
 or extend the degradation, and lower a schema ceiling only where no content at that size is
 editorially defensible. Which of the three each of the twenty-four is remains open, and none
 of it is carried out in the commit that records the suite.
+
+---
+
+**2026-08-20, later — the twenty-four are repaired, and one of the four questions was
+asked wrongly.**
+
+The amendment above left three responses open and said which of them each red case was
+remained undecided. Answered here, case by case, and the count moved from twenty-four red
+to zero — but not before the suite turned up two failures nobody had reported, and one
+defect in the check itself.
+
+**Eight of the twenty-four were also failing a question that was never answered.** When
+`StressControl` ends a render, the three region assertions in the same block `skip()` —
+by design, and documented: a refused render leaves no still to measure. So for every red
+case containment and the quiet border went *unanswered*, not green. Rendered at the frame
+the probe does not cancel and measured with the suite's own assertions, `bar_chart` at its
+ceiling composed into `left` drew ink to x = 1552 — 592 px into the half the compiler had
+reserved for a persistent element — in `standard` and `withCallout`, at both test frames.
+A ninth and tenth appeared only once the headers passed and the renders completed:
+`horizontal` under `pushIn` overflowed its box vertically, the ranking bleeding under its
+own title and off the canvas. **A skipped assertion behind a red one is a place a failure
+can sit indefinitely**, and this suite had ten of them.
+
+Both had one cause, and it is the cause `titleFit.ts` was written about, one layer down:
+**a category label cut to a character count rather than to the column carrying it.**
+`truncate(label, 14)` hands the same fourteen characters to a column 300 px wide and to
+one 60 px wide; because a flex item's minimum size is its min-content width, the row then
+sized itself to the labels and took the plot with it. The ranking paid the same price on
+the other axis — a name wrapped to three lines makes the row three lines tall, so the
+`rowPitch` the scene aggregates against stops being the pitch and the ranking it cut down
+to fit overflows anyway. `truncateToWidth` measures instead, `truncate` is gone, and
+`capacity` now bounds a composed *vertical* chart by width exactly as it already bounded a
+composed horizontal one by height — the note excluding it (*"they simply get narrower"*)
+was true of the bars and false of the names underneath them.
+
+**`image_context`'s clipping was the copy band being given a fixed share of a portrait
+box.** The stack divided the height 7/5 outright; at the schema's ceiling the copy needed
+about a fifth more than that, and grid children do not refuse — each of the three shrank
+below its content and clipped under `AnimatedText`'s own `overflow: hidden`. The `Visual
+context` eyebrow losing 7 px is what proved it: fixed chrome with no content of its own
+cannot be too long. A plate can be any height and a paragraph cannot, so the copy row is
+now `minmax(owed, auto)` and the plate takes the remainder — identical to 7/5 for any copy
+that fitted it, yielding rather than cutting for copy that does not.
+
+**The line ceiling itself was the fourth question asked wrongly, and that is the finding
+worth keeping.** `MAX_DISPLAY_LINES = 4` was this repository's own sentence made checkable
+— *five lines of display type is a header that has eaten its own scene* — and the sentence
+is right. The count was a proxy for it, and a proxy that is faithful only at the size the
+failure was first seen at. The ranking that produced the sentence set a 68-character title
+at 63 px: five lines, 321 px, **39%** of a composed box, and the nine rows underneath ran
+off the canvas. The same five lines *after* the length ladder and the composed drop have
+done their work are 178 px and **16%**, with the chart below them untouched — measured, on
+frames this suite drew. A count cannot tell those two apart. A share can.
+
+So the rule is now `MAX_HEADER_SHARE`, a share of the box the scene was given. **It was
+written as a third and the frames argued it to a half**, which is worth recording because
+the first number was the plausible one. A third leaves two thirds for what the header
+labels, which sounds like where *leaves room for it* stops being true — and it rejected
+`example-housing-context`, the canonical accepted frame of `image_context`, whose headline
+is **42%** of its scene. Rendered side by side, the frame a third produced is the meeker of
+the two: the accepted one is a confident headline beside a plate with a two-line caption
+under it, crowding out nothing. And the ranking that started all of this is **39%** —
+*below* the good frame. No share separates them, and a number chosen to fit both would have
+been tuned to a pair of stills.
+
+A half is the statement that stands without them: past it a header is the larger half of its
+own scene, which is what *eaten* means. It is a coarse backstop on purpose. **It does not
+catch the 39% ranking and does not need to** — that harm was nine rows running off the
+canvas, which the quiet border measures directly and without a proxy. This session watched
+that path work twice: `bar_chart` spilling 592 px into a reserved half, and its ranking
+under `pushIn` bleeding off the bottom, were both caught as region failures once the renders
+were allowed to finish. The fourth question is answered better by the two that were already
+there than by any ceiling standing in for them.
+
+Two things still follow from stating the rule properly, and both were decisions rather than
+consequences:
+
+- **It is a rule about *headers*.** A header labels something else and its job includes
+  leaving room for it. Display type that **is** the scene — a pull-quote — has nothing
+  below it to crowd out, and the only ceiling meaning anything for it is the box, which the
+  clipping and region checks measure directly. `SceneTitle` takes a `displayRole` and
+  publishes it as `data-display-role`; `header` is the default and unmarked type is held to
+  the stricter rule, so forgetting to classify cannot buy a scene a larger budget. This
+  answers `quote`, whose 240-character ceiling and a four-line ceiling could not both hold:
+  240 characters is about six lines at the display floor on a full canvas and thirteen in a
+  half, and no step of the scale reaches four. **No schema ceiling was lowered.**
+- **The fit had to learn the same thing.** `fitTitleStep` answered width only — the widest
+  *word*, because a string wraps and a word does not — which is why a 120-character
+  headline could set eight lines down a 5/12 column with nothing clipped and nothing out of
+  its safe area. It now takes a `maxHeight` and a `lineHeightAt` and steps down while
+  *either* question is unhappy. In px and not in lines, for the reason above: the budget
+  has to be re-asked at every rung.
+
+The check is derived and not declared. `SlotFrame` publishes the box it computed as
+`data-scene-height` and the probe works the ceiling out from it, rather than reading a
+budget off the element — a header whose own arithmetic was wrong is still caught, and
+asking the element what it was allowed would be grading the fit against itself.
+
+**One accepted key frame moved, and only one.** `image_context`'s `example-long-context`
+headline was setting five lines and now sets four; `canonical`, `empty` and `driven` are
+byte-identical. A baseline that moves for the whole reason and not part of it is what this
+repository already says it is checking, and the reviewed still is recorded beside the hash.
+
+What this leaves is a suite that is green on all four questions with **nothing skipped** —
+the region assertions are answered for all seventy-two cases for the first time, because
+no render is refused. Two frames remain honestly poor rather than wrong: at `bar_chart`'s
+absolute ceiling in half a frame the axis gutter takes 245 px of a 538 px box to print an
+eight-character unit five times, which leaves the category names three or four characters
+each. Contained, labelled, and inside every boundary — and a quieter composed axis is a
+design question this repair did not need to answer.

@@ -24,7 +24,7 @@
  *
  * **Two of the four questions are not asked here at all.** Containment and the quiet border
  * are regions of the canvas and are asked below, against the backdrop control. Whether a
- * sentence was clipped, and how many lines of display type it set, are facts about the DOM
+ * sentence was clipped, and how much of its scene a header took, are facts about the DOM
  * that no still carries — `runtime/StressControl.tsx` measures them in the browser and ends
  * the render if they fail, so those two arrive here as a render that did not happen. That
  * is the assertion `it('fits the content into the boxes it was given')` reads.
@@ -89,6 +89,15 @@ type Rendered = { bitmap: Bitmap } | { failure: string };
  * questions genuinely did go unanswered — saying so is more honest than answering them
  * about a frame that does not exist. This is never a silent skip: it happens only where a
  * sibling assertion is failing with the reason.
+ *
+ * **Read "unanswered" literally.** While the twenty-four ceiling cases were red, ten of
+ * these skips were standing over real failures: `bar_chart` composed into `left` drew its
+ * plot 592px into the half the compiler had reserved, and its ranking under `pushIn` ran
+ * off the bottom of the box — neither reported by anything, because the probe cancelled
+ * the render before the region assertions could look. A skip behind a red assertion is a
+ * place a second failure can sit for as long as the first one does. The suite going green
+ * is therefore worth more than the reds going away: it is the first run in which all four
+ * questions were answered for all seventy-two cases.
  */
 const bitmapsOf = (renders: Rendered[], skip: () => void): Bitmap[] => {
   if (renders.some((one) => 'failure' in one)) skip();

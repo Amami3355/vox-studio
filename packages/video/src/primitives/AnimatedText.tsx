@@ -1,11 +1,29 @@
 import type React from 'react';
 import type { MotionProfile } from '../design/motion';
 import { useColumnWidth } from './Column';
+import { useFrameBox } from './SlotFrame';
 import { useTheme, useTypeSize } from './ThemeContext';
-import { TITLE_MAX_WIDTH, useTitleStep } from './titleFit';
+import { MAX_HEADER_SHARE, TITLE_LINE_HEIGHT, TITLE_MAX_WIDTH, useTitleStep } from './titleFit';
 import { useEntrance } from './useEntrance';
 
 export type TextRole = 'display' | 'body' | 'mono';
+
+/**
+ * What a run of display type is *for*, which decides how much of its scene it may take.
+ *
+ * A `header` labels something else on the frame and has to leave room for it, so
+ * `MAX_HEADER_SHARE` applies — a header may take a third of its scene and no more. A
+ * `statement` **is** the scene: a pull-quote has nothing underneath it to crowd out, and
+ * the only ceiling that means anything for it is the box it was given, which the safe-area
+ * and clipping checks already measure.
+ *
+ * Published into the DOM as `data-display-role`, because the one place the distinction can
+ * be *checked* is the browser — what a run of type actually cost is a browser fact, not a
+ * pixel one and not something a still carries. `header` is the default and
+ * is left unmarked: a run of display type nobody has classified is held to the stricter
+ * rule, so forgetting to declare cannot buy a scene a larger budget.
+ */
+export type DisplayRole = 'header' | 'statement';
 
 /**
  * Text with a motivated entrance: a clipped rise, never a bare fade. The clip is what
@@ -23,6 +41,8 @@ export const AnimatedText: React.FC<{
   tracking?: number;
   lineHeight?: number;
   maxWidth?: number | string;
+  /** Only meaningful for display type. See `DisplayRole`. */
+  displayRole?: DisplayRole;
   style?: React.CSSProperties;
 }> = ({
   children,
@@ -35,6 +55,7 @@ export const AnimatedText: React.FC<{
   tracking,
   lineHeight = 1.08,
   maxWidth,
+  displayRole,
   style,
 }) => {
   const theme = useTheme();
@@ -46,6 +67,7 @@ export const AnimatedText: React.FC<{
   return (
     <div style={{ overflow: 'hidden', paddingBottom: size * 0.14, maxWidth }}>
       <div
+        data-display-role={font === 'display' ? (displayRole ?? 'header') : undefined}
         style={{
           fontFamily: theme.type[font],
           fontSize: size,
@@ -101,9 +123,34 @@ export const SceneTitle: React.FC<{
    * make a title overflow, and omitting it cannot make one clip.
    */
   maxStep?: number;
-}> = ({ children, startFrame, profile, color, maxStep }) => {
+  /**
+   * Whether this run of display type labels the frame or *is* it. See `DisplayRole`.
+   *
+   * A header is the default, and it brings `MAX_HEADER_SHARE` with it: the fit steps down
+   * the scale until the string wraps into a height its scene can carry, rather than only
+   * until its widest word fits. A statement declines the ceiling — not the fit. The
+   * width fit still runs, and the box still bounds it; what changes is that a pull-quote
+   * is no longer asked to keep inside a third of the frame, which for a 240-character
+   * quote — a quote that *is* the frame — is not a question worth asking.
+   *
+   * Named `displayRole` and not `role`: on a component that renders a `div`, `role` is the
+   * ARIA attribute, and this is not one.
+   */
+  displayRole?: DisplayRole;
+}> = ({ children, startFrame, profile, color, maxStep, displayRole = 'header' }) => {
   const theme = useTheme();
-  const step = useTitleStep(children, useColumnWidth(), maxStep);
+  /**
+   * A header's budget is a share of the scene's own box, which is the thing it can eat.
+   * The frame box and not the column: a headline down a 5/12 column still has the whole
+   * scene underneath it, and it is the scene the rule is protecting.
+   */
+  const box = useFrameBox();
+  const step = useTitleStep(
+    children,
+    useColumnWidth(),
+    maxStep,
+    displayRole === 'header' ? box.height * MAX_HEADER_SHARE : undefined,
+  );
 
   return (
     <AnimatedText
@@ -115,7 +162,8 @@ export const SceneTitle: React.FC<{
       tracking={theme.type.tracking.tight}
       color={color}
       maxWidth={`${TITLE_MAX_WIDTH * 100}%`}
-      lineHeight={1.02}
+      lineHeight={TITLE_LINE_HEIGHT}
+      displayRole={displayRole}
     >
       {children}
     </AnimatedText>

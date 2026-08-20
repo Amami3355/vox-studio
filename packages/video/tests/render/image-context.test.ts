@@ -95,6 +95,14 @@ describe('ImageContextScene runtime', () => {
       // plate, the eyebrow, the title and the caption were each read on paper at frame 120.
       canonical: 'deeb7727f43aac8958e2e4fb6e163369',
       empty: '5c23bdadca1da65d59564540b73bd4b9',
+      // `longCopy` is unchanged by the 2026-08-20 header work, and that it is unchanged is
+      // the point. `useTitleStep` gained a height budget that day, and an intermediate
+      // version of it counted lines instead — under which this headline dropped a step to
+      // reach four and this hash moved. The rule it shipped as is a *share* of the scene:
+      // five lines here are 326px of a 1008px box, under the third a header may take, so
+      // the fit leaves the frame exactly where a human accepted it in the first place. A
+      // baseline that had moved would have meant the share was doing something the sentence
+      // it comes from never asked for.
       longCopy: 'e26133541a06a7ec683d2915f506b5c8',
       // Accepted 2026-08-15, the first key frame for the only example carrying events.
       // It shares `identityKey` with `canonical` and still hashes differently, which is the

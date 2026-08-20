@@ -111,9 +111,29 @@ const SplitLayout: React.FC<{
    * column is bound by it, so the headline sizes itself and a caption added later inherits
    * the same fact without anyone remembering to wire it.
    */
-  const { imageColumns, copyColumns } = splitLeftGeometry;
+  const { imageColumns, copyColumns, imageRows, copyRows } = splitLeftGeometry;
   const inner = Math.max(0, box.width - outer * 2);
   const copyWidth = stacked ? inner : ((inner - gap) * copyColumns) / (imageColumns + copyColumns);
+
+  /**
+   * The 5/12 the copy band is *owed* when stacked, in px, which is the floor of a row that
+   * can grow rather than the whole of a row that cannot.
+   *
+   * The stack used to divide the height 7/5 outright, and a fixed share of a portrait box
+   * is not a lot of room: at this schema's own ceiling — a 120-character headline over a
+   * 240-character caption — the copy needed about a fifth more than it was given, and grid
+   * children do not refuse. Each of the three shrank below its content and each clipped
+   * under `AnimatedText`'s own `overflow: hidden`, 96px off the headline, 48 off the
+   * caption and 7 off the fixed `Visual context` eyebrow — a label with no content of its
+   * own, which is what proved the squeeze belonged to the column rather than to the copy.
+   *
+   * A plate can be any height and a paragraph cannot: text has an intrinsic size and an
+   * image is happy with whatever is left. So the copy row is `minmax(owed, auto)` and the
+   * plate takes the remainder — identical to the old 7/5 for any copy that fitted it, and
+   * yielding rather than cutting for copy that does not.
+   */
+  const innerHeight = Math.max(0, box.height - outer * 2 - gap);
+  const copyFloor = (innerHeight * copyRows) / (imageRows + copyRows);
 
   return (
     <div
@@ -122,12 +142,8 @@ const SplitLayout: React.FC<{
         minHeight: 0,
         display: 'grid',
         ...(stacked
-          ? {
-              gridTemplateRows: `${splitLeftGeometry.imageRows}fr ${splitLeftGeometry.copyRows}fr`,
-            }
-          : {
-              gridTemplateColumns: `${splitLeftGeometry.imageColumns}fr ${splitLeftGeometry.copyColumns}fr`,
-            }),
+          ? { gridTemplateRows: `minmax(0, 1fr) minmax(${copyFloor}px, auto)` }
+          : { gridTemplateColumns: `${imageColumns}fr ${copyColumns}fr` }),
         gap,
         padding: outer,
       }}
