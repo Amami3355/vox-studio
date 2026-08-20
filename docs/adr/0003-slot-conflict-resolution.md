@@ -529,8 +529,11 @@ written from memory rather than from the diff has.
 
 What this leaves is a suite that is green on all four questions with **nothing skipped** —
 the region assertions are answered for all seventy-two cases for the first time, because
-no render is refused. Two frames remain honestly poor rather than wrong: at `bar_chart`'s
-absolute ceiling in half a frame the axis gutter takes 245 px of a 538 px box to print an
-eight-character unit five times, which leaves the category names three or four characters
-each. Contained, labelled, and inside every boundary — and a quieter composed axis is a
-design question this repair did not need to answer.
+no render is refused. The skip that guards those assertions is now per *frame* rather than
+per case, so one refused frame no longer takes its sibling's answers down with it; what it
+still cannot do is answer for the refused frame itself, which needs the probe to return a
+verdict instead of ending the render. Two frames remain honestly poor rather than wrong: at
+`bar_chart`'s absolute ceiling in half a frame the axis gutter takes 245 px of a 538 px
+box to print an eight-character unit five times, which leaves the category names three
+or four characters each. Contained, labelled, and inside every boundary — and a quieter
+composed axis is a design question this repair did not need to answer.

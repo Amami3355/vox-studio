@@ -81,7 +81,7 @@ let control: Bitmap;
 type Rendered = { bitmap: Bitmap } | { failure: string };
 
 /**
- * The frames, or a skip.
+ * The frames that did render, with their place in `testCase.frames`, or a skip if none did.
  *
  * A refused render leaves no still to measure, and the case is already red on `fits the
  * content into the boxes it was given` in the same block. Repeating that one message under
@@ -89,6 +89,12 @@ type Rendered = { bitmap: Bitmap } | { failure: string };
  * questions genuinely did go unanswered — saying so is more honest than answering them
  * about a frame that does not exist. This is never a silent skip: it happens only where a
  * sibling assertion is failing with the reason.
+ *
+ * **Per frame, and this is half the repair of the hazard below.** A case renders two
+ * frames and they are refused one at a time, so a case whose last frame was cancelled
+ * usually still has a quarter-way still — a real frame, with real regions. Skipping the
+ * whole case threw that away, and let one refused frame hide the *other* frame's
+ * containment, quiet border and liveness as well.
  *
  * **Read "unanswered" literally.** While the twenty-four ceiling cases were red, ten of
  * these skips were standing over real failures: `bar_chart` composed into `left` drew its
@@ -98,13 +104,21 @@ type Rendered = { bitmap: Bitmap } | { failure: string };
  * place a second failure can sit for as long as the first one does. The suite going green
  * is therefore worth more than the reds going away: it is the first run in which all four
  * questions were answered for all seventy-two cases.
+ *
+ * What is left of the hazard is narrower, and is written here so it is not rediscovered
+ * by the same route: a frame the probe *did* refuse is still a frame whose regions nobody
+ * looked at. Closing that means the probe returning a verdict instead of ending the
+ * render, which is a change to `StressControl`'s whole design rather than a tweak.
  */
-const bitmapsOf = (renders: Rendered[], skip: () => void): Bitmap[] => {
-  if (renders.some((one) => 'failure' in one)) skip();
-  return renders.map((one) => {
-    if ('failure' in one) throw new Error(one.failure);
-    return one.bitmap;
-  });
+const drawnFrames = (
+  renders: Rendered[],
+  skip: () => void,
+): Array<[index: number, bitmap: Bitmap]> => {
+  const drawn = renders.flatMap(
+    (one, index): Array<[number, Bitmap]> => ('failure' in one ? [] : [[index, one.bitmap]]),
+  );
+  if (drawn.length === 0) skip();
+  return drawn;
 };
 
 /**
@@ -201,7 +215,7 @@ describe('content the schema accepts renders into the box it was given', () => {
       }
 
       const expected = hashRegions(control, outside);
-      for (const [index, bitmap] of bitmapsOf(renders, skip).entries()) {
+      for (const [index, bitmap] of drawnFrames(renders, skip)) {
         expect({ frame: testCase.frames[index], region: hashRegions(bitmap, outside) }).toEqual({
           frame: testCase.frames[index],
           region: expected,
@@ -218,7 +232,7 @@ describe('content the schema accepts renders into the box it was given', () => {
       const border = bandsInside(regionOfInsets(testCase.safeArea, WIDTH, HEIGHT), EDGE_QUIET_PX);
       const expected = hashRegions(control, border);
 
-      for (const [index, bitmap] of bitmapsOf(renders, skip).entries()) {
+      for (const [index, bitmap] of drawnFrames(renders, skip)) {
         expect({ frame: testCase.frames[index], border: hashRegions(bitmap, border) }).toEqual({
           frame: testCase.frames[index],
           border: expected,
@@ -238,7 +252,7 @@ describe('content the schema accepts renders into the box it was given', () => {
       const inside = [regionOfInsets(testCase.safeArea, WIDTH, HEIGHT)];
       const expected = hashRegions(control, inside);
 
-      for (const [index, bitmap] of bitmapsOf(renders, skip).entries()) {
+      for (const [index, bitmap] of drawnFrames(renders, skip)) {
         expect({
           frame: testCase.frames[index],
           drew: hashRegions(bitmap, inside) !== expected,
