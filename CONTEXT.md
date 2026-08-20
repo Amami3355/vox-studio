@@ -259,7 +259,11 @@ out.
 2. The agent never sees the code. It sees the manifest.
 3. The agent expresses semantic time; the compiler produces physical time.
 4. The render is a pure function of `(props, frame)`. No `useState`, no unseeded
-   randomness, no `Date.now()`.
+   randomness, no `Date.now()` — absolutely in `src/scenes/`, `src/primitives/` and
+   `src/design/`, which is everything the agent can cause to be drawn, and
+   `tests/render-purity.test.ts` holds them to it. A control under `src/runtime/` may keep
+   render-*lifecycle* state that nothing drawn depends on: `StressControl`'s probe holds a
+   `delayRender` handle in the package's one `useState`, argued where it is taken.
 5. Hard constraint → loud failure. Soft constraint → silent degradation. The two regimes
    never overlap.
 6. Consistency comes from the design system; richness comes from the scenes. Tokens stop
