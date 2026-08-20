@@ -99,7 +99,7 @@ describe('ImageContextScene runtime', () => {
       // the point. `useTitleStep` gained a height budget that day, and an intermediate
       // version of it counted lines instead — under which this headline dropped a step to
       // reach four and this hash moved. The rule it shipped as is a *share* of the scene:
-      // five lines here are 326px of a 1008px box, under the third a header may take, so
+      // five lines here are 326px of a 1008px box, under the half a header may take, so
       // the fit leaves the frame exactly where a human accepted it in the first place. A
       // baseline that had moved would have meant the share was doing something the sentence
       // it comes from never asked for.

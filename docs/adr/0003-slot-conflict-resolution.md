@@ -517,10 +517,15 @@ The check is derived and not declared. `SlotFrame` publishes the box it computed
 budget off the element — a header whose own arithmetic was wrong is still caught, and
 asking the element what it was allowed would be grading the fit against itself.
 
-**One accepted key frame moved, and only one.** `image_context`'s `example-long-context`
-headline was setting five lines and now sets four; `canonical`, `empty` and `driven` are
-byte-identical. A baseline that moves for the whole reason and not part of it is what this
-repository already says it is checking, and the reviewed still is recorded beside the hash.
+**No accepted key frame moved, and this paragraph claimed otherwise until it was
+corrected.** An intermediate version of this rule counted lines, and under it
+`image_context`'s `example-long-context` headline dropped from five lines to four and its
+hash moved with it. That build did not ship. The rule that shipped is a *share*, and five
+lines there are 326 px of a 1008 px box — inside the half a header may take — so the fit
+leaves the frame exactly where a human accepted it. Every md5 under `tests/render/` is
+byte-identical to `dev`, and the sentence recorded beside that hash says so. What this
+paragraph was describing is the build in between, which is the failure mode an amendment
+written from memory rather than from the diff has.
 
 What this leaves is a suite that is green on all four questions with **nothing skipped** —
 the region assertions are answered for all seventy-two cases for the first time, because

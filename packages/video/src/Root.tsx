@@ -2,7 +2,6 @@ import type React from 'react';
 import { Composition } from 'remotion';
 import './design/fonts';
 import type { CompiledDocument } from './compile/document';
-import { NO_SAFE_AREA } from './core/types';
 import { FPS, HEIGHT, WIDTH } from './design/theme';
 import { announceShippedPlan, compileShippedPlan, shippedPlans } from './plans';
 import { BACKDROP_CONTROL_ID, BackdropControl } from './runtime/BackdropControl';

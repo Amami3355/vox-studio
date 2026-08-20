@@ -104,9 +104,6 @@ export const MAX_WORD_LENGTH = WORDS_BY_LENGTH.length - 1;
  */
 export const WIDEST_FIGURE = -9_999_999;
 
-/** A field the generator declines to fill, as against one it fills with nothing. */
-const OMIT = Symbol('omit');
-
 /**
  * A string of exactly `length` characters, in whole words.
  *
@@ -246,8 +243,7 @@ const fillObject = (
     const sized = field.maxLength !== undefined || field.maxItems !== undefined;
     if (!required.has(name) && !(sized && 'default' in field)) continue;
 
-    const value = fillField(field, mode, index, path === '' ? name : `${path}.${name}`);
-    if (value !== OMIT) filled[name] = value;
+    filled[name] = fillField(field, mode, index, path === '' ? name : `${path}.${name}`);
   }
 
   return filled;

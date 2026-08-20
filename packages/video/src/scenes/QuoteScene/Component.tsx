@@ -168,10 +168,10 @@ const QuoteFrame: React.FC<{
                 </AnimatedText>
                 {/* A statement, not a header: the quote *is* the scene, so there is nothing
                     below it to crowd out. `MAX_HEADER_SHARE` is a rule about type that
-                    labels something else — it asks a header to leave two thirds of the
-                    frame for what it labels, and a quote that fills its frame is not
-                    failing that, it is doing its job. What still bounds it is the box,
-                    which the safe-area and clipping checks measure directly. */}
+                    labels something else — it asks a header to leave half the frame for
+                    what it labels, and a quote that fills its frame is not failing that,
+                    it is doing its job. What still bounds it is the box, which the
+                    safe-area and clipping checks measure directly. */}
                 <SceneTitle
                   startFrame={start + stagger * 2}
                   profile={profile}

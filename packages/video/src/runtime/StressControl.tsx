@@ -32,6 +32,16 @@
  * A pixel heuristic for the same two questions — a sharp cut in an ink profile, bands of ink
  * counted as lines — would be a guess about typography dressed as a measurement, and the
  * one thing worse than an unasked question is a check that answers a different one.
+ *
+ * ## The one `useState` in `packages/video/src`
+ *
+ * CONTEXT.md rule 4 says the render is a pure function of `(props, frame)` and names
+ * `useState` among the things that break it. `LayoutProbe` holds one, and the exception is
+ * stated here rather than left to be found: the state is Remotion's `delayRender` handle,
+ * which has to be acquired once per mount and handed back to exactly one `continueRender`
+ * or `cancelRender`. It carries no scene state, and nothing drawn depends on it — the frame
+ * this control renders is the same frame with the probe deleted. Read rule 4 as binding on
+ * everything that draws, which is why this is the only file in `src` that needed to say so.
  */
 import type React from 'react';
 import { useEffect, useState } from 'react';
@@ -94,6 +104,14 @@ export const STRESS_CONTROL_DEFAULTS: StressSceneProps = {
   safeArea: NO_SAFE_AREA,
 };
 
+/**
+ * A message is prose, not type in a column, so this is deliberately a character count.
+ *
+ * `truncateToWidth` measures because a category label has a column that has to carry it.
+ * A line of a failure message has a terminal, and sixty characters is the length past
+ * which a finding stops being scannable. The rule the 2026-08-20 repair established — cut
+ * to the column, never to a count — is about layout, and this is not layout.
+ */
 const excerpt = (text: string): string =>
   text.length <= 60 ? text : `${text.slice(0, 57).trimEnd()}…`;
 

@@ -151,15 +151,18 @@ author. That makes the example set the wrong place to keep a regression guard: s
 in shapes the agent should never write, and pinning one down by publishing it teaches the
 defect in order to test it.
 
-A control is a `SceneInstance` in `src/runtime/SceneControl.tsx`, registered as its own
-`<Composition>` in `Root.tsx` and rendered only by a test. It plays through the same pipeline
-an example does — `syntheticBeats`, `resolveEventTimings`, `SceneRenderer`, the capability's
-own schema — so it exercises the real code path. What it is not is a member of
-`capability.examples`, so it never reaches the manifest, `pnpm catalog`, or the safe-area sweep
-that walks the examples. Its composition id carries a `control--` prefix
+A control is a `SceneInstance` — usually one written in `src/runtime/SceneControl.tsx` —
+registered as its own `<Composition>` in `Root.tsx` and rendered only by a test. It plays
+through the same pipeline an example does — `syntheticBeats`, `resolveEventTimings`,
+`SceneRenderer`, the capability's own schema — so it exercises the real code path. What it is
+not is a member of `capability.examples`, so it never reaches the manifest, `pnpm catalog`, or
+the safe-area sweep that walks the examples. Its composition id carries a `control--` prefix
 (`src/runtime/compositionIds.ts`) so the reference renders sort together in the studio, away
 from the examples a reader is browsing. `src/runtime/BackdropControl.tsx` is the same idea one
-level down: a reference frame, not a frame the catalog offers.
+level down: a reference frame, not a frame the catalog offers. `src/runtime/StressControl.tsx`
+is the same idea one level *up*: it carries no content of its own and takes it as input props,
+so `pnpm test:stress` can draw any capability at its schema's ceiling without publishing that
+shape anywhere the agent can read it.
 
 **The bar is high, and deliberately so.** A shape worth rendering is usually a shape worth
 teaching, and that one belongs in `examples.ts`. A control is for the remainder: a frame that

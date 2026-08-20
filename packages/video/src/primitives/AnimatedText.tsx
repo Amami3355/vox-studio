@@ -12,7 +12,7 @@ export type TextRole = 'display' | 'body' | 'mono';
  * What a run of display type is *for*, which decides how much of its scene it may take.
  *
  * A `header` labels something else on the frame and has to leave room for it, so
- * `MAX_HEADER_SHARE` applies — a header may take a third of its scene and no more. A
+ * `MAX_HEADER_SHARE` applies — a header may take half its scene and no more. A
  * `statement` **is** the scene: a pull-quote has nothing underneath it to crowd out, and
  * the only ceiling that means anything for it is the box it was given, which the safe-area
  * and clipping checks already measure.
@@ -130,7 +130,7 @@ export const SceneTitle: React.FC<{
    * the scale until the string wraps into a height its scene can carry, rather than only
    * until its widest word fits. A statement declines the ceiling — not the fit. The
    * width fit still runs, and the box still bounds it; what changes is that a pull-quote
-   * is no longer asked to keep inside a third of the frame, which for a 240-character
+   * is no longer asked to keep inside half the frame, which for a 240-character
    * quote — a quote that *is* the frame — is not a question worth asking.
    *
    * Named `displayRole` and not `role`: on a component that renders a `div`, `role` is the

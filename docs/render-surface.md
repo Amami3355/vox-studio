@@ -76,8 +76,9 @@ the two named roles built on it.
 **The composition rule that lives here.** `titleStep(length)` is a hard ladder: ≤40 chars → step
 5, ≤70 → step 4, else step 3, and it reads *string length only*. Since `f60a6e1` that ladder is a
 **ceiling** rather than the answer: `useTitleStep` (`primitives/titleFit.ts`) measures the widest
-word and steps down the scale until it fits. Length decides how loud a headline should be, the
-box decides how loud it may be, and the box wins.
+word *and* the height the string wraps into, and steps down the scale while either is unhappy.
+Length decides how loud a headline should be, the box decides how loud it may be, and the box
+wins.
 
 **Three degradations, in order, and nothing below them cuts.** Since `c328a6d` this is automatic
 rather than wired per scene:
@@ -168,9 +169,11 @@ finely and the top lands on 7 000 with the gridlines still sparse.
 
 **Three published behaviours worth knowing before editing.** With a highlight active, every other
 bar collapses onto **one** cold neutral rather than a dimmed version of its own hue — five
-differently-muted hues read as mud. Category labels are uppercase, `tracking.wide`, truncated
-at 14 chars vertical / 22 horizontal. And in the vertical orientation **only the highlighted bar
-carries its number** — the axis states the rest, and printing both is the same fact twice.
+differently-muted hues read as mud. Category labels are uppercase, `tracking.wide`, and
+truncated to the width of the column carrying them: `truncateToWidth` (`core/format.ts`)
+measures on the loaded font rather than cutting at a character count. And in the vertical
+orientation **only the highlighted bar carries its number** — the axis states the rest, and
+printing both is the same fact twice.
 
 **The axis is the agent's choice, through `gridlines` in the schema, and it defaults to on.**
 The switch does not add or remove a decoration; it moves where the reader gets a number from,
@@ -296,8 +299,11 @@ just before "leaving".
 - **`pnpm studio`** — Remotion Studio; accepts a real Run's `document.json` via `--props`.
 - **The controls** — reference renders the tests measure against, never shown to the agent.
   `runtime/BackdropControl.tsx` is the ground with nothing on it; `runtime/SceneControl.tsx` is
-  the general form, a whole scene the examples deliberately do not cover. The bar for adding one
-  is in `docs/adding-a-capability.md` §"Controls: the instances the agent never sees".
+  the general form, a whole scene the examples deliberately do not cover;
+  `runtime/StressControl.tsx` is the third kind, carrying no content of its own and taking it as
+  input props instead, so the content-stress suite can draw any capability at its schema's
+  ceiling and measure the result in the DOM. The bar for adding one is in
+  `docs/adding-a-capability.md` §"Controls: the instances the agent never sees".
 
 **Not a judge:** an agent. Ticket 25's corrected objective binds here — a machine visual check is
 for **coherence** (did the renderer execute what the document decided) and never for judging
