@@ -55,8 +55,21 @@ export const truncateToWidth = (
    * one character early on a prefix that ends in a space, and can never settle on one
    * that does not fit. Erring short is the harmless direction here.
    */
-  const fits = (chars: number): boolean =>
-    widthOf(`${text.slice(0, chars).trimEnd()}…`) <= available;
+  /**
+   * A cut that never lands between the halves of a surrogate pair.
+   *
+   * `slice` counts UTF-16 code units and an astral character — an emoji in a category
+   * name — is two of them, so a cut one unit in leaves a lone surrogate: one unit wide to
+   * the ruler, and a replacement box on the frame. Stepping back drops the whole character
+   * instead, which is the direction this search already errs in.
+   */
+  const cutAt = (chars: number): string => {
+    const lead = text.charCodeAt(chars - 1);
+    const splitsAPair = lead >= 0xd800 && lead <= 0xdbff;
+    return text.slice(0, splitsAPair ? chars - 1 : chars).trimEnd();
+  };
+
+  const fits = (chars: number): boolean => widthOf(`${cutAt(chars)}…`) <= available;
 
   let low = 0;
   let high = text.length - 1;
@@ -66,6 +79,11 @@ export const truncateToWidth = (
     else high = mid - 1;
   }
 
-  /** Not even one character and an ellipsis: a lone ellipsis names nothing, so draw none. */
-  return low === 0 ? '' : `${text.slice(0, low).trimEnd()}…`;
+  /**
+   * Not even one character and an ellipsis: a lone ellipsis names nothing, so draw none.
+   * Tested against the cut and not against `low`, because a cut one code unit into an
+   * astral character comes back empty rather than as half a glyph.
+   */
+  const cut = cutAt(low);
+  return cut === '' ? '' : `${cut}…`;
 };

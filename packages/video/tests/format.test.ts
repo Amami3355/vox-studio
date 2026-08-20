@@ -57,6 +57,19 @@ describe('truncateToWidth', () => {
     expect(truncateToWidth('THE NORTHERN', 50, ruler(10))).toBe('THE…');
   });
 
+  it('never cuts an astral character in half', () => {
+    // The ruler counts UTF-16 code units, so the emoji is two of them and the widest
+    // prefix that fits is exactly the six units ending halfway through it. Cutting there
+    // would draw `NORTH` and a replacement box; the whole character goes instead.
+    expect(truncateToWidth('NORTH\u{1F600}ERN', 70, ruler(10))).toBe('NORTH…');
+  });
+
+  it('draws nothing rather than half a glyph and an ellipsis', () => {
+    // Room for one unit before the ellipsis, and the first character is two units wide.
+    // The lone-ellipsis rule reaches this only once the cut is what is tested.
+    expect(truncateToWidth('\u{1F600}NORTH', 25, ruler(10))).toBe('');
+  });
+
   it('leaves an unmeasurable box alone rather than emptying it', () => {
     // A width of zero is a frame mid-layout, not a column that cannot hold a name.
     expect(truncateToWidth('NORTHERN', 0, ruler(10))).toBe('NORTHERN');
