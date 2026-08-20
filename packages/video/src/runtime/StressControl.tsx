@@ -22,10 +22,11 @@
  *   passes, and the sentence is gone. A frame that has lost its tail and a frame that never
  *   had one are the same bytes; the difference exists only in the DOM, as the gap between
  *   `scrollWidth` and `clientWidth`.
- * - **A header that has eaten its own scene.** `primitives/titleFit.ts` bounds a header to
- *   a share of the box its scene was given. Both halves of that are browser facts and
- *   neither is a pixel one: what a run of display type actually cost is the height its line
- *   boxes came to, and the box it is a share of is the rectangle `SlotFrame` computed.
+ * - **Display type that has eaten its own scene.** `primitives/titleFit.ts` bounds a run of
+ *   display type to a share of the box its scene was given — half for a header, the whole
+ *   box for a statement. Both halves of that are browser facts and neither is a pixel one:
+ *   what a run of display type actually cost is the height its line boxes came to, and the
+ *   box it is a share of is the rectangle `SlotFrame` computed.
  *
  * So the browser measures, and a violation ends the render through `cancelRender` with the
  * element and the numbers in the message. The test names the case; this names the defect.
@@ -59,7 +60,7 @@ import { waitForFonts } from '../design/fonts';
 import type { MotionProfileId } from '../design/motion';
 import { defaultTheme } from '../design/theme';
 import { SCENE_BOX_ATTRIBUTE } from '../primitives/SlotFrame';
-import { MAX_HEADER_SHARE } from '../primitives/titleFit';
+import { MAX_HEADER_SHARE, MAX_STATEMENT_SHARE } from '../primitives/titleFit';
 import { requireCapability } from '../scenes/registry';
 import { SceneRenderer } from './SceneRenderer';
 import { controlIdFor } from './compositionIds';
@@ -140,7 +141,7 @@ const clippedText = (): string[] =>
     });
 
 /**
- * Headers taking more of their scene than a header may.
+ * Display type taking more of its scene than its role may.
  *
  * `MAX_HEADER_SHARE` is imported rather than restated. A `4` used to be written here, which
  * made this file a second home for a rule that already had one, and a second copy of a rule
@@ -153,23 +154,26 @@ const clippedText = (): string[] =>
  * what is being measured and a mixed element is several — the figure and its unit in
  * `stat_counter` are two spans on one line.
  *
- * And only *headers*. A run of display type that is the scene rather than a label on it —
- * a pull-quote — declares `data-display-role="statement"` and is bounded by its box, which
- * the clipping and region checks measure directly. Anything unmarked counts as a header, so
- * a scene that forgets to classify its type gets the stricter rule rather than a free pass.
+ * **Both roles, each at the share it carries.** A run of display type that is the scene
+ * rather than a label on it — a pull-quote — declares `data-display-role="statement"` and is
+ * bounded by its box, which is `MAX_STATEMENT_SHARE` and is one. That is not a softer
+ * version of the same check; it is the sentence this rule has always been written in, asked
+ * out loud. A `statement` used to be filtered out here, which meant `quote` — the
+ * capability the role was introduced for — was the one capability the fourth question
+ * never reached. Anything unmarked counts as a header and carries the stricter share, so
+ * a scene that forgets to classify its type cannot buy a larger budget by forgetting.
  *
  * **Derived here rather than read off the element.** The scene publishes the box it was
  * given and this computes the ceiling from it, so a header whose *own* budget was computed
  * wrongly is still caught. Asking the element what it was allowed would be grading the fit
  * against its own arithmetic, which is not a check.
  */
-const oversizedHeaders = (): string[] =>
+const oversizedDisplayType = (): string[] =>
   [...document.querySelectorAll<HTMLElement>('*')]
     .filter((element) => {
       const only = element.childNodes.length === 1 ? element.firstChild : null;
       if (!only || only.nodeType !== Node.TEXT_NODE) return false;
       if ((only.textContent ?? '').trim() === '') return false;
-      if (element.dataset.displayRole === 'statement') return false;
       return getComputedStyle(element).fontFamily.includes(DISPLAY_FAMILY);
     })
     .flatMap((element) => {
@@ -177,16 +181,17 @@ const oversizedHeaders = (): string[] =>
       const sceneHeight = Number(scene?.dataset.sceneHeight ?? 0);
       if (sceneHeight <= 0) return [];
 
-      const ceiling = sceneHeight * MAX_HEADER_SHARE;
+      const role = element.dataset.displayRole === 'statement' ? 'statement' : 'header';
+      const share = role === 'statement' ? MAX_STATEMENT_SHARE : MAX_HEADER_SHARE;
       const height = element.offsetHeight;
-      if (height <= ceiling) return [];
+      if (height <= sceneHeight * share) return [];
 
       const range = document.createRange();
       range.selectNodeContents(element);
       return [
-        `header takes ${height}px of a ${Math.round(sceneHeight)}px scene — ` +
+        `${role} takes ${height}px of a ${Math.round(sceneHeight)}px scene — ` +
           `${Math.round((height / sceneHeight) * 100)}%, over a ceiling of ` +
-          `${Math.round(MAX_HEADER_SHARE * 100)}%, in ${range.getClientRects().length} lines: ` +
+          `${Math.round(share * 100)}%, in ${range.getClientRects().length} lines: ` +
           `"${excerpt((element.textContent ?? '').trim())}"`,
       ];
     });
@@ -219,7 +224,7 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
 
     waitForFonts()
       .then(() => {
-        const findings = [...clippedText(), ...oversizedHeaders()];
+        const findings = [...clippedText(), ...oversizedDisplayType()];
         if (findings.length === 0) {
           continueRender(handle);
           return;

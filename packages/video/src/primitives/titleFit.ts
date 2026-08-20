@@ -73,6 +73,22 @@ export const TITLE_MAX_WIDTH = 0.86;
 export const MAX_HEADER_SHARE = 1 / 2;
 
 /**
+ * What a statement may take, which is the box and nothing past it.
+ *
+ * A share of one is not a number anyone tuned. It is the sentence above — *the only
+ * ceiling that means anything for a statement is the box it was given* — written so the
+ * probe can ask it out loud. Until it existed, `runtime/StressControl.tsx` filtered
+ * statements out of the measurement entirely, and a question nobody asks reports as a
+ * pass: `quote` at its 240-character ceiling was the loudest red the content-stress
+ * suite ever produced, and it went green by being excused rather than by fitting.
+ *
+ * It deliberately bounds a statement no more tightly than its own box. What a pull-quote
+ * *should* look like at 240 characters is a design question, and ticket 25 leaves those
+ * with the user.
+ */
+export const MAX_STATEMENT_SHARE = 1;
+
+/**
  * The leading a fitted title is set at. `SceneTitle` applies it and the fit predicts with
  * it, so the height the fit computes is the height the browser draws.
  */

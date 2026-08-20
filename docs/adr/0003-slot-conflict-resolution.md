@@ -504,7 +504,12 @@ consequences:
   the stricter rule, so forgetting to classify cannot buy a scene a larger budget. This
   answers `quote`, whose 240-character ceiling and a four-line ceiling could not both hold:
   240 characters is about six lines at the display floor on a full canvas and thirteen in a
-  half, and no step of the scale reaches four. **No schema ceiling was lowered.**
+  half, and no step of the scale reaches four. **No schema ceiling was lowered.** What the
+  distinction must not become is an exemption: `MAX_STATEMENT_SHARE` is one, so a statement
+  is measured against its own box rather than dropped from the measurement. The two roles
+  differ in the share they carry, never in whether this question reaches them — a question
+  nobody asks reports as a pass, which is the same defect as a skipped assertion and was
+  briefly true of `quote`, the capability the role was introduced for.
 - **The fit had to learn the same thing.** `fitTitleStep` answered width only — the widest
   *word*, because a string wraps and a word does not — which is why a 120-character
   headline could set eight lines down a 5/12 column with nothing clipped and nothing out of
