@@ -405,7 +405,7 @@
                     }
                   ]
                 },
-                "layout": "standard",
+                "layout": "horizontal",
                 "motionProfile": "energetic",
                 "events": [
                   {

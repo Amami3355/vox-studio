@@ -110,67 +110,117 @@ describe('the vertical slice', () => {
    * 180 frames is a claim about how long its animation needs to read, and shortening the
    * claim to fit the writing would have made the warning unable to fire again.
    */
-  it('reports the two relocations and what the first one costs', () => {
+  it('reports its two relocations, and nothing louder than information', () => {
     expect(report.warnings.map((warning) => [warning.code, warning.severity])).toEqual([
-      ['SLOT_RELOCATED', 'quality'],
       ['SLOT_RELOCATED', 'info'],
-      ['CAPACITY_REDUCED_BY_COMPOSITION', 'quality'],
-      ['NARRATION_NAMES_COLLAPSED_VALUE', 'important'],
+      ['SLOT_RELOCATED', 'info'],
+    ]);
+  });
+
+  it('draws every city the plan wrote', () => {
+    const chart = document.sections[0]?.scenes.find((scene) => scene.id === 'chart');
+    const data = (chart?.props as { data: { label: string }[] }).data;
+
+    expect(data.map((entry) => entry.label)).toEqual([
+      'Berlin',
+      'Paris',
+      'Amsterdam',
+      'Dublin',
+      'London',
     ]);
   });
 
   /**
-   * **The regression test for the whole of 2026-08-21.** This plan compiled clean — two
-   * `info` warnings about where a character stood — and rendered a chart titled "Share of
-   * income spent on rent" whose tallest bar was `OTHERS 60`, a city that does not exist,
-   * standing next to London while the narration named London as the extreme.
+   * The scene still yields into a half — the narrator stands in `cornerBR`, which
+   * `bar_chart` occupies — and that is now a yield it can afford. A `horizontal` ranking
+   * holds eight rows in a half frame where a column chart holds three, which is the repair
+   * `capacityByComposition` exists to make findable.
+   */
+  it('yields into a half it can afford, rather than avoiding the yield', () => {
+    const chart = document.sections[0]?.scenes.find((scene) => scene.id === 'chart');
+
+    expect(chart?.layout).toBe('horizontal');
+    expect(chart?.safeArea).toEqual(slotRect('left'));
+  });
+
+  /**
+   * **The regression for the whole of 2026-08-21, kept after the repair.**
    *
-   * Every assertion below is a thing the report could not say that morning. The two
-   * relocations are still both reported, and they are no longer reported at the same
-   * volume: the first costs the chart most of its categories, the second is the deliberate
-   * move to `left` that composes well and costs nothing.
+   * The plan above is fixed: its chart is a `horizontal` ranking, which holds eight rows in
+   * the half it yields into, so all five cities survive. Asserting only that would delete
+   * the evidence — the suite would go green and stay green, and nothing would hold the
+   * report to saying anything if the layout ever changed back.
+   *
+   * So the defect is reproduced from the repaired plan rather than remembered: one word,
+   * the layout, put back to what it was. The narrator has not moved — it stands in
+   * `cornerBR` in both, which is the point. That morning this compiled with two `info`
+   * warnings about where a character stood and rendered a chart titled "Share of income
+   * spent on rent" whose tallest bar was `OTHERS 60` — Berlin's 27 % plus Paris's 33 %, a
+   * city that does not exist, standing next to London while the narration named London as
+   * the extreme. Every assertion below is something the report could not say that morning.
    */
-  it('names the values the composition collapsed, and says where they went', () => {
-    const capacity = report.warnings.find(
-      (warning) => warning.code === 'CAPACITY_REDUCED_BY_COMPOSITION',
-    );
+  describe('and the placement that broke it', () => {
+    const broken = structuredClone(slice) as ShippedPlan;
+    const chart = broken.plan.sections[0]?.scenes.find((scene) => scene.id === 'chart');
+    if (chart) chart.layout = 'standard';
 
-    expect(capacity?.sceneId).toBe('chart');
-    expect(capacity?.message).toContain('yields into "left"');
-    expect(capacity?.message).toContain('holds 3 of the 8');
-    expect(capacity?.message).toContain('"Berlin"');
-    expect(capacity?.message).toContain('"Paris"');
-  });
+    const { report: brokenReport } = compileShippedPlan(broken);
+    const codes = brokenReport.warnings.map((warning) => [warning.code, warning.severity]);
 
-  /**
-   * The half of 2026-08-21 that `CAPACITY_REDUCED_BY_COMPOSITION` cannot reach. b3 says
-   * *"Berlin sits twenty points lower"* and the annotation reads *"Twenty points above
-   * Berlin"*, over a chart Berlin was collapsed out of. Both halves of that contradiction
-   * are strings this plan wrote itself, which is what makes it decidable.
-   */
-  it('notices that the narration still names a value the chart dropped', () => {
-    const mention = report.warnings.find(
-      (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
-    );
+    it('still compiles, because none of this blocks a preview', () => {
+      expect(brokenReport.ok).toBe(true);
+    });
 
-    expect(mention?.sceneId).toBe('chart');
-    expect(mention?.message).toContain('"Berlin"');
-    expect(mention?.message).toContain('beat "b3"');
-    expect(mention?.message).toContain('events[3].payload.text');
-  });
+    it('no longer reports both relocations at the same volume', () => {
+      expect(codes).toEqual([
+        ['SLOT_RELOCATED', 'quality'],
+        ['SLOT_RELOCATED', 'info'],
+        ['CAPACITY_REDUCED_BY_COMPOSITION', 'quality'],
+        ['NARRATION_NAMES_COLLAPSED_VALUE', 'important'],
+      ]);
+    });
 
-  /**
-   * Paris is collapsed too, and no beat and no annotation names it. Silence there is the
-   * whole precision budget: a check that fired on every dropped value would fire twice
-   * here, and the second warning would carry no defect.
-   */
-  it('says nothing about a value that was dropped and is not spoken of', () => {
-    const mentions = report.warnings.filter(
-      (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
-    );
+    it('names the values the composition collapsed, and says where they went', () => {
+      const capacity = brokenReport.warnings.find(
+        (warning) => warning.code === 'CAPACITY_REDUCED_BY_COMPOSITION',
+      );
 
-    expect(mentions).toHaveLength(1);
-    expect(mentions[0]?.message).not.toContain('Paris');
+      expect(capacity?.sceneId).toBe('chart');
+      expect(capacity?.message).toContain('yields into "left"');
+      expect(capacity?.message).toContain('holds 3 of the 8');
+      expect(capacity?.message).toContain('"Berlin"');
+      expect(capacity?.message).toContain('"Paris"');
+    });
+
+    /**
+     * b3 says *"Berlin sits twenty points lower"* and the annotation reads *"Twenty points
+     * above Berlin"*, over a chart Berlin was collapsed out of. Both halves of that
+     * contradiction are strings this plan wrote itself, which is what makes it decidable.
+     */
+    it('notices that the narration still names a value the chart dropped', () => {
+      const mention = brokenReport.warnings.find(
+        (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
+      );
+
+      expect(mention?.sceneId).toBe('chart');
+      expect(mention?.message).toContain('"Berlin"');
+      expect(mention?.message).toContain('beat "b3"');
+      expect(mention?.message).toContain('events[3].payload.text');
+    });
+
+    /**
+     * Paris is collapsed too, and no beat and no annotation names it. Silence there is the
+     * whole precision budget: a check that fired on every dropped value would fire twice
+     * here, and the second warning would carry no defect.
+     */
+    it('says nothing about a value that was dropped and is not spoken of', () => {
+      const mentions = brokenReport.warnings.filter(
+        (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
+      );
+
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0]?.message).not.toContain('Paris');
+    });
   });
 
   it('runs the twenty to thirty seconds §12 asks for', () => {

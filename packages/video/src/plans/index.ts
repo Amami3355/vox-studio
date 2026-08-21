@@ -77,9 +77,15 @@ export const shippedPlans: ShippedPlan[] = [
  * "nothing to say".** A plan can compile cleanly and still have been changed on the way:
  * a scene yielded into a half, an element relocated or hidden, a plate standing in for a
  * picture. This function used to return `result.document` alone, which threw that away at
- * the exact point it was produced — the slice compiles with two `SLOT_RELOCATED` warnings
- * and nobody opening `section--vertical-slice` was ever told. ADR-0003 says the report is
- * a deliverable rather than a log; a deliverable the only caller cannot see is neither.
+ * the exact point it was produced — the slice compiled with warnings and nobody opening
+ * `section--vertical-slice` was ever told. ADR-0003 says the report is a deliverable
+ * rather than a log; a deliverable the only caller cannot see is neither.
+ *
+ * How little that was worth while the report had nothing to say is its own lesson. The
+ * slice's two `SLOT_RELOCATED` warnings were both `info`, both about where a character
+ * stood, and both true — and the frame they described drew a city that does not exist.
+ * Handing back a report is only half of it; the other half is the report knowing what to
+ * put in it, which took until 2026-08-21.
  */
 export const compileShippedPlan = (
   shipped: ShippedPlan,

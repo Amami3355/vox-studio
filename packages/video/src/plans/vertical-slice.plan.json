@@ -60,7 +60,7 @@
         {
           "id": "chart",
           "component": "bar_chart",
-          "layout": "standard",
+          "layout": "horizontal",
           "motionProfile": "energetic",
           "spansBeats": ["b2", "b3"],
           "pace": "measured",
