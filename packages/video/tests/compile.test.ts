@@ -222,6 +222,9 @@ const withPersistent = (persistent: VideoPlanSection['persistent']): VideoPlan =
  * `['left', 'center']` where `bar_chart` occupied `['bottom', 'left']`, and `left` still
  * clears `cornerBR` while `right` still clears `cornerBL`.
  */
+const contextScene = (continuityPlan.sections[0] as VideoPlanSection)
+  .scenes[1] as VideoPlanSection['scenes'][number];
+
 const cornerScene = (persistent: VideoPlanSection['persistent']): VideoPlan => ({
   ...continuityPlan,
   sections: [
@@ -240,7 +243,7 @@ const cornerScene = (persistent: VideoPlanSection['persistent']): VideoPlan => (
             attribution: 'Maria Alvarez',
           },
         },
-        (continuityPlan.sections[0] as VideoPlanSection).scenes[1] as never,
+        contextScene,
       ],
     },
   ],

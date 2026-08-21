@@ -25,8 +25,11 @@
  * scale move it further. Frames 1 and 20 catch the entrances still moving; 60 is settled;
  * the last frame is each camera at its extreme.
  *
- * **Why these three.** `image_context` declares `['full']` from its own measurement and is
- * not swept: it frees nothing, so there is no slot to check and no claim to hold it to.
+ * **Why these three.** `image_context` declares `['full']` and is not swept only because no
+ * ceiling control exists for it. That used to read "there is no slot to check", and it is no
+ * longer true: a `['full']` declaration is falsifiable now — the branch below holds one to
+ * drawing into *every* slot — so sweeping it is available work rather than a question with
+ * no answer.
  * `bar_chart` was excluded for a worse reason. It declared `['bottom', 'left']`, which
  * freed `cornerTR`, and this header used to say the question was not this suite's to
  * answer — *"that declaration predates any measurement and measuring it is its own work."*
@@ -54,9 +57,10 @@
  * once the declaration frees nothing there is no corner left for them to overclaim. A
  * capability that ever narrows this declaration would have to sweep all three.
  *
- * Both capabilities put ink *past* x = 70%, so horizontal reach is not what frees the
- * corners and `columnRatio`/`SceneTitle`'s 86% cap are not the fragile numbers. The two
- * are clear for different reasons, and each margin is thin in a different direction:
+ * All three put ink *past* x = 70%, so horizontal reach is not what frees a corner and
+ * `columnRatio`/`SceneTitle`'s 86% cap are not the fragile numbers. `quote` and
+ * `stat_counter` are clear for different reasons, and each margin is thin in a different
+ * direction:
  *
  * - `quote` clears them **horizontally, but only in the corner rows**. The elements that
  *   reach above y = 30% or below y = 70% — eyebrow, attribution, role — stop at
@@ -132,9 +136,12 @@ beforeAll(async () => {
 
 describe('an occupied region is one the ink actually crosses', () => {
   /**
-   * The declaration, pinned. This is the half that fails while either capability still
-   * declares `['full']`: the measurement bought exactly the two right-hand corners, and
-   * nothing else — `left` alone would also free `right`, where the ink genuinely goes.
+   * The declaration, pinned — each capability against the set its own sweep bought it.
+   *
+   * For `quote` and `stat_counter` that is exactly the two right-hand corners: this is the
+   * half that fails if either widens back to `['full']`, and `left` alone would also free
+   * `right`, where the ink genuinely goes. For `bar_chart` it is nothing at all, and the
+   * pixels are what hold that — see the branch further down.
    */
   it.each(SWEPT.map((one) => [one.capabilityId, one.frees] as const))(
     '%s frees exactly what it was measured to free',
@@ -143,37 +150,6 @@ describe('an occupied region is one the ink actually crosses', () => {
       expect(freeSlotsOf(meta.occupiesRegions)).toEqual(frees);
     },
   );
-
-  /**
-   * **The regression for 2026-08-21, and what makes `frees: []` above falsifiable.**
-   *
-   * Without this, the table is unfalsifiable: anyone narrowing `occupiesRegions` back would
-   * edit the expected free set in the same commit and the suite would agree with them. This
-   * asks the pixels instead. `cornerTR` is the slot the old `['bottom', 'left']` freed, and
-   * the one a narrator was placed in before a render showed the tallest bar's value label
-   * cut by its shape.
-   *
-   * The settled frame under `editorialStatic` — the stillest camera, so nothing here depends
-   * on a pan carrying ink into the corner that would otherwise stay out of it. If the ink is
-   * there with the camera at rest, it is there.
-   */
-  describe('bar_chart puts ink in the corner it used to give away', () => {
-    let settled: Bitmap;
-
-    beforeAll(async () => {
-      const { meta } = requireCapability('bar_chart');
-      settled = await renderStillAt(
-        controlIdFor('bar-chart-ceiling'),
-        { controlId: 'bar-chart-ceiling', motionProfile: 'editorialStatic' },
-        meta.recommendedDurationFrames - 1,
-      );
-    }, 180_000);
-
-    it('draws into cornerTR, so no declaration may free it', () => {
-      const corner = [regionOf('cornerTR')];
-      expect(hashRegions(settled, corner)).not.toBe(hashRegions(control, corner));
-    });
-  });
 
   for (const { capabilityId, controlId } of SWEPT) {
     const { meta } = requireCapability(capabilityId);
@@ -196,14 +172,20 @@ describe('an occupied region is one the ink actually crosses', () => {
         }, 180_000);
 
         /**
-         * Emitted only where there is a free slot to keep clear. `hashRegions` refuses an
-         * empty region list on purpose — hashing nothing would pass without looking — and a
-         * capability that frees nothing has nothing here to prove.
+         * The two halves of the same question, and which one a capability gets depends on
+         * whether its declaration frees anything.
          *
-         * Not a silent skip. That capability's free set is asserted to be empty by name in
-         * the first block, and the reason it is empty is asserted against the pixels by
-         * `bar_chart puts ink in the corner it used to give away`. The absence of this test
-         * is covered by two present ones rather than by nobody noticing.
+         * A capability that frees slots must keep them clear. A capability that frees none
+         * must earn that by drawing into every slot there is — otherwise `frees: []` is
+         * unfalsifiable, because anyone narrowing the declaration would edit the expected
+         * set in the same commit and the suite would agree with them. Asking the pixels
+         * instead is what would have caught `bar_chart`'s `['bottom', 'left']`: it freed
+         * `cornerTR`, and a narrator was placed there before a render showed the tallest
+         * bar's value label cut by its shape.
+         *
+         * `hashRegions` refuses an empty region list on purpose — hashing nothing would pass
+         * without looking — which is why this is a branch rather than a guard that quietly
+         * emits nothing.
          */
         if (free.length > 0) {
           it('draws nothing into the slots the declaration frees', () => {
@@ -215,6 +197,16 @@ describe('an occupied region is one the ink actually crosses', () => {
                 region: expected,
               });
             }
+          });
+        } else {
+          it('draws into every slot, so no declaration may free one', () => {
+            const settled = stills[frames.length - 1] as Bitmap;
+            const clear = ALL_SLOTS.filter(
+              (slot) =>
+                hashRegions(settled, [regionOf(slot)]) === hashRegions(control, [regionOf(slot)]),
+            );
+
+            expect(clear).toEqual([]);
           });
         }
 

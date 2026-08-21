@@ -101,15 +101,24 @@ export const sceneControls: SceneInstance[] = [
     spansBeats: ['b1'],
     events: [{ at: 'b1.start', action: 'revealAll' }],
     props: {
-      // A 120-character title, twenty entries — the array's hard ceiling — with the longest
-      // label at its own ceiling of 40, and an 8-character unit. Prose rather than one long
-      // token, because a ceiling string that cannot wrap exercises none of the wrapping.
+      // A 120-character title, twenty entries — the array's hard ceiling — an 8-character
+      // unit, and prose rather than one long token, because a ceiling string that cannot
+      // wrap exercises none of the wrapping.
+      //
+      // **The 40-character label, the tallest bar and the highlight are deliberately the
+      // same row.** Only eight of these twenty reach the canvas, and `valueKind: 'share'`
+      // drops the rest rather than bucketing them, so a ceiling label on a collapsed row is
+      // a ceiling nothing draws. Worse, `Bar.tsx:292` prints a value only on the highlighted
+      // bar while `gridlines` is on: a `highlight` naming a dropped row silences every value
+      // label and recedes every bar, which is the *dimmest* chart this component can draw —
+      // the opposite of what a worst-case ink control is for. Putting all three on London
+      // puts the longest label and the highest value label in the same frame.
       title:
         "Share of a household's monthly income now spent on rent across every capital that the survey reached this reporting year",
       unit: 'per cent',
       valueKind: 'share',
       emphasis: 'negative',
-      highlight: 'Prague and the panel estates on the hill',
+      highlight: 'London, all thirty-two boroughs and City',
       data: [
         { label: 'Amsterdam and the metropolitan ring', value: 38 },
         { label: 'Athens with its coastal suburbs', value: 31 },
@@ -124,7 +133,7 @@ export const sceneControls: SceneInstance[] = [
         { label: 'Helsinki and the eastern island suburbs', value: 34 },
         { label: 'Lisbon and the far side of the water', value: 37 },
         { label: 'Ljubljana and the valley towns below', value: 22 },
-        { label: 'London, all boroughs and the City', value: 47 },
+        { label: 'London, all thirty-two boroughs and City', value: 47 },
         { label: 'Madrid and the eastern dormitory towns', value: 33 },
         { label: 'Oslo and the fjord settlements west', value: 39 },
         { label: 'Paris and the whole inner ring road', value: 41 },
