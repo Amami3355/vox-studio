@@ -771,12 +771,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     let foldCurrent = false;
     try {
       if (takeManifest && takeArtifacts) {
-        verifyRunTake(
-          takeManifest,
-          takeArtifacts,
-          plan.beats,
-          proofRequest.production.voice,
-        );
+        verifyRunTake(takeManifest, takeArtifacts, plan.beats, proofRequest.production.voice);
         takeVerified = true;
         if (fold) {
           verifyTimedBeatFold(fold, takeManifest, takeArtifacts, plan.beats);
@@ -880,155 +875,159 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       ? Number(fold.timedBeats.at(-1)?.toMs ?? 0) / 1000
       : null;
 
-    const assertions = evaluateNorthbridgeAssertions({
-      authorship: {
-        kind: authoring.authorship,
-        unscripted: authoring.unscripted,
-      },
-      isolation: {
-        initialFiles: initialInventory.map((entry) => entry.path).sort(),
-        workRootReadWrite:
-          authoring.sandboxEvidence?.workRootReadWrite ??
-          (workRootProbe.exitCode === 0 && workRootProbe.stdout === 'readwrite\n'),
-        repositoryDenied:
-          authoring.sandboxEvidence?.repositoryDenied ??
-          (repositoryProbe.exitCode === 0 && repositoryProbe.stdout === 'denied\n'),
-        serviceDenied:
-          authoring.sandboxEvidence?.serviceDenied ??
-          (serviceProbe.exitCode === 0 && serviceProbe.stdout === 'denied\n'),
-        credentialsDenied:
-          authoring.sandboxEvidence?.credentialsDenied ??
-          (credentialsProbe.exitCode === 0 && credentialsProbe.stdout === 'denied\n'),
-        // Without a spawned sandbox to interrogate, the honest fallback is to check the
-        // environment the harness would have handed over.
-        credentialsEnvironmentDenied:
-          authoring.sandboxEvidence?.credentialsEnvironmentDenied ??
-          remainingSecretVariables(scrubAgentEnvironment(process.env)).length === 0,
-        writesContained: commands.every((record) =>
-          [...record.created, ...record.changed].every((entry) => !entry.path.startsWith('../')),
-        ),
-      },
-      leakScan,
-      contracts: {
-        categories: [...new Set(categories)],
-        allCommandsObserved: expectedCommands.every((command) => observedCommands.has(command)),
-        agentDiscoveryObserved:
-          agentRecords.some(({ envelope }) => envelope.command === 'contract.index') &&
-          agentRecords.some(({ envelope }) => envelope.command === 'contract.show'),
-      },
-      processContract: {
-        envelopesValid: records.every(({ record }) => record.stdoutBase64.length > 0),
-        stderrValid: records.every(({ record }) => record.stderrBase64 === ''),
-        exitsValid: records.every(({ record, envelope }) =>
-          envelope.outcome === 'failed'
-            ? record.exitCode === 1 || record.exitCode === 2
-            : record.exitCode === 0,
-        ),
-      },
-      network: {
-        providerDispatchCount: networkEvents.filter((event) => event.kind === 'provider-dispatch')
-          .length,
-        commandViolations: [
-          ...networkEvents
-            .filter(
-              (event) =>
-                event.kind === 'unauthorized-network' ||
-                (event.kind === 'provider-dispatch' && event.command !== 'production run record'),
-            )
-            .map((event) => event.command),
-          ...authoring.directNetworkEvents.map(() => 'agent-direct-network'),
-        ],
-        directDenied: authoring.directNetworkDenied,
-      },
-      limits: {
-        planVersions,
-        validateCalls: agentRecords.filter(({ envelope }) => envelope.command === 'run.validate')
-          .length,
-        preflightCalls: agentRecords.filter(({ envelope }) => envelope.command === 'run.preflight')
-          .length,
-        postRecordPlanVersions,
-        humanHints: authoring.humanHints,
-      },
-      run: {
-        stage: checkpoint.stage,
-        bindingsFresh: Object.values(checkpoint.bindings).every(
-          (binding) => binding === null || binding.freshness.state === 'fresh',
-        ),
-        receiptChainValid: inspected !== null,
-        attestationsValid: inspected !== null,
-        artifactHashesValid: await descriptorHashesValid(mainRunRoot, checkpoint),
-        recordingInputBound:
-          takeManifest?.recordingInputSha256 === checkpoint.bindings.take?.recordingInputSha256,
-        takeVerified,
-        foldCurrent,
-        recordDispositions: recordEnvelopes.map((envelope) =>
-          String((envelope.data as { disposition?: unknown } | null)?.disposition),
-        ),
-        recordTakeIds: recordEnvelopes.map((envelope) =>
-          String((envelope.data as { takeId?: unknown } | null)?.takeId),
-        ),
-        newTakesUsed: checkpoint.quota.newTakesUsed,
-      },
-      scenario: {
-        capabilities: [...new Set(scenes.map((scene) => scene.component))],
-        highlightMarch: scenes.some((scene) =>
-          scene.events?.some(
-            (event) => event.action === 'highlightBar' && event.payload?.label === 'March',
+    const assertions = evaluateNorthbridgeAssertions(
+      {
+        authorship: {
+          kind: authoring.authorship,
+          unscripted: authoring.unscripted,
+        },
+        isolation: {
+          initialFiles: initialInventory.map((entry) => entry.path).sort(),
+          workRootReadWrite:
+            authoring.sandboxEvidence?.workRootReadWrite ??
+            (workRootProbe.exitCode === 0 && workRootProbe.stdout === 'readwrite\n'),
+          repositoryDenied:
+            authoring.sandboxEvidence?.repositoryDenied ??
+            (repositoryProbe.exitCode === 0 && repositoryProbe.stdout === 'denied\n'),
+          serviceDenied:
+            authoring.sandboxEvidence?.serviceDenied ??
+            (serviceProbe.exitCode === 0 && serviceProbe.stdout === 'denied\n'),
+          credentialsDenied:
+            authoring.sandboxEvidence?.credentialsDenied ??
+            (credentialsProbe.exitCode === 0 && credentialsProbe.stdout === 'denied\n'),
+          // Without a spawned sandbox to interrogate, the honest fallback is to check the
+          // environment the harness would have handed over.
+          credentialsEnvironmentDenied:
+            authoring.sandboxEvidence?.credentialsEnvironmentDenied ??
+            remainingSecretVariables(scrubAgentEnvironment(process.env)).length === 0,
+          writesContained: commands.every((record) =>
+            [...record.created, ...record.changed].every((entry) => !entry.path.startsWith('../')),
           ),
-        ),
-        uniqueMarchWordAnchor:
-          marchCount === 1 &&
-          scenes.some((scene) =>
+        },
+        leakScan,
+        contracts: {
+          categories: [...new Set(categories)],
+          allCommandsObserved: expectedCommands.every((command) => observedCommands.has(command)),
+          agentDiscoveryObserved:
+            agentRecords.some(({ envelope }) => envelope.command === 'contract.index') &&
+            agentRecords.some(({ envelope }) => envelope.command === 'contract.show'),
+        },
+        processContract: {
+          envelopesValid: records.every(({ record }) => record.stdoutBase64.length > 0),
+          stderrValid: records.every(({ record }) => record.stderrBase64 === ''),
+          exitsValid: records.every(({ record, envelope }) =>
+            envelope.outcome === 'failed'
+              ? record.exitCode === 1 || record.exitCode === 2
+              : record.exitCode === 0,
+          ),
+        },
+        network: {
+          providerDispatchCount: networkEvents.filter((event) => event.kind === 'provider-dispatch')
+            .length,
+          commandViolations: [
+            ...networkEvents
+              .filter(
+                (event) =>
+                  event.kind === 'unauthorized-network' ||
+                  (event.kind === 'provider-dispatch' && event.command !== 'production run record'),
+              )
+              .map((event) => event.command),
+            ...authoring.directNetworkEvents.map(() => 'agent-direct-network'),
+          ],
+          directDenied: authoring.directNetworkDenied,
+        },
+        limits: {
+          planVersions,
+          validateCalls: agentRecords.filter(({ envelope }) => envelope.command === 'run.validate')
+            .length,
+          preflightCalls: agentRecords.filter(
+            ({ envelope }) => envelope.command === 'run.preflight',
+          ).length,
+          postRecordPlanVersions,
+          humanHints: authoring.humanHints,
+        },
+        run: {
+          stage: checkpoint.stage,
+          bindingsFresh: Object.values(checkpoint.bindings).every(
+            (binding) => binding === null || binding.freshness.state === 'fresh',
+          ),
+          receiptChainValid: inspected !== null,
+          attestationsValid: inspected !== null,
+          artifactHashesValid: await descriptorHashesValid(mainRunRoot, checkpoint),
+          recordingInputBound:
+            takeManifest?.recordingInputSha256 === checkpoint.bindings.take?.recordingInputSha256,
+          takeVerified,
+          foldCurrent,
+          recordDispositions: recordEnvelopes.map((envelope) =>
+            String((envelope.data as { disposition?: unknown } | null)?.disposition),
+          ),
+          recordTakeIds: recordEnvelopes.map((envelope) =>
+            String((envelope.data as { takeId?: unknown } | null)?.takeId),
+          ),
+          newTakesUsed: checkpoint.quota.newTakesUsed,
+        },
+        scenario: {
+          capabilities: [...new Set(scenes.map((scene) => scene.component))],
+          highlightMarch: scenes.some((scene) =>
             scene.events?.some(
-              (event) => event.at.endsWith('.word:March') && event.payload?.label === 'March',
+              (event) => event.action === 'highlightBar' && event.payload?.label === 'March',
             ),
           ),
-        northbridgeAssetRequirement:
-          northbridgeRequirement?.type === 'image' &&
-          typeof northbridgeRequirement.subject === 'string' &&
-          /bus/i.test(northbridgeRequirement.subject) &&
-          /(?:stop|northbridge|dawn)/i.test(northbridgeRequirement.subject),
-      },
-      preflight: {
-        advisory:
-          preflight?.authority === 'advisory' &&
-          Boolean(preflight.limitations?.some((value) => value.includes('advisory'))),
-        minimumRiskCleared: Boolean(
-          preflight?.duration?.scenes?.every(
-            (scene) => scene.minimum?.assessment === 'margin_clear',
+          uniqueMarchWordAnchor:
+            marchCount === 1 &&
+            scenes.some((scene) =>
+              scene.events?.some(
+                (event) => event.at.endsWith('.word:March') && event.payload?.label === 'March',
+              ),
+            ),
+          northbridgeAssetRequirement:
+            northbridgeRequirement?.type === 'image' &&
+            typeof northbridgeRequirement.subject === 'string' &&
+            /bus/i.test(northbridgeRequirement.subject) &&
+            /(?:stop|northbridge|dawn)/i.test(northbridgeRequirement.subject),
+        },
+        preflight: {
+          advisory:
+            preflight?.authority === 'advisory' &&
+            Boolean(preflight.limitations?.some((value) => value.includes('advisory'))),
+          minimumRiskCleared: Boolean(
+            preflight?.duration?.scenes?.every(
+              (scene) => scene.minimum?.assessment === 'margin_clear',
+            ),
           ),
-        ),
+        },
+        assets: {
+          northbridgeStatus: northbridgeAsset?.status ?? null,
+          failedCount: assetResolutions.filter((asset) => asset.status === 'failed').length,
+        },
+        compilation: {
+          ok: compileReport?.ok === true,
+          errorCount: compileReport?.errors?.length ?? -1,
+        },
+        media: {
+          videoCodec: media.videoCodec,
+          audioCodec: media.audioCodec,
+          previewAudioNonSilent: media.previewAudioNonSilent,
+          takeAudioNonSilent: media.takeAudioNonSilent,
+          takeDurationSeconds,
+          previewDurationSeconds: media.previewDurationSeconds,
+        },
+        probes: {
+          statusReadOnly: Buffer.compare(mainBeforeStatus, mainAfterStatus) === 0,
+          paused:
+            pausedEnvelope.outcome === 'paused' &&
+            pausedEnvelope.run?.stage === 'preflighted' &&
+            pausedCheckpoint.quota.newTakesUsed === 0 &&
+            pausedCheckpoint.bindings.take === null,
+          invalidGrantFailed:
+            invalidEnvelope.outcome === 'failed' &&
+            invalidEnvelope.error?.code === 'REPLACEMENT_AUTHORIZATION_INVALID',
+          preservedMainRun: Buffer.compare(mainBeforeInvalid, mainAfterInvalid) === 0,
+        },
+        evidence: { transcriptRecords: transcript.length, commandRecords: commands.length },
       },
-      assets: {
-        northbridgeStatus: northbridgeAsset?.status ?? null,
-        failedCount: assetResolutions.filter((asset) => asset.status === 'failed').length,
-      },
-      compilation: {
-        ok: compileReport?.ok === true,
-        errorCount: compileReport?.errors?.length ?? -1,
-      },
-      media: {
-        videoCodec: media.videoCodec,
-        audioCodec: media.audioCodec,
-        previewAudioNonSilent: media.previewAudioNonSilent,
-        takeAudioNonSilent: media.takeAudioNonSilent,
-        takeDurationSeconds,
-        previewDurationSeconds: media.previewDurationSeconds,
-      },
-      probes: {
-        statusReadOnly: Buffer.compare(mainBeforeStatus, mainAfterStatus) === 0,
-        paused:
-          pausedEnvelope.outcome === 'paused' &&
-          pausedEnvelope.run?.stage === 'preflighted' &&
-          pausedCheckpoint.quota.newTakesUsed === 0 &&
-          pausedCheckpoint.bindings.take === null,
-        invalidGrantFailed:
-          invalidEnvelope.outcome === 'failed' &&
-          invalidEnvelope.error?.code === 'REPLACEMENT_AUTHORIZATION_INVALID',
-        preservedMainRun: Buffer.compare(mainBeforeInvalid, mainAfterInvalid) === 0,
-      },
-      evidence: { transcriptRecords: transcript.length, commandRecords: commands.length },
-    }, { durationBounds, targetSeconds });
+      { durationBounds, targetSeconds },
+    );
     const verdict = machineVerdict(assertions);
 
     await cp(mainRunRoot, join(stagedEvidence, 'main-run'), { recursive: true });

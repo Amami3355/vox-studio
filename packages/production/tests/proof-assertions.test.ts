@@ -118,7 +118,8 @@ describe('Northbridge machine assertions', () => {
 
   it('reproduces the frozen short budget of 3 Preflight and 5 validate/plan versions', () => {
     const assertions = evaluateNorthbridgeAssertions(passingObservations());
-    const expectedOf = (id: string) => assertions.find((assertion) => assertion.id === id)?.expected;
+    const expectedOf = (id: string) =>
+      assertions.find((assertion) => assertion.id === id)?.expected;
     expect(expectedOf('limits.preflight-calls')).toBe('<=3');
     expect(expectedOf('limits.validate-calls')).toBe('<=5');
     expect(expectedOf('limits.plan-versions')).toBe('<=5');

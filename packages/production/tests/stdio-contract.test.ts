@@ -5,10 +5,7 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProductionIpcHost } from '../src/ipc/host';
 import { createProductionIpcHost } from '../src/ipc/host';
-import {
-  type ProductionPipeBridge,
-  startProductionPipeBridge,
-} from '../src/ipc/pipe-bridge';
+import { type ProductionPipeBridge, startProductionPipeBridge } from '../src/ipc/pipe-bridge';
 import {
   type CommandFixture,
   VALID_PLAN,
