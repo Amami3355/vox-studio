@@ -1,0 +1,6 @@
+# Generated contract projections. `build-catalog.ts` and `contracts/generate.ts` write LF,
+# and their `--check` modes compare bytes, so a CRLF checkout makes the check permanently
+# red on Windows and green on CI. Pin the line endings rather than the comparison: the
+# files are published artifacts, and their bytes are the contract.
+packages/video/src/catalog/*.json                    text eol=lf
+packages/production/src/contracts/generated/*.json   text eol=lf
