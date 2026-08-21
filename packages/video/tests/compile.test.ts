@@ -209,10 +209,48 @@ const withPersistent = (persistent: VideoPlanSection['persistent']): VideoPlan =
 });
 
 /**
- * One element, two placements *inside* the chart scene. `left` clears `cornerBR` and
+ * The same section with a `quote` in front of the `image_context`, for the two fixtures
+ * below.
+ *
+ * Rungs c and d need a scene that frees *some* corner an element can reach but not every
+ * corner it reaches, and until 2026-08-21 `bar_chart` was that scene — because it
+ * overclaimed. It declares `['full']` now, measured, and frees nothing, so it can only ever
+ * produce rung b or rung d. `quote` and `stat_counter` are the two capabilities with a
+ * measured free corner left, and they are the only ones that can exercise rung c at all.
+ *
+ * The mirror is exact and the slots below did not have to change: `quote` occupies
+ * `['left', 'center']` where `bar_chart` occupied `['bottom', 'left']`, and `left` still
+ * clears `cornerBR` while `right` still clears `cornerBL`.
+ */
+const cornerScene = (persistent: VideoPlanSection['persistent']): VideoPlan => ({
+  ...continuityPlan,
+  sections: [
+    {
+      ...(continuityPlan.sections[0] as VideoPlanSection),
+      persistent,
+      scenes: [
+        {
+          id: 'quote',
+          component: 'quote',
+          layout: 'centered',
+          motionProfile: 'editorialStatic',
+          spansBeats: ['b1'],
+          props: {
+            quote: 'Rents climb every year, and pay does not follow them up.',
+            attribution: 'Maria Alvarez',
+          },
+        },
+        (continuityPlan.sections[0] as VideoPlanSection).scenes[1] as never,
+      ],
+    },
+  ],
+});
+
+/**
+ * One element, two placements *inside* the quote scene. `left` clears `cornerBR` and
  * `right` clears `cornerBL`, so neither composition clears the element's whole crossing.
  */
-const movingElementPlan = withPersistent([
+const movingElementPlan = cornerScene([
   {
     id: 'narrator',
     element: 'character',
@@ -225,14 +263,23 @@ const movingElementPlan = withPersistent([
   },
 ]);
 
-/** Two elements over one scene, each cleared by a composition that traps the other. */
-const twoElementPlan = withPersistent([
+/**
+ * Two elements over one scene, each cleared by a composition that traps the other.
+ *
+ * The narrator stands in `right` rather than in a corner, which is the one thing this
+ * fixture had to change when it moved off `bar_chart`. `quote` frees both right-hand
+ * corners by measurement, so a narrator in `cornerBR` would not contend with it at all and
+ * the scene would keep everyone at rung a — the fixture would still pass and would have
+ * stopped testing anything. `right` overlaps `center`, so it contends; `left` clears it and
+ * traps the badge, `right` clears the badge and traps it.
+ */
+const twoElementPlan = cornerScene([
   {
     id: 'narrator',
     element: 'character',
     assetRequirement: narratorRequirement,
     placements: [
-      { at: 'b1.start', slot: 'cornerBR' },
+      { at: 'b1.start', slot: 'right' },
       { at: 'b2.start', slot: 'cornerTR' },
     ],
   },
@@ -342,7 +389,7 @@ describe('compile', () => {
       '"narrator" contends with "context", so the scene yields into "left".',
     ]);
     expect(relocations(movingElementPlan)).toEqual([
-      '"narrator" contends with "chart", so the element moves to "cornerTR", which it also uses in this section.',
+      '"narrator" contends with "quote", so the element moves to "cornerTR", which it also uses in this section.',
       '"narrator" contends with "context", so the scene yields into "left".',
     ]);
   });
@@ -537,10 +584,10 @@ describe('compile', () => {
     const result = compile({ plan: movingElementPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
 
-    const [chart] = result.document.sections[0]?.scenes ?? [];
+    const [scene] = result.document.sections[0]?.scenes ?? [];
 
     // No composition clears both corners, so the scene keeps the one it declared…
-    expect(chart?.safeArea).toEqual(NO_SAFE_AREA);
+    expect(scene?.safeArea).toEqual(NO_SAFE_AREA);
     // …and the element spends the whole scene in the one slot that clears it, which the
     // next scene then yields around rather than moving it a second time.
     expect(result.document.sections[0]?.layoutStates).toEqual([
@@ -552,15 +599,15 @@ describe('compile', () => {
     const result = compile({ plan: twoElementPlan, beats: timedBeats });
     if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
 
-    const [chart] = result.document.sections[0]?.scenes ?? [];
+    const [scene] = result.document.sections[0]?.scenes ?? [];
 
     // `left` would clear the narrator and trap the badge; `right`, the reverse.
-    expect(chart?.safeArea).toEqual(NO_SAFE_AREA);
+    expect(scene?.safeArea).toEqual(NO_SAFE_AREA);
     expect(result.document.sections[0]?.layoutStates).toEqual([
       { elementId: 'narrator', from: 0, to: 90, rect: { top: 0, right: 0, bottom: 70, left: 70 } },
     ]);
     expect(result.report.warnings).toContainEqual(
-      expect.objectContaining({ code: 'PERSISTENT_ELEMENT_HIDDEN', sceneId: 'chart' }),
+      expect.objectContaining({ code: 'PERSISTENT_ELEMENT_HIDDEN', sceneId: 'quote' }),
     );
   });
 

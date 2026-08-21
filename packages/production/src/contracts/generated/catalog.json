@@ -283,8 +283,7 @@
         "supportsEvents": true,
         "requiresAssets": false,
         "occupiesRegions": [
-          "bottom",
-          "left"
+          "full"
         ],
         "supportedCompositions": [
           "full",

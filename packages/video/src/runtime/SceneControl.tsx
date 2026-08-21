@@ -78,6 +78,62 @@ export const sceneControls: SceneInstance[] = [
       role: 'Speaking before the housing select committee, in March 2026.',
     },
   },
+  /**
+   * The third ceiling control, and the one that was missing when it was needed.
+   *
+   * `occupies-regions.test.ts` swept two capabilities and said in its header why not this
+   * one: *"that declaration predates any measurement and measuring it is its own work."* On
+   * 2026-08-21 the unmeasured half came due — a render placed a character in `cornerTR`, the
+   * one slot `['bottom', 'left']` freed, and the tallest bar's value label was drawn under
+   * it with its ascenders cut. The compiler reported nothing, because rung a is exactly
+   * right when a declaration is true.
+   *
+   * `standard` rather than the other two layouts, because it is the arrangement that
+   * produced the clipped frame and the one that puts a value label highest. The declaration
+   * the measurement produced frees no slot at all, so the layouts not swept here have no
+   * corner left to overclaim — see the header of that suite.
+   */
+  {
+    id: 'bar-chart-ceiling',
+    component: 'bar_chart',
+    layout: 'standard',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1'],
+    events: [{ at: 'b1.start', action: 'revealAll' }],
+    props: {
+      // A 120-character title, twenty entries — the array's hard ceiling — with the longest
+      // label at its own ceiling of 40, and an 8-character unit. Prose rather than one long
+      // token, because a ceiling string that cannot wrap exercises none of the wrapping.
+      title:
+        "Share of a household's monthly income now spent on rent across every capital that the survey reached this reporting year",
+      unit: 'per cent',
+      valueKind: 'share',
+      emphasis: 'negative',
+      highlight: 'Prague and the panel estates on the hill',
+      data: [
+        { label: 'Amsterdam and the metropolitan ring', value: 38 },
+        { label: 'Athens with its coastal suburbs', value: 31 },
+        { label: 'Belgrade and the Danube left bank', value: 24 },
+        { label: 'Berlin and the outer eastern districts', value: 27 },
+        { label: 'Bratislava beyond the old town wall', value: 26 },
+        { label: 'Brussels and the nineteen communes', value: 35 },
+        { label: 'Bucharest and the northern sector', value: 23 },
+        { label: 'Budapest across both river banks', value: 25 },
+        { label: 'Copenhagen and the bridge districts', value: 36 },
+        { label: 'Dublin and the southern commuter belt', value: 42 },
+        { label: 'Helsinki and the eastern island suburbs', value: 34 },
+        { label: 'Lisbon and the far side of the water', value: 37 },
+        { label: 'Ljubljana and the valley towns below', value: 22 },
+        { label: 'London, all boroughs and the City', value: 47 },
+        { label: 'Madrid and the eastern dormitory towns', value: 33 },
+        { label: 'Oslo and the fjord settlements west', value: 39 },
+        { label: 'Paris and the whole inner ring road', value: 41 },
+        { label: 'Prague and the panel estates on the hill', value: 28 },
+        { label: 'Reykjavik and the built-up area around', value: 44 },
+        { label: 'Vienna and the districts over the canal', value: 29 },
+      ],
+    },
+  },
   {
     id: 'stat-ceiling',
     component: 'stat_counter',

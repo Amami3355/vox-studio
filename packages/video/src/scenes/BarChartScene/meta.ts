@@ -36,7 +36,28 @@ export const barChartMeta: SceneMeta = {
   ],
   supportsEvents: true,
   requiresAssets: false,
-  occupiesRegions: ['bottom', 'left'],
+  /**
+   * `['full']`, because the scene draws edge to edge and the measurement says so.
+   *
+   * It read `['bottom', 'left']` from the scaffold commit until 2026-08-21, which freed
+   * exactly one slot — `cornerTR` — and `tests/render/occupies-regions.test.ts` declined to
+   * check it, in terms: *"that declaration predates any measurement and measuring it is its
+   * own work."* The work came due when a render put a narrator in that corner and the
+   * tallest bar's value label was drawn underneath it with its ascenders cut. The compiler
+   * said nothing, correctly: rung a keeps an element whose slots the scene declares it never
+   * touches, and this scene had declared away a corner it uses.
+   *
+   * The value label was the first leak found, not the only one available. On a full canvas
+   * the header spans the whole box width and the plot spans it underneath, so `top` and
+   * `right` both carry ink that neither old region covered. Every region set that closes the
+   * corner also frees nothing, so the choice was never which corner to give back — it was
+   * whether a persistent element ever stands over a bar chart, and the answer is no. It
+   * yields into a half it supports, or the element relocates, or it hides.
+   *
+   * `tests/render/occupies-regions.test.ts` now sweeps this capability at its schema ceiling
+   * under every motion profile, which is what the other two declarations have always cost.
+   */
+  occupiesRegions: ['full'],
   supportedCompositions: ['full', 'left', 'right'],
   /**
    * Measured, not estimated — `tests/render/composed-capacity.test.ts` recomputes every
