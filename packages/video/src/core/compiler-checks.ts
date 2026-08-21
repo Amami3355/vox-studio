@@ -202,6 +202,17 @@ export const COMPILER_CHECKS = {
       means: 'The compiler moved a persistent element to avoid an unsafe or occupied placement.',
       repair: 'Accept the safe placement, or choose a conflict-free preferred slot.',
     },
+    NARRATION_NAMES_COLLAPSED_VALUE: {
+      code: 'NARRATION_NAMES_COLLAPSED_VALUE',
+      regime: 'warning',
+      severity: ['important'],
+      means:
+        'Narration or event text names a value this scene collapsed, so the words describe ' +
+        'something the frame does not show.',
+      repair:
+        'Keep the value on screen by freeing the region the scene occupies, or rewrite the ' +
+        'text so it does not name a value the scene does not draw.',
+    },
     CAPACITY_REDUCED_BY_COMPOSITION: {
       code: 'CAPACITY_REDUCED_BY_COMPOSITION',
       regime: 'warning',

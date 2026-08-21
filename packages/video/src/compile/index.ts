@@ -28,6 +28,7 @@ import { FPS } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
 import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { type CapacityOutcome, capacityOutcome, reducesData } from './capacity';
+import { reportCollapsedMentions } from './coherence';
 import { compositionFor, resolvePersistentLayer, safeAreaFor } from './persistent';
 import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
@@ -106,6 +107,14 @@ export const compile = ({
   const frameBeats = toFrameBeats(plan, beats, fps);
   const windowOf = (spansBeats: string[]) => spanWindow(spansBeats, frameBeats);
 
+  /**
+   * The words of each beat, from the plan rather than from the take. A synthetic take
+   * carries no words at all (`FrameBeat.words` is empty), and the coherence check has to
+   * work the same whether or not anything has been recorded — what it reads is what the
+   * agent wrote, which exists from the first draft.
+   */
+  const textOf = new Map(plan.beats.map((beat) => [beat.id, beat.text]));
+
   const warnings = [...report.warnings];
   /**
    * Collected while the sections are built and gated once at the end, rather than thrown
@@ -156,9 +165,29 @@ export const compile = ({
     const layer = resolvePersistentLayer(section, scenes, frameBeats, bounds);
     warnings.push(...layer.warnings);
 
+    const spansOf = new Map(section.scenes.map((scene) => [scene.id, scene.spansBeats]));
+    const beatsOf = (sceneId: string) =>
+      (spansOf.get(sceneId) ?? []).map((id) => ({ id, text: textOf.get(id) ?? '' }));
+
     for (const scene of scenes) {
       scene.safeArea = safeAreaFor(layer, scene.id);
-      reportComposedCapacity(scene, compositionFor(layer, scene.id), section.id, warnings);
+
+      /**
+       * Asked once and read twice. The composition decided how much of the plan's data
+       * reaches the screen; the first reader says so, and the second asks whether anyone
+       * is still talking about what left.
+       */
+      const outcome = capacityOutcome(scene, compositionFor(layer, scene.id));
+      if (outcome === null) continue;
+
+      reportComposedCapacity(scene, outcome, section.id, warnings);
+      reportCollapsedMentions({
+        scene,
+        collapsed: outcome.collapsed,
+        beats: beatsOf(scene.id),
+        sectionId: section.id,
+        warnings,
+      });
     }
 
     return {
@@ -222,14 +251,13 @@ export const compile = ({
  */
 const reportComposedCapacity = (
   scene: CompiledScene,
-  composition: Slot | null,
+  outcome: CapacityOutcome,
   sectionId: string,
   warnings: CompilerWarning[],
 ): void => {
-  const outcome = capacityOutcome(scene, composition);
   if (!reducesData(outcome)) return;
 
-  const { capacity, onFullCanvas, collapsed } = outcome as CapacityOutcome;
+  const { composition, capacity, onFullCanvas, collapsed } = outcome;
   const names = collapsed.map((entry) => `"${entry.label}"`).join(', ');
 
   warnings.push({
@@ -239,7 +267,7 @@ const reportComposedCapacity = (
     sectionId,
     field: 'props',
     message:
-      `"${scene.id}" yields into "${composition as Slot}", where its "${scene.layout}" layout ` +
+      `"${scene.id}" yields into "${composition}", where its "${scene.layout}" layout ` +
       `holds ${capacity} of the ${onFullCanvas} it holds on the full canvas. ` +
       `${names} ${collapsed.length === 1 ? 'is' : 'are'} collapsed and will not be on screen.`,
     suggestion:

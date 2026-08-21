@@ -115,6 +115,7 @@ describe('the vertical slice', () => {
       ['SLOT_RELOCATED', 'quality'],
       ['SLOT_RELOCATED', 'info'],
       ['CAPACITY_REDUCED_BY_COMPOSITION', 'quality'],
+      ['NARRATION_NAMES_COLLAPSED_VALUE', 'important'],
     ]);
   });
 
@@ -139,6 +140,37 @@ describe('the vertical slice', () => {
     expect(capacity?.message).toContain('holds 3 of the 8');
     expect(capacity?.message).toContain('"Berlin"');
     expect(capacity?.message).toContain('"Paris"');
+  });
+
+  /**
+   * The half of 2026-08-21 that `CAPACITY_REDUCED_BY_COMPOSITION` cannot reach. b3 says
+   * *"Berlin sits twenty points lower"* and the annotation reads *"Twenty points above
+   * Berlin"*, over a chart Berlin was collapsed out of. Both halves of that contradiction
+   * are strings this plan wrote itself, which is what makes it decidable.
+   */
+  it('notices that the narration still names a value the chart dropped', () => {
+    const mention = report.warnings.find(
+      (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
+    );
+
+    expect(mention?.sceneId).toBe('chart');
+    expect(mention?.message).toContain('"Berlin"');
+    expect(mention?.message).toContain('beat "b3"');
+    expect(mention?.message).toContain('events[3].payload.text');
+  });
+
+  /**
+   * Paris is collapsed too, and no beat and no annotation names it. Silence there is the
+   * whole precision budget: a check that fired on every dropped value would fire twice
+   * here, and the second warning would carry no defect.
+   */
+  it('says nothing about a value that was dropped and is not spoken of', () => {
+    const mentions = report.warnings.filter(
+      (warning) => warning.code === 'NARRATION_NAMES_COLLAPSED_VALUE',
+    );
+
+    expect(mentions).toHaveLength(1);
+    expect(mentions[0]?.message).not.toContain('Paris');
   });
 
   it('runs the twenty to thirty seconds §12 asks for', () => {
