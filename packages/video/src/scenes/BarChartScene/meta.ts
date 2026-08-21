@@ -60,8 +60,8 @@ export const barChartMeta: SceneMeta = {
   occupiesRegions: ['full'],
   supportedCompositions: ['full', 'left', 'right'],
   /**
-   * Measured, not estimated — `tests/render/composed-capacity.test.ts` recomputes every
-   * one of these from `capacity.ts` and fails on drift.
+   * Measured, not estimated — `tests/composed-capacity.test.ts` recomputes every
+   * one of these from the geometry in `layouts.ts` and fails on drift.
    *
    * The horizontal row is the entry worth reading twice: a half frame that holds three
    * vertical columns holds eight horizontal rows, because a column is bounded by the width

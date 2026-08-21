@@ -10,7 +10,15 @@ import { buildCatalog, buildCatalogEntry, buildPlanContract } from '../src/catal
 import { validateScene } from '../src/catalog/tools';
 import { parseAnchor } from '../src/core/anchor-grammar';
 import { COMPILER_CHECKS } from '../src/core/compiler-checks';
+import type { SceneCapability } from '../src/core/types';
+import { barChartCapability } from '../src/scenes/BarChartScene';
 import { registry } from '../src/scenes/registry';
+
+const withBarChartMeta = (meta: unknown): SceneCapability =>
+  ({
+    ...barChartCapability,
+    meta,
+  }) as SceneCapability;
 
 /**
  * What the manifest must publish before any capability in it is usable.
@@ -85,6 +93,83 @@ describe('the manifest', () => {
 
     const kinds = new Set(examples.map((example) => parseAnchor(example)?.target.kind));
     expect(kinds).toEqual(new Set(['boundary', 'word']));
+  });
+});
+
+describe('capacity metadata', () => {
+  it('refuses a table without the series field it counts', () => {
+    const { seriesField: _seriesField, ...meta } = barChartCapability.meta;
+
+    expect(() => buildCatalogEntry(withBarChartMeta(meta))).toThrow(
+      /capacityByComposition.*seriesField/,
+    );
+  });
+
+  it('refuses a series field the capability schema does not carry', () => {
+    expect(() =>
+      buildCatalogEntry(withBarChartMeta({ ...barChartCapability.meta, seriesField: 'datta' })),
+    ).toThrow(/seriesField.*datta/);
+  });
+
+  it('refuses composition and layout keys outside the capability declarations', () => {
+    expect(() =>
+      buildCatalogEntry(
+        withBarChartMeta({
+          ...barChartCapability.meta,
+          capacityByComposition: {
+            ...barChartCapability.meta.capacityByComposition,
+            full: {
+              ...barChartCapability.meta.capacityByComposition?.full,
+              standrad: 8,
+            },
+          },
+        }),
+      ),
+    ).toThrow(/capacityByComposition.*standrad/);
+  });
+
+  it('refuses an incomplete composition table', () => {
+    const { right: _right, ...incomplete } = barChartCapability.meta.capacityByComposition ?? {};
+
+    expect(() =>
+      buildCatalogEntry(
+        withBarChartMeta({
+          ...barChartCapability.meta,
+          capacityByComposition: incomplete,
+        }),
+      ),
+    ).toThrow(/capacityByComposition.*supportedCompositions/);
+  });
+
+  it('requires the full-canvas comparison baseline', () => {
+    const { full: _full, ...withoutFull } = barChartCapability.meta.capacityByComposition ?? {};
+
+    expect(() =>
+      buildCatalogEntry(
+        withBarChartMeta({
+          ...barChartCapability.meta,
+          supportedCompositions: ['left', 'right'],
+          capacityByComposition: withoutFull,
+        }),
+      ),
+    ).toThrow(/requires "full".*comparison baseline/);
+  });
+
+  it('refuses a capacity that cannot represent a category count', () => {
+    expect(() =>
+      buildCatalogEntry(
+        withBarChartMeta({
+          ...barChartCapability.meta,
+          capacityByComposition: {
+            ...barChartCapability.meta.capacityByComposition,
+            full: {
+              ...barChartCapability.meta.capacityByComposition?.full,
+              standard: 0,
+            },
+          },
+        }),
+      ),
+    ).toThrow(/capacityByComposition\.full\.standard.*positive integer/);
   });
 });
 

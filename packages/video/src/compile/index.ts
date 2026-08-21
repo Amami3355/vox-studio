@@ -257,8 +257,9 @@ const reportComposedCapacity = (
 ): void => {
   if (!reducesData(outcome)) return;
 
-  const { composition, capacity, onFullCanvas, collapsed } = outcome;
-  const names = collapsed.map((entry) => `"${entry.label}"`).join(', ');
+  const { composition, capacity, onFullCanvas, survivors, collapsed } = outcome;
+  const survivorNames = survivors.map((entry) => `"${entry.label}"`).join(', ');
+  const collapsedNames = collapsed.map((entry) => `"${entry.label}"`).join(', ');
 
   warnings.push({
     code: 'CAPACITY_REDUCED_BY_COMPOSITION',
@@ -269,7 +270,8 @@ const reportComposedCapacity = (
     message:
       `"${scene.id}" yields into "${composition}", where its "${scene.layout}" layout ` +
       `holds ${capacity} of the ${onFullCanvas} it holds on the full canvas. ` +
-      `${names} ${collapsed.length === 1 ? 'is' : 'are'} collapsed and will not be on screen.`,
+      `Surviving labels: ${survivorNames}. Collapsed labels: ${collapsedNames}; ` +
+      `${collapsed.length === 1 ? 'it is' : 'they are'} not on screen.`,
     suggestion:
       'Place the contending element in a slot this scene does not occupy, choose a layout ' +
       'the composition holds more of, or shorten the series to what it holds.',

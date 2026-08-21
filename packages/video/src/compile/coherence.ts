@@ -41,10 +41,10 @@ import type { CompiledScene } from './document';
  * a place mid-sentence in a language that capitalises differently, is naming it either way.
  */
 const names = (text: string, label: string): boolean => {
-  const needle = tokenise(label).map((word) => word.text.toLocaleLowerCase());
+  const needle = tokenise(label).map((word) => word.text.toLowerCase());
   if (needle.length === 0) return false;
 
-  const haystack = tokenise(text).map((word) => word.text.toLocaleLowerCase());
+  const haystack = tokenise(text).map((word) => word.text.toLowerCase());
   return haystack.some(
     (_, index) =>
       index + needle.length <= haystack.length &&
@@ -52,12 +52,12 @@ const names = (text: string, label: string): boolean => {
   );
 };
 
-/** Every free-text string an event carries, with the field it came from. */
-const eventTexts = (scene: CompiledScene): { field: string; text: string }[] =>
+/** Every string-valued event field; the key keeps structural labels distinct from prose. */
+const eventStrings = (scene: CompiledScene): { key: string; field: string; text: string }[] =>
   scene.events.flatMap((event, index) =>
     Object.entries(event.payload ?? {})
       .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-      .map(([key, text]) => ({ field: `events[${index}].payload.${key}`, text })),
+      .map(([key, text]) => ({ key, field: `events[${index}].payload.${key}`, text })),
   );
 
 export const reportCollapsedMentions = ({
@@ -74,6 +74,8 @@ export const reportCollapsedMentions = ({
   sectionId: string;
   warnings: CompilerWarning[];
 }): void => {
+  const carriedStrings = eventStrings(scene);
+
   for (const entry of collapsed) {
     /**
      * A payload field that *is* the label is a pointing gesture at a bar that will not be
@@ -82,7 +84,9 @@ export const reportCollapsedMentions = ({
      * removed it. Reported before the prose case because its repair is different: the
      * event has to point somewhere else, or the value has to stay.
      */
-    const pointing = eventTexts(scene).filter(({ text }) => text === entry.label);
+    const pointing = carriedStrings.filter(
+      ({ key, text }) => key === 'label' && text === entry.label,
+    );
     for (const { field } of pointing) {
       warnings.push({
         code: 'NARRATION_NAMES_COLLAPSED_VALUE',
@@ -98,8 +102,8 @@ export const reportCollapsedMentions = ({
     }
 
     const spoken = beats.filter((beat) => names(beat.text, entry.label));
-    const written = eventTexts(scene).filter(
-      ({ text }) => text !== entry.label && names(text, entry.label),
+    const written = carriedStrings.filter(
+      ({ key, text }) => key !== 'label' && names(text, entry.label),
     );
     if (spoken.length === 0 && written.length === 0) continue;
 

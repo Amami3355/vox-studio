@@ -9,7 +9,7 @@
  * runs, and a failure the moment the two drift.
  *
  * **What this proves and what it does not.** It proves the published number is the number
- * `capacity.ts` computes, for every composition, every layout and every motion profile —
+ * `layouts.ts` computes, for every composition, every layout and every motion profile —
  * which is the whole of the compiler's claim, since the compiler only ever repeats what is
  * declared here. It does not prove the resulting frame is worth watching; that is a render
  * and a person, and `meta.ts` says so in terms.
@@ -21,9 +21,12 @@ import { motionProfiles } from '../src/design/motion';
 import { themes } from '../src/design/theme';
 import { cameraBounds, cameraInset } from '../src/primitives/CameraRig';
 import { frameBoxFor } from '../src/primitives/SlotFrame';
-import { barChartCapacity } from '../src/scenes/BarChartScene/capacity';
 import { barChartConstraints } from '../src/scenes/BarChartScene/constraints';
-import { type BarChartLayoutId, barChartLayoutIds } from '../src/scenes/BarChartScene/layouts';
+import {
+  type BarChartLayoutId,
+  barChartCapacity,
+  barChartLayoutIds,
+} from '../src/scenes/BarChartScene/layouts';
 import { barChartMeta } from '../src/scenes/BarChartScene/meta';
 
 const recommendedMax = barChartConstraints.data?.recommendedMax ?? 8;

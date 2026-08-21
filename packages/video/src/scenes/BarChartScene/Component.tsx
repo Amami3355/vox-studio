@@ -18,9 +18,8 @@ import {
   useFrameBox,
   useSpace,
 } from '../../primitives';
-import { barChartCapacity, isComposed } from './capacity';
 import { barChartConstraints } from './constraints';
-import { type BarChartLayoutId, barChartGeometry } from './layouts';
+import { type BarChartLayoutId, barChartCapacity, barChartGeometry, isComposed } from './layouts';
 import type { BarChartProps } from './schema';
 import { initialBarChartState, makeBarChartReducer } from './state';
 
@@ -87,9 +86,8 @@ const ChartFrame: React.FC<{
    * degradation the capability already declares rather than a new one: the weakest values
    * collapse, exactly as they do past the soft limit.
    *
-   * The arithmetic moved to `capacity.ts` when `meta.ts` began publishing its answer, so
-   * that a test can ask the question the same way this line does. What it computes, and
-   * why the vertical form asks about width rather than height, is argued there.
+   * The arithmetic lives beside the layout geometry in `layouts.ts`, so a test can ask the
+   * question the same way this line does and the published answer cannot drift from it.
    */
   const recommendedMax = barChartConstraints.data?.recommendedMax ?? 8;
   const capacity = barChartCapacity({ box, variant, theme, recommendedMax });

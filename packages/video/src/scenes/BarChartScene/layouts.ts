@@ -8,6 +8,8 @@
  * Internal slots accept typed primitives (text, value, annotation, asset), not scenes.
  */
 import type { LayoutDef } from '../../core/types';
+import type { Theme } from '../../design/theme';
+import { type FrameBox, densityFor } from '../../primitives/SlotFrame';
 
 export const barChartLayouts = {
   standard: {
@@ -149,3 +151,58 @@ export const barChartGeometry = {
   calloutColumns: 34,
   chartColumns: 62,
 } as const;
+
+/** A step of a scale, read through the density a box earns. Mirrors `useTypeSize`/`useSpace`. */
+const step = (scale: readonly number[], index: number, density: number): number =>
+  Math.round(
+    (scale[Math.min(scale.length - 1, Math.max(0, Math.round(index)))] as number) * density,
+  );
+
+/** True when the box is portrait enough that the scene draws its composed form. */
+export const isComposed = (box: FrameBox): boolean =>
+  box.width / box.height < barChartGeometry.composeBelowAspect;
+
+/**
+ * How many categories a box can carry at full size.
+ *
+ * `meta.ts` publishes this answer. Keeping the calculation with the layout-owned geometry
+ * lets both the component and `tests/composed-capacity.test.ts` read the same arithmetic,
+ * so the render and the code-blind agent's contract cannot drift apart.
+ */
+export const barChartCapacity = ({
+  box,
+  variant,
+  theme,
+  recommendedMax,
+}: {
+  box: FrameBox;
+  variant: BarChartLayoutId;
+  theme: Theme;
+  recommendedMax: number;
+}): number => {
+  if (!isComposed(box)) return recommendedMax;
+
+  const density = densityFor(box);
+
+  /**
+   * What one horizontal row costs, from the same tokens `BarGroup` lays it out with: the
+   * bar is `valueSize * 1.35` tall and the rows are separated by one `space[3]` gap.
+   */
+  const rowPitch = step(theme.type.scale, 1, density) * 1.35 + step(theme.space, 3, density);
+
+  /**
+   * What one vertical column costs, on the same terms: the room its name needs, plus the
+   * gap that separates it from the next. Width is the bounding axis because the labels,
+   * unlike the bars, cannot shrink below their min-content width without truncation.
+   */
+  const columnPitch =
+    step(theme.type.scale, 0, density) * barChartGeometry.minLabelEms +
+    step(theme.space, 3, density);
+
+  return Math.max(
+    barChartGeometry.minCategories,
+    variant === 'horizontal'
+      ? Math.floor((box.height * barChartGeometry.chartShare) / rowPitch)
+      : Math.floor((box.width * barChartGeometry.chartShare) / columnPitch),
+  );
+};

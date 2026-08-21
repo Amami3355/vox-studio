@@ -310,8 +310,9 @@ in the `message` instead, and the repair goes in `suggestion`.
 
 **V2 needed a refactor the spec did not budget.** Holding the declaration to the arithmetic
 is impossible while the arithmetic lives inline in a React component behind three hooks. The
-capacity expression moved to `BarChartScene/capacity.ts` and SlotFrame's box and density
-arithmetic became callable (`frameBoxFor`, `densityFor`) — unchanged, re-addressed. A test
+capacity expression moved beside its geometry in `BarChartScene/layouts.ts`, and SlotFrame's
+box and density arithmetic became callable (`frameBoxFor`, `densityFor`) — unchanged,
+re-addressed. A test
 that recomputed the box itself would have agreed with itself and with nothing else.
 
 **Slice 5 took a different repair than the one specified, on the evidence of a render.**

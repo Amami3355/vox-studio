@@ -79,23 +79,106 @@ const toJsonSchema = (schema: z.ZodType): JsonSchemaObject =>
     unrepresentable: 'any',
   }) as JsonSchemaObject;
 
-export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => ({
-  ...capability.meta,
-  propsSchema: toJsonSchema(capability.schema),
-  softConstraints: capability.constraints,
-  layouts: Object.entries(capability.layouts).map(([id, layout]) => ({
-    id,
-    description: layout.description,
-    slots: layout.slots,
-  })),
-  actions: Object.entries(capability.actions).map(([id, action]) => ({
-    id,
-    description: action.description,
-    payloadSchema: action.payload ? toJsonSchema(action.payload) : null,
-    ...(action.deicticFields ? { deicticFields: [...action.deicticFields] } : {}),
-  })),
-  examples: capability.examples,
-});
+const keysOf = (value: unknown): string[] =>
+  value !== null && typeof value === 'object' ? Object.keys(value) : [];
+
+const sameMembers = (actual: string[], expected: string[]): boolean =>
+  actual.length === expected.length && actual.every((entry) => expected.includes(entry));
+
+/**
+ * Capacity metadata is compiler input. A misspelled prop/layout or a half-declaration used
+ * to type-check and then disable the warning silently, which is worse than rejecting the
+ * capability: the manifest still promised a repair that the compiler could no longer see.
+ */
+const assertCapacityMetadata = (
+  capability: SceneCapability,
+  propsSchema: JsonSchemaObject,
+): void => {
+  const { capacityByComposition, seriesField } = capability.meta;
+  if ((capacityByComposition === undefined) !== (seriesField === undefined)) {
+    throw new Error(
+      `Capability "${capability.meta.id}" must declare capacityByComposition and seriesField together.`,
+    );
+  }
+  if (capacityByComposition === undefined || seriesField === undefined) return;
+
+  const properties = (propsSchema.properties ?? {}) as Record<string, JsonSchemaObject>;
+  const seriesSchema = properties[seriesField];
+  if (seriesSchema?.type !== 'array') {
+    throw new Error(
+      `Capability "${capability.meta.id}" seriesField "${seriesField}" must name an array prop in its schema.`,
+    );
+  }
+
+  const itemSchema = (seriesSchema.items ?? {}) as JsonSchemaObject;
+  const itemProperties = (itemSchema.properties ?? {}) as Record<string, JsonSchemaObject>;
+  const required = Array.isArray(itemSchema.required) ? itemSchema.required : [];
+  if (
+    itemSchema.type !== 'object' ||
+    itemProperties.label?.type !== 'string' ||
+    !['number', 'integer'].includes(itemProperties.value?.type as string) ||
+    !required.includes('label') ||
+    !required.includes('value')
+  ) {
+    throw new Error(
+      `Capability "${capability.meta.id}" seriesField "${seriesField}" must contain required { label: string, value: number } entries.`,
+    );
+  }
+
+  const compositions = keysOf(capacityByComposition);
+  if (!capability.meta.supportedCompositions.includes('full')) {
+    throw new Error(
+      `Capability "${capability.meta.id}" capacityByComposition requires "full" as its comparison baseline.`,
+    );
+  }
+  if (!sameMembers(compositions, capability.meta.supportedCompositions)) {
+    throw new Error(
+      `Capability "${capability.meta.id}" capacityByComposition must cover exactly supportedCompositions; received ${compositions.join(', ')}.`,
+    );
+  }
+
+  const layouts = Object.keys(capability.layouts);
+  for (const composition of capability.meta.supportedCompositions) {
+    const declared = capacityByComposition[composition] ?? {};
+    const declaredLayouts = keysOf(declared);
+    if (!sameMembers(declaredLayouts, layouts)) {
+      const unknown = declaredLayouts.find((layout) => !layouts.includes(layout));
+      throw new Error(
+        `Capability "${capability.meta.id}" capacityByComposition.${composition} must cover exactly its layouts${unknown ? `; unknown layout "${unknown}"` : ''}.`,
+      );
+    }
+    for (const [layout, capacity] of Object.entries(declared)) {
+      if (!Number.isInteger(capacity) || capacity <= 0) {
+        throw new Error(
+          `Capability "${capability.meta.id}" capacityByComposition.${composition}.${layout} must be a positive integer.`,
+        );
+      }
+    }
+  }
+};
+
+export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => {
+  const propsSchema = toJsonSchema(capability.schema);
+  assertCapacityMetadata(capability, propsSchema);
+
+  return {
+    ...capability.meta,
+    propsSchema,
+    softConstraints: capability.constraints,
+    layouts: Object.entries(capability.layouts).map(([id, layout]) => ({
+      id,
+      description: layout.description,
+      slots: layout.slots,
+    })),
+    actions: Object.entries(capability.actions).map(([id, action]) => ({
+      id,
+      description: action.description,
+      payloadSchema: action.payload ? toJsonSchema(action.payload) : null,
+      ...(action.deicticFields ? { deicticFields: [...action.deicticFields] } : {}),
+    })),
+    examples: capability.examples,
+  };
+};
 
 export const buildCatalog = (): Catalog => ({
   manifestVersion: 4,

@@ -7,7 +7,7 @@
  * entire justification. One that fired on "Berliner" or on a value nobody mentions would
  * be ignored inside a week, and an ignored report is worse than none.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { reportCollapsedMentions } from '../src/compile/coherence';
 import type { CompiledScene } from '../src/compile/document';
 import { type CompilerWarning, NO_SAFE_AREA } from '../src/core/types';
@@ -68,6 +68,18 @@ describe('a collapsed value that is still being spoken about', () => {
     expect(warnings[0]?.message).toContain('events[0].payload.text');
   });
 
+  it('keeps an exact free-text match on the prose path', () => {
+    const warnings = run({
+      collapsed: ['Berlin'],
+      events: [{ frame: 10, action: 'annotate', payload: { text: 'Berlin' } }],
+    });
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.field).toBe('props.data');
+    expect(warnings[0]?.message).toContain('events[0].payload.text');
+    expect(warnings[0]?.message).not.toContain('draw nothing');
+  });
+
   /**
    * A payload field that *is* the label is a different defect with a different repair: the
    * event resolves and draws nothing, the way a `highlightBar` on an absent label does.
@@ -110,12 +122,33 @@ describe('a collapsed value that is still being spoken about', () => {
       run({ collapsed: ['Berlin'], beats: [{ id: 'b1', text: 'berlin sits lower.' }] }),
     ).toHaveLength(1);
   });
+
+  it('folds case without consulting the host locale', () => {
+    const localeFold = vi.spyOn(String.prototype, 'toLocaleLowerCase').mockImplementation(() => {
+      throw new Error('host locale consulted');
+    });
+
+    try {
+      expect(run({ collapsed: ['I'], beats: [{ id: 'b1', text: 'i is lower.' }] })).toHaveLength(1);
+    } finally {
+      localeFold.mockRestore();
+    }
+  });
 });
 
 describe('a collapsed value nobody is talking about', () => {
   it('says nothing when no beat and no event names it', () => {
     expect(
       run({ collapsed: ['Paris'], beats: [{ id: 'b1', text: 'Rents rose everywhere.' }] }),
+    ).toEqual([]);
+  });
+
+  it('does not treat another structural label as prose', () => {
+    expect(
+      run({
+        collapsed: ['Berlin'],
+        events: [{ frame: 10, action: 'highlightBar', payload: { label: 'Berlin district' } }],
+      }),
     ).toEqual([]);
   });
 

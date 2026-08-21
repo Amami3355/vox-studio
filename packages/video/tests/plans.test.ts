@@ -180,7 +180,7 @@ describe('the vertical slice', () => {
       ]);
     });
 
-    it('names the values the composition collapsed, and says where they went', () => {
+    it('names the values the composition kept and collapsed, and says where they went', () => {
       const capacity = brokenReport.warnings.find(
         (warning) => warning.code === 'CAPACITY_REDUCED_BY_COMPOSITION',
       );
@@ -188,6 +188,9 @@ describe('the vertical slice', () => {
       expect(capacity?.sceneId).toBe('chart');
       expect(capacity?.message).toContain('yields into "left"');
       expect(capacity?.message).toContain('holds 3 of the 8');
+      expect(capacity?.message).toContain('"Amsterdam"');
+      expect(capacity?.message).toContain('"Dublin"');
+      expect(capacity?.message).toContain('"London"');
       expect(capacity?.message).toContain('"Berlin"');
       expect(capacity?.message).toContain('"Paris"');
     });
