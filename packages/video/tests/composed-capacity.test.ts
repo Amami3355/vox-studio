@@ -71,7 +71,8 @@ describe('bar_chart publishes what its composed box actually holds', () => {
 
       it(`never promises more than ${slot}/${variant} can draw`, () => {
         const declared = barChartMeta.capacityByComposition?.[slot]?.[variant] ?? 0;
-        for (const actual of computed(slot, variant)) expect(actual).toBeGreaterThanOrEqual(declared);
+        for (const actual of computed(slot, variant))
+          expect(actual).toBeGreaterThanOrEqual(declared);
       });
     }
   }

@@ -1,3 +1,4 @@
+import type { Theme } from '../../design/theme';
 /**
  * How many categories a box can carry at full size.
  *
@@ -13,8 +14,7 @@
  * and the claim cannot drift apart. `tests/render/composed-capacity.test.ts` is what holds
  * them together.
  */
-import { densityFor, type FrameBox } from '../../primitives/SlotFrame';
-import type { Theme } from '../../design/theme';
+import { type FrameBox, densityFor } from '../../primitives/SlotFrame';
 import { barChartGeometry } from './layouts';
 import type { BarChartLayoutId } from './layouts';
 
@@ -59,7 +59,8 @@ export const barChartCapacity = ({
    * plot 592px into the half the compiler had reserved for something else.
    */
   const columnPitch =
-    step(theme.type.scale, 0, density) * barChartGeometry.minLabelEms + step(theme.space, 3, density);
+    step(theme.type.scale, 0, density) * barChartGeometry.minLabelEms +
+    step(theme.space, 3, density);
 
   return Math.max(
     barChartGeometry.minCategories,

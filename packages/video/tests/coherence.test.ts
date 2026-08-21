@@ -8,9 +8,9 @@
  * be ignored inside a week, and an ignored report is worse than none.
  */
 import { describe, expect, it } from 'vitest';
-import { NO_SAFE_AREA, type CompilerWarning } from '../src/core/types';
-import type { CompiledScene } from '../src/compile/document';
 import { reportCollapsedMentions } from '../src/compile/coherence';
+import type { CompiledScene } from '../src/compile/document';
+import { type CompilerWarning, NO_SAFE_AREA } from '../src/core/types';
 
 const scene = (events: CompiledScene['events'] = []): CompiledScene => ({
   id: 'chart',

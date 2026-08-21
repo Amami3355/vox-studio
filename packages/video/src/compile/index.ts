@@ -26,9 +26,9 @@ import {
 import type { MotionProfileId } from '../design/motion';
 import { FPS } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
-import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { type CapacityOutcome, capacityOutcome, reducesData } from './capacity';
 import { reportCollapsedMentions } from './coherence';
+import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
 import { compositionFor, resolvePersistentLayer, safeAreaFor } from './persistent';
 import { checkTimings, spanWindow, toFrameBeats } from './timings';
 

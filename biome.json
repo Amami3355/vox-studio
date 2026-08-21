@@ -2,7 +2,13 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "ignore": ["**/dist", "**/node_modules", "**/catalog.json", "**/.remotion"]
+    "ignore": [
+      "**/dist",
+      "**/node_modules",
+      "**/.remotion",
+      "packages/video/src/catalog/*.json",
+      "packages/production/src/contracts/generated/*.json"
+    ]
   },
   "formatter": {
     "enabled": true,

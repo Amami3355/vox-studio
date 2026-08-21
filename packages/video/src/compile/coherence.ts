@@ -90,9 +90,7 @@ export const reportCollapsedMentions = ({
         sceneId: scene.id,
         sectionId,
         field,
-        message:
-          `"${entry.label}" was collapsed out of "${scene.id}", and this event points at ` +
-          'it by name. The event will resolve and draw nothing.',
+        message: `"${entry.label}" was collapsed out of "${scene.id}", and this event points at it by name. The event will resolve and draw nothing.`,
         suggestion:
           'Keep the value on screen — see CAPACITY_REDUCED_BY_COMPOSITION — or point the ' +
           'event at a value that survives.',
@@ -115,7 +113,7 @@ export const reportCollapsedMentions = ({
       severity: 'important',
       sceneId: scene.id,
       sectionId,
-      field: `props.data`,
+      field: 'props.data',
       message:
         `"${entry.label}" was collapsed out of "${scene.id}" and is not on screen, but ` +
         `${where} still names it. The words describe a frame the viewer is not being shown.`,
