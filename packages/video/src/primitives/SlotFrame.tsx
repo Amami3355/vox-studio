@@ -49,6 +49,33 @@ const FrameBoxCtx = createContext<FrameBox>({ width: WIDTH, height: HEIGHT });
  */
 export const useFrameBox = (): FrameBox => useContext(FrameBoxCtx);
 
+/**
+ * The box a safe area leaves, in canvas px — SlotFrame's arithmetic, extracted so that it
+ * has one home rather than two.
+ *
+ * A capability that publishes what a composed box can hold has made a claim about *this*
+ * function, and `meta.ts` has required since the scaffold that such a claim be paid for by
+ * drawing the frame. A test can only hold it to that if it can ask the same question the
+ * component asks, from the same numbers. Duplicating the margin and the camera allowance
+ * in a test would produce a check that agrees with itself and with nothing else.
+ */
+export const frameBoxFor = (
+  safeArea: SafeArea,
+  { margin, camera }: { margin: number; camera: { x: number; y: number } },
+): FrameBox => {
+  const top = margin + camera.y + (safeArea.top / 100) * HEIGHT;
+  const right = margin + camera.x + (safeArea.right / 100) * WIDTH;
+  const bottom = margin + camera.y + (safeArea.bottom / 100) * HEIGHT;
+  const left = margin + camera.x + (safeArea.left / 100) * WIDTH;
+  return { width: WIDTH - left - right, height: HEIGHT - top - bottom };
+};
+
+/** The density a box earns, on the same terms `SlotFrame` provides it to its children. */
+export const densityFor = (box: FrameBox): number => {
+  const areaRatio = (box.width * box.height) / (WIDTH * HEIGHT);
+  return Math.max(DENSITY_FLOOR, Math.min(1, Math.sqrt(Math.max(areaRatio, 0.01))));
+};
+
 export const SlotFrame: React.FC<{
   safeArea: SafeArea;
   children: React.ReactNode;
@@ -83,13 +110,9 @@ export const SlotFrame: React.FC<{
   const bottom = margin + camera.y + (safeArea.bottom / 100) * HEIGHT;
   const left = margin + camera.x + (safeArea.left / 100) * WIDTH;
 
-  const box = useMemo(
-    () => ({ width: WIDTH - left - right, height: HEIGHT - top - bottom }),
-    [left, right, top, bottom],
-  );
+  const box = useMemo(() => frameBoxFor(safeArea, { margin, camera }), [safeArea, margin, camera]);
 
-  const areaRatio = (box.width * box.height) / (WIDTH * HEIGHT);
-  const density = Math.max(DENSITY_FLOOR, Math.min(1, Math.sqrt(Math.max(areaRatio, 0.01))));
+  const density = densityFor(box);
 
   return (
     <AbsoluteFill

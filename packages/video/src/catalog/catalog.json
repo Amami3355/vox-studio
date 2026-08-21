@@ -269,6 +269,24 @@
         "left",
         "right"
       ],
+      "capacityByComposition": {
+        "full": {
+          "standard": 8,
+          "horizontal": 8,
+          "withCallout": 8
+        },
+        "left": {
+          "standard": 3,
+          "horizontal": 8,
+          "withCallout": 3
+        },
+        "right": {
+          "standard": 3,
+          "horizontal": 8,
+          "withCallout": 3
+        }
+      },
+      "seriesField": "data",
       "minDurationFrames": 90,
       "recommendedDurationFrames": 210,
       "propsSchema": {
@@ -347,7 +365,7 @@
           "recommendedMin": 2,
           "recommendedMax": 8,
           "absoluteMax": 20,
-          "onExceed": "Values ranked below the top 8 are collapsed into a single 'Others' bar.",
+          "onExceed": "On the full canvas, values ranked below the top 8 are collapsed. A scene that yields into a half frame holds fewer — see `capacityByComposition`, which publishes the figure for every composition and layout — and collapses to that number instead. What collapsing does depends on `valueKind`: an 'amount' gathers the rest into a single 'Others' bar carrying their total, a 'share' drops them, because adding proportions of different wholes would invent a category.",
           "onEmpty": "Typographic empty state showing the title alone."
         },
         "title": {

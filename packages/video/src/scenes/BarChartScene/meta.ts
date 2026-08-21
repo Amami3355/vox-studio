@@ -38,6 +38,22 @@ export const barChartMeta: SceneMeta = {
   requiresAssets: false,
   occupiesRegions: ['bottom', 'left'],
   supportedCompositions: ['full', 'left', 'right'],
+  /**
+   * Measured, not estimated — `tests/render/composed-capacity.test.ts` recomputes every
+   * one of these from `capacity.ts` and fails on drift.
+   *
+   * The horizontal row is the entry worth reading twice: a half frame that holds three
+   * vertical columns holds eight horizontal rows, because a column is bounded by the width
+   * its name needs and a row by the height of the box. An agent whose chart has to share a
+   * section with a persistent element has a real repair here that costs it no data at all,
+   * and until this table existed there was no way to publish it.
+   */
+  capacityByComposition: {
+    full: { standard: 8, horizontal: 8, withCallout: 8 },
+    left: { standard: 3, horizontal: 8, withCallout: 3 },
+    right: { standard: 3, horizontal: 8, withCallout: 3 },
+  },
+  seriesField: 'data',
   minDurationFrames: 90,
   recommendedDurationFrames: 210,
 };

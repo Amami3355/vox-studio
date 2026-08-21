@@ -17,8 +17,8 @@ import {
   useEntrance,
   useFrameBox,
   useSpace,
-  useTypeSize,
 } from '../../primitives';
+import { barChartCapacity, isComposed } from './capacity';
 import { barChartConstraints } from './constraints';
 import { type BarChartLayoutId, barChartGeometry } from './layouts';
 import type { BarChartProps } from './schema';
@@ -76,50 +76,23 @@ const ChartFrame: React.FC<{
   const variant = (layout as BarChartLayoutId) ?? 'standard';
 
   const box = useFrameBox();
-  const composed = box.width / box.height < barChartGeometry.composeBelowAspect;
-
-  /**
-   * What one horizontal row costs, from the same tokens `BarGroup` lays it out with: the
-   * bar is `valueSize * 1.35` tall and the rows are separated by one `space[3]` gap. Read
-   * through the density scale, so it already accounts for a squeezed scene.
-   */
-  const rowPitch = useTypeSize(1) * 1.35 + useSpace(3);
-
-  /**
-   * What one vertical column costs, on the same terms: the room its name needs, plus the
-   * gap that separates it from the next. `BarGroup` lays the columns out with exactly
-   * these two tokens.
-   */
-  const columnPitch = useTypeSize(0) * barChartGeometry.minLabelEms + useSpace(3);
+  const composed = isComposed(box);
 
   /**
    * How many categories this box can carry at full size.
    *
    * On the full canvas that is the published soft constraint and nothing else — the
    * catalog says 8, and a scene that quietly kept 6 would make the manifest a lie. A
-   * composed box asks the same question of its own height, and the answer feeds the
+   * composed box asks the same question of its own shape, and the answer feeds the
    * degradation the capability already declares rather than a new one: the weakest values
-   * collapse into `Others`, exactly as they do past the soft limit.
+   * collapse, exactly as they do past the soft limit.
    *
-   * Vertical columns ask the same question of the box's *width*, because that is the axis
-   * they are laid out along. This used to exclude them by name — *"bounded by width rather
-   * than height and not capped here: at `maxWidth: 200` per column, eight of them ask for
-   * 1600px and a half frame gives 537, so they simply get narrower"* — which is true of the
-   * bars and false of the names underneath them. The bars did get narrower. The labels did
-   * not, and the content-stress suite drew the result: twenty categories at their
-   * forty-character ceiling put the plot 592px into the half the compiler had reserved.
-   * Nine columns in a 538px box is not nine narrow columns, it is a chart with no room to
-   * say what it is counting.
+   * The arithmetic moved to `capacity.ts` when `meta.ts` began publishing its answer, so
+   * that a test can ask the question the same way this line does. What it computes, and
+   * why the vertical form asks about width rather than height, is argued there.
    */
   const recommendedMax = barChartConstraints.data?.recommendedMax ?? 8;
-  const capacity = !composed
-    ? recommendedMax
-    : Math.max(
-        barChartGeometry.minCategories,
-        variant === 'horizontal'
-          ? Math.floor((box.height * barChartGeometry.chartShare) / rowPitch)
-          : Math.floor((box.width * barChartGeometry.chartShare) / columnPitch),
-      );
+  const capacity = barChartCapacity({ box, variant, theme, recommendedMax });
 
   const { series: data } = aggregateBeyond(props.data, Math.min(recommendedMax, capacity), {
     valueKind: props.valueKind,

@@ -163,6 +163,40 @@ export type SceneMeta = {
   supportedCompositions: Slot[];
   minDurationFrames: number;
   recommendedDurationFrames: number;
+  /**
+   * How many entries of `seriesField` this capability keeps, per composition and per
+   * layout. Absent for capabilities whose output does not depend on a count.
+   *
+   * **Declared, never computed.** ADR-0003 decision 4 keeps scene geometry out of the
+   * compiler — `safeArea` is the translation, not a second layout system — so the compiler
+   * may not work this number out. It may only be *told*, in the same way
+   * `supportedCompositions` tells it which shapes exist. That is what lets the compile
+   * report say "this scene yielded into `left`, where it holds 3, and your plan has 5"
+   * without the compiler ever knowing what a column pitch is.
+   *
+   * **The number is a floor, not a forecast.** The real capacity also moves with the
+   * camera allowance, which belongs to the motion profile: in a half frame the vertical
+   * form holds 4 under `impact` and 3 under `pushIn`. Publishing the smallest value across
+   * every profile is the only figure that is true whatever the plan chooses, and warning
+   * slightly early is the safe direction — the repair is the same either way.
+   *
+   * **Both axes are load-bearing.** A half frame holds 3 vertical columns and 8 horizontal
+   * rows, because columns are bounded by the width their labels need and rows by height.
+   * Indexing on composition alone would publish one of those two numbers as though it were
+   * both, which is the defect this field exists to end.
+   *
+   * `tests/render/composed-capacity.test.ts` holds every entry to what the scene actually
+   * computes. A number here that nothing checks is `constraints.ts`'s "top 8" again.
+   */
+  capacityByComposition?: Partial<Record<Slot, Record<string, number>>>;
+  /**
+   * The prop holding the series `capacityByComposition` counts, e.g. `'data'`.
+   *
+   * The compiler is generic and `props.data` means nothing to it. Naming the field is what
+   * lets it reuse `aggregateBeyond` and learn not only how many entries would be collapsed
+   * but *which labels*, which is what the narration-coherence check reads.
+   */
+  seriesField?: string;
 };
 
 /** One entry of the catalog. Defined by code, generated at build, immutable at runtime. */
