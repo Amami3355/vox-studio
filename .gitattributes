@@ -1,6 +1,15 @@
-# Generated contract projections. `build-catalog.ts` and `contracts/generate.ts` write LF,
-# and their `--check` modes compare bytes, so a CRLF checkout makes the check permanently
-# red on Windows and green on CI. Pin the line endings rather than the comparison: the
-# files are published artifacts, and their bytes are the contract.
-packages/video/src/catalog/*.json                    text eol=lf
-packages/production/src/contracts/generated/*.json   text eol=lf
+# Line endings are LF, in the repository and in the working tree.
+#
+# Two gates read bytes and both were unreadable without this. `catalog:check` compares the
+# generated contract projections byte for byte, because those files are published artifacts
+# and their bytes *are* the contract. `biome check` formats to LF and reported twenty errors
+# whose only content was a carriage return.
+#
+# Both were red on Windows and green in CI, which is the worst arrangement available: the
+# check is unreadable exactly where the code is edited, and believed exactly where nobody is
+# looking. `core.autocrlf` was converting on checkout with nothing here to say otherwise —
+# the repository itself has always been LF, so this declares what was already true rather
+# than changing anything.
+#
+# `text=auto` sniffs content, so binaries are left alone without needing to be listed.
+* text=auto eol=lf
