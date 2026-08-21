@@ -17,6 +17,7 @@ import {
   type Slot,
 } from '../core/types';
 import { requireCapability } from '../scenes/registry';
+import { capacityOutcome, reducesData } from './capacity';
 import { type ElementOutcome, resolveSceneConflicts } from './conflict';
 import type { CompiledScene, LayoutState } from './document';
 
@@ -25,6 +26,7 @@ type Window = { from: number; to: number };
 export type PersistentLayer = {
   layoutStates: LayoutState[];
   safeAreaOf: Map<string, SafeArea>;
+  compositionOf: Map<string, Slot>;
   warnings: CompilerWarning[];
 };
 
@@ -41,6 +43,17 @@ export const resolvePersistentLayer = (
 
   const layoutStates: LayoutState[] = [];
   const safeAreaOf = new Map<string, SafeArea>();
+  /**
+   * The slot the scene yielded into, kept rather than discarded.
+   *
+   * `safeAreaOf` already carries its *rectangle*, and for the renderer that is the whole
+   * story — the component is told the box it got and never the composition (ADR-0003
+   * decision 4). But the compiler has one more question to ask of the composition itself:
+   * whether the capability publishes a smaller capacity for it. Deriving the slot back out
+   * of a rectangle would be a second reading of `slots.ts`, which is the drift decision 5
+   * exists to prevent, so the answer is simply not thrown away.
+   */
+  const compositionOf = new Map<string, Slot>();
   const warnings: CompilerWarning[] = [];
 
   /**
@@ -77,6 +90,7 @@ export const resolvePersistentLayer = (
 
     if (resolution.composition !== null) {
       safeAreaOf.set(scene.id, slotRect(resolution.composition));
+      compositionOf.set(scene.id, resolution.composition);
     }
 
     for (const [index, { element, segments }] of crossing.entries()) {
@@ -97,12 +111,21 @@ export const resolvePersistentLayer = (
       }
 
       if (outcome.kind === 'sceneYielded') {
+        /**
+         * A yield that merely moves a badge is information. A yield that costs the scene
+         * half its categories is not, and reporting both at `info` is what let the second
+         * hide behind the first for as long as it did. The consequence is asked of
+         * `capacity.ts` rather than worked out here, so that this severity and the
+         * `CAPACITY_REDUCED_BY_COMPOSITION` the compiler emits can never disagree.
+         */
+        const costly = reducesData(capacityOutcome(scene, resolution.composition));
         warnings.push(
           relocation(
             section,
             scene,
             element,
             `the scene yields into "${resolution.composition as Slot}"`,
+            costly ? 'quality' : 'info',
           ),
         );
       }
@@ -134,11 +157,15 @@ export const resolvePersistentLayer = (
     }
   }
 
-  return { layoutStates: merge(layoutStates), safeAreaOf, warnings };
+  return { layoutStates: merge(layoutStates), safeAreaOf, compositionOf, warnings };
 };
 
 export const safeAreaFor = (layer: PersistentLayer, sceneId: string): SafeArea =>
   layer.safeAreaOf.get(sceneId) ?? NO_SAFE_AREA;
+
+/** The composition a scene yielded into, or null when it kept the whole canvas. */
+export const compositionFor = (layer: PersistentLayer, sceneId: string): Slot | null =>
+  layer.compositionOf.get(sceneId) ?? null;
 
 /**
  * `SLOT_RELOCATED` covers two different repairs. The code alone is ambiguous, and the
@@ -149,9 +176,10 @@ const relocation = (
   scene: CompiledScene,
   element: PersistentElement,
   repair: string,
+  severity: 'info' | 'quality' = 'info',
 ): CompilerWarning => ({
   code: 'SLOT_RELOCATED',
-  severity: 'info',
+  severity,
   sceneId: scene.id,
   sectionId: section.id,
   field: `persistent[${element.id}]`,

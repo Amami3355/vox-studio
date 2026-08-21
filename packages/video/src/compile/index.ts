@@ -19,6 +19,7 @@ import {
   type ResolvedSceneAssets,
   type SceneCapability,
   type SemanticEvent,
+  type Slot,
   type TimedBeat,
   type TimedEvent,
 } from '../core/types';
@@ -26,7 +27,8 @@ import type { MotionProfileId } from '../design/motion';
 import { FPS } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
 import type { CompiledAudio, CompiledDocument, CompiledScene, CompiledSection } from './document';
-import { resolvePersistentLayer, safeAreaFor } from './persistent';
+import { type CapacityOutcome, capacityOutcome, reducesData } from './capacity';
+import { compositionFor, resolvePersistentLayer, safeAreaFor } from './persistent';
 import { checkTimings, spanWindow, toFrameBeats } from './timings';
 
 export {
@@ -156,6 +158,7 @@ export const compile = ({
 
     for (const scene of scenes) {
       scene.safeArea = safeAreaFor(layer, scene.id);
+      reportComposedCapacity(scene, compositionFor(layer, scene.id), section.id, warnings);
     }
 
     return {
@@ -201,6 +204,48 @@ export const compile = ({
     },
     report: { ...report, warnings },
   };
+};
+
+/**
+ * A composition that cost the scene data, said out loud.
+ *
+ * The last silent degradation in the system. Every other one already announces itself, and
+ * the map's standing constraint — *"Degradation stays visible"* — makes that a rule rather
+ * than a habit; this one changed the numbers on screen and told nobody. An agent writing
+ * five cities inside the published band of 2–8 received a compile report whose only remark
+ * was an `info` about where a character stood, and rendered four bars.
+ *
+ * Emitted here rather than from `capability.checks` because the question does not exist
+ * until the composition does: `checks` runs inside `validateScene`, long before any
+ * contention has been resolved. This runs on the same line that hands each scene its safe
+ * area, which is the first moment the answer is knowable.
+ */
+const reportComposedCapacity = (
+  scene: CompiledScene,
+  composition: Slot | null,
+  sectionId: string,
+  warnings: CompilerWarning[],
+): void => {
+  const outcome = capacityOutcome(scene, composition);
+  if (!reducesData(outcome)) return;
+
+  const { capacity, onFullCanvas, collapsed } = outcome as CapacityOutcome;
+  const names = collapsed.map((entry) => `"${entry.label}"`).join(', ');
+
+  warnings.push({
+    code: 'CAPACITY_REDUCED_BY_COMPOSITION',
+    severity: 'quality',
+    sceneId: scene.id,
+    sectionId,
+    field: 'props',
+    message:
+      `"${scene.id}" yields into "${composition as Slot}", where its "${scene.layout}" layout ` +
+      `holds ${capacity} of the ${onFullCanvas} it holds on the full canvas. ` +
+      `${names} ${collapsed.length === 1 ? 'is' : 'are'} collapsed and will not be on screen.`,
+    suggestion:
+      'Place the contending element in a slot this scene does not occupy, choose a layout ' +
+      'the composition holds more of, or shorten the series to what it holds.',
+  });
 };
 
 /**

@@ -178,10 +178,20 @@
         "code": "SLOT_RELOCATED",
         "regime": "warning",
         "severity": [
-          "info"
+          "info",
+          "quality"
         ],
         "means": "The compiler moved a persistent element to avoid an unsafe or occupied placement.",
         "repair": "Accept the safe placement, or choose a conflict-free preferred slot."
+      },
+      "CAPACITY_REDUCED_BY_COMPOSITION": {
+        "code": "CAPACITY_REDUCED_BY_COMPOSITION",
+        "regime": "warning",
+        "severity": [
+          "quality"
+        ],
+        "means": "A scene yielded into a composition that holds fewer values than the full canvas, so the weakest were collapsed and are not on screen.",
+        "repair": "Free the region the scene occupies by placing the contending element in a slot the scene does not use, choose a layout the composition holds more of, or shorten the series to what the composition holds."
       },
       "PERSISTENT_ELEMENT_HIDDEN": {
         "code": "PERSISTENT_ELEMENT_HIDDEN",

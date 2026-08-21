@@ -110,11 +110,35 @@ describe('the vertical slice', () => {
    * 180 frames is a claim about how long its animation needs to read, and shortening the
    * claim to fit the writing would have made the warning unable to fire again.
    */
-  it('reports the two relocations, and nothing louder', () => {
+  it('reports the two relocations and what the first one costs', () => {
     expect(report.warnings.map((warning) => [warning.code, warning.severity])).toEqual([
+      ['SLOT_RELOCATED', 'quality'],
       ['SLOT_RELOCATED', 'info'],
-      ['SLOT_RELOCATED', 'info'],
+      ['CAPACITY_REDUCED_BY_COMPOSITION', 'quality'],
     ]);
+  });
+
+  /**
+   * **The regression test for the whole of 2026-08-21.** This plan compiled clean — two
+   * `info` warnings about where a character stood — and rendered a chart titled "Share of
+   * income spent on rent" whose tallest bar was `OTHERS 60`, a city that does not exist,
+   * standing next to London while the narration named London as the extreme.
+   *
+   * Every assertion below is a thing the report could not say that morning. The two
+   * relocations are still both reported, and they are no longer reported at the same
+   * volume: the first costs the chart most of its categories, the second is the deliberate
+   * move to `left` that composes well and costs nothing.
+   */
+  it('names the values the composition collapsed, and says where they went', () => {
+    const capacity = report.warnings.find(
+      (warning) => warning.code === 'CAPACITY_REDUCED_BY_COMPOSITION',
+    );
+
+    expect(capacity?.sceneId).toBe('chart');
+    expect(capacity?.message).toContain('yields into "left"');
+    expect(capacity?.message).toContain('holds 3 of the 8');
+    expect(capacity?.message).toContain('"Berlin"');
+    expect(capacity?.message).toContain('"Paris"');
   });
 
   it('runs the twenty to thirty seconds §12 asks for', () => {
