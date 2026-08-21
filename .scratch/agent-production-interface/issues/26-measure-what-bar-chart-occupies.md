@@ -1,7 +1,7 @@
 # Measure what bar_chart occupies, and declare that
 
 Type: decision
-Status: open
+Status: resolved
 Blocked by: none
 
 ## Objective
@@ -151,3 +151,42 @@ V5 asked for and the reason it asked. The reasoning path is in
 
 Checked before filing: no ticket 01–25 proposes measuring `occupiesRegions` for any capability, and
 the two capabilities that are swept were swept by the commit that wrote the suite.
+
+### Resolved 2026-08-21
+
+`fd66aa0`. `['full']`, the recommended answer, taken after the sweep agreed with it.
+
+**The sweep failed under all six motion profiles before the declaration changed**, so the
+overclaim was never an edge case. The measurement is also much broader than the leak that
+exposed it:
+
+```
+             ink max x   ink y band     ink in the corner rows
+bar_chart    94.9%        8.9%..90.9%   reaches x = 94.9%
+```
+
+For comparison, `quote` stops at x = 65.5% in the corner rows and `stat_counter` draws no ink
+outside y 32.0%..68.3%. Those two clear their corners by 4.5 and 1.7 points. `bar_chart` clears
+nothing by any margin, in any direction, which is why the corner was the wrong question.
+
+**Two things the ticket did not anticipate.**
+
+*`frees: []` needed its own regression.* An empty expected free set is unfalsifiable — anyone
+narrowing the declaration would edit the expectation in the same commit. The suite now also asserts
+against the pixels that `cornerTR` is not clear. Relatedly, `hashRegions` refuses an empty region
+list on purpose, so the per-profile free-slot test is not emitted where there is nothing to keep
+clear; that absence is covered by two present assertions rather than by a silent skip.
+
+*Rung c lost its only fixture.* `bar_chart` freeing exactly one corner was the only way a shipped
+capability could be cleared by one composition and not another, so two `compile.test.ts` fixtures
+moved to `quote`. The mirror is exact — `['left', 'center']` where `bar_chart` had
+`['bottom', 'left']` — and the slots did not have to change, except in the two-element plan, where a
+narrator in `cornerBR` would no longer contend at all: `quote` frees both right-hand corners, so
+that fixture would have passed while testing nothing. It stands in `right` now.
+
+**Only `standard` is swept**, and the ticket's scope allowed for more. Once the declaration frees
+nothing there is no corner left for the other two layouts to overclaim; a future narrowing would
+have to sweep all three, and the suite header says so.
+
+Gates: typecheck green, video 416/416, render 120/121 (ffprobe), stress 291/291, production 91/94
+(the three `proof-harness` failures, unchanged), `catalog:check` and `biome check` both green.
