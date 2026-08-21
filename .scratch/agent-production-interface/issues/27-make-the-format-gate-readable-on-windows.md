@@ -1,7 +1,7 @@
 # Make the format gate readable on Windows
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: none
 
 ## Objective
@@ -99,3 +99,30 @@ it went unnoticed.
 `.scratch/composed-capacity/spec.md` decision D7 deliberately declined this scope as too large to
 hide inside that spec. That was the right call for the branch and is the reason this is a ticket
 rather than a line in someone else's commit.
+
+### Resolved 2026-08-21
+
+`d689902` (attributes and re-checkout), `be9d1af` (biome's ignore list, and this branch's own
+two files), `b84e3fb` (the pre-existing drift). `biome check .` now reports zero errors over 237
+files, and `catalog:check` stays green.
+
+**Three things the ticket did not know.**
+
+*Sixteen of the twenty were real.* Only four diagnostics were carriage returns. The rest had been
+hiding behind them — which is the argument for this ticket restated as a measurement, and the
+reason the acceptance criterion was parity rather than greenness.
+
+*Two gates wanted different bytes for the same files.* biome collapses short JSON arrays;
+`build-catalog.ts` writes them expanded; `catalog:check` compares bytes. `catalog.json` had been
+excluded from biome for exactly this reason and the other four generated projections never were, so
+`biome check --write` would have made `catalog:check` red. The ignore list now names the two
+generated directories — the same two the line-ending rule names, because `pnpm catalog` owns those
+bytes. This was invisible while the format gate was unreadable, and it is the more interesting half
+of what the ticket found.
+
+*The re-checkout needs the attributes committed first.* `git rm --cached -r . && git reset --hard`
+restores from HEAD, so an uncommitted `.gitattributes` is discarded by the very command meant to
+apply it. Commit, then refresh.
+
+The five `packages/production` files were reformatted in their own commit. Typecheck unchanged, and
+that suite still reports 91/94 with the same three `proof-harness` failures, which are ffprobe.
