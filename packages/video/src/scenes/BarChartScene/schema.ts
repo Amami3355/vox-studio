@@ -41,6 +41,18 @@ export const barChartSchema = z.object({
     .default('')
     .describe("Suffix appended to every value, e.g. '%' or '€'. Empty for bare numbers."),
 
+  valueKind: z
+    .enum(['amount', 'share'])
+    .default('amount')
+    .describe(
+      'What the numbers are, which decides what happens to the ones that do not fit. ' +
+        "'amount' is a count, a sum of money, a quantity: values beyond the capacity " +
+        "collapse into a single 'Others' bar carrying their total. 'share' is a " +
+        'percentage or a proportion, where each value is a share of its own whole — ' +
+        'adding them would invent a category, so they are dropped instead and the chart ' +
+        'shows fewer bars. Set this whenever `unit` is a percentage.',
+    ),
+
   gridlines: z
     .boolean()
     .default(true)

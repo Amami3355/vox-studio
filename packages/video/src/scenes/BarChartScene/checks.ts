@@ -13,6 +13,28 @@ export const barChartChecks = (
   const errors: CompilerError[] = [];
   const warnings: CompilerWarning[] = [];
 
+  /**
+   * Asked of the *authored* props, so an absent `valueKind` is still absent — the schema
+   * default has not been applied yet, and "the agent did not say" is the whole question.
+   * An explicit `'amount'` next to a percentage is a claim, and claims are trusted.
+   */
+  const unit = (instance.props as { unit?: unknown }).unit;
+  const valueKind = (instance.props as { valueKind?: unknown }).valueKind;
+  if (typeof unit === 'string' && unit.trim() === '%' && valueKind === undefined) {
+    warnings.push({
+      code: 'VALUE_KIND_UNSTATED',
+      severity: 'quality',
+      sceneId: instance.id,
+      field: 'valueKind',
+      message:
+        'This series is measured in "%" and has not said whether its values are shares. ' +
+        'If it ever has to collapse a value — past the soft limit, or in a composed box — ' +
+        'the collapsed ones will be added together, and a sum of percentages of different ' +
+        'wholes is a number that measures nothing.',
+      suggestion: 'Set `valueKind` to "share", or to "amount" if the values really do add up.',
+    });
+  }
+
   const data = (instance.props as { data?: unknown }).data;
   if (!Array.isArray(data)) return { errors, warnings };
 

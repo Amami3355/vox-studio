@@ -121,6 +121,33 @@ describe('validateScene — soft constraints degrade with a warning', () => {
     expect(report.warnings.some((w) => w.code === 'TITLE_DENSITY')).toBe(true);
   });
 
+  /**
+   * A percentage series that has not said what its values are is one composition away from
+   * drawing a sum of shares — the 2026-08-21 render's `OTHERS 60`. The warning fires on
+   * silence rather than on the aggregation, because by the time the aggregation happens
+   * the plan is already written and the render is already wrong.
+   */
+  it('warns when a percentage series has not said whether its values are shares', () => {
+    const props = { title: 'Rent', unit: '%', data: [{ label: 'Paris', value: 33 }] };
+    const report = validateScene(base({ props }));
+    expect(report.ok).toBe(true);
+    expect(report.warnings.some((w) => w.code === 'VALUE_KIND_UNSTATED')).toBe(true);
+  });
+
+  it('says nothing when the series has stated what its values are', () => {
+    for (const valueKind of ['share', 'amount'] as const) {
+      const props = { title: 'Rent', unit: '%', valueKind, data: [{ label: 'Paris', value: 33 }] };
+      const report = validateScene(base({ props }));
+      expect(report.warnings.some((w) => w.code === 'VALUE_KIND_UNSTATED')).toBe(false);
+    }
+  });
+
+  it('says nothing about a series that is not a percentage', () => {
+    const props = { title: 'Homes', unit: 'k', data: [{ label: 'Paris', value: 33 }] };
+    const report = validateScene(base({ props }));
+    expect(report.warnings.some((w) => w.code === 'VALUE_KIND_UNSTATED')).toBe(false);
+  });
+
   it('treats an empty series as a legitimate degraded state, not an error', () => {
     const report = validateScene(base({ props: { title: 'No figures', data: [] }, events: [] }));
     expect(report.ok).toBe(true);

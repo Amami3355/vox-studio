@@ -214,6 +214,15 @@
           "means": "Adjacent scenes repeat a motion profile often enough to make pacing feel mechanical.",
           "repair": "Vary a scene motionProfile while keeping its intended editorial tone."
         },
+        "VALUE_KIND_UNSTATED": {
+          "code": "VALUE_KIND_UNSTATED",
+          "regime": "warning",
+          "severity": [
+            "quality"
+          ],
+          "means": "A series is measured in percent but has not said whether its values are shares, so anything collapsed beyond capacity would be added together.",
+          "repair": "Set `valueKind` to \"share\" when each value is a proportion of its own whole, or to \"amount\" to confirm the values really do add up."
+        },
         "TITLE_DENSITY": {
           "code": "TITLE_DENSITY",
           "regime": "warning",
@@ -301,6 +310,15 @@
               "description": "Suffix appended to every value, e.g. '%' or '€'. Empty for bare numbers.",
               "type": "string",
               "maxLength": 8
+            },
+            "valueKind": {
+              "default": "amount",
+              "description": "What the numbers are, which decides what happens to the ones that do not fit. 'amount' is a count, a sum of money, a quantity: values beyond the capacity collapse into a single 'Others' bar carrying their total. 'share' is a percentage or a proportion, where each value is a share of its own whole — adding them would invent a category, so they are dropped instead and the chart shows fewer bars. Set this whenever `unit` is a percentage.",
+              "type": "string",
+              "enum": [
+                "amount",
+                "share"
+              ]
             },
             "gridlines": {
               "default": true,

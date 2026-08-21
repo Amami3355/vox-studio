@@ -383,6 +383,7 @@
                   "props": {
                     "title": "Share of income spent on rent",
                     "unit": "%",
+                    "valueKind": "share",
                     "emphasis": "negative",
                     "data": [
                       {

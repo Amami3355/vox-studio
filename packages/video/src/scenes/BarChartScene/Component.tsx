@@ -121,7 +121,9 @@ const ChartFrame: React.FC<{
           : Math.floor((box.width * barChartGeometry.chartShare) / columnPitch),
       );
 
-  const data = aggregateBeyond(props.data, Math.min(recommendedMax, capacity), 'Others');
+  const { series: data } = aggregateBeyond(props.data, Math.min(recommendedMax, capacity), {
+    valueKind: props.valueKind,
+  });
 
   const state = resolveEvents(
     events,
