@@ -74,6 +74,12 @@ describe('LineChartScene runtime', () => {
     );
   });
 
+  /**
+   * A hash names no property, so this says where the property lives: `line-chart.test.ts`
+   * asserts that `utcTimeAxis` maps irregular intervals proportionally. What the hash adds is
+   * that the frame *drawn from* that axis is the one a person accepted — the two together are
+   * the claim, and neither is it alone.
+   */
   it('keeps irregular calendar spacing visible in the accepted comparison frame', async () => {
     const comparison = hashStill(await still('example-line-comparison', 180));
     expect(comparison).toBe(
@@ -123,6 +129,11 @@ describe('LineChartScene runtime', () => {
     );
   });
 
+  /**
+   * Same division as the comparison frame above. `line-chart.test.ts` asserts that a
+   * mixed-sign series puts `trendAxis.zeroRatio` strictly inside the plot with each sign on
+   * its own side of it; this pins the frame that arithmetic produced.
+   */
   it('keeps mixed-sign series crossing the visible zero rule at the hard ceiling', async () => {
     const mixed = hashStill(
       await harness.still(

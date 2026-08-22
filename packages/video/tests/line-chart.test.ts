@@ -294,6 +294,24 @@ describe('line chart axes', () => {
     expect(extent.ratio(103) - extent.ratio(97)).toBeGreaterThan(zero.ratio(103) - zero.ratio(97));
   });
 
+  /**
+   * Where a mixed-sign series puts its zero, which is what the rendered frame is named for.
+   *
+   * `scale.test.ts` asserts `zeroRatio` for `ValueAxis`, the zero-based axis a bar uses. A
+   * trend may measure from its own extent, and this is the case that decides whether the zero
+   * rule lands inside the plot at all: values either side of zero must put it strictly
+   * between the two edges, and every value must fall on the side its sign says.
+   */
+  it('places zero strictly inside the plot when a series crosses it', () => {
+    const axis = trendAxis([-40, -10, 15, 60], 'extent');
+
+    expect(axis.zeroRatio).toBeGreaterThan(0);
+    expect(axis.zeroRatio).toBeLessThan(1);
+    expect(axis.ratio(-40)).toBeLessThan(axis.zeroRatio);
+    expect(axis.ratio(60)).toBeGreaterThan(axis.zeroRatio);
+    expect(axis.ratio(0)).toBeCloseTo(axis.zeroRatio);
+  });
+
   it('maps irregular UTC intervals proportionally and retains endpoint ticks', () => {
     const axis = utcTimeAxis(['2024-01-01', '2024-02-29', '2024-07-01'], 2);
     expect(axis.positions[1]).toBeGreaterThan(0);
