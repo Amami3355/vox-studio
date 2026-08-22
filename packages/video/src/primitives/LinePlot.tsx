@@ -466,7 +466,7 @@ const pointCoordinates = (
 const FocusLabel: React.FC<{
   target: PointCoordinates;
   width: number;
-  padding: { top: number; right: number; bottom: number; left: number };
+  padding: PlotPadding;
   unit: string;
   progress: number;
 }> = ({ target, width, padding, unit, progress }) => {
@@ -480,10 +480,7 @@ const FocusLabel: React.FC<{
     fontWeight: theme.type.weight.medium,
   });
   const cardHeight = size * (2.15 + Math.max(0, metaLines.length - 1) * 0.92);
-  const x = Math.min(
-    width - padding.right - cardWidth,
-    Math.max(padding.left, target.x - cardWidth / 2),
-  );
+  const x = clampCardX(target.x - cardWidth / 2, cardWidth, width, padding);
   const above = target.y - padding.top > cardHeight + gap;
   const y = above ? target.y - cardHeight - gap : target.y + gap;
   const p = clamp01(progress);
@@ -541,7 +538,7 @@ const AnnotationLabel: React.FC<{
   text: string;
   width: number;
   height: number;
-  padding: { top: number; right: number; bottom: number; left: number };
+  padding: PlotPadding;
   unit: string;
   progress: number;
 }> = ({ target, text, width, height, padding, unit, progress }) => {
@@ -566,7 +563,7 @@ const AnnotationLabel: React.FC<{
     size * (annotationStart + Math.max(0, annotationLines.length - 1) * 1.12 + 0.8);
   const placeLeft = target.x > width * 0.58;
   const rawX = placeLeft ? target.x - cardWidth - gap * 2 : target.x + gap * 2;
-  const x = Math.min(width - padding.right - cardWidth, Math.max(padding.left, rawX));
+  const x = clampCardX(rawX, cardWidth, width, padding);
   const y = Math.min(
     height - padding.bottom - cardHeight,
     Math.max(padding.top, target.y - cardHeight / 2),
@@ -629,6 +626,27 @@ const AnnotationLabel: React.FC<{
  * The font a string will actually be drawn in, which is the only thing that decides how
  * wide it is.
  */
+/**
+ * The inset the plot keeps clear on each side, in canvas px.
+ *
+ * Written out inline in two component prop types and passed as one value to both, which is
+ * a type asking to be born: four numbers that always travel together and mean one thing.
+ */
+type PlotPadding = { top: number; right: number; bottom: number; left: number };
+
+/**
+ * Keep a card inside the plot horizontally, wherever it would rather sit.
+ *
+ * Both cards want this and both wrote it out; they disagree only about where they *prefer*
+ * to be — the focus card centres on its point, the annotation card sits to one side of it —
+ * so the preference is the argument and the clamping is shared. They stay two components:
+ * one draws a connector down to its point and one draws a left accent rule, and their
+ * contents are two different editorial objects. But where they want the same number they now
+ * ask the same question, instead of the next change fixing one clamp and not the other.
+ */
+const clampCardX = (desiredX: number, cardWidth: number, width: number, padding: PlotPadding) =>
+  Math.min(width - padding.right - cardWidth, Math.max(padding.left, desiredX));
+
 type TextFace = { fontFamily: string; fontSize: number; fontWeight: number };
 
 /**
