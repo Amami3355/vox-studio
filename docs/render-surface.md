@@ -232,10 +232,11 @@ has not been seen against a real photograph or in the `left`/`right` composition
 The first two pairs are as of `229700c` and have since grown; `QuoteScene`'s are as of `bfac867`
 and `StatCounterScene`'s as of this change.
 
-**Four capabilities. The count is still the load-bearing fact of any breadth judgement**,
-and it has just moved: `stat_counter` is the fourth, the second that composes into `full`
-only and carries no assets, and the first `data`-family frame with no chart. `quote` was the
-third. `docs/measurement-gate.md` recorded two as the reason measure 3 had almost nothing to
+**Five capabilities. The count is still the load-bearing fact of any breadth judgement**,
+and it has moved twice: `stat_counter` was the fourth, the second that composes into `full`
+only and carries no assets, and the first `data`-family frame with no chart; `quote` was the
+third. `line_chart` is the fifth — a second `data` frame, and the first to draw through a
+third-party library, held behind a Primitive by ADR-0014. `docs/measurement-gate.md` recorded two as the reason measure 3 had almost nothing to
 be wrong about; that particular blocker is now cleared, though the measure itself is unrun.
 
 **Owns.** How the frame is divided. This is where composition actually happens, and it is the

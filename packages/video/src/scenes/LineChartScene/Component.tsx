@@ -97,7 +97,7 @@ const LineChartFrame: React.FC<{
       <div style={{ height: headerHeight, display: 'flex', flexDirection: 'column', gap }}>
         <div
           style={{
-            width: 96 * Math.min(1, progressFor(0)),
+            width: lineChartGeometry.accentRuleWidth * Math.min(1, progressFor(0)),
             height: lineChartGeometry.accentRuleHeight,
             flex: '0 0 auto',
             borderRadius: theme.radius[1],

@@ -31,7 +31,7 @@ Paths in the table below are relative to `packages/video/` unless they start wit
 | the component studio grid | `apps/component-studio/src/App.tsx:62` | flattens the registry |
 | the catalog checklist tests | `tests/catalog-contract.test.ts:91` | `describe.each` over the registry |
 
-Capability names are hard-coded in three places, and none of them is on the render path:
+Capability names are hard-coded in two places, and neither of them is on the render path:
 
 - `packages/video/src/catalog/structural-examples.ts:20,44` — the whole-plan examples the
   manifest publishes. A new capability does not have to appear here, but this is where you
@@ -69,8 +69,9 @@ capability with placeholder prose still in it fails `catalog-contract.test.ts`.
 ## The ten files
 
 The template carries all ten, and `tests/template-scene.test.ts` fails if it ever stops
-carrying one. A **live** folder carries eight to ten: the two marked optional below go when
-the capability has nothing true to put in them.
+carrying one. A **live** folder carries eight to eleven: the two template files marked
+optional below go when the capability has nothing true to put in them, and one file is not in
+the template at all because most capabilities never need it.
 
 | file | records | |
 | --- | --- | --- |
@@ -84,11 +85,29 @@ the capability has nothing true to put in them.
 | `Component.tsx` | the render, built only from L0/L1 primitives | |
 | `examples.ts` | at least three, and they are normative | |
 | `index.ts` | the assembly point — the whole surface the capability has | |
+| `stress.ts` | content-stress shapes the generic filler cannot size | optional, and **not in the template** — see below |
 
 What the live folders actually carry today: `BarChartScene/` and `ImageContextScene/` ten
 each, `QuoteScene/` and `StatCounterScene/` nine — each has a single reveal verb and nothing
 in its vocabulary references the gated element, so a `QuoteScene/checks.ts` would state a rule
-that is not true.
+that is not true. `LineChartScene/` carries eleven.
+
+**On `stress.ts`, and why the bar for it is higher than for the other two optional files.**
+`tests/stress/cases.ts` generates its cases from the published schema, one field at a time,
+and its header argues at length why: a hand-written case restates the capability's numbers a
+second time and the second copy is the one that goes stale. Its filler already names the two
+legal answers when it meets a field it cannot size — bound it in the schema, or give the
+capability a control.
+
+`stress.ts` is the third answer, for the case those two do not cover: a shape that is not
+per-field at all. `line_chart` aligns `series[].values` one-for-one with `points` and needs
+its `date` strings to parse and be distinct, so no filler that sizes one field at a time can
+produce an instance the schema accepts. **It is a hook, not a fixture.** It is handed the
+published projection and must read its counts and lengths from it;
+`tests/stress-cases.test.ts` holds every capability that declares one to exactly that, so a
+literal ceiling in here goes red the moment the published one moves. What it may do that the
+generator may not is choose a *shape* at a given size — a constant series, a mixed-sign
+series — for the same reason a control may.
 
 ## The order to write them in
 
@@ -162,7 +181,8 @@ from the examples a reader is browsing. `src/runtime/BackdropControl.tsx` is the
 level down: a reference frame, not a frame the catalog offers. `src/runtime/StressControl.tsx`
 is the same idea one level *up*: it carries no content of its own and takes it as input props,
 so `pnpm test:stress` can draw any capability at its schema's ceiling without publishing that
-shape anywhere the agent can read it.
+shape anywhere the agent can read it — from the generic filler, or from the capability's own
+`stress.ts` where the shape is not per-field.
 
 **The bar is high, and deliberately so.** A shape worth rendering is usually a shape worth
 teaching, and that one belongs in `examples.ts`. A control is for the remainder: a frame that

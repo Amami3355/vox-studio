@@ -66,7 +66,11 @@ describe('LineChartScene runtime', () => {
       // Accepted 2026-08-22 after inspecting the 1920×1080 still: a strong two-level
       // editorial header, quiet zero-based ruler, six proportionally spaced month labels,
       // every observation marked, and one warm straight-segment trend inside the safe area.
-      'f92d10de9e5379dcfbee8a3d218b035f',
+
+      // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
+      // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
+      // Inspected at 1920×1080; each claim above still reads.
+      '38d3f2d80c6bd691ee181578399c4839',
     );
   });
 
@@ -89,7 +93,11 @@ describe('LineChartScene runtime', () => {
     expect(annotated).toBe(
       // Accepted 2026-08-22 at the last frame: the connector terminates at Jun and the
       // card still reads “Journeys · Jun · 63 m” plus the complete annotation copy.
-      '78836c259f6abfa9b9057ece70ecac48',
+
+      // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
+      // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
+      // Inspected at 1920×1080; each claim above still reads.
+      '8fc50f34e458a368eeb713c2f8d48dda',
     );
   });
 
@@ -102,7 +110,11 @@ describe('LineChartScene runtime', () => {
       // Re-accepted 2026-08-22 for the measured legend, same as the comparison frame.
       // Inspected at 1920×1080: the three keys now read as one row, and the recession
       // claim above is unchanged.
-      '106c86e9370b6f8d7b1571f92b1211a4',
+
+      // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
+      // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
+      // Inspected at 1920×1080; each claim above still reads.
+      '0edecff370ffd5292c68f89071141470',
     );
   });
 

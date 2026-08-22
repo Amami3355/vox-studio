@@ -56,9 +56,27 @@ const filenamesInDocTable = (): string[] => {
   const end = rest.indexOf('\n## ');
   const section = end === -1 ? rest : rest.slice(0, end);
 
-  return [...section.matchAll(/`([^`]+\.tsx?)`/g)]
-    .flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
-    .filter((name) => !name.includes('/'));
+  /**
+   * Table rows only, and only their first cell.
+   *
+   * This used to scrape every backticked filename in the whole section, which made the
+   * assertion below fail for prose: a sentence naming `schema.ts` while explaining a rule
+   * counted as a row. The table is the promise; the paragraphs around it are the argument
+   * for the promise, and an argument that cannot mention a file is not much of one.
+   *
+   * A row marked `not in the template` is a file a *capability* may carry and the template
+   * deliberately does not — `stress.ts` is the only one today, and the section says why the
+   * bar for it is higher. Excluded here rather than added to the template, because putting
+   * it there would ship every new capability a hook it almost certainly must not declare.
+   */
+  return section
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith('|') && !/not in the template/.test(line))
+    .flatMap((line) => {
+      const cell = line.split('|')[1] ?? '';
+      const match = cell.match(/`([^`]+\.tsx?)`/);
+      return match?.[1] === undefined ? [] : [match[1]];
+    });
 };
 
 describe('the capability template', () => {

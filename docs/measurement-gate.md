@@ -210,9 +210,10 @@ when this was written. Group 4 unblocks measure 2. *Nothing on the plan unblocks
 `quote` and `stat_counter` did, both off the plan, which is the point: breadth had to be
 bought deliberately because no group on §14 was going to buy it.
 
-**The gate runs at four capabilities, and the count is now met.** The four in the catalog are
-`bar_chart`, `image_context`, `quote` (`typography`) and `stat_counter` (`data`) — three
-families across four capabilities. This paragraph originally named TypographicStatement, the
+**The gate runs at four capabilities, and the count is met with one to spare.** The catalog
+holds five: `bar_chart`, `image_context`, `quote` (`typography`), `stat_counter` (`data`) and
+`line_chart` (`data`) — three families. The threshold is four and remains four; a fifth does
+not lower it, and the paragraph below is about the four the measure was written against. This paragraph originally named TypographicStatement, the
 cheapest being pure type with no assets and no resolver, and Comparison; neither was built,
 and whether they are still owed is the build plan's question and not this threshold's. What
 measure 3 needed was four, and four is what the catalog holds. Four is enough for a brief to

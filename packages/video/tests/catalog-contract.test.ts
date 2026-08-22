@@ -182,6 +182,38 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
     }
   });
 
+  /**
+   * A redirection names an id, and the agent will type what it is told.
+   *
+   * Most targets here are deliberately unbuilt — `timeline`, `stat_donut`, `map` — and that
+   * is the catalogue strategy working: a redirect says "not this scene" whether or not the
+   * better one exists yet, and the agent gets a refusal it can act on either way. What is
+   * *not* deliberate is a target that is a near-miss of a capability that does exist, which
+   * reads as a real id and resolves to nothing.
+   *
+   * So the shape is checked, and the misses are checked against what is built. This is the
+   * half the spec asked for when it required "the existing `bar_chart` redirection no longer
+   * points to an unavailable identifier": `line_chart` is built now, and the assertion below
+   * is what notices if a rename ever leaves that pointing at nothing again.
+   */
+  it('redirects to well-formed ids, and never to a near-miss of a built one', () => {
+    const built = registry.map((one) => one.meta.id);
+    const normalise = (id: string) => id.toLowerCase().replace(/[^a-z]/g, '');
+
+    for (const entry of capability.meta.avoidWhen) {
+      const target = entry.split('→')[1]?.trim() ?? '';
+      expect({ entry, wellFormed: /^[a-z][a-z0-9_]*$/.test(target) }).toEqual({
+        entry,
+        wellFormed: true,
+      });
+      expect({ entry, self: target === capability.meta.id }).toEqual({ entry, self: false });
+
+      if (built.includes(target)) continue;
+      const nearMiss = built.find((id) => normalise(id) === normalise(target));
+      expect({ entry, nearMiss }).toEqual({ entry, nearMiss: undefined });
+    }
+  });
+
   it('declares durations that make sense', () => {
     expect(capability.meta.minDurationFrames).toBeGreaterThan(0);
     expect(capability.meta.recommendedDurationFrames).toBeGreaterThanOrEqual(
@@ -308,4 +340,21 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
       });
     },
   );
+});
+
+/**
+ * The redirection the spec named, asked once rather than per capability.
+ *
+ * Adding `line_chart` was partly *for* this: `bar_chart` had been telling agents to reach for
+ * a capability that did not exist. A per-capability shape check cannot notice that, because
+ * an unbuilt target is legitimate everywhere else in the catalogue.
+ */
+describe('the redirection this capability was added to satisfy', () => {
+  it('sends a continuous-change brief from bar_chart to a capability that exists', () => {
+    const barChart = registry.find((one) => one.meta.id === 'bar_chart');
+    const redirect = barChart?.meta.avoidWhen.find((entry) => entry.includes('line_chart'));
+
+    expect(redirect).toBeDefined();
+    expect(registry.map((one) => one.meta.id)).toContain('line_chart');
+  });
 });

@@ -135,7 +135,7 @@ describe('line_chart schema and validation', () => {
     );
   });
 
-  it('warns without rewriting one point, 17 points and a third series', () => {
+  it('warns without rewriting 17 points and a third series', () => {
     const points = Array.from({ length: 17 }, (_, index) => ({
       date: `2025-${String(index + 1).padStart(2, '0')}-01`,
       label: `P${index}`,
@@ -164,6 +164,32 @@ describe('line_chart schema and validation', () => {
     );
     expect(report.warnings).toContainEqual(
       expect.objectContaining({ field: 'series', code: 'SOFT_LIMIT_EXCEEDED' }),
+    );
+  });
+
+  /**
+   * The other end of the same published band, which the test above was named for and did not
+   * exercise: `constraints.ts` states `recommendedMin: 3` for `points`, and a single
+   * observation is a trend the shot cannot show a trend in.
+   *
+   * It must warn and still render. A one-point series is a legitimate degraded shape — the
+   * schema publishes no `.min()`, which is a promise the empty and near-empty states stay
+   * reachable — so a rejection here would be the hard/soft regimes bleeding into each other.
+   */
+  it('warns below the recommended point floor without rejecting the shape', () => {
+    const report = validateScene(
+      scene({
+        props: {
+          ...canonicalProps,
+          points: [{ date: '2025-01-01', label: 'P0' }],
+          series: [{ label: 'Series 0', values: [1] }],
+        },
+      }),
+    );
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings).toContainEqual(
+      expect.objectContaining({ field: 'points', code: 'SOFT_LIMIT_EXCEEDED' }),
     );
   });
 });
@@ -268,6 +294,43 @@ describe('line chart axes', () => {
   it('refuses invalid and non-increasing UTC dates instead of sorting them', () => {
     expect(() => utcTimeAxis(['2025-02-30'])).toThrow(/Invalid UTC/);
     expect(() => utcTimeAxis(['2025-03-01', '2025-01-01'])).toThrow(/strictly increasing/);
+  });
+
+  /**
+   * The spec asks for "stable positions across time zones", and comparing the axis to itself
+   * in one process does not ask that — the whole point of the claim is that a machine in
+   * Auckland and a machine in Los Angeles agree.
+   *
+   * `TZ` is read by the runtime when it builds a `Date`, so this sets it around the call. The
+   * dates chosen straddle a UTC day boundary at both extremes: `Pacific/Kiritimati` is UTC+14
+   * and `Pacific/Midway` is UTC-11, so a parser that reached for local time would land these
+   * on different calendar days and move the ticks.
+   */
+  it('places the same dates identically whatever the machine time zone is', () => {
+    const dates = ['2024-01-01', '2024-02-29', '2024-07-01', '2024-12-31'];
+    const original = process.env.TZ;
+
+    const under = (zone: string) => {
+      process.env.TZ = zone;
+      return {
+        // Proof the environment actually moved. Without this the two readings below could
+        // agree because nothing changed, and the test would pass by doing nothing.
+        localHour: new Date('2024-07-01T00:00:00Z').getHours(),
+        positions: utcTimeAxis(dates, 3).positions,
+        ticks: utcTimeAxis(dates, 3).tickIndices,
+      };
+    };
+
+    try {
+      const east = under('Pacific/Kiritimati');
+      const west = under('Pacific/Midway');
+
+      expect(east.localHour).not.toBe(west.localHour);
+      expect(east.positions).toEqual(west.positions);
+      expect(east.ticks).toEqual(west.ticks);
+    } finally {
+      process.env.TZ = original;
+    }
   });
 });
 

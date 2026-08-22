@@ -1,4 +1,23 @@
+/**
+ * The y-axis of a trend, which is a different domain question from a bar's and the same
+ * legibility question.
+ *
+ * **Why this is not `core/scale.ts`'s `ValueAxis`, despite the matching field names.** A bar
+ * measures from zero and its axis is the range it has to cover. A trend may measure from its
+ * own extent — `baseline: 'extent'` — where zero can be off the plot entirely, which is what
+ * `zeroRatio` exists to say and what a zero-based axis has no way to express. Two shapes with
+ * the same fields are still two shapes when one of them can answer a question the other
+ * cannot; folding them would mean a bar carrying a `zeroRatio` that is always the same number.
+ *
+ * **Why the tick count is imported rather than chosen.** It read `5` here with nothing said
+ * about it, next to `AXIS_TICKS = 4` in `scale.ts` carrying an argument — *"Ten gridlines is a
+ * printed page being read at leisure; a shot lasts seconds and the reader is listening at the
+ * same time."* That argument is about the viewer, not about the mark, so it holds for every
+ * axis this system draws. A second, quieter number beside it was the copy that goes stale, and
+ * there was no counter-argument written for it because there is not one.
+ */
 import { scaleLinear } from 'd3-scale';
+import { AXIS_TICKS } from './scale';
 
 export type TrendBaseline = 'zero' | 'extent';
 
@@ -14,7 +33,6 @@ export type TrendAxis = {
 };
 
 const HEADROOM_SHARE = 0.1;
-const TICK_COUNT = 5;
 const NICE_COUNT = 10;
 
 /**
@@ -59,7 +77,7 @@ export const trendAxis = (
     min,
     max,
     span,
-    ticks: scale.ticks(options.tickCount ?? TICK_COUNT),
+    ticks: scale.ticks(options.tickCount ?? AXIS_TICKS),
     zeroRatio: (0 - min) / span,
     ratio: (value: number) => (value - min) / span,
   };
