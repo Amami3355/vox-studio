@@ -244,8 +244,10 @@ off. `typographic_statement`'s is the intent, argued in its own `meta.ts`, and n
 later "fix" it. Recorded here because the second one is a deviation from the plan of record,
 not because the argument lives here.
 
-`typographic_statement` also carries the catalogue's only `paintsOwnGround` declaration.
-`SceneMeta` has the field and the reasoning.
+`typographic_statement` also carries the registry's only `paintsOwnGround` declaration. It is
+an internal `SceneCapability` render contract, not `SceneMeta`: the catalog already says that
+the scene occupies and supports only `full`, while the flag exists solely to select the bitmap
+reading used by safe-area and stress tests.
 
 **What is left is not depth, it is kind.** Three of the six are charts, and the sixth is the
 first entry in the table below to be built. A catalogue that can
@@ -257,7 +259,7 @@ entry ordered.
 
 | Capability | What the film gains | Cost |
 |---|---|---|
-| ~~`typographic_statement`~~ **built** | Structure. Chapter and act cards are what divide a sequence into a film. | Lowest — type and motion, no new contract |
+| ~~`typographic_statement`~~ **built** | Structure. Chapter and act cards are what divide a sequence into a film. | Low — type, motion and an internal render contract; no new manifest field |
 | `timeline` | Chronology, the documentary spine. `bar_chart` **and** `line_chart` already redirect to it. | Moderate |
 | `character_explainer` | A presenter that carries the explanation. `PERSISTENT_ELEMENT_TYPES` already has `character`, placed and relocated under ADR-0003. | Moderate |
 | `archive_document` | Evidence — a clipping, an extract, an annotated page. `AssetRequirement.type` already admits `document` and nothing consumes it. | Moderate |

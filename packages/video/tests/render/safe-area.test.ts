@@ -27,7 +27,7 @@
  *   because the probe read the wrong rectangle, or an empty one
  *
  * A scene that brings its own ground is measured against itself instead, on both counts.
- * `SceneMeta.paintsOwnGround` carries why; `quietBorderReading` in `png.ts` carries which
+ * `SceneCapability.paintsOwnGround` carries why; `quietBorderReading` in `png.ts` carries which
  * reading that selects, for this suite and for the content-stress one together.
  *
  * **The control is what makes these absolute, and that is the point.** The suite used to
@@ -56,9 +56,9 @@ import {
   type Region,
   bandsInside,
   bandsOutside,
-  coloursIn,
   decodePng,
   hashRegions,
+  liveFrameReading,
   pixelAt,
   quietBorderReading,
   regionOfInsets,
@@ -120,7 +120,7 @@ type Case = {
   /** Every example the capability publishes, each checked against the control on its own. */
   examples: string[];
   frames: number[];
-  /** See `SceneMeta.paintsOwnGround`, and the quiet-border assertion below. */
+  /** See `SceneCapability.paintsOwnGround`, and the quiet-border assertion below. */
   paintsOwnGround: boolean;
 };
 
@@ -144,7 +144,7 @@ const cases: Case[] = registry.flatMap((capability) =>
       safeArea: slotRect(composition),
       examples: capability.examples.map((example) => example.id),
       frames: framesFor(capability.meta.recommendedDurationFrames),
-      paintsOwnGround: capability.meta.paintsOwnGround === true,
+      paintsOwnGround: capability.paintsOwnGround === true,
     })),
   ),
 );
@@ -328,13 +328,13 @@ describe('a declared composition renders into the rectangle it declared', () => 
      */
     it('draws the scene inside it, so the comparisons above are over a live frame', () => {
       const inside = [insideOf(testCase.safeArea)];
-      const expected = hashRegions(control, inside);
 
       for (const [frame, exampleId, bitmap] of eachRender()) {
-        const drew = testCase.paintsOwnGround
-          ? coloursIn(bitmap, inside).size > 1
-          : hashRegions(bitmap, inside) !== expected;
-        expect({ frame, exampleId, drew }).toEqual({ frame, exampleId, drew: true });
+        const { drew, basis } = liveFrameReading(bitmap, inside, {
+          control,
+          paintsOwnGround: testCase.paintsOwnGround,
+        });
+        expect({ frame, exampleId, basis, drew }).toEqual({ frame, exampleId, basis, drew: true });
       }
     });
   });

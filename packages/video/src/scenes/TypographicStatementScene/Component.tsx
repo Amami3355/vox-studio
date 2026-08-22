@@ -1,11 +1,11 @@
 import type React from 'react';
 import { Fragment, useMemo } from 'react';
-import { useCurrentFrame } from 'remotion';
+import { interpolate, useCurrentFrame } from 'remotion';
 import { resolveEvents } from '../../core/events';
 import type { SceneProps } from '../../core/types';
 import { tokenise } from '../../core/words';
 import type { MotionProfile } from '../../design/motion';
-import { staggerFrames } from '../../design/motion';
+import { motion, staggerFrames } from '../../design/motion';
 import { type Theme, emphasisColor, mix } from '../../design/theme';
 import {
   AnimatedText,
@@ -161,11 +161,13 @@ const CutFrame: React.FC<{
                 startFrame={start + stagger}
                 profile={profile}
                 theme={theme}
+                ground={ground}
                 knock={knock}
                 recessive={recessive}
                 columnWidth={columnWidth}
                 maxHeight={box.height * cutGeometry.statementShare}
                 spoken={state.spoken.value}
+                spokenFrame={state.spokenFrame.value}
               />
             )
           ) : null}
@@ -225,12 +227,26 @@ const Statement: React.FC<{
   startFrame: number;
   profile: MotionProfile;
   theme: Theme;
+  ground: string;
   knock: string;
   recessive: string;
   columnWidth: number;
   maxHeight: number;
   spoken: number | null;
-}> = ({ text, startFrame, profile, theme, knock, recessive, columnWidth, maxHeight, spoken }) => {
+  spokenFrame: number;
+}> = ({
+  text,
+  startFrame,
+  profile,
+  theme,
+  ground,
+  knock,
+  recessive,
+  columnWidth,
+  maxHeight,
+  spoken,
+  spokenFrame,
+}) => {
   /**
    * The face this type is actually set in, handed to the fit rather than assumed by it.
    * A serif at regular weight and normal tracking is not the width of the grotesque the
@@ -245,9 +261,14 @@ const Statement: React.FC<{
     [theme],
   );
 
-  const step = useTitleStep(text, columnWidth, cutGeometry.statementStep, maxHeight, face);
+  const step = useTitleStep(text, columnWidth, {
+    ceiling: cutGeometry.statementStep,
+    maxHeight,
+    face,
+  });
   const size = useTypeSize(step);
   const { segments, tail } = useMemo(() => segmentsOf(text), [text]);
+  const frame = useCurrentFrame();
 
   /**
    * The clamp the reducer could not do. It counts events and never sees the props, so a
@@ -255,24 +276,48 @@ const Statement: React.FC<{
    * that would need it, at `validate`, long before a frame exists.
    */
   const reached = spoken === null ? segments.length : Math.min(spoken, segments.length);
-  const sweeping = spoken !== null && reached < segments.length;
-  /** The word the voice is on, or -1 when it is on none: undriven, or done. */
-  const current = sweeping ? reached - 1 : -1;
+  const progress = interpolate(
+    frame,
+    [spokenFrame, spokenFrame + motion.duration.instant],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+  const driven = spoken !== null;
+  const finishing = driven && reached === segments.length;
+  /** The word the voice is on, or -1 when it is on none: undriven, not started, or settled. */
+  const current = driven && reached > 0 && (!finishing || progress < 1) ? reached - 1 : -1;
+  /** The mark that hands off to `current`; invisible once the interpolation settles. */
+  const previous = current > 0 ? current - 1 : -1;
 
   /** Punctuation belongs to the word in front of it, so a lead takes the tone before it. */
   const toneAt = (index: number): string => {
-    if (!sweeping) return knock;
+    if (!driven) return knock;
+    if (reached === 0) return recessive;
+    if (current === -1) return knock;
     /** Nothing sits in front of the first word, so its lead follows the sentence's future. */
     if (index < 0) return recessive;
-    return index <= current ? knock : recessive;
+    if (index < current) return knock;
+    if (index === current) return mix(recessive, knock, progress);
+    return recessive;
   };
 
-  const mark = {
-    textDecorationLine: 'underline',
-    textDecorationColor: knock,
-    textDecorationThickness: `${Math.max(1, Math.round(size * cutGeometry.markThickness))}px`,
-    textUnderlineOffset: `${Math.round(size * cutGeometry.markOffset)}px`,
-  } as const;
+  const markAt = (index: number): React.CSSProperties => {
+    const amount =
+      index === previous
+        ? 1 - progress
+        : index === current
+          ? finishing
+            ? 1 - Math.abs(2 * progress - 1)
+            : progress
+          : 0;
+    if (amount <= 0) return {};
+    return {
+      textDecorationLine: 'underline',
+      textDecorationColor: mix(ground, knock, amount),
+      textDecorationThickness: `${Math.max(1, Math.round(size * cutGeometry.markThickness))}px`,
+      textUnderlineOffset: `${Math.round(size * cutGeometry.markOffset)}px`,
+    };
+  };
 
   return (
     <AnimatedText
@@ -291,9 +336,7 @@ const Statement: React.FC<{
       {segments.map((segment, index) => (
         <Fragment key={`${index}-${segment.word}`}>
           {segment.lead ? <span style={{ color: toneAt(index - 1) }}>{segment.lead}</span> : null}
-          <span style={{ color: toneAt(index), ...(index === current ? mark : {}) }}>
-            {segment.word}
-          </span>
+          <span style={{ color: toneAt(index), ...markAt(index) }}>{segment.word}</span>
         </Fragment>
       ))}
       {tail ? <span style={{ color: toneAt(segments.length - 1) }}>{tail}</span> : null}

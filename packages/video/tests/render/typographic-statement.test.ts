@@ -25,7 +25,7 @@ import { hashStill, renderHarness } from './harness';
  * Frames in the examples, which all run 120.
  *
  * The driven example holds until `b1.start+short` and sweeps its last word in at
- * `b3.start+long`, so these three are the only places its three states are visible: the
+ * `b3.end-short`, so these three are the only places its three states are visible: the
  * eyebrow alone, the sweep in progress, and the card at rest.
  */
 const HOLD_FRAME = 6;
@@ -147,8 +147,9 @@ describe('the sweep against a recorded take', () => {
   ];
 
   /** "absorb" is 3600ms, which is frame 108 at 30fps. */
-  const QUIET_FRAME = 99;
+  const QUIET_FRAME = 103;
   const BEFORE_ABSORB = 105;
+  const ON_ABSORB = 108;
   const AFTER_ABSORB = 111;
 
   const planWith = (emphasis: string): VideoPlan => ({
@@ -186,29 +187,48 @@ describe('the sweep against a recorded take', () => {
     ],
   });
 
-  const documentFor = (emphasis: string): CompiledDocument => {
-    const result = compile({ plan: planWith(emphasis), beats });
+  const compilePlan = (plan: VideoPlan): CompiledDocument => {
+    const result = compile({ plan, beats });
     if (!result.ok) {
       throw new Error(`fixture plan did not compile: ${JSON.stringify(result.report)}`);
     }
     return result.document;
   };
 
+  const documentFor = (emphasis: string): CompiledDocument => compilePlan(planWith(emphasis));
+
   const renderDocument = async (document: CompiledDocument, frame: number): Promise<string> =>
     hashStill(await harness.still('compiled-document', { document }, frame));
 
-  it('changes the frame on the onset the take measured, and on nothing else', async () => {
+  it('begins an eased change on the measured onset, and on nothing else', async () => {
     const document = documentFor('neutral');
-    const [quiet, before, after] = await Promise.all([
+    const [quiet, before, on, after] = await Promise.all([
       renderDocument(document, QUIET_FRAME),
       renderDocument(document, BEFORE_ABSORB),
+      renderDocument(document, ON_ABSORB),
       renderDocument(document, AFTER_ABSORB),
     ]);
 
     // The control: nothing is spoken between these two, and the card is already at rest.
     expect(quiet).toBe(before);
-    // The claim: the only thing that happened between these two is the word "absorb".
-    expect(after).not.toBe(before);
+    // The event starts from the preceding visual state instead of jumping on its first frame.
+    expect(on).toBe(before);
+    // Three frames into the design token's six-frame ease, only "absorb" has changed.
+    expect(after).not.toBe(on);
+  }, 120_000);
+
+  it('keeps every future word recessive before the first spoken cue', async () => {
+    const undriven = planWith('neutral');
+    const card = undriven.sections[0]?.scenes[0];
+    if (!card) throw new Error('fixture plan has no card scene');
+    card.events = card.events?.filter((event) => event.action === 'revealStatement');
+
+    const [waiting, standing] = await Promise.all([
+      renderDocument(documentFor('neutral'), 45),
+      renderDocument(compilePlan(undriven), 45),
+    ]);
+
+    expect(waiting).not.toBe(standing);
   }, 120_000);
 
   /**

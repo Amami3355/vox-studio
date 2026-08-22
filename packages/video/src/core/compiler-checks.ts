@@ -110,6 +110,14 @@ export const COMPILER_CHECKS = {
         'Remove the surplus events, or lengthen the content they step through until there is ' +
         'a step for each one.',
     },
+    EVENT_CONTENT_MISMATCH: {
+      code: 'EVENT_CONTENT_MISMATCH',
+      regime: 'error',
+      means:
+        'An advancing event names a narration step different from the content step it changes.',
+      repair:
+        'Make the word anchor name the corresponding content word, or use a beat boundary for coarse pacing.',
+    },
     EVENTS_OUT_OF_ORDER: {
       code: 'EVENTS_OUT_OF_ORDER',
       regime: 'error',

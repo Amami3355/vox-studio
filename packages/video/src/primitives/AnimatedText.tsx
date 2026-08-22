@@ -159,12 +159,10 @@ export const SceneTitle: React.FC<{
    * scene underneath it, and it is the scene the rule is protecting.
    */
   const box = useFrameBox();
-  const step = useTitleStep(
-    children,
-    useColumnWidth(),
-    maxStep,
-    displayRole === 'header' ? box.height * MAX_HEADER_SHARE : undefined,
-  );
+  const step = useTitleStep(children, useColumnWidth(), {
+    ceiling: maxStep,
+    maxHeight: displayRole === 'header' ? box.height * MAX_HEADER_SHARE : undefined,
+  });
 
   return (
     <AnimatedText

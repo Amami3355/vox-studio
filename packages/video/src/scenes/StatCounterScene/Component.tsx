@@ -123,7 +123,7 @@ const StatFrame: React.FC<{
    * the spec never asked for.
    */
   const valueText = `${value}`;
-  const valueStep = useTitleStep(valueText, columnWidth, statGeometry.valueStep);
+  const valueStep = useTitleStep(valueText, columnWidth, { ceiling: statGeometry.valueStep });
   const unitStep = Math.max(0, valueStep - statGeometry.unitStepDrop);
 
   return (

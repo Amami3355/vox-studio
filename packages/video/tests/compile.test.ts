@@ -1127,18 +1127,47 @@ describe('a statement swept word by word', () => {
    * sentence up in a sequence the plan never wrote.
    */
   it('refuses word anchors written in an order the take did not speak', () => {
-    const swapped = [...sweep];
-    swapped[1] = sweep[4] as (typeof sweep)[number];
-    swapped[4] = sweep[1] as (typeof sweep)[number];
+    const reversedWords: TimedBeat[] = [
+      { id: 'b7', text: 'is.', fromMs: 0, toMs: 3500, words: at(400, 400, ['is']) },
+      { id: 'b8', text: 'Nobody.', fromMs: 3500, toMs: 8000, words: at(3500, 400, ['Nobody']) },
+    ];
 
     const result = compile({
-      plan: cardPlanWith([{ at: 'b7.start', action: 'revealStatement' }, ...swapped]),
-      beats: cardBeats,
+      plan: cardPlanWith(
+        [
+          { at: 'b7.start', action: 'revealStatement' },
+          { at: 'b8.word:Nobody', action: 'advanceWord' },
+          { at: 'b7.word:is', action: 'advanceWord' },
+        ],
+        reversedWords,
+      ),
+      beats: reversedWords,
     });
 
     expect(result.ok).toBe(false);
     expect(result.report.errors).toContainEqual(
       expect.objectContaining({ code: 'EVENTS_OUT_OF_ORDER', sceneId: 'card' }),
+    );
+  });
+
+  it('refuses a word anchor that would light a different statement word', () => {
+    const result = compile({
+      plan: cardPlanWith([
+        { at: 'b7.start', action: 'revealStatement' },
+        { at: 'b7.word:Nobody', action: 'advanceWord' },
+        { at: 'b7.word:left', action: 'advanceWord' },
+      ]),
+      beats: cardBeats,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({
+        code: 'EVENT_CONTENT_MISMATCH',
+        sceneId: 'card',
+        field: 'events[2].at',
+        expected: ['is'],
+      }),
     );
   });
 

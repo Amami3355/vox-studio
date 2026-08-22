@@ -319,7 +319,7 @@ export type StressCase = {
   profile: StressProfile;
   safeArea: SafeArea;
   frames: number[];
-  /** See `SceneMeta.paintsOwnGround`, and `quietBorderReading` in `render/png.ts`. */
+  /** See `SceneCapability.paintsOwnGround`, and `quietBorderReading` in `render/png.ts`. */
   paintsOwnGround: boolean;
 };
 
@@ -367,7 +367,7 @@ export const stressCases = (): StressCase[] =>
             profile,
             safeArea: slotRect(composition),
             frames: framesFor(capability.meta.recommendedDurationFrames),
-            paintsOwnGround: capability.meta.paintsOwnGround === true,
+            paintsOwnGround: capability.paintsOwnGround === true,
           })),
         ),
       ),

@@ -82,12 +82,10 @@ const LineChartFrame: React.FC<{
     ? Math.min(progressFor(annotation.since), annotationReveal)
     : 0;
 
-  const titleFit = useTitleFit(
-    props.title,
-    box.width,
-    lineChartGeometry.titleMaxStep,
-    box.height * MAX_HEADER_SHARE,
-  );
+  const titleFit = useTitleFit(props.title, box.width, {
+    ceiling: lineChartGeometry.titleMaxStep,
+    maxHeight: box.height * MAX_HEADER_SHARE,
+  });
   /** A stable allocation from the same measured fit that `SceneTitle` renders. */
   const headerHeight = Math.ceil(ACCENT_RULE_HEIGHT + gap + titleFit.height + titleBottom);
   const plotHeight = Math.max(1, box.height - headerHeight - bottomGap);

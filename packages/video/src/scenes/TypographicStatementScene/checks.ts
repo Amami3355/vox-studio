@@ -1,7 +1,8 @@
+import { parseAnchor } from '../../core/anchor-grammar';
 /**
  * Referential checks the generic validator cannot express.
  *
- * Both rules judge **counts and written order, never frames**, which is what lets them fail
+ * Both rules judge **content and written order, never frames**, which is what lets them fail
  * at `validate` — before a take exists and before anyone has paid to record one. ADR-0011
  * makes that sound: a scene's events play in the order they are written, so the n-th
  * `advanceWord` is the n-th word whatever the anchors later resolve to.
@@ -13,13 +14,12 @@
  *   drawing. The eighth `advanceWord` on a seven-word sentence is not a crash and not a
  *   different picture; it is an event that moves nothing, which is the "renders fine,
  *   animates nothing" species this file exists to catch.
- * - The order rule is true because the words are mounted *inside* the statement's gate.
- *   Move the sentence out from behind `revealStatement` and this rule stops being true, so
- *   it has to be re-read against the component if the gate ever moves.
+ * - The correspondence rule is true because the n-th `advanceWord` lights the n-th token.
+ *   A word anchor naming anything else would cut on one spoken word and light another.
  */
 import type { CompilerError, CompilerWarning, SceneInstance } from '../../core/types';
 import { tokenise } from '../../core/words';
-import { ADVANCE_WORD_ACTION, REVEAL_STATEMENT_ACTION } from './state';
+import { ADVANCE_WORD_ACTION } from './state';
 
 export const typographicStatementChecks = (
   instance: SceneInstance,
@@ -29,11 +29,9 @@ export const typographicStatementChecks = (
 
   const statement = instance.props.statement;
   /** A statement that is not a string is `INVALID_PROPS`, already reported, never this. */
-  const words = typeof statement === 'string' ? tokenise(statement).length : null;
+  const words = typeof statement === 'string' ? tokenise(statement) : null;
 
   const events = instance.events ?? [];
-  const revealIndex = events.findIndex((event) => event.action === REVEAL_STATEMENT_ACTION);
-  const reveal = revealIndex >= 0 ? events[revealIndex] : undefined;
 
   let advanced = 0;
   let surplusAt: number | null = null;
@@ -42,19 +40,21 @@ export const typographicStatementChecks = (
     if (event.action !== ADVANCE_WORD_ACTION) continue;
     advanced += 1;
 
-    if (revealIndex >= 0 && index < revealIndex) {
+    const expectedWord = words?.[advanced - 1]?.text;
+    const target = parseAnchor(event.at)?.target;
+    if (expectedWord !== undefined && target?.kind === 'word' && target.word !== expectedWord) {
       errors.push({
-        code: 'EVENT_BEFORE_ELEMENT_REVEALED',
+        code: 'EVENT_CONTENT_MISMATCH',
         sceneId: instance.id,
-        field: `events[${index}]`,
+        field: `events[${index}].at`,
         message:
-          'advanceWord is written before revealStatement, so it moves the voice through a ' +
-          'sentence that is still held back.',
-        ...(reveal ? { expected: [reveal.at] } : {}),
+          `This is advanceWord ${advanced}, so it lights statement word "${expectedWord}", ` +
+          `but its anchor names narration word "${target.word}".`,
+        expected: [expectedWord],
       });
     }
 
-    if (words !== null && advanced > words && surplusAt === null) surplusAt = index;
+    if (words !== null && advanced > words.length && surplusAt === null) surplusAt = index;
   }
 
   /**
@@ -67,8 +67,8 @@ export const typographicStatementChecks = (
       sceneId: instance.id,
       field: `events[${surplusAt}]`,
       message:
-        `The statement has ${words} ${words === 1 ? 'word' : 'words'} and this scene lists ` +
-        `${advanced} advanceWord events, so the last ${advanced - words} move nothing.`,
+        `The statement has ${words.length} ${words.length === 1 ? 'word' : 'words'} and this scene lists ` +
+        `${advanced} advanceWord events, so the last ${advanced - words.length} move nothing.`,
     });
   }
 

@@ -46,7 +46,6 @@ export const typographicStatementMeta: SceneMeta = {
   requiresAssets: false,
   occupiesRegions: ['full'],
   supportedCompositions: ['full'],
-  paintsOwnGround: true,
   /**
    * Two seconds and four. Shorter than `quote`'s 90/180 because a card is seven words and
    * not a paragraph, and a chapter card held past its sentence stops reading as a cut and

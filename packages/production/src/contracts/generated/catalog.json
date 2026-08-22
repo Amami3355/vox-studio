@@ -2,7 +2,7 @@
   "category": "catalog",
   "contractVersion": 3,
   "contract": {
-    "manifestVersion": 5,
+    "manifestVersion": 4,
     "time": {
       "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
       "forms": [
@@ -92,6 +92,12 @@
           "regime": "error",
           "means": "A scene lists more advancing events than its own content has steps to take, so the last of them move nothing on the frame.",
           "repair": "Remove the surplus events, or lengthen the content they step through until there is a step for each one."
+        },
+        "EVENT_CONTENT_MISMATCH": {
+          "code": "EVENT_CONTENT_MISMATCH",
+          "regime": "error",
+          "means": "An advancing event names a narration step different from the content step it changes.",
+          "repair": "Make the word anchor name the corresponding content word, or use a beat boundary for coarse pacing."
         },
         "EVENTS_OUT_OF_ORDER": {
           "code": "EVENTS_OUT_OF_ORDER",
@@ -2062,7 +2068,6 @@
         "supportedCompositions": [
           "full"
         ],
-        "paintsOwnGround": true,
         "minDurationFrames": 60,
         "recommendedDurationFrames": 120,
         "propsSchema": {
@@ -2137,7 +2142,7 @@
           },
           {
             "id": "advanceWord",
-            "description": "Move the voice on by one word: everything before it stands in full, the word itself takes the mark, and the rest of the sentence stays recessive. Write one per word, in spoken order — the n-th event is the n-th word, so there is nothing to name. Anchor them to `word:` forms for a card that follows a recorded take, or to beat boundaries to pace it without one. Write none and the whole sentence simply stands.",
+            "description": "Move the voice on by one word: everything before it stands in full, the word itself takes the mark, and the rest of the sentence stays recessive. Write one per word, in spoken order — the n-th event advances the n-th statement word, so there is no payload to name. For a recorded take, anchor it to that same word with `word:`; otherwise use beat boundaries for coarse pacing. Write none and the whole sentence simply stands.",
             "payloadSchema": null
           }
         ],
@@ -2203,7 +2208,7 @@
                 "action": "advanceWord"
               },
               {
-                "at": "b3.start+long",
+                "at": "b3.end-short",
                 "action": "advanceWord"
               }
             ],

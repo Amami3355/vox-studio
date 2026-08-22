@@ -271,6 +271,13 @@ export type TitleFit = {
  */
 export type TypeFace = { fontFamily: string; fontWeight: number; tracking: number };
 
+/** Physical constraints for one fitted run, named so callers cannot swap positional values. */
+export type TitleFitOptions = {
+  ceiling?: number;
+  maxHeight?: number;
+  face?: TypeFace;
+};
+
 /** The face `SceneTitle` and every capability before the chapter card set their type in. */
 export const displayFace = (theme: Theme): TypeFace => ({
   fontFamily: theme.type.display,
@@ -282,12 +289,11 @@ export const displayFace = (theme: Theme): TypeFace => ({
 export const useTitleFit = (
   text: string,
   columnWidth: number,
-  ceiling?: number,
-  maxHeight?: number,
-  face?: TypeFace,
+  options: TitleFitOptions = {},
 ): TitleFit => {
   const theme = useTheme();
   const density = useDensity();
+  const { ceiling, maxHeight, face } = options;
 
   return useMemo(() => {
     const set = face ?? displayFace(theme);
@@ -321,7 +327,5 @@ export const useTitleFit = (
 export const useTitleStep = (
   text: string,
   columnWidth: number,
-  ceiling?: number,
-  maxHeight?: number,
-  face?: TypeFace,
-): number => useTitleFit(text, columnWidth, ceiling, maxHeight, face).step;
+  options: TitleFitOptions = {},
+): number => useTitleFit(text, columnWidth, options).step;

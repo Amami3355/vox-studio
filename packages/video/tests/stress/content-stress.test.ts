@@ -48,6 +48,7 @@ import {
   bandsOutside,
   decodePng,
   hashRegions,
+  liveFrameReading,
   pixelAt,
   quietBorderReading,
   regionOfInsets,
@@ -259,13 +260,17 @@ describe('content the schema accepts renders into the box it was given', () => {
      */
     it('draws the scene inside it, so the comparisons above are over a live frame', ({ skip }) => {
       const inside = [regionOfInsets(testCase.safeArea, WIDTH, HEIGHT)];
-      const expected = hashRegions(control, inside);
 
       for (const [index, bitmap] of drawnFrames(renders, skip)) {
+        const { drew, basis } = liveFrameReading(bitmap, inside, {
+          control,
+          paintsOwnGround: testCase.paintsOwnGround,
+        });
         expect({
           frame: testCase.frames[index],
-          drew: hashRegions(bitmap, inside) !== expected,
-        }).toEqual({ frame: testCase.frames[index], drew: true });
+          basis,
+          drew,
+        }).toEqual({ frame: testCase.frames[index], basis, drew: true });
       }
     });
   });

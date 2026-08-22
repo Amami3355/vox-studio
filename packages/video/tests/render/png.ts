@@ -170,7 +170,7 @@ export const hashRegions = (bitmap: Bitmap, regions: Region[]): string => {
  *
  * The absolute form of the question `hashRegions` asks relatively: an area that has to be
  * *empty* on a ground no control knows cannot be compared to one, but it can be asked
- * whether it holds a single colour. `SceneMeta.paintsOwnGround` carries when that applies.
+ * whether it holds a single colour. `SceneCapability.paintsOwnGround` carries when that applies.
  *
  * Returns the set rather than a boolean so a failure can say what it found.
  */
@@ -191,7 +191,7 @@ export const coloursIn = (bitmap: Bitmap, regions: Region[]): Set<string> => {
 /**
  * What a quiet border must be, and what it is — in whichever of the two readings applies.
  *
- * `SceneMeta.paintsOwnGround` says why there are two and when each is right; it is not
+ * `SceneCapability.paintsOwnGround` says why there are two and when each is right; it is not
  * restated here. What lives here is the mechanism: which reading each flag selects, and
  * what the two strings are made of.
  *
@@ -212,10 +212,12 @@ export type BorderReading = {
   basis: 'equals the backdrop control' | 'is one flat colour';
 };
 
+type GroundReadingOptions = { control: Bitmap; paintsOwnGround: boolean };
+
 export const quietBorderReading = (
   bitmap: Bitmap,
   border: Region[],
-  options: { control: Bitmap; paintsOwnGround: boolean },
+  options: GroundReadingOptions,
 ): BorderReading =>
   options.paintsOwnGround
     ? {
@@ -227,6 +229,35 @@ export const quietBorderReading = (
         expected: hashRegions(options.control, border),
         actual: hashRegions(bitmap, border),
         basis: 'equals the backdrop control',
+      };
+
+/**
+ * Whether a reserved region contains scene content, in the same two ground regimes as the
+ * quiet-border reading above. A scene on the shared backdrop must differ from its control;
+ * a scene owning the ground must contain more than that one flat colour.
+ *
+ * Kept beside `quietBorderReading` because the safe-area and content-stress suites ask both
+ * questions. A branch copied into either suite can silently turn a bare owned ground into a
+ * live frame while the other suite still asks the correct question.
+ */
+export type LiveFrameReading = {
+  drew: boolean;
+  basis: 'differs from the backdrop control' | 'contains content over its own ground';
+};
+
+export const liveFrameReading = (
+  bitmap: Bitmap,
+  inside: Region[],
+  options: GroundReadingOptions,
+): LiveFrameReading =>
+  options.paintsOwnGround
+    ? {
+        drew: coloursIn(bitmap, inside).size > 1,
+        basis: 'contains content over its own ground',
+      }
+    : {
+        drew: hashRegions(bitmap, inside) !== hashRegions(options.control, inside),
+        basis: 'differs from the backdrop control',
       };
 
 /**

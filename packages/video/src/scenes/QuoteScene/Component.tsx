@@ -117,11 +117,11 @@ const QuoteFrame: React.FC<{
    * that keeps a quote a quote. In a composed box the ladder still runs, one rung down:
    * see the composed form above.
    */
-  const quoteStep = useTitleStep(
-    quote,
-    columnWidth,
-    composed ? composedStepCeiling(quote.length, centeredGeometry.composedStepDrop) : undefined,
-  );
+  const quoteStep = useTitleStep(quote, columnWidth, {
+    ceiling: composed
+      ? composedStepCeiling(quote.length, centeredGeometry.composedStepDrop)
+      : undefined,
+  });
   const markStep = Math.min(centeredGeometry.markStep, quoteStep + 1);
 
   return (

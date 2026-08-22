@@ -31,10 +31,10 @@ export const typographicStatementActions = {
     description:
       'Move the voice on by one word: everything before it stands in full, the word ' +
       'itself takes the mark, and the rest of the sentence stays recessive. Write one ' +
-      'per word, in spoken order — the n-th event is the n-th word, so there is nothing ' +
-      'to name. Anchor them to `word:` forms for a card that follows a recorded take, or ' +
-      'to beat boundaries to pace it without one. Write none and the whole sentence ' +
-      'simply stands.',
+      'per word, in spoken order — the n-th event advances the n-th statement word, so ' +
+      'there is no payload to name. For a recorded take, anchor it to that same word with ' +
+      '`word:`; otherwise use beat boundaries for coarse pacing. Write none and the whole ' +
+      'sentence simply stands.',
     payload: null,
   },
 } as const satisfies Record<string, ActionDef>;

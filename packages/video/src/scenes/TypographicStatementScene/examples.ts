@@ -61,7 +61,7 @@ export const typographicStatementExamples: SceneExample[] = [
       { at: 'b2.start+long', action: 'advanceWord' },
       { at: 'b3.start', action: 'advanceWord' },
       { at: 'b3.start+short', action: 'advanceWord' },
-      { at: 'b3.start+long', action: 'advanceWord' },
+      { at: 'b3.end-short', action: 'advanceWord' },
     ],
     props: { ...chapterTwo },
   },

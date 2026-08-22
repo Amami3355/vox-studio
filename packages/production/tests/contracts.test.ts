@@ -43,8 +43,8 @@ describe('production contract projections', () => {
     }
   });
 
-  it('publishes checks as an exact view of catalog v3', () => {
-    expect(catalog.contract.manifestVersion).toBe(5);
+  it('publishes checks as an exact view of catalog v4', () => {
+    expect(catalog.contract.manifestVersion).toBe(4);
     expect(checks.contract).toEqual(catalog.contract.checks);
   });
 

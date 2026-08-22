@@ -81,29 +81,31 @@ design, not a fallback.
 13. As a narrative agent, I want to be refused when I write more `advanceWord` events than
     the statement has words, so that the error arrives at validation rather than as a card
     that stops moving halfway.
-14. As a narrative agent, I want to be refused when my word anchors are written out of spoken
+14. As a narrative agent, I want a word anchor to name the statement word its event advances,
+    so that the narration cannot cut on one word while the card marks another.
+15. As a narrative agent, I want to be refused when my word anchors are written out of spoken
     order, so that the plan's written order stays the order the card plays.
-15. As a narrative agent, I want the capability's `avoidWhen` to redirect me to `quote` when
+16. As a narrative agent, I want the capability's `avoidWhen` to redirect me to `quote` when
     I am setting a person's words, so that I do not use a chapter card as a pull-quote.
-16. As a narrative agent, I want a statement length band with a named degradation, so that I
+17. As a narrative agent, I want a statement length band with a named degradation, so that I
     can decide whether a longer sentence is worth the type scale it costs.
-17. As a viewer, I want the film to visibly change register at an act break, so that I can
+18. As a viewer, I want the film to visibly change register at an act break, so that I can
     feel the structure without being told it.
-18. As a viewer, I want the sentence readable from the frame it appears on, so that I can
+19. As a viewer, I want the sentence readable from the frame it appears on, so that I can
     read ahead of the narrator rather than being fed one word at a time.
-19. As a viewer, I want the emphasis to follow the voice, so that the word being spoken is
+20. As a viewer, I want the emphasis to follow the voice, so that the word being spoken is
     the word I am looking at.
-20. As a viewer, I want no persistent narrator figure crossing a chapter card, so that the
+21. As a viewer, I want no persistent narrator figure crossing a chapter card, so that the
     cut stays a cut.
-21. As a viewer on a poor display, I want the knocked-out type to hold contrast in every
+22. As a viewer on a poor display, I want the knocked-out type to hold contrast in every
     ground role and both themes, so that the card is legible wherever it is watched.
-22. As a maintainer, I want the card to render correctly with an empty statement, so that a
+23. As a maintainer, I want the card to render correctly with an empty statement, so that a
     plan that has not filled the card in yet does not produce a broken frame.
-23. As a maintainer, I want the serif to live in the theme rather than in the component, so
+24. As a maintainer, I want the serif to live in the theme rather than in the component, so
     that a second theme inherits it and no scene invents a font family.
-24. As a maintainer, I want the capability tested at seams that already exist, so that adding
+25. As a maintainer, I want the capability tested at seams that already exist, so that adding
     it does not add a testing surface to keep alive.
-25. As a maintainer, I want the accepted key frames to fail loudly when the design moves, so
+26. As a maintainer, I want the accepted key frames to fail loudly when the design moves, so
     that a deliberate change is reviewed by a human and an accidental one is caught.
 
 ---
@@ -164,6 +166,10 @@ Two verbs, both with `payload: null`. `supportsEvents: true`.
   vocabulary exists to avoid. It would also make the verb deictic, which under ADR-0012 means
   no scene example could illustrate it at all.
 
+For a `word:` anchor, written order is necessary but not sufficient: the n-th anchor must name
+the n-th token of `statement`. Beat-boundary anchors remain legal for coarse pacing, where no
+word claim is being made.
+
 The word-anchored form a plan writes with a real take:
 
 ```ts
@@ -209,17 +215,26 @@ plan with no take loses the sweep and loses nothing else.
 The component clamps `spoken` to the statement's word count. The reducer does not, because
 the reducer does not know the props.
 
+The tone and mark use `motion.duration.instant` through Remotion `interpolate()`. Six frames is
+short enough to begin on the measured onset and settle before the next 12-frame word in the
+reference take, while still satisfying the design-system rule that an animated property never
+jumps between frames. On the final word the same interval retires the mark and leaves the exact
+undriven frame.
+
 ### D6 — Checks
 
-`checks.ts` **exists** here, where `QuoteScene` deletes it. One referential rule the generic
-validator cannot express: more `advanceWord` events than the statement has words.
+`checks.ts` **exists** here, where `QuoteScene` deletes it. Two referential rules the generic
+validator cannot express:
+
+- more `advanceWord` events than the statement has words;
+- a word-anchored n-th `advanceWord` naming anything other than the n-th statement word.
 
 The word count comes from `tokenise()` in `core/words.ts` — the one module that decides what
 a word is, and the same one the anchor grammar consults. A second definition of "word" inside
 this capability would be a rule the agent could satisfy in the anchor and violate in the
 check.
 
-It judges **counts and written order, never frames**, so it fails at `validate` — before a
+It judges **content and written order, never frames**, so it fails at `validate` — before a
 take exists and before anyone has paid to record one.
 
 Per the procedure, this file is written after `Component.tsx` and verified against it: a
@@ -233,15 +248,28 @@ Layout-owned geometry, authored nowhere the agent can reach: the statement colum
 of the frame box, the statement's ceiling step, the eyebrow gap, and the ordinal's corner.
 A second arrangement would be a different scene.
 
-### D8 — The one design-system change
+### D8 — Shared-surface changes
 
-The chosen direction sets the statement in a serif, which the theme does not carry. This is
-the only cross-cutting change in the spec:
+The chosen direction sets the statement in a serif and paints a semantic ground edge to edge.
+Those choices require the following shared changes; they are part of the capability's scope
+rather than post-hoc exceptions:
 
 - `Theme.type` gains a **`displayAlt`** role, with a fallback stack, defined once and
   inherited by both existing themes.
 - `design/fonts.ts` loads it. `@remotion/google-fonts/InstrumentSerif` is present in the
   installed package — verified, not assumed.
+- `titleFit.ts` accepts a named `face` inside an options object, so the measured face is the
+  one the browser draws without growing a positional-argument list.
+- `Backdrop` accepts an optional resolved ground and draws it flat; the semantic role remains
+  resolved by the scene through `emphasisColor()`.
+- `EmptyState` accepts optional tone and ground overrides, because its small label must meet
+  normal-text contrast on the hot ground.
+- `StressControl` recognises both display families and multi-span display text, so the new
+  scene remains inside the existing stress surface.
+- `SceneCapability.paintsOwnGround` records the internal render assertion used by safe-area
+  and stress tests. It is deliberately outside `SceneMeta` and the generated catalog: the
+  agent-facing editorial fact is already expressed by the summary, occupied regions and
+  supported compositions; this flag only selects the correct bitmap reading.
 
 The component adds no family of its own; every value it draws still resolves to `design/`.
 
@@ -308,6 +336,8 @@ these cases join that file rather than starting a new one.
 - A word the beat does not speak is refused, and the message names the words it does speak.
 - A word the beat speaks twice is refused rather than resolved to the first match.
 - A word anchor against a synthetic take is refused and says it has no take.
+- A word anchor naming a different token from the statement word it advances is refused with
+  `EVENT_CONTENT_MISMATCH`.
 - Anchors written out of spoken order are refused with `EVENTS_OUT_OF_ORDER` (ADR-0011).
 - More `advanceWord` events than the statement has words is refused at `validate` (D6).
 
@@ -328,8 +358,9 @@ Built on the `render/quote.test.ts` shape, which keeps two different questions a
   `scripts/still.mts`, and each hash carries a sentence saying what changed in the picture.
 - **One compiled-plan render carrying real word timings**, on the
   `render/compiled-video.test.ts` pattern — the only place the sweep is proven on pixels
-  rather than on frame numbers. The frame before `b7.word:absorb` and the frame after it
-  settles must differ.
+  rather than on frame numbers. The onset frame equals the settled frame immediately before
+  it, then a frame inside `motion.duration.instant` differs: the word begins easing at the
+  measured onset rather than jumping there or changing elsewhere.
 
 ### Stress
 
@@ -402,18 +433,6 @@ parallelism only, one `service-render` failure is a missing `ffprobe`, and biome
 Written after the fact, against the decisions above. Everything not listed here was built as
 specified.
 
-### One decision reversed: D5's `spokenFrame`
-
-D5 gave the state a third field, `spokenFrame`, "so its colour change can ease rather than
-jump". **It is not there, and the ease is gone with it.**
-
-A word anchor exists so the picture moves on the frame the word was *measured* at. `useEntrance`
-under `editorialStatic` takes roughly ten frames to settle, and at this granularity ten frames
-is a whole word — so the sprung version showed a word brightening well after the narrator had
-moved on, which is the arithmetic-instead-of-a-word that `anchor-grammar.ts` refuses when it
-declines to give `word:` an offset. The tone now changes on the frame. The field that would
-have softened it would have had no reader, so it was removed rather than left as dead state.
-
 ### One behaviour added that the spec did not name: the mark retires
 
 When the sweep reaches the end of the sentence, the mark lifts and every word stands. The spec
@@ -422,38 +441,14 @@ once settled — and that requirement is only satisfiable if the card comes to r
 undriven state. It is also the better picture: a cursor parked under the last word for the
 length of the hold reads as a voice that stopped mid-sentence.
 
-### Cross-cutting changes beyond D8
+### Shared changes
 
-D8 named one: `Theme.type.displayAlt` plus the font load. Five more were needed and each is
-argued in the file it lives in.
+D8 now names the complete shared surface: font role and load, measured face, owned backdrop,
+contrast-aware empty state, stress probe, and the internal owned-ground render contract. The
+implementation arguments live with those interfaces; this section no longer grants scope after
+the fact.
 
-- **`titleFit.ts` takes the face it is measuring.** The fit's own header says it is *measured
-  rather than estimated*, and that stopped being true the moment a second display face existed —
-  a serif at regular weight and normal tracking is not the width of a grotesque at 800 and
-  tracking tight. `TypeFace` is an input now, defaulted to the face every existing caller uses.
-- **`Backdrop` takes a `ground`.** A colour, not a flag; the caller still resolves a semantic
-  role through `emphasisColor`. Given one it draws flat, because the radial lift that makes an
-  ordinary scene read as a lit set makes a saturated full-canvas ground read as a gradient,
-  which is a decoration rather than a cut.
-- **`EmptyState` takes a tone and a ground.** `inkMuted` on a hot ground is not a degraded
-  frame, it is an illegible one. Both default to the theme's own.
-- **`StressControl`'s display-type probe learned the second face**, and learned to measure a
-  statement that colours its own words. It filtered on one family and on "exactly one text
-  child"; a sentence split into a span per word passes neither, so the one capability whose
-  entire frame is display type would have been the one the fourth ADR-0003 question never
-  reached — a question nobody asks reporting as a pass.
-- **The quiet-border question is asked two ways now, from one place.** Both `safe-area.test.ts`
-  and `stress/content-stress.test.ts` compared the band inside the reserved rectangle against a
-  render of `Backdrop` — the wrong control for a scene standing on its own ground: it fails a
-  correct frame, and any frame it passes has passed for no reason. `SceneMeta` gained
-  `paintsOwnGround`, and for a scene that declares it the same question is asked absolutely
-  instead: the band must be one flat colour, which is what "no ink here" means when the ground
-  belongs to the scene. Both readings live in `quietBorderReading` in `tests/render/png.ts`,
-  because the two suites had been carrying the same one-branch rule and a rule with two branches
-  copied into two files is the copy that goes stale. The declaration is published, so an agent
-  reading the manifest also learns why this capability cannot share a frame.
-
-### One compiler check added
+### Compiler checks added
 
 D6 said `checks.ts` refuses more `advanceWord` events than the statement has words, and named no
 code for it. No existing code says that: `INVALID_PAYLOAD` is about a payload this vocabulary
@@ -461,18 +456,20 @@ does not have, and `EVENT_BEFORE_ELEMENT_REVEALED` is about an element that is m
 frame *yet*. `EVENT_EXCEEDS_CONTENT` was added to `COMPILER_CHECKS.errors` and is published with
 the rest.
 
-`checks.ts` also carries a second rule the spec did not list, on the `line_chart` precedent: an
-`advanceWord` written before `revealStatement` moves the voice through a sentence that is still
-held back. It is true of the component because the words are mounted inside the statement's
-gate — and it stops being true if that gate ever moves, which its header says out loud.
+`EVENT_CONTENT_MISMATCH` covers the other false-but-renderable plan: a word anchor naming one
+narration token while positional advancement lights another statement token. The previously
+added refusal for `advanceWord` written before `revealStatement` was removed before merge; D6
+does not ask for it, and written order alone does not prove that pre-positioning the sweep is
+always invalid.
 
 ### Examples
 
 D11's four examples exist. The `driven` one spans three beats rather than two: it holds the
 statement until `b1.start+short` so the eyebrow-alone frame is a picture the catalogue actually
 contains, and its seven `advanceWord` events then run `.start`, `.start+short`, `.start+long`
-across the remaining beats, which is a shape an agent can copy. Two beats could not carry both
-the hold and seven ascending boundary anchors.
+and `.end-short` across the remaining beats, which is a shape an agent can copy and which leaves
+the final ease a real hold before the scene ends. Two beats could not carry both the hold and
+seven ascending boundary anchors.
 
 ### Gates, as run
 
@@ -516,11 +513,13 @@ size is the scale's floor step at the density floor, 35px.
 Five key frames moved. The stills were looked at again before the hashes were re-accepted, and
 the accepted block says why they moved.
 
-### The one that changed a published contract
+### The one that briefly changed a published contract
 
-**`manifestVersion` was still 4.** `SceneMeta.paintsOwnGround` adds a key to every catalog
-entry's shape, and ADR-0006 is explicit that the bump is the record that the shape changed. It
-is 5, in `build.ts` and in both suites that assert it.
+The first review put `paintsOwnGround` on `SceneMeta` and bumped `manifestVersion` to 5. The
+merge-readiness review found that the flag selects a bitmap assertion and has no agent-facing
+decision to carry. It now lives on internal `SceneCapability`, the generated entry has no new
+key, and `manifestVersion` remains 4. That also preserves ADR-0013's reserved version 5 for its
+future transition language.
 
 ### The one that made a spec sentence true
 
@@ -543,7 +542,7 @@ the one variable D11 asked for.
 ### Rule 1 — the same fact written out more than once
 
 Four rationales had been written in full in two to four places each. Each now has one home and
-the rest point at it: `paintsOwnGround`'s reasoning lives on the field in `core/types.ts`; the
+the rest point at it: `paintsOwnGround`'s reasoning lives on the internal field in `core/types.ts`; the
 mechanism of the two border readings lives in `quietBorderReading`; why this capability keeps
 `checks.ts` lives in its `index.ts`; the ADR-0012 "a scene example has no take" argument lives
 in `examples.ts`; and the rung-b consequence lives in `meta.ts`, with the proposals file
@@ -556,16 +555,15 @@ recording only that it *is* a deviation.
 - `quietBorderReading` returns a `basis` alongside `expected` and `actual`. Its two branches
   are not the same measurement — one compares two bitmaps, the other compares a band to its own
   frame's corner — and a failure that does not say which it took is unreadable.
-- `safe-area.test.ts`'s third question ("the comparisons above are over a live frame") passed
-  trivially for a ground-painting scene, since a painted rectangle differs from the backdrop
-  whether or not anything was drawn on it. It now asks that the region holds more than one
-  colour.
+- The shared `liveFrameReading` makes both `safe-area.test.ts` and
+  `stress/content-stress.test.ts` ask that an owned-ground region holds more than one colour.
+  A bare colour can no longer pass either suite as a live empty state.
 - Four stale capability counts, in `CONTEXT.md`, `docs/render-surface.md` and two places in
   `docs/proposals/architecture-evolutions.md`, said four or five. Six.
 - `Backdrop` no longer computes its radial lift before the branch that does not use it.
 
 ### Gates, re-run after the review
 
-`catalog:check` green; typecheck clean; biome exit 0; unit 664 passed with the same three
-`proof-harness` failures; render 163 passed with the same missing-`ffprobe` failure; stress
+`catalog:check` green; typecheck clean; biome exit 0; unit 665 passed with the same three
+`proof-harness` failures; render 164 passed with the same missing-`ffprobe` failure; stress
 1035 passed. The five key frames were re-rendered, looked at, and re-accepted.
