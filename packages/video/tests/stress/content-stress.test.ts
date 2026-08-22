@@ -228,22 +228,23 @@ describe('content the schema accepts renders into the box it was given', () => {
     /**
      * The half containment cannot see: a scene that runs its copy off the *canvas* edge
      * draws nothing illegal, because from `full` there is no region outside the reserved
-     * rectangle at all. Same comparison, read one rectangle in.
-     *
-     * `quietBorderReading` owns both readings of it — against the backdrop control for a
-     * scene standing on the film's ground, and as a flatness test for one that brought its
-     * own. `safe-area.test.ts` asks the identical question of the examples, so the rule has
-     * one home rather than one per suite.
+     * rectangle at all. Same comparison, read one rectangle in, in whichever reading
+     * `quietBorderReading` selects — `safe-area.test.ts` asks the identical question of the
+     * examples, so the rule has one home rather than one per suite.
      */
     it('leaves a quiet border inside that rectangle, so nothing is cropped by it', ({ skip }) => {
       const border = bandsInside(regionOfInsets(testCase.safeArea, WIDTH, HEIGHT), EDGE_QUIET_PX);
       const { paintsOwnGround } = testCase;
 
       for (const [index, bitmap] of drawnFrames(renders, skip)) {
-        const reading = quietBorderReading(bitmap, border, { control, paintsOwnGround });
-        expect({ frame: testCase.frames[index], border: reading.actual }).toEqual({
+        const { expected, actual, basis } = quietBorderReading(bitmap, border, {
+          control,
+          paintsOwnGround,
+        });
+        expect({ frame: testCase.frames[index], basis, border: actual }).toEqual({
           frame: testCase.frames[index],
-          border: reading.expected,
+          basis,
+          border: expected,
         });
       }
     });

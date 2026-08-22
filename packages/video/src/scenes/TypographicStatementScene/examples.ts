@@ -4,8 +4,10 @@
  * canonical card, the same card driven, an edge case past the recommended band, and an
  * empty case that proves the scene survives with no statement at all.
  *
- * The driven example carries the *same props* as the canonical one and differs only in its
- * events, so an agent comparing the two sees one variable and not three.
+ * The driven example differs from the canonical one **in its events and in nothing else** —
+ * same props, same layout, same profile, same beat span — so an agent comparing the two sees
+ * one variable and not three. The span is on both for that reason and not because the
+ * canonical card needs three beats; an instance with no events resolves no anchors.
  *
  * **None of these can carry a word anchor, and that is not an omission.** A scene example
  * has no take: `syntheticBeats` gives it `words: []`, and a word anchor resolved against
@@ -34,7 +36,13 @@ export const typographicStatementExamples: SceneExample[] = [
     component: 'typographic_statement',
     layout: 'cut',
     motionProfile: 'editorialStatic',
-    spansBeats: ['b1'],
+    /**
+     * Three beats, matching the driven example exactly, so that "differs only in its events"
+     * is true of the pair rather than nearly true. An eventless instance resolves no
+     * anchors, so the span costs this frame nothing and buys the comparison its one
+     * variable.
+     */
+    spansBeats: ['b1', 'b2', 'b3'],
     props: { ...chapterTwo },
   },
   {

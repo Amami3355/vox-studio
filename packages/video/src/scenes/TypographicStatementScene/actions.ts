@@ -9,8 +9,8 @@
  * events to the order they are written, so the *n*-th `advanceWord` is the *n*-th word by
  * construction. A payload naming the word would write it twice — once in the anchor, once
  * in the payload — and two sources that can diverge is the failure this vocabulary exists
- * to avoid. It would also make the verb deictic, and under ADR-0012 a deictic action cannot
- * be illustrated in `examples.ts` at all, because a scene example has no take.
+ * to avoid. It would also make the verb deictic, which under ADR-0012 costs the capability
+ * every example of it; `examples.ts` has that half.
  *
  * So the verb declares no `deicticFields` either, and that is not an oversight. A pointing
  * gesture says "this one" and is wrong if it lands late. This one says "the voice has moved

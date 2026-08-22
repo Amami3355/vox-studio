@@ -80,7 +80,9 @@ describe('TypographicStatementScene runtime', () => {
     ]);
 
     expect({ canonical, longCopy, empty, held, swept }).toEqual({
-      // Accepted 2026-08-22, the first key frames for this capability. Reviewed on stills at
+      // Accepted 2026-08-22, the first key frames for this capability, and re-accepted the same
+      // day after code review moved the ordinal and the empty-state label to full knock (see
+      // `cutGeometry.unspokenMix`). Reviewed on stills at
       // the frames named above, on `editorial-paper`:
       //
       //   canonical — the accent taken to full bleed, the eyebrow and the statement knocked
@@ -88,30 +90,31 @@ describe('TypographicStatementScene runtime', () => {
       //     ordinal small in mono in the bottom corner.
       //   longCopy  — the same card on the `negative` ground, the fit having taken the
       //     statement down the scale to four lines. Nothing near the ordinal or the border.
-      //   empty     — the rule and STATEMENT PENDING in the recessive tone, and nothing
-      //     else, because this example carries an empty eyebrow and ordinal too. Degraded
-      //     typographically, never to black and never to unreadable ink on a hot ground.
+      //   empty     — a faint rule and STATEMENT PENDING in full knock, and nothing else,
+      //     because this example carries an empty eyebrow and ordinal too. Degraded
+      //     typographically, never to black and never to unreadable ink on a hot ground:
+      //     the label is 26px at the density floor, so it is held to 4.5:1 and not to the
+      //     3:1 the sweep's recessive tone clears.
       //   held      — the eyebrow and the ordinal alone on the ground, mid-entrance. This is
       //     the picture `revealStatement` exists to produce.
       //   swept     — "Nobody is" in full, "left" carrying the mark, and the rest of the
       //     sentence recessive but still legible. This is the picture `advanceWord` exists
       //     to produce, and the reason the recession is a mix rather than a fade.
-      canonical: '17e21c28fb81ff107f268878160f6b8d',
-      longCopy: '10effe83acdcdeb7b8b294d8210cdb4a',
-      empty: '30978b6b2d5491edb47c219a6a7e65af',
-      held: '105da918e69390367214ff5b191489d4',
-      swept: '4daa017028d1ff69437ee69f0c8571dc',
+      canonical: 'f0577ec9e3209bc3e4569f5e420f8f1e',
+      longCopy: '33e41cb24bd5eb26456adb4c14c15f83',
+      empty: '1e011f825a1561736d461ea731eca49b',
+      held: '311836b94badebaf10fa414cade89fe9',
+      swept: '14dbef1ec41309130451ae2f4906ae17',
     });
   }, 120_000);
 });
 
 /**
- * The take's half, which no example can carry.
+ * The take's half, which no example can carry — `examples.ts` says why.
  *
- * A scene example has no recorded take, so `syntheticBeats` gives it `words: []` and a word
- * anchor against it throws by design. The only way to render the sweep against real onsets
- * is to compile a plan and play the document, which is what `compiled-video.test.ts` does
- * for ADR-0003 and what this does for the word anchor.
+ * The only way to render the sweep against real onsets is to compile a plan and play the
+ * document, which is what `compiled-video.test.ts` does for ADR-0003 and what this does for
+ * the word anchor.
  */
 describe('the sweep against a recorded take', () => {
   /**

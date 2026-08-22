@@ -24,11 +24,12 @@ export const Backdrop: React.FC<{ children?: React.ReactNode; ground?: string }>
   ground,
 }) => {
   const theme = useTheme();
-  const lift = mix(theme.color.bg, theme.color.surface, 0.9);
 
   if (ground !== undefined) {
     return <AbsoluteFill style={{ backgroundColor: ground }}>{children}</AbsoluteFill>;
   }
+
+  const lift = mix(theme.color.bg, theme.color.surface, 0.9);
 
   return (
     <AbsoluteFill style={{ backgroundColor: theme.color.bg }}>

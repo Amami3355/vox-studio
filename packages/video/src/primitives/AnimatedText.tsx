@@ -8,8 +8,19 @@ import { useEntrance } from './useEntrance';
 
 export type TextRole = 'display' | 'displayAlt' | 'body' | 'mono';
 
-/** The two faces that count as display type, wherever the distinction has to be made. */
-export const DISPLAY_ROLES: readonly TextRole[] = ['display', 'displayAlt'];
+/**
+ * The faces that count as display type, wherever the distinction has to be made.
+ *
+ * One list, because there are two readers and they must not drift: this component decides
+ * whether a run publishes `data-display-role`, and `runtime/StressControl.tsx` decides
+ * whether to measure it. A face in one and not the other is a run of display type that
+ * marks itself and is never checked, or is checked and never marks itself.
+ */
+export const DISPLAY_ROLES = ['display', 'displayAlt'] as const satisfies readonly TextRole[];
+
+/** Whether a role is one of them. The widening lives here rather than at each call site. */
+export const isDisplay = (role: TextRole): boolean =>
+  (DISPLAY_ROLES as readonly TextRole[]).includes(role);
 
 /**
  * What a run of display type is *for*, which decides how much of its scene it may take.
@@ -70,7 +81,7 @@ export const AnimatedText: React.FC<{
   return (
     <div style={{ overflow: 'hidden', paddingBottom: size * 0.14, maxWidth }}>
       <div
-        data-display-role={DISPLAY_ROLES.includes(font) ? (displayRole ?? 'header') : undefined}
+        data-display-role={isDisplay(font) ? (displayRole ?? 'header') : undefined}
         style={{
           fontFamily: theme.type[font],
           fontSize: size,

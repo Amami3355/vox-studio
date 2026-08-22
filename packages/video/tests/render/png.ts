@@ -168,11 +168,9 @@ export const hashRegions = (bitmap: Bitmap, regions: Region[]): string => {
 /**
  * Every distinct colour in some rectangles of one bitmap.
  *
- * The absolute form of the question `hashRegions` asks relatively. Two renders can be
- * compared over an area with a digest; an area that has to be *empty* on a ground the
- * control does not know cannot — and a scene that paints its own ground is exactly that
- * case (`SceneMeta.paintsOwnGround`). One colour across a band means nothing was drawn in
- * it, whatever the colour turns out to be.
+ * The absolute form of the question `hashRegions` asks relatively: an area that has to be
+ * *empty* on a ground no control knows cannot be compared to one, but it can be asked
+ * whether it holds a single colour. `SceneMeta.paintsOwnGround` carries when that applies.
  *
  * Returns the set rather than a boolean so a failure can say what it found.
  */
@@ -191,37 +189,44 @@ export const coloursIn = (bitmap: Bitmap, regions: Region[]): Set<string> => {
 };
 
 /**
- * The quiet-border reading of one frame: what the band must be, and what it is.
+ * What a quiet border must be, and what it is — in whichever of the two readings applies.
+ *
+ * `SceneMeta.paintsOwnGround` says why there are two and when each is right; it is not
+ * restated here. What lives here is the mechanism: which reading each flag selects, and
+ * what the two strings are made of.
+ *
+ * `basis` travels with them because the two readings are not the same measurement, and a
+ * failure that does not say which one it took is unreadable. Against the control, both
+ * strings are digests of the same bands of two bitmaps. Flat, `expected` is the frame's own
+ * corner and `actual` is every colour the band contains — so a pass means the band is that
+ * one colour, and the comparison is with the frame itself rather than with anything else.
  *
  * Two suites ask this — `render/safe-area.test.ts` over the examples, `stress/content-
- * stress.test.ts` over the schemas' own ceilings — and until the rule had two branches they
- * could each carry their own copy of the one. They cannot now: a second copy of a rule is
- * the copy that goes stale, and a stale copy of *this* rule reads as a design regression in
- * a suite nobody has changed.
- *
- * **The relative branch** is the original: the band must be byte-identical to the same band
- * of a `Backdrop` render, because a scene with ink there has spent its margin and is being
- * cropped by its own edge.
- *
- * **The absolute branch** is for a scene that declares `SceneMeta.paintsOwnGround`. Its
- * band is its own ground and differs from `Backdrop` everywhere by design, so comparing
- * them would fail a correct frame and any frame that passed would have passed by accident.
- * Asked the other way round, the band must be *one colour* — which is what "no ink here"
- * means when the ground belongs to the scene, and is the stronger reading of the two.
- *
- * Returns both sides as strings so the caller states the comparison itself and a failure
- * prints what was found rather than a boolean.
+ * stress.test.ts` over the schemas' own ceilings — and each carried its own copy while the
+ * rule had one branch. With two branches that is the copy that goes stale, and a stale copy
+ * of *this* rule reads as a design regression in a suite nobody has changed.
  */
+export type BorderReading = {
+  expected: string;
+  actual: string;
+  basis: 'equals the backdrop control' | 'is one flat colour';
+};
+
 export const quietBorderReading = (
   bitmap: Bitmap,
   border: Region[],
   options: { control: Bitmap; paintsOwnGround: boolean },
-): { expected: string; actual: string } =>
+): BorderReading =>
   options.paintsOwnGround
-    ? { expected: pixelAt(bitmap, 0, 0), actual: [...coloursIn(bitmap, border)].join(' ') }
+    ? {
+        expected: pixelAt(bitmap, 0, 0),
+        actual: [...coloursIn(bitmap, border)].join(' '),
+        basis: 'is one flat colour',
+      }
     : {
         expected: hashRegions(options.control, border),
         actual: hashRegions(bitmap, border),
+        basis: 'equals the backdrop control',
       };
 
 /**

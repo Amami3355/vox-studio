@@ -29,10 +29,10 @@ const withBarChartMeta = (meta: unknown): SceneCapability =>
  * while every event in every example is anchored.
  */
 describe('the manifest', () => {
-  it('publishes the canonical compiler-check registry once in catalog v3', () => {
+  it('publishes the canonical compiler-check registry once, at the current manifest version', () => {
     const catalog = buildCatalog();
 
-    expect(catalog.manifestVersion).toBe(4);
+    expect(catalog.manifestVersion).toBe(5);
     expect(catalog.checks).toBe(COMPILER_CHECKS);
 
     const entries = [

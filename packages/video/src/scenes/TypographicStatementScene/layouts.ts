@@ -52,14 +52,24 @@ export const cutGeometry = {
    * How far an unspoken word recedes toward the ground, as a mix.
    *
    * Measured, not chosen by eye. At 0.28 the recessive tone holds 3.15:1 against its ground
-   * at the tightest of the six role × theme combinations (`positive` on `editorial-paper`),
-   * which clears the 3:1 large-text floor — and every word on this card is large text, at
-   * 48px in the worst case the schema admits. The knocked-out ink itself runs 4.59:1 to
-   * 10.30:1 across the same six.
+   * at the tightest of the six role × theme combinations (`positive` on `editorial-paper`).
+   * That clears the 3:1 WCAG floor for **large** text and nothing else, so the tone is
+   * spent on large text and nothing else: the smallest word this card can draw is the type
+   * scale's floor step at the density floor — 48 × 0.72, or 35px — which is well past the
+   * 24px line. The knocked-out ink itself runs 4.59:1 to 10.30:1 across the same six.
    *
-   * The recession is deliberately mild. A word the voice has not reached yet still has to
-   * be *readable*: the viewer reads ahead of the narrator, and a sweep that hid its own
-   * sentence would be a word-at-a-time reveal, which is the treatment this design rejected.
+   * **Small type on this ground does not recede at all**, and the arithmetic is why. On
+   * `positive` over paper the ink is 4.59:1 against its ground, which is barely over the
+   * 4.5:1 normal-text floor — so *any* recession puts small type under it. The ordinal is
+   * 28px before density and 20px at the floor; the empty state's label is 36px and 26px.
+   * Both are drawn in full knock. This is D3's own sentence — a ground this saturated is a
+   * reason never to put body copy on it — applied to the two runs of small type the layout
+   * does have.
+   *
+   * The recession is deliberately mild for the words that do take it. A word the voice has
+   * not reached yet still has to be *readable*: the viewer reads ahead of the narrator, and
+   * a sweep that hid its own sentence would be a word-at-a-time reveal, which is the
+   * treatment this design rejected.
    */
   unspokenMix: 0.28,
   /**

@@ -147,8 +147,9 @@ increment**. It is not an emphasis role, so it would need a second field; three 
 the seam and a fourth ground can be added later without breaking anything.
 
 All six combinations (three roles × two themes) clear 4.5:1 for the knocked-out type. The
-tightest is `positive` on `editorial-paper` at 4.50:1, which is display-only — it is a reason
-never to put body copy on this ground, and the layout does not.
+tightest is `positive` on `editorial-paper` at **4.59:1** — corrected during the build from the
+4.50 first written here, which was a design-canvas figure nobody had recomputed. It is
+display-only: a reason never to put body copy on this ground, and the layout does not.
 
 ### D4 — Action vocabulary
 
@@ -487,3 +488,84 @@ the hold and seven ascending boundary anchors.
   profiles.
 - `npx biome check .` — **clean, exit 0.** The spec's note that the baseline is 9 pre-existing
   errors is stale; there are none.
+
+---
+
+## What the review changed
+
+A two-axis review ran against `dev` after the first commit. Seven findings were acted on; this
+records what moved and, where a finding was about the record rather than the code, what the
+record now says.
+
+### The one that changed pixels
+
+**The ordinal and the empty-state label were drawn in the recessive tone, and they are too
+small to carry it.** `cutGeometry.unspokenMix` clears 3:1 — the WCAG floor for *large* text —
+and the comment defending it said "every word on this card is large text, at 48px in the worst
+case". True of the statement's words and of nothing else. The ordinal is 28px before density,
+and `SlotFrame` gives a full-frame scene a density of about 0.86, dropping to the 0.72 floor
+under `pushIn`: **20px**, under the 24px line, at 3.15:1. The empty state's label is 26px at
+the floor.
+
+Both are drawn in full knock now. On `positive` over paper the ink is 4.59:1, barely over the
+4.5:1 normal-text floor, so *any* recession puts small type under it — which is D3's own
+sentence about not putting body copy on this ground, applied to the two runs of small type the
+layout has. The recessive tone is spent only on the statement's words, whose smallest possible
+size is the scale's floor step at the density floor, 35px.
+
+Five key frames moved. The stills were looked at again before the hashes were re-accepted, and
+the accepted block says why they moved.
+
+### The one that changed a published contract
+
+**`manifestVersion` was still 4.** `SceneMeta.paintsOwnGround` adds a key to every catalog
+entry's shape, and ADR-0006 is explicit that the bump is the record that the shape changed. It
+is 5, in `build.ts` and in both suites that assert it.
+
+### The one that made a spec sentence true
+
+**D11 said `driven` "carries the same props as `canonical` and differs only in its events".**
+It did not: canonical spanned one beat and driven three. Canonical spans three now. An
+eventless instance resolves no anchors, so the span costs that frame nothing and the pair has
+the one variable D11 asked for.
+
+### Findings about the record, not the code
+
+- **D3's contrast figure was stale.** 4.50:1 came from the design canvas; recomputed it is
+  4.59:1. Corrected in D3 itself rather than noted here, because a spec that states a number is
+  the place the number should be right.
+- **Seam 2's ground relation is asserted on two compiled plans, not on two examples.** The
+  spec said "the same example at `emphasis: neutral` and `emphasis: negative`". Two examples
+  differing only in a role would be a shape the agent is taught to author for no editorial
+  reason, so the relation is asked of two fixture plans instead. The behaviour is proven; the
+  test file carries the argument.
+
+### Rule 1 — the same fact written out more than once
+
+Four rationales had been written in full in two to four places each. Each now has one home and
+the rest point at it: `paintsOwnGround`'s reasoning lives on the field in `core/types.ts`; the
+mechanism of the two border readings lives in `quietBorderReading`; why this capability keeps
+`checks.ts` lives in its `index.ts`; the ADR-0012 "a scene example has no take" argument lives
+in `examples.ts`; and the rung-b consequence lives in `meta.ts`, with the proposals file
+recording only that it *is* a deviation.
+
+### Smaller repairs
+
+- `StressControl`'s `DISPLAY_FAMILIES` is derived from `AnimatedText`'s `DISPLAY_ROLES` rather
+  than hand-copied, so a third face is added in one place.
+- `quietBorderReading` returns a `basis` alongside `expected` and `actual`. Its two branches
+  are not the same measurement — one compares two bitmaps, the other compares a band to its own
+  frame's corner — and a failure that does not say which it took is unreadable.
+- `safe-area.test.ts`'s third question ("the comparisons above are over a live frame") passed
+  trivially for a ground-painting scene, since a painted rectangle differs from the backdrop
+  whether or not anything was drawn on it. It now asks that the region holds more than one
+  colour.
+- Four stale capability counts, in `CONTEXT.md`, `docs/render-surface.md` and two places in
+  `docs/proposals/architecture-evolutions.md`, said four or five. Six.
+- `Backdrop` no longer computes its radial lift before the branch that does not use it.
+
+### Gates, re-run after the review
+
+`catalog:check` green; typecheck clean; biome exit 0; unit 664 passed with the same three
+`proof-harness` failures; render 163 passed with the same missing-`ffprobe` failure; stress
+1035 passed. The five key frames were re-rendered, looked at, and re-accepted.

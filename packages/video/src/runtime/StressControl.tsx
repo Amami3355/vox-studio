@@ -59,6 +59,7 @@ import { NO_SAFE_AREA, type SafeArea, type TimedEvent } from '../core/types';
 import { waitForFonts } from '../design/fonts';
 import type { MotionProfileId } from '../design/motion';
 import { defaultTheme } from '../design/theme';
+import { DISPLAY_ROLES } from '../primitives/AnimatedText';
 import { SCENE_BOX_ATTRIBUTE } from '../primitives/SlotFrame';
 import { MAX_HEADER_SHARE, MAX_STATEMENT_SHARE } from '../primitives/titleFit';
 import { requireCapability } from '../scenes/registry';
@@ -79,13 +80,14 @@ const CLIP_TOLERANCE_PX = 2;
 /**
  * The display faces, as the theme spells them before the fallbacks.
  *
- * Both of them. A second display face was added for the chapter card, and a probe that
- * knew only the first would have answered "no display type on this frame" for the one
- * capability whose entire frame is display type — a question nobody asks reporting as a
- * pass, which is the failure this whole file was written against.
+ * Derived from `DISPLAY_ROLES` rather than listed, so a third face is added in one place.
+ * A probe that knew only the first face would answer "no display type on this frame" for
+ * the one capability whose entire frame is display type — a question nobody asks reporting
+ * as a pass, which is the failure this whole file was written against, and a hand-kept
+ * second copy of the list is exactly how that would happen again.
  */
-const DISPLAY_FAMILIES = [defaultTheme.type.display, defaultTheme.type.displayAlt].map((stack) =>
-  (stack.split(',')[0] as string).trim(),
+const DISPLAY_FAMILIES = DISPLAY_ROLES.map((role) =>
+  (defaultTheme.type[role].split(',')[0] as string).trim(),
 );
 
 export type StressSceneProps = {

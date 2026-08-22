@@ -86,7 +86,11 @@ const CutFrame: React.FC<{
   const columnWidth = box.width * cutGeometry.columnRatio;
 
   const knock = theme.color.bg;
-  /** The theme's `inkMuted`, re-derived against this card's ground. See `cutGeometry`. */
+  /**
+   * The theme's `inkMuted`, re-derived against this card's ground — and spent only on the
+   * statement's own words, which are the only run of type here large enough to carry it.
+   * `cutGeometry.unspokenMix` has the arithmetic.
+   */
   const recessive = mix(knock, ground, cutGeometry.unspokenMix);
 
   /**
@@ -148,7 +152,7 @@ const CutFrame: React.FC<{
                 message="Statement pending"
                 startFrame={start}
                 profile={profile}
-                color={recessive}
+                color={knock}
                 ground={ground}
               />
             ) : (
@@ -170,7 +174,12 @@ const CutFrame: React.FC<{
       {/* Apparatus, and outside the gate for the same reason the eyebrow is: a page number
           does not wait for the page. Absolute so that carrying one does not push the
           sentence off centre — the band `cutGeometry.statementShare` reserves is what keeps
-          the two apart, rather than a row in the flow. */}
+          the two apart, rather than a row in the flow.
+
+          In full knock, not the recessive tone, and its own size is why: 28px before
+          density and 20px at the floor is not large text, so the 3:1 the recession clears
+          is not the bar it has to pass. See `cutGeometry.unspokenMix`. It is quiet enough
+          by being 20px in a corner next to a 168px sentence. */}
       {ordinal ? (
         <div style={{ position: 'absolute', right: 0, bottom: 0 }}>
           <AnimatedText
@@ -180,7 +189,7 @@ const CutFrame: React.FC<{
             step={0}
             weight={theme.type.weight.regular}
             tracking={theme.type.tracking.wide}
-            color={recessive}
+            color={knock}
           >
             {ordinal}
           </AnimatedText>

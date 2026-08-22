@@ -26,11 +26,9 @@
  * - inside it, it differs from the control, which is what stops the first two passing
  *   because the probe read the wrong rectangle, or an empty one
  *
- * One capability stands on a ground of its own and says so — `SceneMeta.paintsOwnGround` —
- * and for it the border question is asked absolutely instead: the band must be one flat
- * colour. Both readings live in `quietBorderReading`, in `png.ts`, because the content-stress
- * suite asks the same question of the same bands and two copies of a rule with two branches
- * is one copy too many.
+ * A scene that brings its own ground is measured against itself instead, on both counts.
+ * `SceneMeta.paintsOwnGround` carries why; `quietBorderReading` in `png.ts` carries which
+ * reading that selects, for this suite and for the content-stress one together.
  *
  * **The control is what makes these absolute, and that is the point.** The suite used to
  * ask the same three things as a relation between two examples of the same capability, on
@@ -58,6 +56,7 @@ import {
   type Region,
   bandsInside,
   bandsOutside,
+  coloursIn,
   decodePng,
   hashRegions,
   pixelAt,
@@ -297,41 +296,45 @@ describe('a declared composition renders into the rectangle it declared', () => 
      * `section--vertical-slice` while this suite stayed green.
      *
      * Same comparison, read one rectangle in: the band just inside the reserved rectangle
-     * must still be backdrop, because a scene with ink there has spent its margin and is
-     * being cropped by its own edge.
-     *
-     * **Unless the scene brought its own ground**, which `SceneMeta.paintsOwnGround`
-     * declares. There the backdrop is not the control — the band is the scene's ground and
-     * differs from `Backdrop` everywhere by design — so the same question is asked
-     * absolutely instead of relatively: the band must be *one colour*. That is what "no ink
-     * here" means when the ground belongs to the scene, and it is the stronger of the two
-     * readings, since it cannot be satisfied by a frame that merely happens to match a
-     * control.
+     * must still be ground, because a scene with ink there has spent its margin and is
+     * being cropped by its own edge. Which reading of "still ground" applies is
+     * `quietBorderReading`'s, and `basis` says which one it took.
      */
     it('leaves a quiet border inside that rectangle, so nothing is cropped by it', () => {
       const border = bandsInside(insideOf(testCase.safeArea), EDGE_QUIET_PX);
       const { paintsOwnGround } = testCase;
 
       for (const [frame, exampleId, bitmap] of eachRender()) {
-        const reading = quietBorderReading(bitmap, border, { control, paintsOwnGround });
-        expect({ frame, exampleId, border: reading.actual }).toEqual({
+        const { expected, actual, basis } = quietBorderReading(bitmap, border, {
+          control,
+          paintsOwnGround,
+        });
+        expect({ frame, exampleId, basis, border: actual }).toEqual({
           frame,
           exampleId,
-          border: reading.expected,
+          basis,
+          border: expected,
         });
       }
     });
 
+    /**
+     * What stops the two above passing because the probe read an empty rectangle.
+     *
+     * Against the control it is "this frame is not the backdrop". That sentence is free for
+     * a scene that painted the rectangle a different colour before drawing anything, so for
+     * one that declares `paintsOwnGround` the question is asked the same way its border was:
+     * the reserved region must hold **more than one colour**, which a bare ground does not.
+     */
     it('draws the scene inside it, so the comparisons above are over a live frame', () => {
       const inside = [insideOf(testCase.safeArea)];
       const expected = hashRegions(control, inside);
 
       for (const [frame, exampleId, bitmap] of eachRender()) {
-        expect({ frame, exampleId, drew: hashRegions(bitmap, inside) !== expected }).toEqual({
-          frame,
-          exampleId,
-          drew: true,
-        });
+        const drew = testCase.paintsOwnGround
+          ? coloursIn(bitmap, inside).size > 1
+          : hashRegions(bitmap, inside) !== expected;
+        expect({ frame, exampleId, drew }).toEqual({ frame, exampleId, drew: true });
       }
     });
   });

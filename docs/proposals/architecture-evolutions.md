@@ -232,26 +232,23 @@ TTS key — so no measure has been taken. Nothing below unblocks step 8 by argum
 follows is what step 8 should *be* when the measure lands, written now because the list has
 changed and a list decided under schedule pressure is the one that gets decided badly.
 
-**Depth was the right axis and it is largely spent.** The catalogue is five capabilities, not
+**Depth was the right axis and it is largely spent.** The catalogue is six capabilities, not
 the two this entry describes: `bar_chart`, `image_context`, `quote`, `stat_counter`,
-`line_chart`. The order it set — compositions, layouts, prop slots, actions — is done at both
+`line_chart`, `typographic_statement`. The order it set — compositions, layouts, prop slots, actions — is done at both
 ends for `image_context`, and `quote` and `stat_counter` carry all three compositions with
 `occupiesRegions` measured rather than hoped. Layouts and prop slots remain the open middle,
-and they are still volume. Two exceptions are on the books, each argued in its own spec, and
-they are the same fact about the machinery for opposite reasons. `line_chart` ships
-`supportedCompositions: ['full']` because no composed form has been designed for it yet — a
-deliberate first-increment non-goal. `typographic_statement` ships the same declaration
-because **an act break must not share the frame**: a narrator standing in the corner of the cut
-is a narrator who did not stop. Both therefore can never reach ADR-0003 rung b — a persistent
-element crossing either relocates or hides, and the scene never yields. For the first that is a
-cost to be paid off; for the second it is the intent, and nothing should later "fix" it.
+and they are still volume. **Two capabilities now ship `supportedCompositions: ['full']` and
+so can never reach ADR-0003 rung b** — a persistent element crossing either relocates or
+hides, and the scene never yields. `line_chart`'s is a first-increment non-goal to be paid
+off. `typographic_statement`'s is the intent, argued in its own `meta.ts`, and nothing should
+later "fix" it. Recorded here because the second one is a deviation from the plan of record,
+not because the argument lives here.
 
-`typographic_statement` also carries the only `paintsOwnGround` declaration in the catalogue.
-The field is new and exists because a scene that replaces the backdrop cannot be measured
-against it: `safe-area.test.ts` asks whether the band inside the reserved rectangle is still
-ground, and for this one capability it asks that the band is one flat colour instead.
+`typographic_statement` also carries the catalogue's only `paintsOwnGround` declaration.
+`SceneMeta` has the field and the reasoning.
 
-**What is left is not depth, it is kind.** Three of the five are charts. A catalogue that can
+**What is left is not depth, it is kind.** Three of the six are charts, and the sixth is the
+first entry in the table below to be built. A catalogue that can
 compare, trend and count states a number well and cannot make an argument: it has no way to
 say *when*, *where*, *who*, or *what this chapter is*. §14's target of 8–12 robust
 capabilities was never a count for its own sake — it is the breadth at which a sequence of

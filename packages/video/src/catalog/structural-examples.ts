@@ -41,10 +41,9 @@ const minimalContextPlan: VideoPlan = {
  * The seven-anchor sweep, published as a plan because it cannot be published as a render.
  *
  * `typographic_statement.advanceWord` is written one event per word, and the form that
- * matters is the one anchored to the words themselves — the picture moving with the
- * sentence being spoken. No `examples.ts` in the library can show it: a scene example has
- * no take, `syntheticBeats` gives it `words: []`, and a word anchor against that throws by
- * design. ADR-0012 names this exact route out, and this is it.
+ * matters is the one anchored to the words themselves. No `examples.ts` in the library can
+ * carry it, for the reason that file states and ADR-0012 decides; a structural plan example
+ * is the route out both name, and this is it.
  *
  * Every word of the statement appears in the beat text exactly once, which is not a
  * coincidence and is the thing to copy: a word anchor naming a word its beat speaks twice

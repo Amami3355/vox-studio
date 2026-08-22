@@ -2,7 +2,7 @@
   "category": "catalog",
   "contractVersion": 3,
   "contract": {
-    "manifestVersion": 4,
+    "manifestVersion": 5,
     "time": {
       "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
       "forms": [
@@ -2150,7 +2150,9 @@
             "layout": "cut",
             "motionProfile": "editorialStatic",
             "spansBeats": [
-              "b1"
+              "b1",
+              "b2",
+              "b3"
             ],
             "props": {
               "eyebrow": "Chapter two",
