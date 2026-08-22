@@ -104,6 +104,40 @@ export const LinePlot: React.FC<LinePlotProps> = ({
     [yAxis.ticks, unit, theme, axisSize],
   );
 
+  /**
+   * Where each legend entry starts, measured rather than divided.
+   *
+   * This used to place entry *n* at `padding.left + (n * plotWidth) / series.length` — an
+   * even division that knows nothing about the labels standing in it. `series.label` is a
+   * 32-character ceiling, so three long labels in three equal thirds is a collision nobody
+   * would find until they watched the frame, and `LinePlot`'s own contract says it owns
+   * "collision-safe plot padding". The file already measures its date labels with the same
+   * utility; the legend was the half that guessed.
+   *
+   * A cursor, in the order the plan wrote the series, each entry as wide as its own marker
+   * plus its own text. `legendOverflows` is the honest report of the case where even that
+   * does not fit — see where it is used.
+   */
+  const legendEntryWidth = useMemo(
+    () =>
+      series.map(
+        (entry) =>
+          gap * 1.9 +
+          measureText({
+            text: entry.label,
+            fontFamily: theme.type.body,
+            fontSize: legendSize,
+            fontWeight: theme.type.weight.medium,
+          }).width,
+      ),
+    [series, theme, legendSize, gap],
+  );
+  const legendStarts = legendEntryWidth.reduce<number[]>((starts, entryWidth, index) => {
+    const previous = starts[index - 1] ?? 0;
+    starts.push(index === 0 ? 0 : previous + (legendEntryWidth[index - 1] as number) + gap * 2.4);
+    return starts;
+  }, []);
+
   const legendHeight = series.length > 1 ? Math.round((legendSize + gap * 1.5) * density) : gap;
   const padding = {
     top: legendHeight + gap * 2,
@@ -293,7 +327,8 @@ export const LinePlot: React.FC<LinePlotProps> = ({
               return (
                 <g
                   key={entry.label}
-                  transform={`translate(${padding.left + (index * plotWidth) / series.length}, ${legendSize})`}
+                  data-legend-entry={entry.label}
+                  transform={`translate(${padding.left + (legendStarts[index] as number)}, ${legendSize})`}
                 >
                   <line
                     x1={0}
@@ -438,8 +473,12 @@ const FocusLabel: React.FC<{
   const theme = useTheme();
   const size = useTypeSize(0);
   const gap = useSpace(2);
-  const metaLines = wrapAnnotation(`${target.series} · ${target.pointLabel}`, 32);
   const cardWidth = Math.min(440, Math.max(260, width * 0.27));
+  const metaLines = wrapToWidth(`${target.series} · ${target.pointLabel}`, cardWidth - gap * 2.8, {
+    fontFamily: theme.type.body,
+    fontSize: size * 0.95,
+    fontWeight: theme.type.weight.medium,
+  });
   const cardHeight = size * (2.15 + Math.max(0, metaLines.length - 1) * 0.92);
   const x = Math.min(
     width - padding.right - cardWidth,
@@ -510,11 +549,18 @@ const AnnotationLabel: React.FC<{
   const size = useTypeSize(0);
   const gap = useSpace(2);
   const cardWidth = Math.min(560, Math.max(360, width * 0.34));
-  const metadataLines = wrapAnnotation(
+  /** The card's inner width: its box less the left rule and the padding on both sides. */
+  const inner = cardWidth - gap * 2.8;
+  const metadataLines = wrapToWidth(
     `${target.series} · ${target.pointLabel} · ${formatValue(target.value, unit)}`,
-    38,
+    inner,
+    { fontFamily: theme.type.body, fontSize: size * 0.82, fontWeight: theme.type.weight.medium },
   );
-  const annotationLines = wrapAnnotation(text, 42);
+  const annotationLines = wrapToWidth(text, inner, {
+    fontFamily: theme.type.body,
+    fontSize: size,
+    fontWeight: theme.type.weight.medium,
+  });
   const annotationStart = 1.05 + metadataLines.length * 0.9 + 0.35;
   const cardHeight =
     size * (annotationStart + Math.max(0, annotationLines.length - 1) * 1.12 + 0.8);
@@ -579,15 +625,42 @@ const AnnotationLabel: React.FC<{
   );
 };
 
-const wrapAnnotation = (text: string, limit: number): string[] => {
+/**
+ * The font a string will actually be drawn in, which is the only thing that decides how
+ * wide it is.
+ */
+type TextFace = { fontFamily: string; fontSize: number; fontWeight: number };
+
+/**
+ * Wrap to a width in pixels, not to a count of characters.
+ *
+ * This wrapped at 32, 38 and 42 characters while the cards it wraps into are sized in
+ * pixels — `Math.min(560, Math.max(360, width * 0.34))` — so the two agreed only by
+ * coincidence, and the coincidence is per-string: "WWWWW" and "lllll" are the same five
+ * characters and nowhere near the same width. ADR-0014 §6 asks for "the deterministic
+ * layout utilities already owned by the design system", and this file already reaches for
+ * exactly that when it sizes the date axis; the annotation cards were the half that did not.
+ *
+ * Greedy, and a word too long for the line still gets its own line rather than being cut —
+ * an overhanging word is visible and a silently truncated one is not.
+ */
+const wrapToWidth = (text: string, available: number, face: TextFace): string[] => {
+  const words = text.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  if (words.length === 0) return [];
+
+  const widthOf = (candidate: string) => measureText({ text: candidate, ...face }).width;
+
   const lines: string[] = [];
-  let remaining = text.trim().replace(/\s+/g, ' ');
-  while (remaining.length > limit) {
-    const wordBreak = remaining.lastIndexOf(' ', limit);
-    const breakAt = wordBreak > 0 ? wordBreak : limit;
-    lines.push(remaining.slice(0, breakAt).trimEnd());
-    remaining = remaining.slice(breakAt).trimStart();
+  let line = words[0] as string;
+  for (const word of words.slice(1)) {
+    const candidate = `${line} ${word}`;
+    if (widthOf(candidate) <= available) {
+      line = candidate;
+      continue;
+    }
+    lines.push(line);
+    line = word;
   }
-  if (remaining.length > 0) lines.push(remaining);
+  lines.push(line);
   return lines;
 };

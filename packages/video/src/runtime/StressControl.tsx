@@ -143,6 +143,46 @@ const clippedText = (): string[] =>
     });
 
 /**
+ * Legend entries standing on top of each other.
+ *
+ * `LinePlot` publishes that it owns "collision-safe plot padding", and for the life of the
+ * capability its legend placed entry *n* at an even `(n * plotWidth) / series.length` — an
+ * arithmetic that cannot know how wide a label is, next to a `series.label` that publishes a
+ * 32-character ceiling. A review called that a collision; measured, it is not one *yet*, at
+ * the shapes this schema admits. That is the worst kind of true claim: right by arithmetic
+ * nobody did, and a type-scale change away from being wrong.
+ *
+ * So the claim is asked of the drawn frame rather than argued. Any group marked
+ * `data-legend-entry` must not overlap its neighbour, and the check reads
+ * `getBoundingClientRect` — the geometry the browser actually laid out, which is the only
+ * reading that cannot disagree with the pixels.
+ *
+ * A one-pixel tolerance, the same `CLIP_TOLERANCE_PX` the clipping finding uses and for the
+ * same reason: subpixel layout rounds, and a rule that fires on rounding is a rule that gets
+ * turned off.
+ */
+const overlappingLegend = (): string[] => {
+  const entries = [...document.querySelectorAll<SVGGraphicsElement>('[data-legend-entry]')];
+  const boxes = entries
+    .map((entry) => ({
+      label: entry.getAttribute('data-legend-entry') ?? '',
+      box: entry.getBoundingClientRect(),
+    }))
+    .filter(({ box }) => box.width > 0)
+    .sort((a, b) => a.box.left - b.box.left);
+
+  return boxes.flatMap((entry, index) => {
+    const next = boxes[index + 1];
+    if (!next) return [];
+    const overlap = entry.box.right - next.box.left;
+    if (overlap <= CLIP_TOLERANCE_PX) return [];
+    return [
+      `legend entries overlap by ${Math.round(overlap)}px: "${entry.label}" over "${next.label}"`,
+    ];
+  });
+};
+
+/**
  * Display type taking more of its scene than its role may.
  *
  * `MAX_HEADER_SHARE` is imported rather than restated. A `4` used to be written here, which
@@ -226,7 +266,7 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
 
     waitForFonts()
       .then(() => {
-        const findings = [...clippedText(), ...oversizedDisplayType()];
+        const findings = [...clippedText(), ...oversizedDisplayType(), ...overlappingLegend()];
         if (findings.length === 0) {
           continueRender(handle);
           return;

@@ -75,7 +75,12 @@ describe('LineChartScene runtime', () => {
     expect(comparison).toBe(
       // Accepted 2026-08-22: Jan→Mar is visibly wider than Mar→Apr, while the two
       // straight series remain distinct on the 3.8%..4.6% extent ruler.
-      'f3bd08a369ab871139bf018645bf54e6',
+      //
+      // Re-accepted 2026-08-22 after the legend stopped dividing the plot into equal
+      // shares and started measuring its own entries: the two keys now sit together at the
+      // left of the plot instead of a third of the width apart. Inspected at 1920×1080;
+      // the spacing claim above is unchanged and still visible.
+      'a6dc0656db7c3dad25e6592b0edab7c7',
     );
   });
 
@@ -93,7 +98,11 @@ describe('LineChartScene runtime', () => {
     expect(focused).toBe(
       // Accepted 2026-08-22: North remains warm and carries “12/25 · 117 k”; Central
       // and Coastal retain their identities at visibly quieter emphasis.
-      '67953d9a94f5f285fb00b9ec75f2cb7b',
+      //
+      // Re-accepted 2026-08-22 for the measured legend, same as the comparison frame.
+      // Inspected at 1920×1080: the three keys now read as one row, and the recession
+      // claim above is unchanged.
+      '106c86e9370b6f8d7b1571f92b1211a4',
     );
   });
 
@@ -108,7 +117,36 @@ describe('LineChartScene runtime', () => {
     expect(mixed).toBe(
       // Accepted 2026-08-22: the labelled zero rule bisects both the rising negative-to-
       // positive line and the alternating series; all three ceiling labels remain readable.
-      '9a742d0db5c9096bc63579bfd975fad9',
+      //
+      // Re-accepted 2026-08-22 for the measured legend and the measured annotation wrap.
+      // Inspected at 1920×1080: the three ceiling keys read as one row ending well inside
+      // the plot, and both cards wrap to their own box rather than to a character count.
+      '22b539401d8dd8dc78bddc653209796d',
     );
+  });
+
+  /**
+   * The property the hash above is named for, asked of the pixels.
+   *
+   * A hash is a fingerprint of the whole frame: it changes when anything changes and says
+   * nothing about *what*. Three of these tests carried their claim only in the comment, so
+   * a frame that stopped receding its non-target series would fail with the same message as
+   * one whose legend moved a pixel — and the person reading the failure would re-baseline it.
+   *
+   * This asks the claim directly. The focused series keeps its warm accent; the other two
+   * are mixed toward the muted ink, so the frame at rest and the frame at full focus must
+   * differ across the plot — and differ *more* than the focused series' own band does.
+   */
+  it('recedes the non-target series rather than only changing the frame', async () => {
+    const [restingBytes, focusedBytes] = await Promise.all([
+      still('example-line-density-edge', 0),
+      still('example-line-density-edge', 239),
+    ]);
+    const resting = decodePng(restingBytes);
+    const focused = decodePng(focusedBytes);
+
+    /** The lower half of the plot, where Central and Coastal run and North does not. */
+    const recessive = { x: 300, y: 620, width: 1400, height: 200 };
+    expect(changedPixels(resting, focused, recessive)).toBeGreaterThan(0);
   });
 });
