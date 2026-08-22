@@ -4,6 +4,7 @@ import { imageContextCapability } from './ImageContextScene';
 import { lineChartCapability } from './LineChartScene';
 import { quoteCapability } from './QuoteScene';
 import { statCounterCapability } from './StatCounterScene';
+import { typographicStatementCapability } from './TypographicStatementScene';
 
 /**
  * The catalog, in code. Everything downstream — the manifest, the four tools, the
@@ -16,6 +17,7 @@ export const registry: SceneCapability[] = [
   lineChartCapability,
   quoteCapability,
   statCounterCapability,
+  typographicStatementCapability,
 ];
 
 export const capabilityIds = (): string[] => registry.map((c) => c.meta.id);

@@ -6,7 +6,10 @@ import { useTheme, useTypeSize } from './ThemeContext';
 import { MAX_HEADER_SHARE, TITLE_LINE_HEIGHT, TITLE_MAX_WIDTH, useTitleStep } from './titleFit';
 import { useEntrance } from './useEntrance';
 
-export type TextRole = 'display' | 'body' | 'mono';
+export type TextRole = 'display' | 'displayAlt' | 'body' | 'mono';
+
+/** The two faces that count as display type, wherever the distinction has to be made. */
+export const DISPLAY_ROLES: readonly TextRole[] = ['display', 'displayAlt'];
 
 /**
  * What a run of display type is *for*, which decides how much of its scene it may take.
@@ -67,7 +70,7 @@ export const AnimatedText: React.FC<{
   return (
     <div style={{ overflow: 'hidden', paddingBottom: size * 0.14, maxWidth }}>
       <div
-        data-display-role={font === 'display' ? (displayRole ?? 'header') : undefined}
+        data-display-role={DISPLAY_ROLES.includes(font) ? (displayRole ?? 'header') : undefined}
         style={{
           fontFamily: theme.type[font],
           fontSize: size,

@@ -89,10 +89,18 @@ not an arbitrary maximum on capability-owned behaviour.
 | `index.ts` | the assembly point — the whole surface the capability has | |
 | `stress.ts` | content-stress shapes the generic filler cannot size | optional, and **not in the template** — see below |
 
-What the live folders actually carry today: `BarChartScene/` and `ImageContextScene/` ten
-each, `QuoteScene/` and `StatCounterScene/` nine — each has a single reveal verb and nothing
-in its vocabulary references the gated element, so a `QuoteScene/checks.ts` would state a rule
-that is not true. `LineChartScene/` carries eleven.
+What the live folders actually carry today: `BarChartScene/`, `ImageContextScene/` and
+`TypographicStatementScene/` ten each, `QuoteScene/` and `StatCounterScene/` nine — each of
+those two has a single reveal verb and nothing in its vocabulary references the gated element,
+so a `QuoteScene/checks.ts` would state a rule that is not true. `LineChartScene/` carries
+eleven.
+
+`TypographicStatementScene/` is the one to read for why the ninth file comes back. It is in
+the same family as `QuoteScene` and carries the same reveal verb, and it still needs
+`checks.ts` — because its *second* verb references the gated element twice over: `advanceWord`
+steps through the words the statement contains, and it acts on words the reveal has not put on
+the frame yet. Neither is expressible in the generic validator, and both are true of how the
+component is built.
 
 **On `stress.ts`, and why the bar for it is higher than for the other two optional files.**
 `tests/stress/cases.ts` generates its cases from the published schema, one field at a time,

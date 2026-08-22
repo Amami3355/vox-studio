@@ -100,6 +100,16 @@ export const COMPILER_CHECKS = {
       means: 'An event acts on an element the plan has not brought onto the frame yet.',
       repair: 'Move the reveal to an earlier anchor, or move this event to one at or after it.',
     },
+    EVENT_EXCEEDS_CONTENT: {
+      code: 'EVENT_EXCEEDS_CONTENT',
+      regime: 'error',
+      means:
+        'A scene lists more advancing events than its own content has steps to take, so the ' +
+        'last of them move nothing on the frame.',
+      repair:
+        'Remove the surplus events, or lengthen the content they step through until there is ' +
+        'a step for each one.',
+    },
     EVENTS_OUT_OF_ORDER: {
       code: 'EVENTS_OUT_OF_ORDER',
       regime: 'error',

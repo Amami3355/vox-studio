@@ -22,6 +22,19 @@ export type Theme = {
   };
   type: {
     display: string;
+    /**
+     * The second display face, for the one register the first cannot reach.
+     *
+     * A role and not a decoration. `display` is a grotesque and carries every heading,
+     * label and figure in the system; a chapter card sets one sentence as the whole frame
+     * and wants the voice a serif has. `theme.ts` already anchors `editorial-paper` on The
+     * Economist and the FT, and both title in serif — so this is the reference being
+     * honoured rather than a departure from it.
+     *
+     * It lives here rather than in the capability that wanted it, for the reason every
+     * other token does: a second theme inherits it, and no scene may invent a family.
+     */
+    displayAlt: string;
     body: string;
     mono: string;
     /** Typographic scale in px, ascending. */
@@ -66,6 +79,7 @@ export const editorialCold: Theme = {
   type: {
     // Populated by design/fonts.ts at module load; these are the fallback stacks.
     display: 'Archivo, system-ui, sans-serif',
+    displayAlt: '"Instrument Serif", Georgia, "Times New Roman", serif',
     body: 'Inter, system-ui, sans-serif',
     mono: '"JetBrains Mono", ui-monospace, monospace',
     scale: [28, 36, 48, 64, 88, 120, 168],

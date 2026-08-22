@@ -237,10 +237,19 @@ the two this entry describes: `bar_chart`, `image_context`, `quote`, `stat_count
 `line_chart`. The order it set — compositions, layouts, prop slots, actions — is done at both
 ends for `image_context`, and `quote` and `stat_counter` carry all three compositions with
 `occupiesRegions` measured rather than hoped. Layouts and prop slots remain the open middle,
-and they are still volume. One exception is on the books and argued in its own spec:
-`line_chart` ships `supportedCompositions: ['full']`, which makes it the only capability that
-can never reach ADR-0003 rung b — a persistent element crossing it relocates or hides, and the
-scene never yields. That is a deliberate first-increment non-goal, not drift.
+and they are still volume. Two exceptions are on the books, each argued in its own spec, and
+they are the same fact about the machinery for opposite reasons. `line_chart` ships
+`supportedCompositions: ['full']` because no composed form has been designed for it yet — a
+deliberate first-increment non-goal. `typographic_statement` ships the same declaration
+because **an act break must not share the frame**: a narrator standing in the corner of the cut
+is a narrator who did not stop. Both therefore can never reach ADR-0003 rung b — a persistent
+element crossing either relocates or hides, and the scene never yields. For the first that is a
+cost to be paid off; for the second it is the intent, and nothing should later "fix" it.
+
+`typographic_statement` also carries the only `paintsOwnGround` declaration in the catalogue.
+The field is new and exists because a scene that replaces the backdrop cannot be measured
+against it: `safe-area.test.ts` asks whether the band inside the reserved rectangle is still
+ground, and for this one capability it asks that the band is one flat colour instead.
 
 **What is left is not depth, it is kind.** Three of the five are charts. A catalogue that can
 compare, trend and count states a number well and cannot make an argument: it has no way to
@@ -251,7 +260,7 @@ entry ordered.
 
 | Capability | What the film gains | Cost |
 |---|---|---|
-| `typographic_statement` | Structure. Chapter and act cards are what divide a sequence into a film. | Lowest — type and motion, no new contract |
+| ~~`typographic_statement`~~ **built** | Structure. Chapter and act cards are what divide a sequence into a film. | Lowest — type and motion, no new contract |
 | `timeline` | Chronology, the documentary spine. `bar_chart` **and** `line_chart` already redirect to it. | Moderate |
 | `character_explainer` | A presenter that carries the explanation. `PERSISTENT_ELEMENT_TYPES` already has `character`, placed and relocated under ADR-0003. | Moderate |
 | `archive_document` | Evidence — a clipping, an extract, an annotated page. `AssetRequirement.type` already admits `document` and nothing consumes it. | Moderate |
@@ -327,10 +336,18 @@ question opened in the first act and never returned to is a contradiction the pl
 both halves of, exactly like a narration naming a value the frame collapsed. That is checkable
 with no taste in the compiler at all.
 
-**One consequence for the catalogue.** `typographic_statement` in the entry above is the
-*visible* half of this, and built alone it produces title cards that decorate rather than
-divide. The card is worth having either way. It is worth considerably more once there is
-something for it to be the boundary of.
+**One consequence for the catalogue, and it is no longer hypothetical.**
+`typographic_statement` is the *visible* half of this and it now exists. Built alone, it
+produces title cards that decorate rather than divide — worth having either way, and worth
+considerably more once there is something for it to be the boundary of.
+
+The gap has a name on the card. Its `ordinal` prop is a free string the agent writes by hand,
+so a card reading "02 / 05" in a film with six acts validates, compiles and renders, and no
+check in the system has anything to say about it. It is not derivable today for exactly the
+reason above: a section carries no statement of what it is for, and `.strict()` leaves nowhere
+to put one. **Deriving the ordinal is the first thing an act model would buy**, and it is the
+cheapest possible demonstration that the model is real — a number that stops being a claim the
+agent makes and starts being a fact the plan implies.
 
 ---
 

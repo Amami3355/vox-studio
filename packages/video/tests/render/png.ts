@@ -166,6 +166,65 @@ export const hashRegions = (bitmap: Bitmap, regions: Region[]): string => {
 };
 
 /**
+ * Every distinct colour in some rectangles of one bitmap.
+ *
+ * The absolute form of the question `hashRegions` asks relatively. Two renders can be
+ * compared over an area with a digest; an area that has to be *empty* on a ground the
+ * control does not know cannot — and a scene that paints its own ground is exactly that
+ * case (`SceneMeta.paintsOwnGround`). One colour across a band means nothing was drawn in
+ * it, whatever the colour turns out to be.
+ *
+ * Returns the set rather than a boolean so a failure can say what it found.
+ */
+export const coloursIn = (bitmap: Bitmap, regions: Region[]): Set<string> => {
+  if (regions.length === 0) throw new Error('Refusing to read an empty region list.');
+
+  const found = new Set<string>();
+  for (const region of regions) {
+    for (let y = region.y; y < region.y + region.height; y += 1) {
+      for (let x = region.x; x < region.x + region.width; x += 1) {
+        found.add(pixelAt(bitmap, x, y));
+      }
+    }
+  }
+  return found;
+};
+
+/**
+ * The quiet-border reading of one frame: what the band must be, and what it is.
+ *
+ * Two suites ask this — `render/safe-area.test.ts` over the examples, `stress/content-
+ * stress.test.ts` over the schemas' own ceilings — and until the rule had two branches they
+ * could each carry their own copy of the one. They cannot now: a second copy of a rule is
+ * the copy that goes stale, and a stale copy of *this* rule reads as a design regression in
+ * a suite nobody has changed.
+ *
+ * **The relative branch** is the original: the band must be byte-identical to the same band
+ * of a `Backdrop` render, because a scene with ink there has spent its margin and is being
+ * cropped by its own edge.
+ *
+ * **The absolute branch** is for a scene that declares `SceneMeta.paintsOwnGround`. Its
+ * band is its own ground and differs from `Backdrop` everywhere by design, so comparing
+ * them would fail a correct frame and any frame that passed would have passed by accident.
+ * Asked the other way round, the band must be *one colour* — which is what "no ink here"
+ * means when the ground belongs to the scene, and is the stronger reading of the two.
+ *
+ * Returns both sides as strings so the caller states the comparison itself and a failure
+ * prints what was found rather than a boolean.
+ */
+export const quietBorderReading = (
+  bitmap: Bitmap,
+  border: Region[],
+  options: { control: Bitmap; paintsOwnGround: boolean },
+): { expected: string; actual: string } =>
+  options.paintsOwnGround
+    ? { expected: pixelAt(bitmap, 0, 0), actual: [...coloursIn(bitmap, border)].join(' ') }
+    : {
+        expected: hashRegions(options.control, border),
+        actual: hashRegions(bitmap, border),
+      };
+
+/**
  * The four bands hugging the *inner* edges of a rectangle — the border a scene is meant
  * to leave quiet. `bandsOutside` asks whether a scene stayed in its rectangle at all;
  * this asks whether it stopped short of the rectangle's edges, which is the difference

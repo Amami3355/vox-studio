@@ -49,6 +49,7 @@ import {
   decodePng,
   hashRegions,
   pixelAt,
+  quietBorderReading,
   regionOfInsets,
 } from '../render/png';
 import { type StressCase, stressCases } from './cases';
@@ -228,15 +229,21 @@ describe('content the schema accepts renders into the box it was given', () => {
      * The half containment cannot see: a scene that runs its copy off the *canvas* edge
      * draws nothing illegal, because from `full` there is no region outside the reserved
      * rectangle at all. Same comparison, read one rectangle in.
+     *
+     * `quietBorderReading` owns both readings of it — against the backdrop control for a
+     * scene standing on the film's ground, and as a flatness test for one that brought its
+     * own. `safe-area.test.ts` asks the identical question of the examples, so the rule has
+     * one home rather than one per suite.
      */
     it('leaves a quiet border inside that rectangle, so nothing is cropped by it', ({ skip }) => {
       const border = bandsInside(regionOfInsets(testCase.safeArea, WIDTH, HEIGHT), EDGE_QUIET_PX);
-      const expected = hashRegions(control, border);
+      const { paintsOwnGround } = testCase;
 
       for (const [index, bitmap] of drawnFrames(renders, skip)) {
-        expect({ frame: testCase.frames[index], border: hashRegions(bitmap, border) }).toEqual({
+        const reading = quietBorderReading(bitmap, border, { control, paintsOwnGround });
+        expect({ frame: testCase.frames[index], border: reading.actual }).toEqual({
           frame: testCase.frames[index],
-          border: expected,
+          border: reading.expected,
         });
       }
     });

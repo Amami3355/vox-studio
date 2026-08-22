@@ -37,12 +37,74 @@ const minimalContextPlan: VideoPlan = {
   ],
 };
 
+/**
+ * The seven-anchor sweep, published as a plan because it cannot be published as a render.
+ *
+ * `typographic_statement.advanceWord` is written one event per word, and the form that
+ * matters is the one anchored to the words themselves — the picture moving with the
+ * sentence being spoken. No `examples.ts` in the library can show it: a scene example has
+ * no take, `syntheticBeats` gives it `words: []`, and a word anchor against that throws by
+ * design. ADR-0012 names this exact route out, and this is it.
+ *
+ * Every word of the statement appears in the beat text exactly once, which is not a
+ * coincidence and is the thing to copy: a word anchor naming a word its beat speaks twice
+ * is refused rather than resolved to the first match.
+ */
+const wordDrivenStatementPlan: VideoPlan = {
+  beats: [
+    { id: 'b7', text: 'Nobody is left to absorb the difference.' },
+    { id: 'b8', text: 'What follows is an account of who pays instead.' },
+  ],
+  sections: [
+    {
+      id: 'act-two',
+      spansBeats: ['b7', 'b8'],
+      scenes: [
+        {
+          id: 'act-two-card',
+          component: 'typographic_statement',
+          layout: 'cut',
+          motionProfile: 'editorialStatic',
+          spansBeats: ['b7', 'b8'],
+          props: {
+            eyebrow: 'Chapter two',
+            statement: 'Nobody is left to absorb the difference',
+            ordinal: '02 / 05',
+            emphasis: 'neutral',
+          },
+          events: [
+            { at: 'b7.start', action: 'revealStatement' },
+            { at: 'b7.word:Nobody', action: 'advanceWord' },
+            { at: 'b7.word:is', action: 'advanceWord' },
+            { at: 'b7.word:left', action: 'advanceWord' },
+            { at: 'b7.word:to', action: 'advanceWord' },
+            { at: 'b7.word:absorb', action: 'advanceWord' },
+            { at: 'b7.word:the', action: 'advanceWord' },
+            { at: 'b7.word:difference', action: 'advanceWord' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 export const STRUCTURAL_PLAN_EXAMPLES: readonly StructuralPlanExample[] = [
   {
     id: 'minimal-context-plan',
     title: 'Smallest complete Beat to Section to SceneInstance partition',
     demonstrates: ['beats', 'sections', 'scenes', 'image_context', 'asset requirement'],
     plan: minimalContextPlan,
+  },
+  {
+    id: 'word-driven-statement-plan',
+    title: 'A chapter card whose sweep follows the recorded take, word by word',
+    demonstrates: [
+      'typographic_statement',
+      'word anchor',
+      'one event per word',
+      'events no scene example can carry',
+    ],
+    plan: wordDrivenStatementPlan,
   },
   {
     id: 'multi-capability-persistent-plan',

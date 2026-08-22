@@ -26,6 +26,12 @@
  * - inside it, it differs from the control, which is what stops the first two passing
  *   because the probe read the wrong rectangle, or an empty one
  *
+ * One capability stands on a ground of its own and says so — `SceneMeta.paintsOwnGround` —
+ * and for it the border question is asked absolutely instead: the band must be one flat
+ * colour. Both readings live in `quietBorderReading`, in `png.ts`, because the content-stress
+ * suite asks the same question of the same bands and two copies of a rule with two branches
+ * is one copy too many.
+ *
  * **The control is what makes these absolute, and that is the point.** The suite used to
  * ask the same three things as a relation between two examples of the same capability, on
  * the grounds that backdrop does not know what the scene says. True, but blind to anything
@@ -55,6 +61,7 @@ import {
   decodePng,
   hashRegions,
   pixelAt,
+  quietBorderReading,
   regionOfInsets,
 } from './png';
 
@@ -114,6 +121,8 @@ type Case = {
   /** Every example the capability publishes, each checked against the control on its own. */
   examples: string[];
   frames: number[];
+  /** See `SceneMeta.paintsOwnGround`, and the quiet-border assertion below. */
+  paintsOwnGround: boolean;
 };
 
 /**
@@ -136,6 +145,7 @@ const cases: Case[] = registry.flatMap((capability) =>
       safeArea: slotRect(composition),
       examples: capability.examples.map((example) => example.id),
       frames: framesFor(capability.meta.recommendedDurationFrames),
+      paintsOwnGround: capability.meta.paintsOwnGround === true,
     })),
   ),
 );
@@ -198,6 +208,8 @@ describe('a declared composition renders into the rectangle it declared', () => 
       'stat_counter composed into left under pushIn',
       'stat_counter composed into right under cinematic',
       'stat_counter composed into right under pushIn',
+      'typographic_statement composed into full under cinematic',
+      'typographic_statement composed into full under pushIn',
     ]);
     for (const one of cases) expect(one.examples.length).toBeGreaterThan(1);
   });
@@ -287,16 +299,25 @@ describe('a declared composition renders into the rectangle it declared', () => 
      * Same comparison, read one rectangle in: the band just inside the reserved rectangle
      * must still be backdrop, because a scene with ink there has spent its margin and is
      * being cropped by its own edge.
+     *
+     * **Unless the scene brought its own ground**, which `SceneMeta.paintsOwnGround`
+     * declares. There the backdrop is not the control — the band is the scene's ground and
+     * differs from `Backdrop` everywhere by design — so the same question is asked
+     * absolutely instead of relatively: the band must be *one colour*. That is what "no ink
+     * here" means when the ground belongs to the scene, and it is the stronger of the two
+     * readings, since it cannot be satisfied by a frame that merely happens to match a
+     * control.
      */
     it('leaves a quiet border inside that rectangle, so nothing is cropped by it', () => {
       const border = bandsInside(insideOf(testCase.safeArea), EDGE_QUIET_PX);
-      const expected = hashRegions(control, border);
+      const { paintsOwnGround } = testCase;
 
       for (const [frame, exampleId, bitmap] of eachRender()) {
-        expect({ frame, exampleId, border: hashRegions(bitmap, border) }).toEqual({
+        const reading = quietBorderReading(bitmap, border, { control, paintsOwnGround });
+        expect({ frame, exampleId, border: reading.actual }).toEqual({
           frame,
           exampleId,
-          border: expected,
+          border: reading.expected,
         });
       }
     });

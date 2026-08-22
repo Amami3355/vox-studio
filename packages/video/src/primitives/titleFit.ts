@@ -13,6 +13,7 @@
  */
 import { measureText } from '@remotion/layout-utils';
 import { useMemo } from 'react';
+import type { Theme } from '../design/theme';
 import { useDensity, useTheme } from './ThemeContext';
 
 /**
@@ -257,27 +258,49 @@ export type TitleFit = {
   height: number;
 };
 
+/**
+ * The face a run of type is actually set in, so the fit measures the letterforms that will
+ * be drawn.
+ *
+ * The header of this file says the fit is *measured rather than estimated* — that it reads
+ * the real advance width of the real loaded font. That sentence stopped being true the
+ * moment a second display face existed: a serif at regular weight and normal tracking is
+ * not the width of a grotesque at 800 and tracking tight, and a fit that measures one while
+ * the browser draws the other is an estimate wearing a measurement's clothes. So the face is
+ * an input, defaulted to the one every existing caller uses and never guessed.
+ */
+export type TypeFace = { fontFamily: string; fontWeight: number; tracking: number };
+
+/** The face `SceneTitle` and every capability before the chapter card set their type in. */
+export const displayFace = (theme: Theme): TypeFace => ({
+  fontFamily: theme.type.display,
+  fontWeight: theme.type.weight.bold,
+  tracking: theme.type.tracking.tight,
+});
+
 /** The fitted step and the physical block it produces, from the same measurement pass. */
 export const useTitleFit = (
   text: string,
   columnWidth: number,
   ceiling?: number,
   maxHeight?: number,
+  face?: TypeFace,
 ): TitleFit => {
   const theme = useTheme();
   const density = useDensity();
 
   return useMemo(() => {
+    const set = face ?? displayFace(theme);
     const sizeAt = (step: number): number =>
       Math.round((theme.type.scale[step] as number) * density);
 
     const widthAt = (candidate: string, step: number): number =>
       measureText({
         text: candidate,
-        fontFamily: theme.type.display,
+        fontFamily: set.fontFamily,
         fontSize: sizeAt(step),
-        fontWeight: theme.type.weight.bold,
-        letterSpacing: `${theme.type.tracking.tight * sizeAt(step)}px`,
+        fontWeight: set.fontWeight,
+        letterSpacing: `${set.tracking * sizeAt(step)}px`,
       }).width;
 
     const words = text.split(/\s+/).filter(Boolean);
@@ -292,7 +315,7 @@ export const useTitleFit = (
     });
     const lineCount = wrappedLineCount({ words, step, available, widthAt });
     return { step, lineCount, height: lineCount * sizeAt(step) * TITLE_LINE_HEIGHT };
-  }, [text, columnWidth, ceiling, maxHeight, theme, density]);
+  }, [text, columnWidth, ceiling, maxHeight, face, theme, density]);
 };
 
 export const useTitleStep = (
@@ -300,4 +323,5 @@ export const useTitleStep = (
   columnWidth: number,
   ceiling?: number,
   maxHeight?: number,
-): number => useTitleFit(text, columnWidth, ceiling, maxHeight).step;
+  face?: TypeFace,
+): number => useTitleFit(text, columnWidth, ceiling, maxHeight, face).step;

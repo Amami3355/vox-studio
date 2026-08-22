@@ -204,6 +204,24 @@ export type SceneMeta = {
   requiresAssets: boolean;
   occupiesRegions: Slot[];
   supportedCompositions: Slot[];
+  /**
+   * Whether this scene replaces the film's backdrop with a ground of its own.
+   *
+   * Absent means no, which is true of every capability that draws on the ground every other
+   * shot shares. A chapter card does not: it paints a semantic role edge to edge, and the
+   * brightness change is the whole point of the shot.
+   *
+   * Declared rather than detected, for the same reason `supportedCompositions` is. Two
+   * things read it and neither can work it out. `tests/render/safe-area.test.ts` asks of
+   * every frame whether the band just inside the reserved rectangle is still *ground*, and
+   * it asks by comparing against a render of `Backdrop` — which is the wrong control for a
+   * scene standing on a different ground, and would fail a correct frame while passing any
+   * frame that happened to match. Told, it asks the same question the other way round: that
+   * the band is one flat colour, which is what "no ink here" means when the ground belongs
+   * to the scene. And an agent reading the manifest learns why this capability cannot share
+   * a frame, which `supportedCompositions: ['full']` states without explaining.
+   */
+  paintsOwnGround?: boolean;
   minDurationFrames: number;
   recommendedDurationFrames: number;
 } & SceneCapacityMetadata;

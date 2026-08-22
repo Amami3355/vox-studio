@@ -292,6 +292,89 @@
       }
     },
     {
+      "id": "word-driven-statement-plan",
+      "title": "A chapter card whose sweep follows the recorded take, word by word",
+      "demonstrates": [
+        "typographic_statement",
+        "word anchor",
+        "one event per word",
+        "events no scene example can carry"
+      ],
+      "plan": {
+        "beats": [
+          {
+            "id": "b7",
+            "text": "Nobody is left to absorb the difference."
+          },
+          {
+            "id": "b8",
+            "text": "What follows is an account of who pays instead."
+          }
+        ],
+        "sections": [
+          {
+            "id": "act-two",
+            "spansBeats": [
+              "b7",
+              "b8"
+            ],
+            "scenes": [
+              {
+                "id": "act-two-card",
+                "component": "typographic_statement",
+                "layout": "cut",
+                "motionProfile": "editorialStatic",
+                "spansBeats": [
+                  "b7",
+                  "b8"
+                ],
+                "props": {
+                  "eyebrow": "Chapter two",
+                  "statement": "Nobody is left to absorb the difference",
+                  "ordinal": "02 / 05",
+                  "emphasis": "neutral"
+                },
+                "events": [
+                  {
+                    "at": "b7.start",
+                    "action": "revealStatement"
+                  },
+                  {
+                    "at": "b7.word:Nobody",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:is",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:left",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:to",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:absorb",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:the",
+                    "action": "advanceWord"
+                  },
+                  {
+                    "at": "b7.word:difference",
+                    "action": "advanceWord"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "multi-capability-persistent-plan",
       "title": "Multiple capabilities, persistent placement and semantic events",
       "demonstrates": [

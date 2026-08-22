@@ -12,9 +12,22 @@ export const EmptyState: React.FC<{
   message?: string;
   startFrame: number;
   profile: MotionProfile;
-}> = ({ message = 'No data available', startFrame, profile }) => {
+  /**
+   * The tone the label is set in, and the ground its rule recedes into.
+   *
+   * Both default to the theme's own, which is the right answer for every scene that sits on
+   * the film's backdrop. `typographic_statement` does not — it paints an emphasis role to
+   * full bleed — and `inkMuted` on a saturated ground is not a degraded frame, it is an
+   * illegible one. So the two colours the empty state needs are inputs when a scene has
+   * moved the ground out from under it, and are still the theme's the rest of the time.
+   */
+  color?: string;
+  ground?: string;
+}> = ({ message = 'No data available', startFrame, profile, color, ground }) => {
   const theme = useTheme();
   const gap = useSpace(3);
+  const tone = color ?? theme.color.inkMuted;
+  const into = ground ?? theme.color.bg;
 
   return (
     <div
@@ -24,7 +37,7 @@ export const EmptyState: React.FC<{
         flexDirection: 'column',
         justifyContent: 'center',
         gap,
-        borderTop: `1px solid ${mix(theme.color.inkMuted, theme.color.bg, 0.75)}`,
+        borderTop: `1px solid ${mix(tone, into, 0.75)}`,
         paddingTop: gap,
       }}
     >
@@ -33,7 +46,7 @@ export const EmptyState: React.FC<{
         profile={profile}
         font="body"
         step={1}
-        color={theme.color.inkMuted}
+        color={tone}
         tracking={theme.type.tracking.wide}
         style={{ textTransform: 'uppercase' }}
       >

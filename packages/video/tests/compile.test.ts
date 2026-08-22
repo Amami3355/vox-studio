@@ -951,3 +951,236 @@ describe('compile', () => {
     });
   });
 });
+
+/**
+ * The chapter card's sweep, decided before a pixel exists.
+ *
+ * Everything `typographic_statement.advanceWord` promises is settled in the compiler: which
+ * frame each word lands on, and which plans are refused for asking. None of it needs a
+ * browser, so none of it is asserted in the render suite — what is asserted there is that
+ * the frames differ, which is a different question.
+ *
+ * Its own fixtures rather than the shared `timedBeats`, because the subject is a beat whose
+ * every word the plan names, and the shared take was written for a boundary-anchored bar
+ * chart.
+ */
+describe('a statement swept word by word', () => {
+  const STATEMENT = 'Nobody is left to absorb the difference';
+  const SPOKEN = ['Nobody', 'is', 'left', 'to', 'absorb', 'the', 'difference'];
+
+  /**
+   * Onsets 400ms apart from 400ms, so every frame below is a number a reader can check:
+   * 400ms is frame 12 at 30fps, and each word after it is 12 frames on. Deliberately not
+   * starting at 0 — a first word at 0 would land on the same frame as `b7.start`, and the
+   * assertion would stop being able to tell the reveal from the first word.
+   */
+  const cardBeats: TimedBeat[] = [
+    {
+      id: 'b7',
+      text: 'Nobody is left to absorb the difference.',
+      fromMs: 0,
+      toMs: 3500,
+      words: at(400, 400, SPOKEN),
+    },
+    {
+      id: 'b8',
+      text: 'What follows is an account of who pays instead.',
+      fromMs: 3500,
+      toMs: 8000,
+      words: at(3500, 400, [
+        'What',
+        'follows',
+        'is',
+        'an',
+        'account',
+        'of',
+        'who',
+        'pays',
+        'instead',
+      ]),
+    },
+  ];
+
+  const sweep = SPOKEN.map((word) => ({ at: `b7.word:${word}`, action: 'advanceWord' }));
+
+  const cardPlanWith = (events: SceneInstance['events'], beats = cardBeats): VideoPlan => ({
+    beats: beats.map(({ id, text }) => ({ id, text })),
+    sections: [
+      {
+        id: 'act-two',
+        spansBeats: ['b7', 'b8'],
+        scenes: [
+          {
+            id: 'card',
+            component: 'typographic_statement',
+            layout: 'cut',
+            motionProfile: 'editorialStatic',
+            spansBeats: ['b7', 'b8'],
+            props: {
+              eyebrow: 'Chapter two',
+              statement: STATEMENT,
+              ordinal: '02 / 05',
+              emphasis: 'neutral',
+            },
+            events,
+          },
+        ],
+      },
+    ],
+  });
+
+  const eventsOf = (document: CompiledDocument) => document.sections[0]?.scenes[0]?.events ?? [];
+
+  it('lands one event on each measured onset, in the order they were written', () => {
+    const result = compile({
+      plan: cardPlanWith([{ at: 'b7.start', action: 'revealStatement' }, ...sweep]),
+      beats: cardBeats,
+    });
+
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+    expect(eventsOf(result.document)).toEqual([
+      { frame: 0, action: 'revealStatement' },
+      { frame: 12, action: 'advanceWord' },
+      { frame: 24, action: 'advanceWord' },
+      { frame: 36, action: 'advanceWord' },
+      { frame: 48, action: 'advanceWord' },
+      { frame: 60, action: 'advanceWord' },
+      { frame: 72, action: 'advanceWord' },
+      { frame: 84, action: 'advanceWord' },
+    ]);
+  });
+
+  it('refuses a word the beat does not speak, and names the words it does', () => {
+    const result = compile({
+      plan: cardPlanWith([
+        { at: 'b7.start', action: 'revealStatement' },
+        { at: 'b7.word:absorbs', action: 'advanceWord' },
+      ]),
+      beats: cardBeats,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'UNKNOWN_ANCHOR', expected: SPOKEN }),
+    );
+  });
+
+  /**
+   * A repeated word is refused rather than resolved to the first match, which is the
+   * decision the whole word vocabulary turns on: a silent first match is a silent choice of
+   * which syllable the picture cuts on.
+   */
+  it('refuses a word the beat speaks twice rather than taking the first', () => {
+    const repeated: TimedBeat[] = [
+      {
+        ...(cardBeats[0] as TimedBeat),
+        text: 'Nobody is left to absorb the gap the market made.',
+        words: at(400, 300, [
+          'Nobody',
+          'is',
+          'left',
+          'to',
+          'absorb',
+          'the',
+          'gap',
+          'the',
+          'market',
+          'made',
+        ]),
+      },
+      cardBeats[1] as TimedBeat,
+    ];
+
+    const result = compile({
+      plan: cardPlanWith(
+        [
+          { at: 'b7.start', action: 'revealStatement' },
+          { at: 'b7.word:the', action: 'advanceWord' },
+        ],
+        repeated,
+      ),
+      beats: repeated,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'AMBIGUOUS_ANCHOR', sceneId: 'card' }),
+    );
+  });
+
+  it('refuses the sweep against a take that was never recorded', () => {
+    const result = compile({
+      plan: cardPlanWith([{ at: 'b7.start', action: 'revealStatement' }, ...sweep]),
+      beats: cardBeats.map((beat) => ({ ...beat, words: [] })),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'INVALID_TIMING_INPUT', field: 'beats.b7.words' }),
+    );
+  });
+
+  /**
+   * ADR-0011, asked of this vocabulary specifically, because this is the vocabulary that
+   * depends on it: `advanceWord` carries no payload, so the n-th event is the n-th word by
+   * written order and nothing else. Two anchors resolving out of that order would light the
+   * sentence up in a sequence the plan never wrote.
+   */
+  it('refuses word anchors written in an order the take did not speak', () => {
+    const swapped = [...sweep];
+    swapped[1] = sweep[4] as (typeof sweep)[number];
+    swapped[4] = sweep[1] as (typeof sweep)[number];
+
+    const result = compile({
+      plan: cardPlanWith([{ at: 'b7.start', action: 'revealStatement' }, ...swapped]),
+      beats: cardBeats,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.report.errors).toContainEqual(
+      expect.objectContaining({ code: 'EVENTS_OUT_OF_ORDER', sceneId: 'card' }),
+    );
+  });
+
+  it('refuses more advanceWord events than the statement has words', () => {
+    const result = compile({
+      plan: cardPlanWith([
+        { at: 'b7.start', action: 'revealStatement' },
+        ...sweep,
+        { at: 'b8.start', action: 'advanceWord' },
+      ]),
+      beats: cardBeats,
+    });
+
+    expect(result.ok).toBe(false);
+    const error = result.report.errors.find((e) => e.code === 'EVENT_EXCEEDS_CONTENT');
+    expect(error?.sceneId).toBe('card');
+    expect(error?.message).toContain('7 words');
+    expect(error?.message).toContain('8 advanceWord');
+  });
+
+  /**
+   * The degradation, stated as a compile rather than as a picture. A plan written before
+   * anyone has paid to record a take paces the same card at beat granularity, and the
+   * compiler accepts it — which is what makes the sweep an enhancement rather than a
+   * dependency on step 7.
+   */
+  it('accepts the same card paced at beat boundaries with no take at all', () => {
+    const result = compile({
+      plan: cardPlanWith([
+        { at: 'b7.start', action: 'revealStatement' },
+        { at: 'b7.start+short', action: 'advanceWord' },
+        { at: 'b7.start+long', action: 'advanceWord' },
+        { at: 'b7.end-short', action: 'advanceWord' },
+        { at: 'b8.start', action: 'advanceWord' },
+        { at: 'b8.start+short', action: 'advanceWord' },
+        { at: 'b8.start+long', action: 'advanceWord' },
+        { at: 'b8.end-short', action: 'advanceWord' },
+      ]),
+      beats: cardBeats.map((beat) => ({ ...beat, words: [] })),
+    });
+
+    if (!result.ok) throw new Error(`expected the plan to compile: ${format(result.report)}`);
+    expect(eventsOf(result.document)).toHaveLength(8);
+  });
+});

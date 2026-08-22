@@ -76,8 +76,17 @@ export const STRESS_CONTROL_ID = controlIdFor('stress');
  */
 const CLIP_TOLERANCE_PX = 2;
 
-/** The display face, as the theme spells it before the fallbacks. */
-const DISPLAY_FAMILY = (defaultTheme.type.display.split(',')[0] as string).trim();
+/**
+ * The display faces, as the theme spells them before the fallbacks.
+ *
+ * Both of them. A second display face was added for the chapter card, and a probe that
+ * knew only the first would have answered "no display type on this frame" for the one
+ * capability whose entire frame is display type — a question nobody asks reporting as a
+ * pass, which is the failure this whole file was written against.
+ */
+const DISPLAY_FAMILIES = [defaultTheme.type.display, defaultTheme.type.displayAlt].map((stack) =>
+  (stack.split(',')[0] as string).trim(),
+);
 
 export type StressSceneProps = {
   capabilityId: string;
@@ -237,10 +246,27 @@ const textOutsideItsSvg = (): string[] =>
 const oversizedDisplayType = (): string[] =>
   [...document.querySelectorAll<HTMLElement>('*')]
     .filter((element) => {
-      const only = element.childNodes.length === 1 ? element.firstChild : null;
-      if (!only || only.nodeType !== Node.TEXT_NODE) return false;
-      if ((only.textContent ?? '').trim() === '') return false;
-      return getComputedStyle(element).fontFamily.includes(DISPLAY_FAMILY);
+      /**
+       * A declared statement is measured whole, whatever it is made of inside.
+       *
+       * The one-text-node rule below is a heuristic for "this element is one run of type",
+       * and it is still the right one for anything unmarked. It is wrong for a statement
+       * that colours its own words: `typographic_statement` splits its sentence into a span
+       * per word so the sweep can tone them, and every one of those spans passes the
+       * heuristic on its own while the sentence they make up — the run that actually has a
+       * height — passes nothing. A scene that says `displayRole="statement"` has named the
+       * element it wants held to the rule, and that declaration is the better evidence.
+       *
+       * Only `statement`, never the unmarked `header` default: `stat_counter` sets its
+       * figure and its unit as two spans on one line, and those are genuinely several runs.
+       */
+      if (element.dataset.displayRole !== 'statement') {
+        const only = element.childNodes.length === 1 ? element.firstChild : null;
+        if (!only || only.nodeType !== Node.TEXT_NODE) return false;
+        if ((only.textContent ?? '').trim() === '') return false;
+      }
+      const family = getComputedStyle(element).fontFamily;
+      return DISPLAY_FAMILIES.some((face) => family.includes(face));
     })
     .flatMap((element) => {
       const scene = element.closest<HTMLElement>(`[${SCENE_BOX_ATTRIBUTE}]`);
