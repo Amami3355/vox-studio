@@ -99,6 +99,23 @@ SceneCapability reuses the smaller interface.
 - Shared geometry becomes local to `src/primitives/` (and pure arithmetic to `src/core/`), so a
   fix to axes, labels, density or frame-driven motion benefits every consuming capability.
 
+## What the first adoption actually cost
+
+Recorded here because the `line_chart` spec's *Out of Scope* names `@visx/scale`, `@visx/group`
+and `@visx/curve` as packages this decision does not buy — *"unless a separately recorded need
+changes this scope"* — and one dependency brought all three anyway.
+
+`packages/video` declares exactly one: `@visx/shape`. The lockfile holds five, because
+`@visx/shape` depends on `@visx/curve`, `@visx/group`, `@visx/scale` and `@visx/vendor`. No
+source file imports any of the four, and none is a direct dependency, so the *authoring* scope
+is what the spec said it was. The install cost is not, and the difference between those two is
+worth having written down rather than discovered at the next audit.
+
+Nothing changes as a result. The seam this ADR is about is which module may `import` a
+library, not which package manager entry exists — and `tests/render-purity.test.ts` holds the
+seam that matters. It now also asserts the declared surface is one package, so a second direct
+`@visx/*` dependency is a decision somebody has to take on purpose.
+
 ## References
 
 - Remotion, [Animating properties](https://www.remotion.dev/docs/animating-properties)

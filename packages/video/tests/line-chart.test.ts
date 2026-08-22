@@ -206,11 +206,24 @@ describe('line_chart referential actions and reducer', () => {
     );
   });
 
-  it('rejects plot actions written before a declared reveal and accepts them after it', () => {
+  /**
+   * Every verb that targets the plot, not just the one that was easiest to write.
+   *
+   * The spec asks for "each plot-targeting action before and after an authored reveal", and
+   * the rule is about the *plot* rather than about any one action: a gesture at something the
+   * frame has not drawn yet points at nothing, whichever gesture it is. Checking one of the
+   * three left the other two resting on the reducer being written the same way, which is the
+   * kind of assumption this suite exists to stop making.
+   */
+  it.each([
+    ['focusPoint', { series: 'Demand', label: 'Jun' }],
+    ['focusSeries', { series: 'Demand' }],
+    ['annotatePoint', { series: 'Demand', label: 'Jun', text: 'A durable note' }],
+  ])('rejects %s written before a declared reveal and accepts it after', (action, payload) => {
     const before = validateScene(
       scene({
         events: [
-          { at: 'b1.start', action: 'focusPoint', payload: { series: 'Demand', label: 'Jun' } },
+          { at: 'b1.start', action, payload },
           { at: 'b1.end', action: 'revealTrend' },
         ],
       }),
@@ -219,7 +232,7 @@ describe('line_chart referential actions and reducer', () => {
       scene({
         events: [
           { at: 'b1.start', action: 'revealTrend' },
-          { at: 'b1.end', action: 'focusPoint', payload: { series: 'Demand', label: 'Jun' } },
+          { at: 'b1.end', action, payload },
         ],
       }),
     );
@@ -375,5 +388,64 @@ describe('line_chart through the generic compiler', () => {
     if (result.ok) {
       expect(result.document.sections[0]?.scenes[0]?.events[0]?.frame).toBe(120);
     }
+  });
+
+  /**
+   * The reveal's own anchor, which the test above does not exercise.
+   *
+   * The spec asks that "compiler tests resolve reveal and focus anchors against a real Take",
+   * and the two are not the same journey: a focus carries `deicticFields` and is held to
+   * landing on the word it names, while `revealTrend` carries no payload at all and is
+   * anchored by the plan's sense of when the trend should arrive. A capability whose reveal
+   * silently failed to resolve would draw a settled chart from frame zero and pass every
+   * assertion above.
+   *
+   * Both in one plan, and in order, because `EVENTS_OUT_OF_ORDER` is binding (ADR-0011): the
+   * frames the compiler produces have to come back in the order the plan wrote them.
+   */
+  it('resolves a reveal and a focus in one plan, in the order they were written', () => {
+    const beats: TimedBeat[] = [
+      {
+        id: 'b1',
+        text: 'Demand rose sharply by Jun.',
+        fromMs: 0,
+        toMs: 5000,
+        words: ['Demand', 'rose', 'sharply', 'by', 'Jun'].map((text, index) => ({
+          text,
+          fromMs: index * 1000,
+        })),
+      },
+    ];
+    const plan = {
+      beats: beats.map(({ id, text }) => ({ id, text })),
+      sections: [
+        {
+          id: 's1',
+          spansBeats: ['b1'],
+          scenes: [
+            scene({
+              events: [
+                { at: 'b1.word:rose', action: 'revealTrend' },
+                {
+                  at: 'b1.word:Jun',
+                  action: 'focusPoint',
+                  payload: { series: 'Demand', label: 'Jun' },
+                },
+              ],
+            }),
+          ],
+        },
+      ],
+    };
+
+    expect(validateVideoPlan(plan).ok).toBe(true);
+    const result = compile({ plan, beats });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const events = result.document.sections[0]?.scenes[0]?.events ?? [];
+    expect(events.map((event) => event.action)).toEqual(['revealTrend', 'focusPoint']);
+    expect(events[0]?.frame).toBe(30);
+    expect(events[1]?.frame).toBe(120);
   });
 });

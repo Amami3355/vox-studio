@@ -171,6 +171,28 @@ describe('ADR-0014: visualization dependencies stay behind internal seams', () =
     expect(findings).toEqual([]);
   });
 
+  /**
+   * The declared surface, not just the import seam.
+   *
+   * The seam above says *where* a library may be used; this says *how many* there are. The
+   * `line_chart` spec put `@visx/scale`, `@visx/group` and `@visx/curve` out of scope, and
+   * `@visx/shape` depends on all three, so the lockfile holds five while the authoring scope
+   * holds one. That gap is fine and is recorded in ADR-0014 — what would not be fine is a
+   * second one arriving as a direct dependency without anyone deciding to take it.
+   */
+  it('declares exactly one Visx package as a direct dependency', () => {
+    const manifest = JSON.parse(readFileSync(join(SRC, '..', 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared = [
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.devDependencies ?? {}),
+    ].filter((name) => name.startsWith('@visx/'));
+
+    expect(declared).toEqual(['@visx/shape']);
+  });
+
   it('allows D3 only in pure core arithmetic or primitive implementations', () => {
     const findings = allSource.flatMap((path) => {
       const local = relative(SRC, path).replace(/\\/g, '/');
