@@ -114,7 +114,12 @@ describe('LineChartScene runtime', () => {
       // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
       // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
       // Inspected at 1920×1080; each claim above still reads.
-      '0edecff370ffd5292c68f89071141470',
+
+      // Re-accepted 2026-08-22: the example moved from the hard ceiling of 36 points to the
+      // useful boundary of 17, which is what the spec asked it to teach. Inspected at
+      // 1920×1080: seven of seventeen date labels survive the thinning, every observation
+      // keeps its marker, and the recession claim above still reads.
+      '040b36a8ffe145dc6cb5fa851350c347',
     );
   });
 

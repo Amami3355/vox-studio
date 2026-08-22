@@ -16,9 +16,24 @@ const canonicalProps: LineChartProps = {
   series: [{ label: 'Journeys', values: [42, 45, 44, 51, 56, 63] }],
 };
 
-const edgePoints = Array.from({ length: 36 }, (_, index) => ({
-  date: `${2023 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
-  label: `${String((index % 12) + 1).padStart(2, '0')}/${String(23 + Math.floor(index / 12))}`,
+/**
+ * One past each published recommendation, which is the boundary worth teaching.
+ *
+ * `constraints.ts` recommends up to 16 points and up to 2 series; the schema admits 36 and 3.
+ * This example used to stand at 36 — the *hard* ceiling — and its note said so, but the hard
+ * ceiling is a number the schema already states and the stress suite already draws, and an
+ * agent reading it learns the largest shape that compiles rather than the shape where the
+ * frame starts degrading.
+ *
+ * The useful boundary is the first shape past the recommendation: 17 points, where
+ * intermediate labels begin to thin, and a third series, which the legend keeps and the plot
+ * gets denser for. It is also the only version of this example that respects the division
+ * `SceneControl.tsx` states — examples teach shapes an agent should write, and a shape past
+ * the recommended band belongs in a control, which is exactly where the ceiling already lives.
+ */
+const edgePoints = Array.from({ length: 17 }, (_, index) => ({
+  date: `${2024 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
+  label: `${String((index % 12) + 1).padStart(2, '0')}/${String(24 + Math.floor(index / 12))}`,
 }));
 
 export const lineChartExamples: SceneExample[] = [
@@ -79,14 +94,14 @@ export const lineChartExamples: SceneExample[] = [
   },
   {
     id: 'example-line-density-edge',
-    title: 'Edge case — 36 points and three series',
-    note: 'The hard density boundary: every observation remains in the lines while intermediate labels and ordinary markers thin.',
+    title: 'Edge case — one past the recommended point and series counts',
+    note: 'The useful density boundary at 17 points and three series: every observation remains in the lines while intermediate labels and ordinary markers thin.',
     component: 'line_chart',
     layout: 'standard',
     motionProfile: 'impact',
     spansBeats: ['b1', 'b2', 'b3'],
     props: {
-      title: 'Three years of monthly demand across the full service network',
+      title: 'Seventeen months of demand across the full service network',
       unit: 'k',
       baseline: 'zero',
       points: edgePoints,
@@ -104,7 +119,7 @@ export const lineChartExamples: SceneExample[] = [
           values: edgePoints.map((_, index) => 31 + index * 1.45 + (index % 3) * 4),
         },
       ],
-      focus: { series: 'North', label: '12/25' },
+      focus: { series: 'North', label: '05/25' },
     },
   },
   {

@@ -1491,8 +1491,8 @@
           },
           {
             "id": "example-line-density-edge",
-            "title": "Edge case — 36 points and three series",
-            "note": "The hard density boundary: every observation remains in the lines while intermediate labels and ordinary markers thin.",
+            "title": "Edge case — one past the recommended point and series counts",
+            "note": "The useful density boundary at 17 points and three series: every observation remains in the lines while intermediate labels and ordinary markers thin.",
             "component": "line_chart",
             "layout": "standard",
             "motionProfile": "impact",
@@ -1502,58 +1502,10 @@
               "b3"
             ],
             "props": {
-              "title": "Three years of monthly demand across the full service network",
+              "title": "Seventeen months of demand across the full service network",
               "unit": "k",
               "baseline": "zero",
               "points": [
-                {
-                  "date": "2023-01-01",
-                  "label": "01/23"
-                },
-                {
-                  "date": "2023-02-01",
-                  "label": "02/23"
-                },
-                {
-                  "date": "2023-03-01",
-                  "label": "03/23"
-                },
-                {
-                  "date": "2023-04-01",
-                  "label": "04/23"
-                },
-                {
-                  "date": "2023-05-01",
-                  "label": "05/23"
-                },
-                {
-                  "date": "2023-06-01",
-                  "label": "06/23"
-                },
-                {
-                  "date": "2023-07-01",
-                  "label": "07/23"
-                },
-                {
-                  "date": "2023-08-01",
-                  "label": "08/23"
-                },
-                {
-                  "date": "2023-09-01",
-                  "label": "09/23"
-                },
-                {
-                  "date": "2023-10-01",
-                  "label": "10/23"
-                },
-                {
-                  "date": "2023-11-01",
-                  "label": "11/23"
-                },
-                {
-                  "date": "2023-12-01",
-                  "label": "12/23"
-                },
                 {
                   "date": "2024-01-01",
                   "label": "01/24"
@@ -1621,34 +1573,6 @@
                 {
                   "date": "2025-05-01",
                   "label": "05/25"
-                },
-                {
-                  "date": "2025-06-01",
-                  "label": "06/25"
-                },
-                {
-                  "date": "2025-07-01",
-                  "label": "07/25"
-                },
-                {
-                  "date": "2025-08-01",
-                  "label": "08/25"
-                },
-                {
-                  "date": "2025-09-01",
-                  "label": "09/25"
-                },
-                {
-                  "date": "2025-10-01",
-                  "label": "10/25"
-                },
-                {
-                  "date": "2025-11-01",
-                  "label": "11/25"
-                },
-                {
-                  "date": "2025-12-01",
-                  "label": "12/25"
                 }
               ],
               "series": [
@@ -1671,26 +1595,7 @@
                     73.1,
                     77.8,
                     82.5,
-                    75.2,
-                    79.9,
-                    84.6,
-                    89.3,
-                    82,
-                    86.69999999999999,
-                    91.4,
-                    96.1,
-                    88.8,
-                    93.5,
-                    98.19999999999999,
-                    102.9,
-                    95.6,
-                    100.3,
-                    105,
-                    109.69999999999999,
-                    102.4,
-                    107.1,
-                    111.8,
-                    116.5
+                    75.2
                   ]
                 },
                 {
@@ -1712,26 +1617,7 @@
                     61.25,
                     64.5,
                     57.75,
-                    61,
-                    64.25,
-                    67.5,
-                    70.75,
-                    64,
-                    67.25,
-                    70.5,
-                    73.75,
-                    77,
-                    70.25,
-                    73.5,
-                    76.75,
-                    80,
-                    83.25,
-                    76.5,
-                    79.75,
-                    83,
-                    86.25,
-                    89.5,
-                    82.75
+                    61
                   ]
                 },
                 {
@@ -1753,32 +1639,13 @@
                     53.849999999999994,
                     59.3,
                     52.75,
-                    58.2,
-                    63.65,
-                    57.099999999999994,
-                    62.55,
-                    68,
-                    61.45,
-                    66.9,
-                    72.35,
-                    65.8,
-                    71.25,
-                    76.69999999999999,
-                    70.15,
-                    75.6,
-                    81.05,
-                    74.5,
-                    79.94999999999999,
-                    85.4,
-                    78.85,
-                    84.3,
-                    89.75
+                    58.2
                   ]
                 }
               ],
               "focus": {
                 "series": "North",
-                "label": "12/25"
+                "label": "05/25"
               }
             }
           },
