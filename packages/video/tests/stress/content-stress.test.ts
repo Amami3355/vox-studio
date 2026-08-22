@@ -142,6 +142,7 @@ const renderCase = async (testCase: StressCase, frame: number): Promise<Rendered
           {
             capabilityId: testCase.capabilityId,
             props: testCase.props,
+            events: testCase.events,
             layout: testCase.layout,
             motionProfile: testCase.profile,
             safeArea: testCase.safeArea,

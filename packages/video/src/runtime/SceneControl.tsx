@@ -22,6 +22,31 @@ import type { SceneInstance } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
 import { SceneRenderer } from './SceneRenderer';
 
+const lineChartCeilingPoints = Array.from({ length: 36 }, (_, index) => ({
+  date: `${2023 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
+  label: `Observation ${String(index + 1).padStart(2, '0')} reporting`,
+}));
+
+const lineChartCeilingSeries = [
+  {
+    label: 'Northern metropolitan households',
+    values: Array.from({ length: 36 }, (_, index) =>
+      index === 0 ? -9_999_999 : index * 310_000 - 4_000_000,
+    ),
+  },
+  {
+    label: 'Central city comparison baseline',
+    values: Array.from({ length: 36 }, () => 2_500_000),
+  },
+  {
+    label: 'Southern regional change measure',
+    values: Array.from(
+      { length: 36 },
+      (_, index) => (index % 2 === 0 ? -1 : 1) * (800_000 + index * 120_000),
+    ),
+  },
+];
+
 export const sceneControls: SceneInstance[] = [
   /**
    * An empty label is the frame's standing element failing, not a stat being held back, so
@@ -52,7 +77,7 @@ export const sceneControls: SceneInstance[] = [
     },
   },
   /**
-   * Both ceiling controls exist for `tests/render/occupies-regions.test.ts`, which checks
+   * The ceiling controls exist for `tests/render/occupies-regions.test.ts`, which checks
    * the one claim no other suite reads: that `occupiesRegions` is true of the pixels. The
    * claim is worst where the copy is longest, so every string sits at its schema ceiling —
    * in multi-word prose, because a one-token ceiling string exercises no wrapping and
@@ -141,6 +166,41 @@ export const sceneControls: SceneInstance[] = [
         { label: 'Reykjavik and the built-up area around', value: 44 },
         { label: 'Vienna and the districts over the canal', value: 29 },
       ],
+    },
+  },
+  {
+    id: 'line-chart-ceiling',
+    component: 'line_chart',
+    layout: 'standard',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1'],
+    events: [
+      { at: 'b1.start', action: 'revealTrend' },
+      {
+        at: 'b1.start',
+        action: 'annotatePoint',
+        payload: {
+          series: 'Southern regional change measure',
+          label: 'Observation 19 reporting',
+          text: 'A late annotation remains attached at hard density ceiling throughout.',
+        },
+      },
+    ],
+    props: {
+      // The hard schema ceiling: 120 title characters, 36 dated points with 24-character
+      // labels, three 32-character series names, an 8-character unit and a 70-character
+      // annotation. Mixed signs, a constant series and the widest figure exercise the plot
+      // domain while focus and annotation draw their durable overlays in the settled frame.
+      title:
+        "Share of a household's monthly income now spent on rent across every capital that the survey reached this reporting year",
+      points: lineChartCeilingPoints,
+      series: lineChartCeilingSeries,
+      unit: 'per cent',
+      baseline: 'extent',
+      focus: {
+        series: 'Northern metropolitan households',
+        label: 'Observation 36 reporting',
+      },
     },
   },
   {

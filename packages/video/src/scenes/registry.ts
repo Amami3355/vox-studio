@@ -1,6 +1,7 @@
 import type { SceneCapability } from '../core/types';
 import { barChartCapability } from './BarChartScene';
 import { imageContextCapability } from './ImageContextScene';
+import { lineChartCapability } from './LineChartScene';
 import { quoteCapability } from './QuoteScene';
 import { statCounterCapability } from './StatCounterScene';
 
@@ -12,6 +13,7 @@ import { statCounterCapability } from './StatCounterScene';
 export const registry: SceneCapability[] = [
   barChartCapability,
   imageContextCapability,
+  lineChartCapability,
   quoteCapability,
   statCounterCapability,
 ];

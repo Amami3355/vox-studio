@@ -17,7 +17,8 @@
  *
  * **Why the ceiling, and why controls.** Ink extent is worst where copy is longest, so
  * the renders carry every string at its schema ceiling (`control--quote-ceiling`,
- * `control--stat-ceiling`). The published examples never go there, and must not — see
+ * `control--stat-ceiling`, `control--bar-chart-ceiling`, `control--line-chart-ceiling`).
+ * The published examples never go there, and must not — see
  * `runtime/SceneControl.tsx`.
  *
  * **Why all six profiles and these frames.** Entrances here are a clipped vertical rise,
@@ -25,7 +26,7 @@
  * scale move it further. Frames 1 and 20 catch the entrances still moving; 60 is settled;
  * the last frame is each camera at its extreme.
  *
- * **Why these three.** `image_context` declares `['full']` and is not swept only because no
+ * **Why these four.** `image_context` declares `['full']` and is not swept only because no
  * ceiling control exists for it. That used to read "there is no slot to check", and it is no
  * longer true: a `['full']` declaration is falsifiable now — the branch below holds one to
  * drawing into *every* slot — so sweeping it is available work rather than a question with
@@ -35,10 +36,12 @@
  * answer — *"that declaration predates any measurement and measuring it is its own work."*
  * The work came due on 2026-08-21, when a render put a narrator in that corner and the
  * tallest bar's value label was drawn under it with its ascenders cut. It is swept now, and
- * it frees nothing.
+ * it frees nothing. `line_chart` enters the sweep with its first registration: its conservative
+ * `['full']` declaration is measured rather than accepted as a default.
  *
- * **What actually keeps the corners clear.** Measured worst-case over all six profiles
- * at frames 1/20/60/last, at the schema ceiling, default theme:
+ * **What actually keeps the corners clear.** Measured worst-case over all six profiles at
+ * frames 1/20/60/last, at the schema ceiling, default theme. The numerical rows predate
+ * `line_chart`; its full-frame claim is held by the same per-slot pixel assertion below:
  *
  * ```
  *                ink max x   ink y band     ink in the corner rows   the real margin
@@ -57,7 +60,8 @@
  * once the declaration frees nothing there is no corner left for them to overclaim. A
  * capability that ever narrows this declaration would have to sweep all three.
  *
- * All three put ink *past* x = 70%, so horizontal reach is not what frees a corner and
+ * The three tabulated capabilities put ink *past* x = 70%, so horizontal reach is not what
+ * frees a corner and
  * `columnRatio`/`SceneTitle`'s 86% cap are not the fragile numbers. `quote` and
  * `stat_counter` are clear for different reasons, and each margin is thin in a different
  * direction:
@@ -96,6 +100,7 @@ const SWEPT = [
    * away, under every profile, so no narrower set is available to it.
    */
   { capabilityId: 'bar_chart', controlId: 'bar-chart-ceiling', frees: [] },
+  { capabilityId: 'line_chart', controlId: 'line-chart-ceiling', frees: [] },
 ] as const satisfies readonly { capabilityId: string; controlId: string; frees: Slot[] }[];
 
 /**
@@ -140,8 +145,8 @@ describe('an occupied region is one the ink actually crosses', () => {
    *
    * For `quote` and `stat_counter` that is exactly the two right-hand corners: this is the
    * half that fails if either widens back to `['full']`, and `left` alone would also free
-   * `right`, where the ink genuinely goes. For `bar_chart` it is nothing at all, and the
-   * pixels are what hold that — see the branch further down.
+   * `right`, where the ink genuinely goes. For `bar_chart` and `line_chart` it is nothing
+   * at all, and the pixels hold each claim independently — see the branch further down.
    */
   it.each(SWEPT.map((one) => [one.capabilityId, one.frees] as const))(
     '%s frees exactly what it was measured to free',

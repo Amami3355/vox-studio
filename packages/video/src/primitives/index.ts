@@ -7,6 +7,7 @@ export * from './titleFit';
 export * from './Reveal';
 export * from './Bar';
 export * from './Gridlines';
+export * from './LinePlot';
 export * from './Callout';
 export * from './Stamp';
 export * from './EmptyState';

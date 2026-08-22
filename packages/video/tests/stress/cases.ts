@@ -32,7 +32,7 @@
 import type { JsonSchemaObject } from '../../src/catalog/build';
 import { buildCatalogEntry } from '../../src/catalog/build';
 import { slotRect } from '../../src/core/slots';
-import type { SafeArea, Slot } from '../../src/core/types';
+import type { SafeArea, Slot, TimedEvent } from '../../src/core/types';
 import { registry } from '../../src/scenes/registry';
 
 /**
@@ -164,11 +164,13 @@ export const prose = (length: number, from = 0): string => {
 const figureAt = (index: number): number =>
   index === 0 ? WIDEST_FIGURE : Math.round(Math.abs(WIDEST_FIGURE) / (index + 1));
 
-export type StressContentId = 'ceiling' | 'floor';
+export type StressContentId = 'ceiling' | 'floor' | 'minimum' | 'recommended' | 'degraded';
 
 export type StressContent = {
   id: StressContentId;
   props: Record<string, unknown>;
+  /** Resolved control timing. Present only when temporal state is itself under stress. */
+  events?: TimedEvent[];
 };
 
 const fillField = (
@@ -256,17 +258,89 @@ const fillObject = (
  * silence where a floor would be, and anything between them is a number somebody chose.
  * A case at 137 characters would be a fixture wearing a generator's clothes.
  */
-export const stressContent = (propsSchema: JsonSchemaObject): StressContent[] =>
-  (['ceiling', 'floor'] as const).map((id) => ({
+export const stressContent = (
+  propsSchema: JsonSchemaObject,
+  capabilityId?: string,
+): StressContent[] => {
+  if (capabilityId === 'line_chart') return lineChartStressContent();
+  return (['ceiling', 'floor'] as const).map((id) => ({
     id,
     props: fillObject(propsSchema, id, 0, ''),
   }));
+};
+
+const datedPoints = (count: number, longLabels = false) =>
+  Array.from({ length: count }, (_, index) => ({
+    date: `${2023 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
+    label: longLabels ? `${prose(21, index)} ${String(index).padStart(2, '0')}` : `P${index + 1}`,
+  }));
+
+const lineSeries = (count: number, seriesCount: number) =>
+  Array.from({ length: seriesCount }, (_, seriesIndex) => ({
+    label: prose(32, seriesIndex),
+    values: Array.from({ length: count }, (_, pointIndex) => {
+      if (seriesIndex === 0) {
+        return pointIndex === 0 ? WIDEST_FIGURE : pointIndex * 310_000 - 4_000_000;
+      }
+      if (seriesIndex === 1) return 2_500_000;
+      return (pointIndex % 2 === 0 ? -1 : 1) * (800_000 + pointIndex * 120_000);
+    }),
+  }));
+
+/** The five line-chart regimes named by its spec, all still derived from published limits. */
+const lineChartStressContent = (): StressContent[] => {
+  const build = (
+    id: StressContentId,
+    pointCount: number,
+    seriesCount: number,
+    longLabels = false,
+  ): StressContent => {
+    const points = datedPoints(pointCount, longLabels);
+    const series = lineSeries(pointCount, seriesCount);
+    return {
+      id,
+      props: {
+        title: id === 'ceiling' ? prose(120) : `Line chart ${id}`,
+        points,
+        series,
+        unit: id === 'ceiling' ? prose(8) : 'k',
+        ...(id === 'ceiling' && series[0] && points.at(-1)
+          ? { focus: { series: series[0].label, label: points.at(-1)?.label } }
+          : {}),
+      },
+      ...(id === 'ceiling' && series[2] && points[18]
+        ? {
+            events: [
+              {
+                frame: 180,
+                action: 'annotatePoint',
+                payload: {
+                  series: series[2].label,
+                  label: points[18].label,
+                  text: 'A late annotation remains attached at the hard density ceiling',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  };
+
+  return [
+    { id: 'floor', props: { title: '', points: [], series: [], unit: '' } },
+    build('minimum', 1, 1),
+    build('recommended', 16, 2),
+    build('degraded', 17, 3),
+    build('ceiling', 36, 3, true),
+  ];
+};
 
 export type StressCase = {
   label: string;
   capabilityId: string;
   content: StressContentId;
   props: Record<string, unknown>;
+  events?: TimedEvent[];
   layout: string;
   composition: Slot;
   profile: StressProfile;
@@ -305,21 +379,23 @@ const framesFor = (duration: number): number[] => [Math.round(duration * 0.25), 
  */
 export const stressCases = (): StressCase[] =>
   registry.flatMap((capability) =>
-    stressContent(buildCatalogEntry(capability).propsSchema).flatMap((content) =>
-      Object.keys(capability.layouts).flatMap((layout) =>
-        capability.meta.supportedCompositions.flatMap((composition) =>
-          STRESS_PROFILES.map((profile) => ({
-            label: `${capability.meta.id} at its ${content.id}, ${layout}, composed into ${composition} under ${profile}`,
-            capabilityId: capability.meta.id,
-            content: content.id,
-            props: content.props,
-            layout,
-            composition,
-            profile,
-            safeArea: slotRect(composition),
-            frames: framesFor(capability.meta.recommendedDurationFrames),
-          })),
+    stressContent(buildCatalogEntry(capability).propsSchema, capability.meta.id).flatMap(
+      (content) =>
+        Object.keys(capability.layouts).flatMap((layout) =>
+          capability.meta.supportedCompositions.flatMap((composition) =>
+            STRESS_PROFILES.map((profile) => ({
+              label: `${capability.meta.id} at its ${content.id}, ${layout}, composed into ${composition} under ${profile}`,
+              capabilityId: capability.meta.id,
+              content: content.id,
+              props: content.props,
+              ...(content.events ? { events: content.events } : {}),
+              layout,
+              composition,
+              profile,
+              safeArea: slotRect(composition),
+              frames: framesFor(capability.meta.recommendedDurationFrames),
+            })),
+          ),
         ),
-      ),
     ),
   );

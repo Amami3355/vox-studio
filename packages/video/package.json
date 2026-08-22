@@ -25,6 +25,7 @@
     "@remotion/google-fonts": "4.0.508",
     "@remotion/layout-utils": "4.0.508",
     "@remotion/player": "4.0.508",
+    "@visx/shape": "^4.0.0",
     "d3-scale": "^4.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

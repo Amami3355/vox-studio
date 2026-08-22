@@ -251,12 +251,19 @@ export const fitTitleStep = ({
  * real loaded font at the real size, synchronously and leaving no DOM of its own behind,
  * which is what keeps the component a pure function of (props, frame).
  */
-export const useTitleStep = (
+export type TitleFit = {
+  step: number;
+  lineCount: number;
+  height: number;
+};
+
+/** The fitted step and the physical block it produces, from the same measurement pass. */
+export const useTitleFit = (
   text: string,
   columnWidth: number,
   ceiling?: number,
   maxHeight?: number,
-): number => {
+): TitleFit => {
   const theme = useTheme();
   const density = useDensity();
 
@@ -273,13 +280,24 @@ export const useTitleStep = (
         letterSpacing: `${theme.type.tracking.tight * sizeAt(step)}px`,
       }).width;
 
-    return fitTitleStep({
-      words: text.split(/\s+/).filter(Boolean),
+    const words = text.split(/\s+/).filter(Boolean);
+    const available = columnWidth * TITLE_MAX_WIDTH;
+    const step = fitTitleStep({
+      words,
       top: Math.min(ceiling ?? titleStep(text.length), theme.type.scale.length - 1),
-      available: columnWidth * TITLE_MAX_WIDTH,
+      available,
       widthAt,
       maxHeight,
       lineHeightAt: (step) => sizeAt(step) * TITLE_LINE_HEIGHT,
     });
+    const lineCount = wrappedLineCount({ words, step, available, widthAt });
+    return { step, lineCount, height: lineCount * sizeAt(step) * TITLE_LINE_HEIGHT };
   }, [text, columnWidth, ceiling, maxHeight, theme, density]);
 };
+
+export const useTitleStep = (
+  text: string,
+  columnWidth: number,
+  ceiling?: number,
+  maxHeight?: number,
+): number => useTitleFit(text, columnWidth, ceiling, maxHeight).step;

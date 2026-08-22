@@ -57,6 +57,11 @@ const FORBIDDEN: ReadonlyArray<readonly [string, RegExp]> = [
   ['new Date', /\bnew\s+Date\s*\(/],
   ['Math.random', /\bMath\.random\s*\(/],
   ['performance.now', /\bperformance\.now\s*\(/],
+  ['requestAnimationFrame', /\brequestAnimationFrame\s*\(/],
+  ['setTimeout', /\bsetTimeout\s*\(/],
+  ['setInterval', /\bsetInterval\s*\(/],
+  ['CSS animation', /\banimation\s*:/],
+  ['CSS transition', /\btransition\s*:/],
 ];
 
 const sourceFilesIn = (dir: string): string[] =>
@@ -144,5 +149,36 @@ describe('rule 4: the render is a pure function of (props, frame)', () => {
     expect(withoutComments(source).includes('Math.random')).toBe(false);
     // The code survives, and on the line it was written on.
     expect(withoutComments(source).split('\n')[4]).toBe('export const two = 2;');
+  });
+});
+
+describe('ADR-0014: visualization dependencies stay behind internal seams', () => {
+  const allSource = sourceFilesIn(SRC);
+  const imports = (path: string): string[] => {
+    const source = withoutComments(readFileSync(path, 'utf8'));
+    return [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].flatMap((match) =>
+      match[1] ? [match[1]] : [],
+    );
+  };
+
+  it('allows Visx only inside Vox primitives', () => {
+    const findings = allSource.flatMap((path) =>
+      imports(path).some((specifier) => specifier.startsWith('@visx/')) &&
+      !relative(SRC, path).replace(/\\/g, '/').startsWith('primitives/')
+        ? [relative(SRC, path).replace(/\\/g, '/')]
+        : [],
+    );
+    expect(findings).toEqual([]);
+  });
+
+  it('allows D3 only in pure core arithmetic or primitive implementations', () => {
+    const findings = allSource.flatMap((path) => {
+      const local = relative(SRC, path).replace(/\\/g, '/');
+      const allowed = local.startsWith('core/') || local.startsWith('primitives/');
+      return imports(path).some((specifier) => specifier.startsWith('d3-')) && !allowed
+        ? [local]
+        : [];
+    });
+    expect(findings).toEqual([]);
   });
 });

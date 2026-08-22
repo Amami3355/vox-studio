@@ -1039,6 +1039,770 @@
         ]
       },
       {
+        "id": "line_chart",
+        "name": "LineChartScene",
+        "family": "data",
+        "summary": "Continuous numeric change across ordered calendar dates.",
+        "useWhen": [
+          "showing a trend, acceleration or slowdown over calendar time",
+          "showing how a numeric measure changed across a period",
+          "comparing one to three temporal series on one value axis",
+          "calling out a dated high, low or inflection"
+        ],
+        "avoidWhen": [
+          "comparing discrete named categories → bar_chart",
+          "showing one number → stat_counter",
+          "showing shares of a whole → stat_donut",
+          "showing dated events without a numeric measure → timeline",
+          "showing correlation between two numeric variables → scatter_plot"
+        ],
+        "supportsEvents": true,
+        "requiresAssets": false,
+        "occupiesRegions": [
+          "full"
+        ],
+        "supportedCompositions": [
+          "full"
+        ],
+        "minDurationFrames": 120,
+        "recommendedDurationFrames": 240,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Headline above the trend. Best under 48 characters; longer copy steps down."
+            },
+            "points": {
+              "maxItems": 36,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "description": "Observation date in strict YYYY-MM-DD form, interpreted at UTC midnight."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 24,
+                    "description": "Concise authored date label shown on the x-axis and named by point actions."
+                  }
+                },
+                "required": [
+                  "date",
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Shared ordered time axis. Best between 3 and 16 observations; up to 36 remain fully plotted with sparse labels and markers."
+            },
+            "series": {
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32,
+                    "description": "Unique series name used by the legend, focus and annotation actions."
+                  },
+                  "values": {
+                    "maxItems": 36,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "description": "Finite value observed at the aligned point index."
+                    },
+                    "description": "Values aligned one-for-one with `points` in authored order."
+                  }
+                },
+                "required": [
+                  "label",
+                  "values"
+                ],
+                "additionalProperties": false
+              },
+              "description": "One or two aligned temporal series are recommended; three remain renderable."
+            },
+            "unit": {
+              "default": "",
+              "description": "Suffix applied consistently to axis, focus and annotation values, e.g. '%' or '°C'.",
+              "type": "string",
+              "maxLength": 8
+            },
+            "baseline": {
+              "default": "zero",
+              "description": "`zero` includes zero to avoid exaggerating ordinary change. `extent` uses observed bounds with headroom for narrow measures such as temperature or rates.",
+              "type": "string",
+              "enum": [
+                "zero",
+                "extent"
+              ]
+            },
+            "focus": {
+              "description": "Initial semantic focus. A point focus always belongs to a named series.",
+              "type": "object",
+              "properties": {
+                "series": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "description": "Must match one `series.label`."
+                },
+                "label": {
+                  "description": "Optional point display label to focus within the named series.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 24
+                }
+              },
+              "required": [
+                "series"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "title",
+            "points",
+            "series"
+          ],
+          "additionalProperties": false
+        },
+        "softConstraints": {
+          "points": {
+            "recommendedMin": 3,
+            "recommendedMax": 16,
+            "absoluteMax": 36,
+            "onExceed": "All observations and straight segments remain. Intermediate date labels and ordinary point markers thin deterministically; first, last, focused and annotated points stay labelled.",
+            "onEmpty": "The title remains with a designed “No trend data available” empty state."
+          },
+          "series": {
+            "recommendedMax": 2,
+            "absoluteMax": 3,
+            "onExceed": "The third series remains fully plotted and identified in the legend, but the shot carries higher visual density."
+          },
+          "title": {
+            "recommendedMax": 48,
+            "onExceed": "Title drops through the shared type-fitting ladder to preserve the plot.",
+            "onExceedCode": "TITLE_DENSITY"
+          }
+        },
+        "layouts": [
+          {
+            "id": "standard",
+            "description": "A title and optional legend above one proportional UTC plot. Point annotations stay inside the plot.",
+            "slots": [
+              "title",
+              "legend",
+              "plot",
+              "annotation"
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "id": "revealTrend",
+            "description": "Hold plot marks back, then draw the trend from earlier to later dates.",
+            "payloadSchema": null
+          },
+          {
+            "id": "focusSeries",
+            "description": "Bring one temporal series forward and clear any earlier point focus.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "series": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "description": "Must match one `series.label`."
+                }
+              },
+              "required": [
+                "series"
+              ],
+              "additionalProperties": false
+            },
+            "deicticFields": [
+              "series"
+            ]
+          },
+          {
+            "id": "focusPoint",
+            "description": "Focus one dated observation and show its exact date and formatted value.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "series": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "description": "Must match one `series.label`."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 24,
+                  "description": "Must match one `points[].label`."
+                }
+              },
+              "required": [
+                "series",
+                "label"
+              ],
+              "additionalProperties": false
+            },
+            "deicticFields": [
+              "label"
+            ]
+          },
+          {
+            "id": "annotatePoint",
+            "description": "Attach one concise explanatory note to a dated observation.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "series": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "description": "Must match one `series.label`."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 24,
+                  "description": "Must match one `points[].label`."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 70,
+                  "description": "Concise annotation copy, up to 70 characters."
+                }
+              },
+              "required": [
+                "series",
+                "label",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "examples": [
+          {
+            "id": "example-line-canonical",
+            "title": "Canonical monthly trend",
+            "note": "One series, a zero baseline and proportional calendar spacing. The trend reveals automatically.",
+            "component": "line_chart",
+            "layout": "standard",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "pace": "measured",
+            "props": {
+              "title": "Monthly rail journeys keep climbing",
+              "unit": "m",
+              "baseline": "zero",
+              "points": [
+                {
+                  "date": "2025-01-01",
+                  "label": "Jan"
+                },
+                {
+                  "date": "2025-02-01",
+                  "label": "Feb"
+                },
+                {
+                  "date": "2025-03-01",
+                  "label": "Mar"
+                },
+                {
+                  "date": "2025-04-01",
+                  "label": "Apr"
+                },
+                {
+                  "date": "2025-05-01",
+                  "label": "May"
+                },
+                {
+                  "date": "2025-06-01",
+                  "label": "Jun"
+                }
+              ],
+              "series": [
+                {
+                  "label": "Journeys",
+                  "values": [
+                    42,
+                    45,
+                    44,
+                    51,
+                    56,
+                    63
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "example-line-comparison",
+            "title": "Two-series comparison",
+            "note": "Two related rates share an extent axis so their narrow but meaningful movement remains visible.",
+            "component": "line_chart",
+            "layout": "standard",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "props": {
+              "title": "Mortgage rates diverged after spring",
+              "unit": "%",
+              "baseline": "extent",
+              "points": [
+                {
+                  "date": "2025-01-01",
+                  "label": "Jan"
+                },
+                {
+                  "date": "2025-03-01",
+                  "label": "Mar"
+                },
+                {
+                  "date": "2025-04-01",
+                  "label": "Apr"
+                },
+                {
+                  "date": "2025-07-01",
+                  "label": "Jul"
+                },
+                {
+                  "date": "2025-10-01",
+                  "label": "Oct"
+                }
+              ],
+              "series": [
+                {
+                  "label": "Fixed",
+                  "values": [
+                    4.1,
+                    4,
+                    4.15,
+                    4.45,
+                    4.6
+                  ]
+                },
+                {
+                  "label": "Variable",
+                  "values": [
+                    4,
+                    4.05,
+                    4.2,
+                    4.1,
+                    3.95
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "id": "example-line-driven",
+            "title": "Plan-driven reveal and annotation",
+            "note": "Same evidence as the canonical example; events first hold the line back, then attach one durable explanation.",
+            "component": "line_chart",
+            "layout": "standard",
+            "motionProfile": "pushIn",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "pace": "slow",
+            "props": {
+              "title": "Monthly rail journeys keep climbing",
+              "unit": "m",
+              "baseline": "zero",
+              "points": [
+                {
+                  "date": "2025-01-01",
+                  "label": "Jan"
+                },
+                {
+                  "date": "2025-02-01",
+                  "label": "Feb"
+                },
+                {
+                  "date": "2025-03-01",
+                  "label": "Mar"
+                },
+                {
+                  "date": "2025-04-01",
+                  "label": "Apr"
+                },
+                {
+                  "date": "2025-05-01",
+                  "label": "May"
+                },
+                {
+                  "date": "2025-06-01",
+                  "label": "Jun"
+                }
+              ],
+              "series": [
+                {
+                  "label": "Journeys",
+                  "values": [
+                    42,
+                    45,
+                    44,
+                    51,
+                    56,
+                    63
+                  ]
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b2.start",
+                "action": "revealTrend"
+              },
+              {
+                "at": "b3.start",
+                "action": "annotatePoint",
+                "payload": {
+                  "series": "Journeys",
+                  "label": "Jun",
+                  "text": "Summer demand arrived early"
+                }
+              }
+            ]
+          },
+          {
+            "id": "example-line-density-edge",
+            "title": "Edge case — 36 points and three series",
+            "note": "The hard density boundary: every observation remains in the lines while intermediate labels and ordinary markers thin.",
+            "component": "line_chart",
+            "layout": "standard",
+            "motionProfile": "impact",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "props": {
+              "title": "Three years of monthly demand across the full service network",
+              "unit": "k",
+              "baseline": "zero",
+              "points": [
+                {
+                  "date": "2023-01-01",
+                  "label": "01/23"
+                },
+                {
+                  "date": "2023-02-01",
+                  "label": "02/23"
+                },
+                {
+                  "date": "2023-03-01",
+                  "label": "03/23"
+                },
+                {
+                  "date": "2023-04-01",
+                  "label": "04/23"
+                },
+                {
+                  "date": "2023-05-01",
+                  "label": "05/23"
+                },
+                {
+                  "date": "2023-06-01",
+                  "label": "06/23"
+                },
+                {
+                  "date": "2023-07-01",
+                  "label": "07/23"
+                },
+                {
+                  "date": "2023-08-01",
+                  "label": "08/23"
+                },
+                {
+                  "date": "2023-09-01",
+                  "label": "09/23"
+                },
+                {
+                  "date": "2023-10-01",
+                  "label": "10/23"
+                },
+                {
+                  "date": "2023-11-01",
+                  "label": "11/23"
+                },
+                {
+                  "date": "2023-12-01",
+                  "label": "12/23"
+                },
+                {
+                  "date": "2024-01-01",
+                  "label": "01/24"
+                },
+                {
+                  "date": "2024-02-01",
+                  "label": "02/24"
+                },
+                {
+                  "date": "2024-03-01",
+                  "label": "03/24"
+                },
+                {
+                  "date": "2024-04-01",
+                  "label": "04/24"
+                },
+                {
+                  "date": "2024-05-01",
+                  "label": "05/24"
+                },
+                {
+                  "date": "2024-06-01",
+                  "label": "06/24"
+                },
+                {
+                  "date": "2024-07-01",
+                  "label": "07/24"
+                },
+                {
+                  "date": "2024-08-01",
+                  "label": "08/24"
+                },
+                {
+                  "date": "2024-09-01",
+                  "label": "09/24"
+                },
+                {
+                  "date": "2024-10-01",
+                  "label": "10/24"
+                },
+                {
+                  "date": "2024-11-01",
+                  "label": "11/24"
+                },
+                {
+                  "date": "2024-12-01",
+                  "label": "12/24"
+                },
+                {
+                  "date": "2025-01-01",
+                  "label": "01/25"
+                },
+                {
+                  "date": "2025-02-01",
+                  "label": "02/25"
+                },
+                {
+                  "date": "2025-03-01",
+                  "label": "03/25"
+                },
+                {
+                  "date": "2025-04-01",
+                  "label": "04/25"
+                },
+                {
+                  "date": "2025-05-01",
+                  "label": "05/25"
+                },
+                {
+                  "date": "2025-06-01",
+                  "label": "06/25"
+                },
+                {
+                  "date": "2025-07-01",
+                  "label": "07/25"
+                },
+                {
+                  "date": "2025-08-01",
+                  "label": "08/25"
+                },
+                {
+                  "date": "2025-09-01",
+                  "label": "09/25"
+                },
+                {
+                  "date": "2025-10-01",
+                  "label": "10/25"
+                },
+                {
+                  "date": "2025-11-01",
+                  "label": "11/25"
+                },
+                {
+                  "date": "2025-12-01",
+                  "label": "12/25"
+                }
+              ],
+              "series": [
+                {
+                  "label": "North",
+                  "values": [
+                    48,
+                    52.7,
+                    57.4,
+                    62.1,
+                    54.8,
+                    59.5,
+                    64.2,
+                    68.9,
+                    61.6,
+                    66.3,
+                    71,
+                    75.7,
+                    68.4,
+                    73.1,
+                    77.8,
+                    82.5,
+                    75.2,
+                    79.9,
+                    84.6,
+                    89.3,
+                    82,
+                    86.69999999999999,
+                    91.4,
+                    96.1,
+                    88.8,
+                    93.5,
+                    98.19999999999999,
+                    102.9,
+                    95.6,
+                    100.3,
+                    105,
+                    109.69999999999999,
+                    102.4,
+                    107.1,
+                    111.8,
+                    116.5
+                  ]
+                },
+                {
+                  "label": "Central",
+                  "values": [
+                    39,
+                    42.25,
+                    45.5,
+                    48.75,
+                    52,
+                    45.25,
+                    48.5,
+                    51.75,
+                    55,
+                    58.25,
+                    51.5,
+                    54.75,
+                    58,
+                    61.25,
+                    64.5,
+                    57.75,
+                    61,
+                    64.25,
+                    67.5,
+                    70.75,
+                    64,
+                    67.25,
+                    70.5,
+                    73.75,
+                    77,
+                    70.25,
+                    73.5,
+                    76.75,
+                    80,
+                    83.25,
+                    76.5,
+                    79.75,
+                    83,
+                    86.25,
+                    89.5,
+                    82.75
+                  ]
+                },
+                {
+                  "label": "Coastal",
+                  "values": [
+                    31,
+                    36.45,
+                    41.9,
+                    35.35,
+                    40.8,
+                    46.25,
+                    39.7,
+                    45.15,
+                    50.6,
+                    44.05,
+                    49.5,
+                    54.95,
+                    48.4,
+                    53.849999999999994,
+                    59.3,
+                    52.75,
+                    58.2,
+                    63.65,
+                    57.099999999999994,
+                    62.55,
+                    68,
+                    61.45,
+                    66.9,
+                    72.35,
+                    65.8,
+                    71.25,
+                    76.69999999999999,
+                    70.15,
+                    75.6,
+                    81.05,
+                    74.5,
+                    79.94999999999999,
+                    85.4,
+                    78.85,
+                    84.3,
+                    89.75
+                  ]
+                }
+              ],
+              "focus": {
+                "series": "North",
+                "label": "12/25"
+              }
+            }
+          },
+          {
+            "id": "example-line-empty",
+            "title": "Empty case — no temporal observations",
+            "note": "The canonical empty shape preserves the title and shows a designed explanation instead of a broken plot.",
+            "component": "line_chart",
+            "layout": "standard",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "title": "No comparable trend was published",
+              "points": [],
+              "series": [],
+              "unit": "",
+              "baseline": "zero"
+            }
+          }
+        ]
+      },
+      {
         "id": "quote",
         "name": "QuoteScene",
         "family": "typography",

@@ -13,7 +13,7 @@ import { registry, requireCapability } from '../src/scenes/registry';
 import { MAX_WORD_LENGTH, WIDEST_FIGURE, prose, stressCases, stressContent } from './stress/cases';
 
 const contentFor = (capabilityId: string) =>
-  stressContent(buildCatalogEntry(requireCapability(capabilityId)).propsSchema);
+  stressContent(buildCatalogEntry(requireCapability(capabilityId)).propsSchema, capabilityId);
 
 const at = (capabilityId: string, id: 'ceiling' | 'floor'): Record<string, unknown> => {
   const found = contentFor(capabilityId).find((one) => one.id === id);
@@ -120,6 +120,23 @@ describe('content is generated from the published schema, not written', () => {
     });
   });
 
+  it('covers every line-chart density regime and its late annotated ceiling', () => {
+    const content = contentFor('line_chart');
+    expect(content.map((one) => one.id)).toEqual([
+      'floor',
+      'minimum',
+      'recommended',
+      'degraded',
+      'ceiling',
+    ]);
+    expect((content.find((one) => one.id === 'ceiling')?.props.points as unknown[]).length).toBe(
+      36,
+    );
+    expect(content.find((one) => one.id === 'ceiling')?.events).toContainEqual(
+      expect.objectContaining({ action: 'annotatePoint', frame: 180 }),
+    );
+  });
+
   it('leaves every choice the schema does not size to the capability', () => {
     // `gridlines`, `emphasis`, `treatment`, `orientation` are choices, not sizes; an
     // optional `highlight` or `identityKey` is a choice too. The generator fills what the
@@ -143,7 +160,10 @@ describe('content is generated from the published schema, not written', () => {
     // that keeps the two readings honest: whatever it derives from the manifest has to
     // survive the zod schema the manifest was derived from.
     for (const capability of registry) {
-      for (const content of stressContent(buildCatalogEntry(capability).propsSchema)) {
+      for (const content of stressContent(
+        buildCatalogEntry(capability).propsSchema,
+        capability.meta.id,
+      )) {
         expect(() => capability.schema.parse(content.props)).not.toThrow();
       }
     }
@@ -160,10 +180,12 @@ describe('the matrix is every layout by every composition by both profiles', () 
     const arrangements = registry.reduce(
       (total, capability) =>
         total +
-        Object.keys(capability.layouts).length * capability.meta.supportedCompositions.length,
+        Object.keys(capability.layouts).length *
+          capability.meta.supportedCompositions.length *
+          stressContent(buildCatalogEntry(capability).propsSchema, capability.meta.id).length,
       0,
     );
-    expect(cases.length).toBe(arrangements * 2 * 2);
+    expect(cases.length).toBe(arrangements * 2);
   });
 
   it('names each case by everything that varies in it', () => {

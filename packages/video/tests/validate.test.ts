@@ -905,6 +905,10 @@ describe('tools', () => {
     expect(searchScenes('compare rent between cities')[0]?.id).toBe('bar_chart');
   });
 
+  it('ranks continuous calendar trends as line_chart', () => {
+    expect(searchScenes('trend changing over calendar time')[0]?.id).toBe('line_chart');
+  });
+
   it('getSceneSpec exposes schema, constraints, actions, layouts and examples', () => {
     const spec = getSceneSpec('bar_chart');
     expect(spec.propsSchema).toBeTruthy();
@@ -912,6 +916,20 @@ describe('tools', () => {
     expect(spec.actions.map((a) => a.id)).toContain('highlightBar');
     expect(spec.layouts.map((l) => l.id)).toContain('withCallout');
     expect(spec.examples.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('publishes the complete line_chart authoring contract', () => {
+    const spec = getSceneSpec('line_chart');
+    expect(spec.propsSchema.properties).toHaveProperty('points');
+    expect(spec.propsSchema.properties).toHaveProperty('series');
+    expect(spec.actions.map((action) => action.id)).toEqual([
+      'revealTrend',
+      'focusSeries',
+      'focusPoint',
+      'annotatePoint',
+    ]);
+    expect(spec.layouts.map((layout) => layout.id)).toEqual(['standard']);
+    expect(spec.examples).toHaveLength(5);
   });
 
   it('getSceneSpec fails loudly on an unknown id', () => {

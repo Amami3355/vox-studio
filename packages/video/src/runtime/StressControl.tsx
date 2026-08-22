@@ -5,7 +5,7 @@
  * the third kind — a control with **no content of its own**, whose content arrives as input
  * props. ADR-0003's content-stress amendment needs a frame per generated case, and the
  * cases are generated from the schemas, so there is nothing to enumerate here the way
- * `sceneControls` enumerates its three. What is fixed is the harness; what varies is
+ * `sceneControls` enumerates its named instances. What is fixed is the harness; what varies is
  * handed in. It is registered in `Root.tsx` for the reason every control is: the tests
  * render through the same bundle the studio does, and there is no second entry point.
  *
@@ -55,7 +55,7 @@ import {
 } from 'remotion';
 import { repositoryAssetLibrary } from '../assets/library';
 import { createAssetResolver, resolveSceneAssets } from '../assets/resolver';
-import { NO_SAFE_AREA, type SafeArea } from '../core/types';
+import { NO_SAFE_AREA, type SafeArea, type TimedEvent } from '../core/types';
 import { waitForFonts } from '../design/fonts';
 import type { MotionProfileId } from '../design/motion';
 import { defaultTheme } from '../design/theme';
@@ -83,6 +83,8 @@ export type StressSceneProps = {
   capabilityId: string;
   /** Generated from the capability's published schema. See `tests/stress/cases.ts`. */
   props: Record<string, unknown>;
+  /** Resolved state used when late temporal state is part of a capability's ceiling. */
+  events?: TimedEvent[];
   layout: string;
   motionProfile: MotionProfileId;
   /** The composition the compiler would have chosen, as the rectangle the scene sees. */
@@ -245,13 +247,14 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
  * Plays one generated case.
  *
  * A near-copy of `ControlScene`'s body, deliberately, and for the reason stated there: the
- * three answer to different owners. This one has no beats and no events — generated content
- * is content, and an event is a plan's decision about time — so `syntheticBeats` is not
- * called and the scene draws its settled state.
+ * three answer to different owners. This one has no beats. It normally draws settled
+ * generated content; a capability-specific ceiling may also carry a resolved event when
+ * late semantic state is part of the stress claim.
  */
 export const StressScene: React.FC<StressSceneProps> = ({
   capabilityId,
   props,
+  events,
   layout,
   motionProfile,
   safeArea,
@@ -273,6 +276,7 @@ export const StressScene: React.FC<StressSceneProps> = ({
       <SceneRenderer
         capabilityId={capabilityId}
         props={props}
+        events={events}
         assets={assets}
         layout={layout}
         motionProfile={motionProfile}
