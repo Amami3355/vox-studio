@@ -263,15 +263,20 @@ export type SceneCapability = {
    * no per-field filler can know either.
    *
    * **It is a hook, not a fixture.** Whatever it returns must be derived from the same
-   * published limits the generic path reads — the schema handed in, and the capability's own
-   * `constraints`. Restating a ceiling here would be the second copy that goes stale, which
-   * is the whole argument in that file's header, and it is not weakened by moving the
-   * restatement into the capability folder.
+   * published limits the generic path reads — the props schema, action payload schemas and
+   * the capability's own `constraints`. Restating a ceiling here would be the second copy
+   * that goes stale, which is the whole argument in that file's header, and it is not
+   * weakened by moving the restatement into the capability folder.
    */
   stressContent?: (published: {
     /** The JSON Schema in `catalog.json` — the ceiling the agent was actually told about. */
     propsSchema: Record<string, unknown>;
     constraints: SoftConstraints;
+    /** The generated action projection, including each payload schema and its limits. */
+    actions: {
+      id: string;
+      payloadSchema: Record<string, unknown> | null;
+    }[];
   }) => StressShape[];
 };
 

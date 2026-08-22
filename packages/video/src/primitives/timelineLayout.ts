@@ -18,12 +18,14 @@ import {
   formatUtcDate,
   formatUtcSpan,
   parseUtcDate,
+  timeTickIndices,
   utcMidnight,
   utcMonthsBetween,
+  utcTimeAxis,
   utcYearOf,
 } from '../core/time-axis';
 
-export type DatedEvent = { date: string; label: string; track?: string };
+export type DatedEvent = { date: string; label: string };
 export type DatedPeriod = { label: string; from: string; to: string };
 
 /**
@@ -73,15 +75,16 @@ export const timelineAxis = (events: DatedEvent[], periods: DatedPeriod[]): Time
 
   const openingYear = stamps.length === 0 ? 1970 : utcYearOf(Math.min(...stamps));
   const closingYear = stamps.length === 0 ? 1970 : utcYearOf(Math.max(...stamps));
-  const from = utcMidnight(openingYear, 1, 1);
+  const yearBoundary = (year: number): string => `${String(year).padStart(4, '0')}-01-01`;
+  const from = timestampOf(yearBoundary(openingYear), 'axis');
   const to = utcMidnight(closingYear + 1, 1, 1);
-  const span = to - from;
+  const proportional = utcTimeAxis([yearBoundary(openingYear)], 0, { from, to });
 
   return {
     from,
     to,
     years: Array.from({ length: closingYear - openingYear + 1 }, (_, index) => openingYear + index),
-    ratio: (timestamp) => (span <= 0 ? 0 : (timestamp - from) / span),
+    ratio: proportional.ratio,
   };
 };
 
@@ -92,27 +95,14 @@ export type TimelineTick = { year: number; ratio: number };
  * can letter — always keeping the opening and closing years, which are the two a viewer
  * needs to know the span the chronology covers.
  *
- * The same shape as `timeTickIndices`, and not a call to it: that one thins a list of
- * *observations* by index, and these are the axis's own divisions.
+ * `timeTickIndices` owns the thinning rule for every dated axis, so observation labels and
+ * year divisions cannot drift into different answers about which endpoints must survive.
  */
 export const timelineTicks = (axis: TimelineAxis, maximum: number): TimelineTick[] => {
   const { years } = axis;
   if (years.length === 0 || maximum <= 0) return [];
 
-  const chosen =
-    years.length <= maximum
-      ? years
-      : maximum === 1
-        ? [years[0] as number]
-        : [
-            ...new Set(
-              Array.from(
-                { length: maximum },
-                (_, slot) =>
-                  years[Math.round((slot * (years.length - 1)) / (maximum - 1))] as number,
-              ),
-            ),
-          ];
+  const chosen = timeTickIndices(years.length, maximum).map((index) => years[index] as number);
 
   return chosen.map((year) => ({ year, ratio: axis.ratio(utcMidnight(year, 1, 1)) }));
 };
@@ -157,16 +147,19 @@ export const timelineEventRatios = (events: DatedEvent[], axis: TimelineAxis): n
   events.map((event) => axis.ratio(timestampOf(event.date, 'events')));
 
 /**
- * The distinct `track` values an authored chronology carries, in first-seen order.
- *
- * Exported because two readers need the same answer and must not drift: `checks.ts`
- * refuses a layout whose track count it cannot draw, and the component decides how many
- * rails to draw. A refusal is a claim about how the component is built, and this is the
- * one sentence both of them read it from.
+ * Box available to a period label after the same inset is left on both sides. A band
+ * narrower than the preferred inset reduces it symmetrically, so neither label edge can
+ * cross the band it names.
  */
-export const timelineTracks = (events: DatedEvent[]): string[] => [
-  ...new Set(events.flatMap((event) => (event.track === undefined ? [] : [event.track]))),
-];
+export const timelinePeriodLabelBox = (
+  span: Pick<TimelinePeriodSpan, 'fromRatio' | 'toRatio'>,
+  axisWidth: number,
+  totalInset: number,
+): { leftInset: number; width: number } => {
+  const bandWidth = Math.max(0, (span.toRatio - span.fromRatio) * axisWidth);
+  const leftInset = Math.min(totalInset / 2, bandWidth / 2);
+  return { leftInset, width: Math.max(0, bandWidth - leftInset * 2) };
+};
 
 /**
  * The date under an event, worded. `core/time-axis.ts` owns the wording; this name is the

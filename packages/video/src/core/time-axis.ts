@@ -15,6 +15,17 @@ const daysInMonth = (year: number, month: number): number => {
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 };
 
+/**
+ * One UTC midnight from its calendar parts. `Date.UTC(25, ...)` means 1925 by legacy
+ * JavaScript rule, so the year is always set explicitly.
+ */
+export const utcMidnight = (year: number, month: number, day: number): number => {
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getTime();
+};
+
 /** Parse one strict calendar date at UTC midnight. Locale and host timezone never participate. */
 export const parseUtcDate = (value: string): number | null => {
   const match = UTC_DATE.exec(value);
@@ -23,23 +34,7 @@ export const parseUtcDate = (value: string): number | null => {
   const month = Number(match[2]);
   const day = Number(match[3]);
   if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return null;
-  /** `Date.UTC(25, ...)` means 1925 by legacy JavaScript rule; set the year explicitly. */
-  const date = new Date(0);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getTime();
-};
-
-/**
- * One UTC midnight from its calendar parts, the same way `parseUtcDate` builds one and for
- * the same reason: `Date.UTC(25, ...)` means 1925 by legacy JavaScript rule, so the year is
- * always set explicitly.
- */
-export const utcMidnight = (year: number, month: number, day: number): number => {
-  const date = new Date(0);
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getTime();
+  return utcMidnight(year, month, day);
 };
 
 /**
@@ -128,9 +123,14 @@ export const timeTickIndices = (count: number, maximum = 6): number[] => {
 
 /**
  * Proportional UTC time axis. Written order is binding: invalid, duplicate or descending
- * dates throw rather than being sorted into a plausible but unauthored trend.
+ * dates throw rather than being sorted into a plausible but unauthored trend. A supplied
+ * domain lets a caller snap the proportional scale beyond the authored observations.
  */
-export const utcTimeAxis = (dates: string[], maximumTicks = 6): TimeAxis => {
+export const utcTimeAxis = (
+  dates: string[],
+  maximumTicks = 6,
+  domain?: { from: number; to: number },
+): TimeAxis => {
   const timestamps = dates.map((date) => {
     const parsed = parseUtcDate(date);
     if (parsed === null) throw new Error(`Invalid UTC calendar date "${date}".`);
@@ -143,8 +143,15 @@ export const utcTimeAxis = (dates: string[], maximumTicks = 6): TimeAxis => {
     }
   }
 
-  const first = timestamps[0] ?? 0;
-  const last = timestamps.at(-1) ?? first;
+  if (domain && (!Number.isFinite(domain.from) || !Number.isFinite(domain.to))) {
+    throw new Error('UTC time-axis domain must contain finite timestamps.');
+  }
+  if (domain && domain.to <= domain.from) {
+    throw new Error('UTC time-axis domain must end after it starts.');
+  }
+
+  const first = domain?.from ?? timestamps[0] ?? 0;
+  const last = domain?.to ?? timestamps.at(-1) ?? first;
   const span = last - first;
   const ratio = (timestamp: number): number => (span === 0 ? 0.5 : (timestamp - first) / span);
 

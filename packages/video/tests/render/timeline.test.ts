@@ -188,21 +188,20 @@ describe('TimelineScene runtime', () => {
 
   it('keeps the durable annotation attached to the moment it explains', async () => {
     expect(hashStill(await still('example-timeline-driven', 269))).toBe(
-      // Accepted 2026-08-22 at the last frame: the connector drops from the Karlsruhe mark,
+      // Accepted 2026-08-23 at the last frame: the connector drops from the Karlsruhe mark,
       // turns, and runs into the callout's own rule, so the note is attached to the moment
       // rather than floating under the axis. The card is titled with that event's label and
       // carries the whole annotation on two lines, clear of the frame's bottom edge.
-      '4221afee02082f1d6489a5296b20a5c8',
+      '48b264e80fa190a012c755ef3e2e3314',
     );
   });
 
   it('keeps the two-lane density edge readable', async () => {
     expect(hashStill(await still('example-timeline-density-edge', 180))).toBe(
-      // Accepted 2026-08-22: seven events, one past the recommended six. Six keep a
-      // labelled column across two lanes; the crowded March hearing keeps its mark on the
-      // axis without its words, which is the degradation `constraints.onExceed` publishes.
-      // The fifteen-month investigation band spans exactly the stretch it names.
-      '3cd793b59218cf58f5e7ba4574b5cdcd',
+      // Accepted 2026-08-23: six events, exactly the recommended edge. The crowded March
+      // dates use separate lanes while the first and last remain labelled. The fifteen-month
+      // investigation band spans exactly the stretch it names.
+      '50e4556bcf480e09566041ecdd97e27f',
     );
   });
 

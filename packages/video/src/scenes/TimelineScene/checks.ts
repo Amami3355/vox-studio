@@ -1,5 +1,4 @@
 import type { CompilerError, CompilerWarning, SceneInstance } from '../../core/types';
-import { timelineTracks } from '../../primitives/timelineLayout';
 
 const EVENT_ACTIONS = new Set(['focusEvent', 'annotate']);
 
@@ -11,10 +10,9 @@ const EVENT_ACTIONS = new Set(['focusEvent', 'annotate']);
  *
  * Written **against** `Component.tsx` rather than ahead of it, per the trap in
  * `docs/adding-a-capability.md`: a refusal is a claim about how the component is built, and
- * one that outlives the branch teaches the agent a rule that is not true. The track refusal
- * below is exactly that kind of claim — `spine` draws one rail and reads no `track`, so a
- * second track is a dimension the author wrote that the frame does not carry. When `lanes`
- * lands it draws two, and this refusal narrows to the layouts that still cannot.
+ * one that outlives the branch teaches the agent a rule that is not true. Fields belonging
+ * to deferred layouts stay out of the schema entirely, so this stage needs no refusal for
+ * a dimension its renderer does not yet understand.
  */
 export const timelineChecks = (
   instance: SceneInstance,
@@ -23,34 +21,6 @@ export const timelineChecks = (
   const warnings: CompilerWarning[] = [];
   const events = readObjects(instance.props.events);
   const labels = events.flatMap((event) => (typeof event.label === 'string' ? [event.label] : []));
-
-  const tracks = timelineTracks(
-    events.flatMap((event) =>
-      typeof event.date === 'string' && typeof event.label === 'string'
-        ? [
-            {
-              date: event.date,
-              label: event.label,
-              ...(typeof event.track === 'string' ? { track: event.track } : {}),
-            },
-          ]
-        : [],
-    ),
-  );
-
-  /**
-   * The "renders fine, means something else" class, which is the one worth a hard error:
-   * the frame would be correct and a dimension the author wrote would simply be missing
-   * from it. Nothing downstream would ever say so.
-   */
-  if (tracks.length > 1) {
-    errors.push({
-      code: 'INVALID_PROPS',
-      sceneId: instance.id,
-      field: 'events[].track',
-      message: `The "${instance.layout ?? 'spine'}" layout draws one thread, and this chronology carries ${tracks.length}; the others would be dropped from the picture without a word. Give each thread its own scene, or drop the track names.`,
-    });
-  }
 
   if (labels.length === 0) return { errors, warnings };
 

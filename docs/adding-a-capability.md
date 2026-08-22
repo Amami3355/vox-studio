@@ -110,7 +110,8 @@ capability a control.
 per-field at all. `line_chart` aligns `series[].values` one-for-one with `points` and needs
 its `date` strings to parse and be distinct, so no filler that sizes one field at a time can
 produce an instance the schema accepts. **It is a hook, not a fixture.** It is handed the
-published projection and must read its counts and lengths from it;
+published props schema, soft constraints and action payload schemas, and must read every
+count and length from those projections;
 `tests/stress-cases.test.ts` holds every capability that declares one to exactly that, so a
 literal ceiling in here goes red the moment the published one moves. What it may do that the
 generator may not is choose a *shape* at a given size — a constant series, a mixed-sign

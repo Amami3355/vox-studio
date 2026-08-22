@@ -257,7 +257,8 @@ describe('a capability that supplies its own stress shapes still reads its publi
         { maxItems?: number; maxLength?: number }
       >;
 
-      const byRegime = new Map(stressContent(capability).map((shape) => [shape.id, shape.props]));
+      const shapes = stressContent(capability);
+      const byRegime = new Map(shapes.map((shape) => [shape.id, shape.props]));
       expect([...byRegime.keys()].sort()).toEqual([
         'ceiling',
         'degraded',
@@ -296,6 +297,30 @@ describe('a capability that supplies its own stress shapes still reads its publi
           });
         }
       }
+
+      /** Temporal stress copy is sized from the published action payload, not source Zod. */
+      const ceilingShape = shapes.find((shape) => shape.id === 'ceiling');
+      let checkedActionLengths = 0;
+      for (const event of ceilingShape?.events ?? []) {
+        const payloadSchema = entry.actions.find(
+          (action) => action.id === event.action,
+        )?.payloadSchema;
+        const payloadProperties = (payloadSchema?.properties ?? {}) as Record<
+          string,
+          { maxLength?: number }
+        >;
+        for (const [name, published] of Object.entries(payloadProperties)) {
+          const value = event.payload?.[name];
+          if (published.maxLength === undefined || typeof value !== 'string') continue;
+          checkedActionLengths += 1;
+          expect({ action: event.action, field: name, length: value.length }).toEqual({
+            action: event.action,
+            field: name,
+            length: published.maxLength,
+          });
+        }
+      }
+      if ((ceilingShape?.events?.length ?? 0) > 0) expect(checkedActionLengths).toBeGreaterThan(0);
 
       // The floor is the shape every deliberately absent `.min()` promises stays reachable.
       const floor = byRegime.get('floor') ?? {};

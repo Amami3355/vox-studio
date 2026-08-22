@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { validateScene } from '../src/catalog/validate';
 import { resolveEvents } from '../src/core/events';
 import type { SceneInstance } from '../src/core/types';
-import { timelineSchema } from '../src/scenes/TimelineScene';
+import { timelineConstraints, timelineExamples, timelineSchema } from '../src/scenes/TimelineScene';
 import { initialTimelineState, timelineReducer } from '../src/scenes/TimelineScene/state';
 
 const canonicalProps = {
@@ -194,19 +194,14 @@ describe('timeline referential checks', () => {
     expect(error?.expected).toEqual(['b1.end']);
   });
 
-  /**
-   * The "renders fine, means something else" case, and the only reason it is an error
-   * rather than a warning: the frame would be correct and a dimension the author wrote
-   * would simply be missing from it, with nothing downstream ever saying so.
-   */
-  it('refuses a second thread, because the layout that draws one would drop it in silence', () => {
+  it('keeps the deferred track field out of the published stage-one schema', () => {
     const report = validateScene(
       scene({
         props: {
-          title: 'Two threads',
+          title: 'A future two-thread chronology',
           events: [
             { date: '2019-06-18', label: 'The Senate votes', track: 'Policy' },
-            { date: '2019-09-04', label: 'Listings fall', track: 'Market' },
+            { date: '2019-09-04', label: 'Listings fall' },
           ],
           periods: [],
         },
@@ -214,24 +209,17 @@ describe('timeline referential checks', () => {
     );
 
     expect(report.ok).toBe(false);
-    expect(report.errors[0]?.message).toMatch(/carries 2/);
+    expect(report.errors[0]?.field).toBe('events.0');
+    expect(report.errors[0]?.message).toMatch(/Unrecognized key.*track/);
   });
 
-  it('leaves a single named thread alone, since one thread is what the layout draws', () => {
-    expect(
-      validateScene(
-        scene({
-          props: {
-            title: 'One thread, named',
-            events: [
-              { date: '2019-06-18', label: 'The Senate votes', track: 'Policy' },
-              { date: '2020-02-23', label: 'The cap takes effect', track: 'Policy' },
-            ],
-            periods: [],
-          },
-        }),
-      ).ok,
-    ).toBe(true);
+  it('teaches the published recommendation exactly at the density edge', () => {
+    const edge = timelineExamples.find((example) => example.id === 'example-timeline-density-edge');
+
+    expect(edge).toBeDefined();
+    expect((edge?.props.events as unknown[]).length).toBe(
+      timelineConstraints.events?.recommendedMax,
+    );
   });
 });
 

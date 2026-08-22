@@ -24,9 +24,9 @@ import {
   monthsBetween,
   timelineAxis,
   timelineEventRatios,
+  timelinePeriodLabelBox,
   timelinePeriodSpans,
   timelineTicks,
-  timelineTracks,
 } from '../src/primitives/timelineLayout';
 import { timelineConstraints } from '../src/scenes/TimelineScene/constraints';
 import {
@@ -109,6 +109,14 @@ describe('the axis a chronology is drawn on', () => {
     expect(only).toBeLessThan(0.6);
   });
 
+  it('keeps the last schema-valid year on a finite proportional axis', () => {
+    const axis = timelineAxis([{ date: '9999-12-31', label: 'The last authored day' }], []);
+    const event = at('9999-12-31');
+
+    expect(axis.ratio(event)).toBeGreaterThan(0.99);
+    expect(axis.ratio(event)).toBeLessThan(1);
+  });
+
   it('has an axis for the empty chronology rather than dividing by zero', () => {
     const axis = timelineAxis([], []);
 
@@ -163,29 +171,30 @@ describe('a period is a duration, not a pair of dates', () => {
   it('never reports a negative span, whatever a caller hands it', () => {
     expect(monthsBetween(at('2021-04-15'), at('2020-02-23'))).toBe(0);
   });
+
+  it('keeps a label inside even a very short period band', () => {
+    const axis = timelineAxis(berlin, []);
+    const [span] = timelinePeriodSpans(
+      [{ label: 'A long name for a short period', from: '2020-02-23', to: '2020-03-01' }],
+      axis,
+    );
+    if (!span) throw new Error('Expected one period span.');
+
+    const axisWidth = 1200;
+    const inset = 24;
+    const labelBox = timelinePeriodLabelBox(span, axisWidth, inset);
+    const labelLeft = span.fromRatio * axisWidth + labelBox.leftInset;
+    const labelRight = labelLeft + labelBox.width;
+
+    expect(labelLeft).toBeGreaterThanOrEqual(span.fromRatio * axisWidth);
+    expect(labelRight).toBeLessThanOrEqual(span.toRatio * axisWidth);
+  });
 });
 
 describe('dates are worded without a locale, so a render reproduces anywhere', () => {
   it('sets a date the way the frame prints it', () => {
     expect(formatEventDate(at('2019-06-18'))).toBe('18 Jun 2019');
     expect(formatEventDate(at('2021-04-05'))).toBe('5 Apr 2021');
-  });
-});
-
-describe('tracks', () => {
-  it('reports the distinct threads in first-seen order, ignoring the events that name none', () => {
-    expect(
-      timelineTracks([
-        { date: '2019-01-01', label: 'a', track: 'Policy' },
-        { date: '2019-02-01', label: 'b' },
-        { date: '2019-03-01', label: 'c', track: 'Market' },
-        { date: '2019-04-01', label: 'd', track: 'Policy' },
-      ]),
-    ).toEqual(['Policy', 'Market']);
-  });
-
-  it('reports none for an ordinary single-thread chronology', () => {
-    expect(timelineTracks(berlin)).toEqual([]);
   });
 });
 

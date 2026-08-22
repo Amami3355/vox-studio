@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { truncateToWidth } from '../core/format';
 import type { MotionProfile } from '../design/motion';
 import { mix } from '../design/theme';
-import { Callout } from './Callout';
+import { Callout, calloutLayoutMetrics } from './Callout';
 import { useSpace, useTheme, useTypeSize } from './ThemeContext';
 import { layoutDateLabels, wrapTextToWidth } from './linePlotLayout';
 import {
@@ -13,6 +13,7 @@ import {
   formatEventDate,
   timelineAxis,
   timelineEventRatios,
+  timelinePeriodLabelBox,
   timelinePeriodSpans,
   timelineTicks,
   timestampOf,
@@ -41,16 +42,6 @@ export type TimelineSpineProps = {
 
 /** The most lines an event label wraps into before its tail is cut to the column. */
 const MAX_LABEL_LINES = 3;
-
-/**
- * `Callout`'s own measurements, read back so a caller can work out how tall a card will be
- * before it draws one. Two numbers in a second place, which is a cost — the alternative was
- * to make the primitive take a height budget, and a callout that knows about the room under
- * an axis is a callout that knows about timelines.
- */
-const CALLOUT_MAX_WIDTH = 520;
-const CALLOUT_LINE_HEIGHT = 1.32;
-const CALLOUT_RULE_HEIGHT = 2;
 
 /**
  * The leading an event label is set at. Tighter than body copy because these are short runs
@@ -225,23 +216,6 @@ export const TimelineSpine: React.FC<TimelineSpineProps> = ({
   });
   const laneOf = new Map(placements.map((placement) => [placement.index, placement]));
 
-  /**
-   * Where a band's name has to stop.
-   *
-   * It may run past its own band — a period named in one word would otherwise put a length
-   * ceiling on `periods[].label`, which is the composition choice the design study rejected
-   * for the `ledger` gutter, and for the same reason: a choice that constrains a field is
-   * worse than one that costs pixels. What it may not do is reach the next band's name, so
-   * the stop is the next period along, or the edge of the frame when there is none.
-   */
-  const bandLabelRight = (fromRatio: number): number => {
-    const next = spans
-      .map((other) => other.fromRatio)
-      .filter((start) => start > fromRatio)
-      .sort((a, b) => a - b)[0];
-    return next === undefined ? width : xAt(next);
-  };
-
   const gridInk = mix(theme.color.inkMuted, theme.color.bg, 0.82);
   const axisInk = mix(theme.color.inkMuted, theme.color.bg, 0.28);
   const markerInk = mix(theme.color.inkMuted, theme.color.bg, 0.45);
@@ -254,7 +228,12 @@ export const TimelineSpine: React.FC<TimelineSpineProps> = ({
     return revealed * (1 - 0.45 * clamp01(focusProgress));
   };
 
-  const annotationWidth = Math.min(CALLOUT_MAX_WIDTH, Math.max(320, width * 0.34));
+  const calloutMetrics = calloutLayoutMetrics({
+    space: gap,
+    bodySize: labelSize,
+    labelSize: dateSize,
+  });
+  const annotationWidth = Math.min(calloutMetrics.maxWidth, Math.max(320, width * 0.34));
   const annotationX =
     annotationIndex >= 0
       ? Math.min(
@@ -270,17 +249,17 @@ export const TimelineSpine: React.FC<TimelineSpineProps> = ({
    *
    * `Callout` grows with whatever it is handed, and what it is handed here is agent copy at
    * a ninety-character ceiling — six lines of it once the widest glyph is repeated, which
-   * ran the card off the bottom of the canvas. The arithmetic below is `Callout`'s own type
-   * scale read back: the line height it sets its copy at, and the padding it puts around
-   * it. That is a second copy of two numbers, and it is the price of keeping the primitive
-   * ignorant of the box its caller has left it.
+   * ran the card off the bottom of the canvas. `calloutLayoutMetrics` exposes the
+   * primitive's measurable contract, so this caller can reserve the remaining height
+   * without copying any of the CSS numbers that decide it.
    */
-  const annotationInner = annotationWidth - gap * 1.5;
-  const annotationLineHeight = labelSize * CALLOUT_LINE_HEIGHT;
-  const annotationLabelBlock = dateSize * 0.82 * 1.2 + gap + CALLOUT_RULE_HEIGHT;
+  const annotationInner = annotationWidth - calloutMetrics.innerWidthInset;
   const annotationLines = Math.max(
     1,
-    Math.floor((height - annotationRuleY - annotationLabelBlock - gap * 2) / annotationLineHeight),
+    Math.floor(
+      (height - annotationRuleY - calloutMetrics.fixedHeightWithLabel) /
+        calloutMetrics.bodyLineHeight,
+    ),
   );
   const annotationCopy = useMemo(() => {
     if (!annotation) return '';
@@ -309,12 +288,12 @@ export const TimelineSpine: React.FC<TimelineSpineProps> = ({
         measureText({
           text: candidate,
           fontFamily: theme.type.mono,
-          fontSize: dateSize * 0.82,
+          fontSize: calloutMetrics.labelFontSize,
           fontWeight: theme.type.weight.regular,
           letterSpacing: `${theme.type.tracking.wide * dateSize}px`,
         }).width,
     );
-  }, [annotationIndex, events, annotationInner, theme, dateSize]);
+  }, [annotationIndex, events, annotationInner, theme, dateSize, calloutMetrics.labelFontSize]);
 
   return (
     <div style={{ position: 'relative', width, height }}>
@@ -408,32 +387,35 @@ export const TimelineSpine: React.FC<TimelineSpineProps> = ({
         ) : null}
       </svg>
 
-      {spans.map((span) => (
-        <div
-          key={`${span.label}-label`}
-          style={{
-            position: 'absolute',
-            left: xAt(span.fromRatio) + gap * 0.5,
-            top: axisY - bandHeight,
-            height: bandHeight,
-            display: 'flex',
-            alignItems: 'center',
-            maxWidth: Math.max(0, bandLabelRight(span.fromRatio) - xAt(span.fromRatio) - gap),
-            opacity: chrome,
-            fontFamily: theme.type.mono,
-            fontSize: dateSize * 0.78,
-            fontWeight: theme.type.weight.medium,
-            letterSpacing: `${theme.type.tracking.wide * dateSize * 0.78}px`,
-            textTransform: 'uppercase',
-            color: theme.color.inkMuted,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {`${span.label} · ${span.duration}`}
-        </div>
-      ))}
+      {spans.map((span) => {
+        const labelBox = timelinePeriodLabelBox(span, width, gap);
+        return (
+          <div
+            key={`${span.label}-label`}
+            style={{
+              position: 'absolute',
+              left: xAt(span.fromRatio) + labelBox.leftInset,
+              top: axisY - bandHeight,
+              height: bandHeight,
+              display: 'flex',
+              alignItems: 'center',
+              maxWidth: labelBox.width,
+              opacity: chrome,
+              fontFamily: theme.type.mono,
+              fontSize: dateSize * 0.78,
+              fontWeight: theme.type.weight.medium,
+              letterSpacing: `${theme.type.tracking.wide * dateSize * 0.78}px`,
+              textTransform: 'uppercase',
+              color: theme.color.inkMuted,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {`${span.label} · ${span.duration}`}
+          </div>
+        );
+      })}
 
       {blocks.map((block) => {
         const placement = laneOf.get(block.index);

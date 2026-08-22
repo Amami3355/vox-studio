@@ -22,14 +22,6 @@ const eventSchema = z
       .describe(
         'What happened, set as display type and named by `focusEvent` and `annotate`. Must be unique within the scene.',
       ),
-    track: z
-      .string()
-      .min(1)
-      .max(24)
-      .optional()
-      .describe(
-        'Name of the thread this event belongs to. Absent means one thread. Exactly two distinct values are required by the `lanes` layout and refused by the others.',
-      ),
   })
   .strict();
 

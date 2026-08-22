@@ -29,9 +29,12 @@
  * and none of those is a size anything publishes.
  */
 import type { SoftConstraints, StressShape } from '../../core/types';
-import { LINE_CHART_ANNOTATION_TEXT_MAX } from './actions';
 
-type Published = { propsSchema: Record<string, unknown>; constraints: SoftConstraints };
+type Published = {
+  propsSchema: Record<string, unknown>;
+  constraints: SoftConstraints;
+  actions: { id: string; payloadSchema: Record<string, unknown> | null }[];
+};
 
 /** Walk the published schema to a field, so a rename in `schema.ts` fails here loudly. */
 const field = (schema: Record<string, unknown>, path: string[]): Record<string, unknown> => {
@@ -50,6 +53,13 @@ const sizeOf = (node: Record<string, unknown>, key: 'maxItems' | 'maxLength'): n
   const value = node[key];
   if (typeof value !== 'number') throw new Error(`line_chart stress: no published ${key}.`);
   return value;
+};
+
+/** Resolve one published action payload, so a rename or payload removal fails loudly. */
+const actionPayload = (actions: Published['actions'], id: string): Record<string, unknown> => {
+  const payload = actions.find((action) => action.id === id)?.payloadSchema;
+  if (!payload) throw new Error(`line_chart stress: action "${id}" publishes no payload schema.`);
+  return payload;
 };
 
 const recommended = (constraints: SoftConstraints, name: string): number => {
@@ -135,13 +145,21 @@ const alignedSeries = (
     }),
   }));
 
-export const lineChartStressContent = ({ propsSchema, constraints }: Published): StressShape[] => {
+export const lineChartStressContent = ({
+  propsSchema,
+  constraints,
+  actions,
+}: Published): StressShape[] => {
   const pointsMax = sizeOf(field(propsSchema, ['points']), 'maxItems');
   const seriesMax = sizeOf(field(propsSchema, ['series']), 'maxItems');
   const titleMax = sizeOf(field(propsSchema, ['title']), 'maxLength');
   const unitMax = sizeOf(field(propsSchema, ['unit']), 'maxLength');
   const pointLabelMax = sizeOf(field(propsSchema, ['points', '[]', 'label']), 'maxLength');
   const seriesLabelMax = sizeOf(field(propsSchema, ['series', '[]', 'label']), 'maxLength');
+  const annotationTextMax = sizeOf(
+    field(actionPayload(actions, 'annotatePoint'), ['text']),
+    'maxLength',
+  );
 
   const pointsRecommended = recommended(constraints, 'points');
   const seriesRecommended = recommended(constraints, 'series');
@@ -189,7 +207,7 @@ export const lineChartStressContent = ({ propsSchema, constraints }: Published):
                 payload: {
                   series: annotated.label,
                   label: midpoint.label,
-                  text: unbreakable(LINE_CHART_ANNOTATION_TEXT_MAX),
+                  text: unbreakable(annotationTextMax),
                 },
               },
             ],

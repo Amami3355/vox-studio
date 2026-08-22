@@ -20,9 +20,12 @@
  * inside the chronology, and which moment carries the late annotation.
  */
 import type { SoftConstraints, StressShape } from '../../core/types';
-import { TIMELINE_ANNOTATION_TEXT_MAX } from './actions';
 
-type Published = { propsSchema: Record<string, unknown>; constraints: SoftConstraints };
+type Published = {
+  propsSchema: Record<string, unknown>;
+  constraints: SoftConstraints;
+  actions: { id: string; payloadSchema: Record<string, unknown> | null }[];
+};
 
 /** Walk the published schema to a field, so a rename in `schema.ts` fails here loudly. */
 const field = (schema: Record<string, unknown>, path: string[]): Record<string, unknown> => {
@@ -40,6 +43,13 @@ const sizeOf = (node: Record<string, unknown>, key: 'maxItems' | 'maxLength'): n
   const value = node[key];
   if (typeof value !== 'number') throw new Error(`timeline stress: no published ${key}.`);
   return value;
+};
+
+/** Resolve one published action payload, so a rename or payload removal fails loudly. */
+const actionPayload = (actions: Published['actions'], id: string): Record<string, unknown> => {
+  const payload = actions.find((action) => action.id === id)?.payloadSchema;
+  if (!payload) throw new Error(`timeline stress: action "${id}" publishes no payload schema.`);
+  return payload;
 };
 
 const recommended = (constraints: SoftConstraints, name: string): number => {
@@ -115,12 +125,20 @@ const periodsOver = (
     };
   });
 
-export const timelineStressContent = ({ propsSchema, constraints }: Published): StressShape[] => {
+export const timelineStressContent = ({
+  propsSchema,
+  constraints,
+  actions,
+}: Published): StressShape[] => {
   const eventsMax = sizeOf(field(propsSchema, ['events']), 'maxItems');
   const periodsMax = sizeOf(field(propsSchema, ['periods']), 'maxItems');
   const titleMax = sizeOf(field(propsSchema, ['title']), 'maxLength');
   const eventLabelMax = sizeOf(field(propsSchema, ['events', '[]', 'label']), 'maxLength');
   const periodLabelMax = sizeOf(field(propsSchema, ['periods', '[]', 'label']), 'maxLength');
+  const annotationTextMax = sizeOf(
+    field(actionPayload(actions, 'annotate'), ['text']),
+    'maxLength',
+  );
 
   const eventsRecommended = recommended(constraints, 'events');
   const periodsRecommended = recommended(constraints, 'periods');
@@ -160,7 +178,7 @@ export const timelineStressContent = ({ propsSchema, constraints }: Published): 
                 action: 'annotate',
                 payload: {
                   label: annotated.label,
-                  text: unbreakable(TIMELINE_ANNOTATION_TEXT_MAX),
+                  text: unbreakable(annotationTextMax),
                 },
               },
             ],

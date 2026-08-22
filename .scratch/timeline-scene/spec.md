@@ -4,7 +4,7 @@ Status: stage 1 built — `spine` shipped on `capability/timeline`, `ledger` and
 
 Built 2026-08-22: `packages/video/src/scenes/TimelineScene/` (eleven files), the pure
 geometry module `packages/video/src/primitives/timelineLayout.ts`, the L1
-`primitives/TimelineSpine.tsx`, and the registry line. Two decisions in this spec were
+`primitives/TimelineSpine.tsx`, and the registry line. Three decisions in this spec were
 overtaken by the code and are recorded where they landed:
 
 - **`meta.capacityByComposition` is not declared.** `catalog/build.ts` requires
@@ -17,6 +17,9 @@ overtaken by the code and are recorded where they landed:
   the arithmetic this capability was told to reuse rather than reimplement — throws on
   equal dates, and two events at one axis position draw on top of each other. The refusal
   names the repair: one label that carries both.
+- **`events[].track` is not published in stage 1.** The field belongs to `lanes`, which is
+  explicitly step 6 of the staged build. Publishing it with `spine` would teach the planner
+  a value the only shipped renderer ignores. It lands with `lanes` and its two refusals.
 
 ## Problem Statement
 

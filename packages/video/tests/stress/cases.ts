@@ -288,10 +288,14 @@ const STRESS_REGIMES: readonly StressRegime[] = [
 ];
 
 export const stressContent = (capability: SceneCapability): StressContent[] => {
-  const { propsSchema, softConstraints } = buildCatalogEntry(capability);
+  const { propsSchema, softConstraints, actions } = buildCatalogEntry(capability);
 
   if (capability.stressContent) {
-    const shapes = capability.stressContent({ propsSchema, constraints: softConstraints });
+    const shapes = capability.stressContent({
+      propsSchema,
+      constraints: softConstraints,
+      actions,
+    });
     for (const shape of shapes) {
       if (!STRESS_REGIMES.includes(shape.id)) {
         throw new Error(

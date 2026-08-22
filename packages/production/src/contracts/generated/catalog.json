@@ -2096,12 +2096,6 @@
                     "minLength": 1,
                     "maxLength": 48,
                     "description": "What happened, set as display type and named by `focusEvent` and `annotate`. Must be unique within the scene."
-                  },
-                  "track": {
-                    "description": "Name of the thread this event belongs to. Absent means one thread. Exactly two distinct values are required by the `lanes` layout and refused by the others.",
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 24
                   }
                 },
                 "required": [
@@ -2339,8 +2333,8 @@
           },
           {
             "id": "example-timeline-density-edge",
-            "title": "Edge case — one past the recommended event count",
-            "note": "Seven events, where crowded intermediate labels begin stacking onto a second lane while the first and last stay on the lane nearest the axis.",
+            "title": "Edge case — at the recommended event count",
+            "note": "Six events, the largest recommended chronology, with crowded intermediate labels stacked while the first and last remain labelled.",
             "component": "timeline",
             "layout": "spine",
             "motionProfile": "editorialStatic",
@@ -2349,12 +2343,8 @@
               "b2"
             ],
             "props": {
-              "title": "Seven turns in one inquiry",
+              "title": "Six turns in one inquiry",
               "events": [
-                {
-                  "date": "2022-01-11",
-                  "label": "The first complaint is filed"
-                },
                 {
                   "date": "2022-03-02",
                   "label": "The regulator opens a file"
