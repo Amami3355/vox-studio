@@ -32,7 +32,13 @@
 import type { JsonSchemaObject } from '../../src/catalog/build';
 import { buildCatalogEntry } from '../../src/catalog/build';
 import { slotRect } from '../../src/core/slots';
-import type { SafeArea, Slot, TimedEvent } from '../../src/core/types';
+import type {
+  SafeArea,
+  SceneCapability,
+  Slot,
+  StressRegime,
+  TimedEvent,
+} from '../../src/core/types';
 import { registry } from '../../src/scenes/registry';
 
 /**
@@ -164,7 +170,11 @@ export const prose = (length: number, from = 0): string => {
 const figureAt = (index: number): number =>
   index === 0 ? WIDEST_FIGURE : Math.round(Math.abs(WIDEST_FIGURE) / (index + 1));
 
-export type StressContentId = 'ceiling' | 'floor' | 'minimum' | 'recommended' | 'degraded';
+/**
+ * Re-exported rather than declared, so the suite and the capabilities that supply their own
+ * shapes name the same five regimes from one place.
+ */
+export type StressContentId = StressRegime;
 
 export type StressContent = {
   id: StressContentId;
@@ -252,87 +262,49 @@ const fillObject = (
 };
 
 /**
- * The two ends of what a capability's schema admits.
+ * What a capability's schema admits, at the ends it publishes.
  *
- * Two and not a sample in between: the schema's own statements are the ceiling and the
- * silence where a floor would be, and anything between them is a number somebody chose.
- * A case at 137 characters would be a fixture wearing a generator's clothes.
+ * Two ends and not a sample in between: the schema's own statements are the ceiling and the
+ * silence where a floor would be, and anything between them is a number somebody chose. A
+ * case at 137 characters would be a fixture wearing a generator's clothes.
+ *
+ * A capability may declare `stressContent` when its shape is not per-field — `line_chart`
+ * aligns `series[].values` with `points` and needs its dates to parse, and no filler that
+ * sizes one field at a time can honour either. That hook is held to the same rule this file
+ * is: it is handed the published projection and must read its counts from it. What it may
+ * do that a generator may not is choose a *shape* at a given size, which is the same
+ * division `docs/adding-a-capability.md` draws for controls.
+ *
+ * The regime ids stay one vocabulary. A hook returning something outside `STRESS_REGIMES`
+ * fails here by name rather than producing a case the sweep silently cannot label.
  */
-export const stressContent = (
-  propsSchema: JsonSchemaObject,
-  capabilityId?: string,
-): StressContent[] => {
-  if (capabilityId === 'line_chart') return lineChartStressContent();
+const STRESS_REGIMES: readonly StressRegime[] = [
+  'floor',
+  'minimum',
+  'recommended',
+  'degraded',
+  'ceiling',
+];
+
+export const stressContent = (capability: SceneCapability): StressContent[] => {
+  const { propsSchema, softConstraints } = buildCatalogEntry(capability);
+
+  if (capability.stressContent) {
+    const shapes = capability.stressContent({ propsSchema, constraints: softConstraints });
+    for (const shape of shapes) {
+      if (!STRESS_REGIMES.includes(shape.id)) {
+        throw new Error(
+          `${capability.meta.id} published stress regime "${shape.id}", which this suite cannot sweep.`,
+        );
+      }
+    }
+    return shapes;
+  }
+
   return (['ceiling', 'floor'] as const).map((id) => ({
     id,
     props: fillObject(propsSchema, id, 0, ''),
   }));
-};
-
-const datedPoints = (count: number, longLabels = false) =>
-  Array.from({ length: count }, (_, index) => ({
-    date: `${2023 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
-    label: longLabels ? `${prose(21, index)} ${String(index).padStart(2, '0')}` : `P${index + 1}`,
-  }));
-
-const lineSeries = (count: number, seriesCount: number) =>
-  Array.from({ length: seriesCount }, (_, seriesIndex) => ({
-    label: prose(32, seriesIndex),
-    values: Array.from({ length: count }, (_, pointIndex) => {
-      if (seriesIndex === 0) {
-        return pointIndex === 0 ? WIDEST_FIGURE : pointIndex * 310_000 - 4_000_000;
-      }
-      if (seriesIndex === 1) return 2_500_000;
-      return (pointIndex % 2 === 0 ? -1 : 1) * (800_000 + pointIndex * 120_000);
-    }),
-  }));
-
-/** The five line-chart regimes named by its spec, all still derived from published limits. */
-const lineChartStressContent = (): StressContent[] => {
-  const build = (
-    id: StressContentId,
-    pointCount: number,
-    seriesCount: number,
-    longLabels = false,
-  ): StressContent => {
-    const points = datedPoints(pointCount, longLabels);
-    const series = lineSeries(pointCount, seriesCount);
-    return {
-      id,
-      props: {
-        title: id === 'ceiling' ? prose(120) : `Line chart ${id}`,
-        points,
-        series,
-        unit: id === 'ceiling' ? prose(8) : 'k',
-        ...(id === 'ceiling' && series[0] && points.at(-1)
-          ? { focus: { series: series[0].label, label: points.at(-1)?.label } }
-          : {}),
-      },
-      ...(id === 'ceiling' && series[2] && points[18]
-        ? {
-            events: [
-              {
-                frame: 180,
-                action: 'annotatePoint',
-                payload: {
-                  series: series[2].label,
-                  label: points[18].label,
-                  text: 'A late annotation remains attached at the hard density ceiling',
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-  };
-
-  return [
-    { id: 'floor', props: { title: '', points: [], series: [], unit: '' } },
-    build('minimum', 1, 1),
-    build('recommended', 16, 2),
-    build('degraded', 17, 3),
-    build('ceiling', 36, 3, true),
-  ];
 };
 
 export type StressCase = {
@@ -379,23 +351,22 @@ const framesFor = (duration: number): number[] => [Math.round(duration * 0.25), 
  */
 export const stressCases = (): StressCase[] =>
   registry.flatMap((capability) =>
-    stressContent(buildCatalogEntry(capability).propsSchema, capability.meta.id).flatMap(
-      (content) =>
-        Object.keys(capability.layouts).flatMap((layout) =>
-          capability.meta.supportedCompositions.flatMap((composition) =>
-            STRESS_PROFILES.map((profile) => ({
-              label: `${capability.meta.id} at its ${content.id}, ${layout}, composed into ${composition} under ${profile}`,
-              capabilityId: capability.meta.id,
-              content: content.id,
-              props: content.props,
-              ...(content.events ? { events: content.events } : {}),
-              layout,
-              composition,
-              profile,
-              safeArea: slotRect(composition),
-              frames: framesFor(capability.meta.recommendedDurationFrames),
-            })),
-          ),
+    stressContent(capability).flatMap((content) =>
+      Object.keys(capability.layouts).flatMap((layout) =>
+        capability.meta.supportedCompositions.flatMap((composition) =>
+          STRESS_PROFILES.map((profile) => ({
+            label: `${capability.meta.id} at its ${content.id}, ${layout}, composed into ${composition} under ${profile}`,
+            capabilityId: capability.meta.id,
+            content: content.id,
+            props: content.props,
+            ...(content.events ? { events: content.events } : {}),
+            layout,
+            composition,
+            profile,
+            safeArea: slotRect(composition),
+            frames: framesFor(capability.meta.recommendedDurationFrames),
+          })),
         ),
+      ),
     ),
   );

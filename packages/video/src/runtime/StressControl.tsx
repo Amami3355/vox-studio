@@ -83,7 +83,7 @@ export type StressSceneProps = {
   capabilityId: string;
   /** Generated from the capability's published schema. See `tests/stress/cases.ts`. */
   props: Record<string, unknown>;
-  /** Resolved state used when late temporal state is part of a capability's ceiling. */
+  /** Already folded to frames, never an anchor. See `StressScene` on why this exists. */
   events?: TimedEvent[];
   layout: string;
   motionProfile: MotionProfileId;
@@ -247,9 +247,17 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
  * Plays one generated case.
  *
  * A near-copy of `ControlScene`'s body, deliberately, and for the reason stated there: the
- * three answer to different owners. This one has no beats. It normally draws settled
- * generated content; a capability-specific ceiling may also carry a resolved event when
- * late semantic state is part of the stress claim.
+ * three answer to different owners. This one has no beats — `syntheticBeats` is not called
+ * and the scene draws its settled state, because generated content is content and an event
+ * is a plan's decision about time.
+ *
+ * **The one exception, and why it is not that rule bending.** A shape may put *time itself*
+ * under stress rather than content: `line_chart` publishes that an annotation stays attached
+ * to its point while labels around it thin, and the densest shape its schema admits is the
+ * only place that claim can fail. There is no settled frame that states it, so the case
+ * carries a resolved event — already folded to a frame, not an anchor a plan would write.
+ * Nothing here decides *when*; the capability that made the claim does, in its own
+ * `stress.ts`, and only for the ceiling.
  */
 export const StressScene: React.FC<StressSceneProps> = ({
   capabilityId,

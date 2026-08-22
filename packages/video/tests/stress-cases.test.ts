@@ -10,10 +10,16 @@
 import { describe, expect, it } from 'vitest';
 import { buildCatalogEntry } from '../src/catalog/build';
 import { registry, requireCapability } from '../src/scenes/registry';
-import { MAX_WORD_LENGTH, WIDEST_FIGURE, prose, stressCases, stressContent } from './stress/cases';
+import {
+  MAX_WORD_LENGTH,
+  type StressContentId,
+  WIDEST_FIGURE,
+  prose,
+  stressCases,
+  stressContent,
+} from './stress/cases';
 
-const contentFor = (capabilityId: string) =>
-  stressContent(buildCatalogEntry(requireCapability(capabilityId)).propsSchema, capabilityId);
+const contentFor = (capabilityId: string) => stressContent(requireCapability(capabilityId));
 
 const at = (capabilityId: string, id: 'ceiling' | 'floor'): Record<string, unknown> => {
   const found = contentFor(capabilityId).find((one) => one.id === id);
@@ -160,10 +166,7 @@ describe('content is generated from the published schema, not written', () => {
     // that keeps the two readings honest: whatever it derives from the manifest has to
     // survive the zod schema the manifest was derived from.
     for (const capability of registry) {
-      for (const content of stressContent(
-        buildCatalogEntry(capability).propsSchema,
-        capability.meta.id,
-      )) {
+      for (const content of stressContent(capability)) {
         expect(() => capability.schema.parse(content.props)).not.toThrow();
       }
     }
@@ -182,7 +185,7 @@ describe('the matrix is every layout by every composition by both profiles', () 
         total +
         Object.keys(capability.layouts).length *
           capability.meta.supportedCompositions.length *
-          stressContent(buildCatalogEntry(capability).propsSchema, capability.meta.id).length,
+          stressContent(capability).length,
       0,
     );
     expect(cases.length).toBe(arrangements * 2);
@@ -207,4 +210,83 @@ describe('the matrix is every layout by every composition by both profiles', () 
       });
     }
   });
+});
+
+/**
+ * A capability may supply its own stress shapes when the generic filler cannot size them —
+ * `line_chart` aligns `series[].values` with `points` and needs its dates to parse. The
+ * hook is held to the rule the generator is held to, and this is what holds it: every count
+ * and every length it produces has to be the one the projection publishes.
+ *
+ * Without this the hook would be the hand-written fixture the suite's header exists to
+ * refuse, just relocated into a capability folder. Raise a ceiling in `schema.ts` and the
+ * ceiling case must move with it; lower a `recommendedMax` in `constraints.ts` and the
+ * degraded case must follow.
+ */
+describe('a capability that supplies its own stress shapes still reads its published limits', () => {
+  const supplying = registry.filter((capability) => capability.stressContent !== undefined);
+
+  it('has at least one, or this suite is asserting nothing', () => {
+    expect(supplying.length).toBeGreaterThan(0);
+  });
+
+  it.each(supplying.map((capability) => [capability.meta.id, capability] as const))(
+    '%s reaches every published ceiling and recommendation',
+    (_id, capability) => {
+      const entry = buildCatalogEntry(capability);
+      const properties = (entry.propsSchema.properties ?? {}) as Record<
+        string,
+        { maxItems?: number; maxLength?: number }
+      >;
+
+      const byRegime = new Map(stressContent(capability).map((shape) => [shape.id, shape.props]));
+      expect([...byRegime.keys()].sort()).toEqual([
+        'ceiling',
+        'degraded',
+        'floor',
+        'minimum',
+        'recommended',
+      ]);
+
+      /** A string's length and an array's length are the same published question. */
+      const sizeIn = (regime: StressContentId, name: string): number | undefined => {
+        const value = byRegime.get(regime)?.[name];
+        if (typeof value === 'string') return value.length;
+        return Array.isArray(value) ? value.length : undefined;
+      };
+
+      for (const [name, constraint] of Object.entries(entry.softConstraints)) {
+        const published = properties[name];
+        const ceiling = published?.maxItems ?? published?.maxLength;
+
+        if (ceiling !== undefined) {
+          expect({ field: name, regime: 'ceiling', size: sizeIn('ceiling', name) }).toEqual({
+            field: name,
+            regime: 'ceiling',
+            size: ceiling,
+          });
+        }
+
+        if (constraint.recommendedMax !== undefined && published?.maxItems !== undefined) {
+          expect({ field: name, size: sizeIn('recommended', name) }).toEqual({
+            field: name,
+            size: constraint.recommendedMax,
+          });
+          expect({ field: name, size: sizeIn('degraded', name) }).toEqual({
+            field: name,
+            size: constraint.recommendedMax + 1,
+          });
+        }
+      }
+
+      // The floor is the shape every deliberately absent `.min()` promises stays reachable.
+      const floor = byRegime.get('floor') ?? {};
+      for (const [name, value] of Object.entries(floor)) {
+        expect({ field: name, empty: (value as string | unknown[]).length }).toEqual({
+          field: name,
+          empty: 0,
+        });
+      }
+    },
+  );
 });

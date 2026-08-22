@@ -7,6 +7,7 @@ import { lineChartExamples } from './examples';
 import { lineChartLayouts } from './layouts';
 import { lineChartMeta } from './meta';
 import { lineChartSchema } from './schema';
+import { lineChartStressContent } from './stress';
 
 export const lineChartCapability: SceneCapability = {
   meta: lineChartMeta,
@@ -17,6 +18,7 @@ export const lineChartCapability: SceneCapability = {
   examples: lineChartExamples,
   component: LineChartScene as unknown as React.ComponentType<SceneProps<never>>,
   checks: lineChartChecks,
+  stressContent: lineChartStressContent,
 };
 
 export { LineChartScene } from './Component';

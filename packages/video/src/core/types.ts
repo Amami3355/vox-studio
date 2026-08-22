@@ -208,6 +208,22 @@ export type SceneMeta = {
   recommendedDurationFrames: number;
 } & SceneCapacityMetadata;
 
+/**
+ * One shape the content-stress suite should draw, named by the regime it stands for.
+ *
+ * The five regimes are the ones `tests/stress/cases.ts` knows how to sweep. A capability
+ * that supplies its own shapes names them from this list rather than inventing a sixth, so
+ * the suite's vocabulary stays one vocabulary; the suite rejects anything else by name.
+ */
+export type StressRegime = 'floor' | 'minimum' | 'recommended' | 'degraded' | 'ceiling';
+
+export type StressShape = {
+  id: StressRegime;
+  props: Record<string, unknown>;
+  /** Resolved control timing. Present only when temporal state is itself under stress. */
+  events?: TimedEvent[];
+};
+
 /** One entry of the catalog. Defined by code, generated at build, immutable at runtime. */
 export type SceneCapability = {
   meta: SceneMeta;
@@ -226,6 +242,28 @@ export type SceneCapability = {
     errors: CompilerError[];
     warnings: CompilerWarning[];
   };
+  /**
+   * Content-stress shapes the generic filler cannot size, for the same reason `checks`
+   * exists: some statements a capability makes are not expressible in the generic form.
+   *
+   * `tests/stress/cases.ts` derives its cases from the published projection, and its filler
+   * throws with the two legal answers when it meets a field it cannot size — *"Either bound
+   * it in the schema, or give the capability a control for it."* A capability whose shape is
+   * cross-field is the third case that message did not anticipate: `line_chart` aligns
+   * `series[].values` one-for-one with `points` and needs its `date` strings to parse, and
+   * no per-field filler can know either.
+   *
+   * **It is a hook, not a fixture.** Whatever it returns must be derived from the same
+   * published limits the generic path reads — the schema handed in, and the capability's own
+   * `constraints`. Restating a ceiling here would be the second copy that goes stale, which
+   * is the whole argument in that file's header, and it is not weakened by moving the
+   * restatement into the capability folder.
+   */
+  stressContent?: (published: {
+    /** The JSON Schema in `catalog.json` — the ceiling the agent was actually told about. */
+    propsSchema: Record<string, unknown>;
+    constraints: SoftConstraints;
+  }) => StressShape[];
 };
 
 /** One use of a capability inside one video. */
