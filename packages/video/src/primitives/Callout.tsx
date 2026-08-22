@@ -51,6 +51,7 @@ export const Callout: React.FC<{
             color,
             letterSpacing: `${theme.type.tracking.wide * labelSize}px`,
             textTransform: 'uppercase',
+            maxWidth: '100%',
           }}
         >
           {label}
@@ -68,6 +69,17 @@ export const Callout: React.FC<{
           borderRadius: theme.radius[2],
           // The annotation column clips while it is opening, and this text is agent-written.
           overflowWrap: 'break-word',
+          /**
+           * A callout never grows past the column it was given.
+           *
+           * `overflow-wrap: break-word` wraps a long token but leaves intrinsic sizing
+           * alone — deliberately, per `AnimatedText` — so a flex item sized to fit-content
+           * still asks for its max-content width and gets it. One unbreakable
+           * ninety-character token therefore drew this plate straight off the canvas from
+           * `timeline`'s annotation. Clamping the used width is the fix that changes
+           * nothing for a callout that already fitted.
+           */
+          maxWidth: '100%',
         }}
       >
         {text}

@@ -1,0 +1,103 @@
+import type { SceneExample } from '../../core/types';
+import type { TimelineProps } from './schema';
+
+/**
+ * The examples are normative — the agent imitates them far more faithfully than it reads a
+ * description — so every shape here is one it is being taught to author.
+ *
+ * **`focusEvent` is absent, and that is legal rather than an omission.** It declares
+ * `deicticFields`, a scene example has no take, and `syntheticBeats` gives it `words: []`,
+ * so a word anchor resolved against one throws by design. ADR-0012 permits leaving such an
+ * action out; `image_context` omits `emphasize` on the same terms. Do not invent a
+ * compensating example elsewhere — one was, and it was removed.
+ */
+const canonicalProps: TimelineProps = {
+  title: 'The Berlin rent cap, start to finish',
+  events: [
+    { date: '2019-06-18', label: 'The Senate votes a cap' },
+    { date: '2020-02-23', label: 'The cap takes effect' },
+    { date: '2020-11-23', label: 'Rents are cut, not only frozen' },
+    { date: '2021-04-15', label: 'Karlsruhe strikes the law down' },
+  ],
+  periods: [{ label: 'Cap in force', from: '2020-02-23', to: '2021-04-15' }],
+};
+
+/**
+ * One past the published recommendation, which is the boundary worth teaching.
+ *
+ * `constraints.ts` recommends up to 6 events and the schema admits 24. The useful edge is
+ * the first shape that degrades — seven events, where the packer starts stacking crowded
+ * intermediate labels onto a second lane — and not the hard ceiling, which the schema
+ * already states and `pnpm test:stress` already draws. An agent reading the ceiling learns
+ * the largest shape that compiles rather than the shape where the frame starts costing
+ * something.
+ */
+const edgeProps: TimelineProps = {
+  title: 'Seven turns in one inquiry',
+  events: [
+    { date: '2022-01-11', label: 'The first complaint is filed' },
+    { date: '2022-03-02', label: 'The regulator opens a file' },
+    { date: '2022-03-29', label: 'The first hearing sits' },
+    { date: '2022-09-14', label: 'Documents are subpoenaed' },
+    { date: '2023-02-08', label: 'An interim report lands' },
+    { date: '2023-06-21', label: 'The board resigns' },
+    { date: '2024-05-30', label: 'The fine is confirmed on appeal' },
+  ],
+  periods: [{ label: 'Under investigation', from: '2022-03-02', to: '2023-06-21' }],
+};
+
+export const timelineExamples: SceneExample[] = [
+  {
+    id: 'example-timeline-canonical',
+    title: 'Canonical chronology with a named period',
+    note: 'Four dated events on a proportional axis, and the fourteen months the cap was in force drawn as one continuous band rather than as two dates.',
+    component: 'timeline',
+    layout: 'spine',
+    motionProfile: 'subtleDrift',
+    spansBeats: ['b1', 'b2'],
+    pace: 'measured',
+    props: canonicalProps,
+  },
+  {
+    id: 'example-timeline-driven',
+    title: 'Plan-driven reveal and annotation',
+    note: 'The same chronology; events first hold it back, then attach one durable explanation to the moment it belongs to.',
+    component: 'timeline',
+    layout: 'spine',
+    motionProfile: 'pushIn',
+    spansBeats: ['b1', 'b2', 'b3'],
+    pace: 'slow',
+    props: canonicalProps,
+    events: [
+      { at: 'b2.start', action: 'revealTimeline' },
+      {
+        at: 'b3.start',
+        action: 'annotate',
+        payload: {
+          label: 'Karlsruhe strikes the law down',
+          text: 'Rents rebounded overnight, and every month of difference fell due',
+        },
+      },
+    ],
+  },
+  {
+    id: 'example-timeline-density-edge',
+    title: 'Edge case — one past the recommended event count',
+    note: 'Seven events, where crowded intermediate labels begin stacking onto a second lane while the first and last stay on the lane nearest the axis.',
+    component: 'timeline',
+    layout: 'spine',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1', 'b2'],
+    props: edgeProps,
+  },
+  {
+    id: 'example-timeline-empty',
+    title: 'Empty case — no dated events',
+    note: 'The canonical empty shape keeps the title and shows a designed explanation instead of a bare axis.',
+    component: 'timeline',
+    layout: 'spine',
+    motionProfile: 'editorialStatic',
+    spansBeats: ['b1'],
+    props: { title: 'No dated record of the decision survives', events: [], periods: [] },
+  },
+];

@@ -207,6 +207,8 @@ describe('a declared composition renders into the rectangle it declared', () => 
       'stat_counter composed into left under pushIn',
       'stat_counter composed into right under cinematic',
       'stat_counter composed into right under pushIn',
+      'timeline composed into full under cinematic',
+      'timeline composed into full under pushIn',
       'typographic_statement composed into full under cinematic',
       'typographic_statement composed into full under pushIn',
     ]);

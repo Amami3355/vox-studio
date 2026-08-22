@@ -9,6 +9,8 @@ export * from './Reveal';
 export * from './Bar';
 export * from './Gridlines';
 export * from './LinePlot';
+export * from './TimelineSpine';
+export * from './timelineLayout';
 export * from './Callout';
 export * from './Stamp';
 export * from './EmptyState';

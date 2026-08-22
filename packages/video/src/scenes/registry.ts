@@ -4,6 +4,7 @@ import { imageContextCapability } from './ImageContextScene';
 import { lineChartCapability } from './LineChartScene';
 import { quoteCapability } from './QuoteScene';
 import { statCounterCapability } from './StatCounterScene';
+import { timelineCapability } from './TimelineScene';
 import { typographicStatementCapability } from './TypographicStatementScene';
 
 /**
@@ -17,6 +18,7 @@ export const registry: SceneCapability[] = [
   lineChartCapability,
   quoteCapability,
   statCounterCapability,
+  timelineCapability,
   typographicStatementCapability,
 ];
 

@@ -30,6 +30,89 @@ export const parseUtcDate = (value: string): number | null => {
   return date.getTime();
 };
 
+/**
+ * One UTC midnight from its calendar parts, the same way `parseUtcDate` builds one and for
+ * the same reason: `Date.UTC(25, ...)` means 1925 by legacy JavaScript rule, so the year is
+ * always set explicitly.
+ */
+export const utcMidnight = (year: number, month: number, day: number): number => {
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getTime();
+};
+
+/**
+ * The calendar readings a dated layout needs, kept here rather than beside the layout that
+ * wants them.
+ *
+ * Not a matter of taste: `tests/render-purity.test.ts` forbids `new Date(` anywhere under
+ * `src/primitives`, `src/scenes` or `src/design`, because a frame that reads a clock is a
+ * frame that stops reproducing across Remotion's parallel workers. Constructing a `Date`
+ * *from a timestamp* is pure — it reads no clock — but the check is deliberately syntactic
+ * and deliberately coarse, and widening it to tell the two apart would be widening it to
+ * admit the case it exists to catch. `core/` is where the calendar already lives, so this
+ * is where the readings live too.
+ */
+export const utcYearOf = (timestamp: number): number => new Date(timestamp).getUTCFullYear();
+
+/**
+ * Whole months between two instants, counted on the calendar rather than divided out of a
+ * day count. Thirty-one January days and twenty-eight February days are both one month to a
+ * reader, and a scene that said "0.9 months" would be answering a question nobody asked.
+ */
+export const utcMonthsBetween = (from: number, to: number): number => {
+  const start = new Date(from);
+  const end = new Date(to);
+  const months =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    (end.getUTCMonth() - start.getUTCMonth());
+  return Math.max(0, end.getUTCDate() < start.getUTCDate() ? months - 1 : months);
+};
+
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/**
+ * One date, worded. No locale lookup — the render must be reproducible on any machine,
+ * which is the same reason `core/format.ts` groups digits by hand.
+ */
+export const formatUtcDate = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return `${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()] as string} ${date.getUTCFullYear()}`;
+};
+
+const DAY_MS = 86_400_000;
+
+/**
+ * How long a stretch of time lasted, in the coarsest unit that still says something.
+ *
+ * Days below a month, months below two years, years above — because "twenty-six months" is
+ * arithmetic and "two years" is a fact, and a duration is printed so a viewer does not have
+ * to do the subtraction themselves.
+ */
+export const formatUtcSpan = (from: number, to: number): string => {
+  const months = utcMonthsBetween(from, to);
+  if (months < 1) {
+    const days = Math.max(1, Math.round((to - from) / DAY_MS));
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+  if (months < 24) return months === 1 ? '1 month' : `${months} months`;
+  return `${Math.round(months / 12)} years`;
+};
+
 /** Sparse deterministic labels, always retaining the first and last observation. */
 export const timeTickIndices = (count: number, maximum = 6): number[] => {
   if (count <= 0 || maximum <= 0) return [];

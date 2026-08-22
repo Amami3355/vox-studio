@@ -180,7 +180,9 @@ scene library. If the manifest is insufficient, fix the manifest, not the prompt
 **Compiled document** — What the compiler emits and the Section runtime plays. Frames,
 percentages and resolved assets; never an anchor, a slot or a millisecond. It is JSON,
 which is what makes a video's composition assertable without rendering it. Avoid:
-"timeline", and "compiled plan" — a plan is the input.
+"timeline", and "compiled plan" — a plan is the input. "Timeline" is doubly unavailable now
+that it names a scene capability: a chronology of dated events, which is a thing on screen
+and not a representation of the whole video.
 
 **Compile report** — A structured deliverable (`errors[]`, `warnings[]`), not a log.
 

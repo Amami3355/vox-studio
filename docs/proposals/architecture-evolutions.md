@@ -260,7 +260,7 @@ entry ordered.
 | Capability | What the film gains | Cost |
 |---|---|---|
 | ~~`typographic_statement`~~ **built** | Structure. Chapter and act cards are what divide a sequence into a film. | Low — type, motion and an internal render contract; no new manifest field |
-| `timeline` | Chronology, the documentary spine. `bar_chart` **and** `line_chart` already redirect to it. | Moderate |
+| ~~`timeline`~~ **built** | Chronology, the documentary spine. `bar_chart` **and** `line_chart` redirected to it before it existed; both now land somewhere. Shipped with the `spine` layout only — `ledger` and `lanes` are specified and staged behind it. | Moderate |
 | `character_explainer` | A presenter that carries the explanation. `PERSISTENT_ELEMENT_TYPES` already has `character`, placed and relocated under ADR-0003. | Moderate |
 | `archive_document` | Evidence — a clipping, an extract, an annotated page. `AssetRequirement.type` already admits `document` and nothing consumes it. | Moderate |
 | `map` | Place. `AssetRequirement.type` already admits `map`, likewise unconsumed. | Highest — projection, geo data, sourced assets |

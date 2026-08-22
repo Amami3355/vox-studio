@@ -2046,6 +2046,368 @@
         ]
       },
       {
+        "id": "timeline",
+        "name": "TimelineScene",
+        "family": "context",
+        "summary": "A sequence of dated events in the order they happened, carrying no numeric measure.",
+        "useWhen": [
+          "showing a chronology of dated events",
+          "showing how long a named period lasted and what fell inside it",
+          "showing that two moments are separated by a silence",
+          "situating a decision, a ruling or an announcement in time"
+        ],
+        "avoidWhen": [
+          "showing a numeric measure that moves over time → line_chart",
+          "comparing discrete named categories → bar_chart",
+          "showing a single figure, dated or not → stat_counter",
+          "showing ordered steps that carry no dates → diagram"
+        ],
+        "supportsEvents": true,
+        "requiresAssets": false,
+        "occupiesRegions": [
+          "full"
+        ],
+        "supportedCompositions": [
+          "full"
+        ],
+        "minDurationFrames": 110,
+        "recommendedDurationFrames": 270,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "Headline above the chronology. Best under 48 characters; longer copy steps down."
+            },
+            "events": {
+              "maxItems": 24,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "description": "Date the event happened, in strict YYYY-MM-DD form, interpreted at UTC midnight."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48,
+                    "description": "What happened, set as display type and named by `focusEvent` and `annotate`. Must be unique within the scene."
+                  },
+                  "track": {
+                    "description": "Name of the thread this event belongs to. Absent means one thread. Exactly two distinct values are required by the `lanes` layout and refused by the others.",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 24
+                  }
+                },
+                "required": [
+                  "date",
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              "description": "The chronology, in strictly ascending date order. Authored order is binding and is never sorted. Best between 3 and 6 events; more remain drawn with their labels stacked."
+            },
+            "periods": {
+              "default": [],
+              "description": "Named stretches of time drawn as continuous things rather than as pairs of events. One is the ordinary case; two remain drawable.",
+              "maxItems": 2,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "description": "What the marked stretch of time is, e.g. \"Rent cap in force\"."
+                  },
+                  "from": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "description": "First day of the period, in strict YYYY-MM-DD form."
+                  },
+                  "to": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "description": "Last day of the period, in strict YYYY-MM-DD form. Never before `from`."
+                  }
+                },
+                "required": [
+                  "label",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "title",
+            "events"
+          ],
+          "additionalProperties": false
+        },
+        "softConstraints": {
+          "events": {
+            "recommendedMin": 3,
+            "recommendedMax": 6,
+            "absoluteMax": 24,
+            "onExceed": "Every event keeps its mark on the axis at its proportional date. Crowded intermediate labels stack onto a second lane and then thin deterministically, leaving the mark without its words; the first, last, focused and annotated events stay labelled on the lane nearest the axis.",
+            "onEmpty": "The title remains with a designed “No dated events available” empty state."
+          },
+          "periods": {
+            "recommendedMax": 1,
+            "absoluteMax": 2,
+            "onExceed": "Both periods are drawn in full. Two bands on one axis read as one striped stretch of time unless the periods are far apart."
+          },
+          "title": {
+            "recommendedMax": 48,
+            "onExceed": "Title drops through the shared type-fitting ladder to preserve the axis.",
+            "onExceedCode": "TITLE_DENSITY"
+          }
+        },
+        "layouts": [
+          {
+            "id": "spine",
+            "description": "A horizontal axis where distance is elapsed time, so the gap between two events is information rather than composition. Use when how long something took is part of what the chronology says.",
+            "slots": [
+              "title",
+              "axis",
+              "events",
+              "period",
+              "annotation"
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "id": "revealTimeline",
+            "description": "Hold the chronology back, then reveal its events in date order.",
+            "payloadSchema": null
+          },
+          {
+            "id": "focusEvent",
+            "description": "Bring one dated event forward and let the rest of the chronology recede.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 48,
+                  "description": "Must match one `events[].label`."
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "additionalProperties": false
+            },
+            "deicticFields": [
+              "label"
+            ]
+          },
+          {
+            "id": "annotate",
+            "description": "Attach one durable explanation to a dated event, and leave it up.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 48,
+                  "description": "Must match one `events[].label`."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 90,
+                  "description": "Concise annotation copy, up to 90 characters."
+                }
+              },
+              "required": [
+                "label",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "examples": [
+          {
+            "id": "example-timeline-canonical",
+            "title": "Canonical chronology with a named period",
+            "note": "Four dated events on a proportional axis, and the fourteen months the cap was in force drawn as one continuous band rather than as two dates.",
+            "component": "timeline",
+            "layout": "spine",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "pace": "measured",
+            "props": {
+              "title": "The Berlin rent cap, start to finish",
+              "events": [
+                {
+                  "date": "2019-06-18",
+                  "label": "The Senate votes a cap"
+                },
+                {
+                  "date": "2020-02-23",
+                  "label": "The cap takes effect"
+                },
+                {
+                  "date": "2020-11-23",
+                  "label": "Rents are cut, not only frozen"
+                },
+                {
+                  "date": "2021-04-15",
+                  "label": "Karlsruhe strikes the law down"
+                }
+              ],
+              "periods": [
+                {
+                  "label": "Cap in force",
+                  "from": "2020-02-23",
+                  "to": "2021-04-15"
+                }
+              ]
+            }
+          },
+          {
+            "id": "example-timeline-driven",
+            "title": "Plan-driven reveal and annotation",
+            "note": "The same chronology; events first hold it back, then attach one durable explanation to the moment it belongs to.",
+            "component": "timeline",
+            "layout": "spine",
+            "motionProfile": "pushIn",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "pace": "slow",
+            "props": {
+              "title": "The Berlin rent cap, start to finish",
+              "events": [
+                {
+                  "date": "2019-06-18",
+                  "label": "The Senate votes a cap"
+                },
+                {
+                  "date": "2020-02-23",
+                  "label": "The cap takes effect"
+                },
+                {
+                  "date": "2020-11-23",
+                  "label": "Rents are cut, not only frozen"
+                },
+                {
+                  "date": "2021-04-15",
+                  "label": "Karlsruhe strikes the law down"
+                }
+              ],
+              "periods": [
+                {
+                  "label": "Cap in force",
+                  "from": "2020-02-23",
+                  "to": "2021-04-15"
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b2.start",
+                "action": "revealTimeline"
+              },
+              {
+                "at": "b3.start",
+                "action": "annotate",
+                "payload": {
+                  "label": "Karlsruhe strikes the law down",
+                  "text": "Rents rebounded overnight, and every month of difference fell due"
+                }
+              }
+            ]
+          },
+          {
+            "id": "example-timeline-density-edge",
+            "title": "Edge case — one past the recommended event count",
+            "note": "Seven events, where crowded intermediate labels begin stacking onto a second lane while the first and last stay on the lane nearest the axis.",
+            "component": "timeline",
+            "layout": "spine",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1",
+              "b2"
+            ],
+            "props": {
+              "title": "Seven turns in one inquiry",
+              "events": [
+                {
+                  "date": "2022-01-11",
+                  "label": "The first complaint is filed"
+                },
+                {
+                  "date": "2022-03-02",
+                  "label": "The regulator opens a file"
+                },
+                {
+                  "date": "2022-03-29",
+                  "label": "The first hearing sits"
+                },
+                {
+                  "date": "2022-09-14",
+                  "label": "Documents are subpoenaed"
+                },
+                {
+                  "date": "2023-02-08",
+                  "label": "An interim report lands"
+                },
+                {
+                  "date": "2023-06-21",
+                  "label": "The board resigns"
+                },
+                {
+                  "date": "2024-05-30",
+                  "label": "The fine is confirmed on appeal"
+                }
+              ],
+              "periods": [
+                {
+                  "label": "Under investigation",
+                  "from": "2022-03-02",
+                  "to": "2023-06-21"
+                }
+              ]
+            }
+          },
+          {
+            "id": "example-timeline-empty",
+            "title": "Empty case — no dated events",
+            "note": "The canonical empty shape keeps the title and shows a designed explanation instead of a bare axis.",
+            "component": "timeline",
+            "layout": "spine",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "title": "No dated record of the decision survives",
+              "events": [],
+              "periods": []
+            }
+          }
+        ]
+      },
+      {
         "id": "typographic_statement",
         "name": "TypographicStatementScene",
         "family": "typography",
