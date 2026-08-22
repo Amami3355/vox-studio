@@ -221,6 +221,117 @@ films are made of. What those films contribute here is *pace* — cut rhythm, pu
 that lives in motion profiles and a `cameraPush` action, not in a capability. If maps are
 still wanted after the measure, that is step 8 proper and it will have earned its place.
 
+**Progress, 2026-08-22.** The gate this entry set has not opened, and the question it was
+answering has changed shape. Both need recording: the second is the reason to reopen step 8,
+the first is the reason not to reopen it yet.
+
+**The gate is still shut.** The rule above is that no new capability ships before the step 9
+harness has measured what exists. `packages/production/src/proof/` is built, and its three
+`proof-harness` cases do not pass — they need an external agent run, a Codex credential and a
+TTS key — so no measure has been taken. Nothing below unblocks step 8 by argument. What
+follows is what step 8 should *be* when the measure lands, written now because the list has
+changed and a list decided under schedule pressure is the one that gets decided badly.
+
+**Depth was the right axis and it is largely spent.** The catalogue is five capabilities, not
+the two this entry describes: `bar_chart`, `image_context`, `quote`, `stat_counter`,
+`line_chart`. The order it set — compositions, layouts, prop slots, actions — is done at both
+ends for `image_context`, and `quote` and `stat_counter` carry all three compositions with
+`occupiesRegions` measured rather than hoped. Layouts and prop slots remain the open middle,
+and they are still volume. One exception is on the books and argued in its own spec:
+`line_chart` ships `supportedCompositions: ['full']`, which makes it the only capability that
+can never reach ADR-0003 rung b — a persistent element crossing it relocates or hides, and the
+scene never yields. That is a deliberate first-increment non-goal, not drift.
+
+**What is left is not depth, it is kind.** Three of the five are charts. A catalogue that can
+compare, trend and count states a number well and cannot make an argument: it has no way to
+say *when*, *where*, *who*, or *what this chapter is*. §14's target of 8–12 robust
+capabilities was never a count for its own sake — it is the breadth at which a sequence of
+correct frames becomes a film. That is the axis step 8 should buy, and it is not the axis this
+entry ordered.
+
+| Capability | What the film gains | Cost |
+|---|---|---|
+| `typographic_statement` | Structure. Chapter and act cards are what divide a sequence into a film. | Lowest — type and motion, no new contract |
+| `timeline` | Chronology, the documentary spine. `bar_chart` **and** `line_chart` already redirect to it. | Moderate |
+| `character_explainer` | A presenter that carries the explanation. `PERSISTENT_ELEMENT_TYPES` already has `character`, placed and relocated under ADR-0003. | Moderate |
+| `archive_document` | Evidence — a clipping, an extract, an annotated page. `AssetRequirement.type` already admits `document` and nothing consumes it. | Moderate |
+| `map` | Place. `AssetRequirement.type` already admits `map`, likewise unconsumed. | Highest — projection, geo data, sourced assets |
+
+Three of those are already §13 step 8's own row: `CharacterExplainer`, `TypographicStatement`,
+`Map`. Its fourth, `Comparison`, is what `bar_chart` does. `timeline` and `archive_document`
+are the additions, and both are the documentary register the row was written before the
+vertical slice had picked one.
+
+**Not recommended: `stat_donut` and `scatter_plot`.** Both are honest `avoidWhen` targets and
+both are more chart. Building them deepens the axis that is already the catalogue's strongest
+and leaves the weak one untouched.
+
+**And the highest-value item is not a capability at all**, which is this entry's original
+decision holding rather than failing. `quote` gaining an optional background `assetRequirement`
+and a layout for it — copy held left over a full-bleed plate whose subject sits right — buys a
+second register out of a capability that already measures its ink to x = 70.7% and already
+declares all three compositions. That is depth, and it costs one prop, one layout and a render
+test. Three things have to move with it:
+
+- **`AssetRequirement` cannot ask for negative space.** `orientation` is an aspect ratio, not a
+  composition, so there is no way to require that the subject sits right and the left stays
+  clear — which is the entire premise. The field would be `Slot`-shaped, and it has to enter
+  the identity key: the same subject composed left and composed right are two pictures, and
+  the resolver matches on identity alone, never on subject.
+- **Nothing verifies the returned pixels obey.** A `ready` plate whose subject lands under the
+  copy is unreadable, and a legibility promise is rule 5's loud half. The repo's own idiom
+  answers it — a scrim primitive as the repair, a contrast probe over the text region as the
+  proof, in the shape `tests/render/occupies-regions.test.ts` and `StressControl` already use.
+- **`quote.avoidWhen` reads `'pairing a claim with a photograph → image_context'`.** That line
+  becomes false the day this ships and goes with it, or the catalogue redirects agents away
+  from its own best frame.
+
+A full-bleed plate also moves `occupiesRegions` to `['full']` by `image_context`'s own
+reasoning — there is no quadrant it leaves empty — which costs `quote` the two free corners it
+currently gives a character. That is a trade to make against a render, not on paper.
+
+---
+
+## Nothing above the section decides what the film is arguing
+
+**Frozen doc:** rule 6 puts premium richness in "les scènes et leur mise en scène", and §1's
+layers stop at the section runtime. **Code:** `videoPlanSchema` is `.strict()` with exactly two
+keys, `beats` and `sections`, and a section is `{ id, spansBeats, persistent?, scenes }`. A
+section is a span of time that owns elements. It carries no statement of what it is *for*, and
+`.strict()` means there is nowhere to put one.
+
+The absence is not a missing feature. It is a missing *check*, and it is the same defect class
+as everything else in this repository. Every compiler check that exists decides whether a shot
+is legible and honest — `BEAT_UNCOVERED`, `BEAT_DOUBLE_BOOKED`, `SCENE_CUTS_MID_SENTENCE`,
+`MOTION_PROFILE_REPETITION`, `NARRATION_NAMES_COLLAPSED_VALUE`. Not one of them decides whether
+the film says anything. A code-blind agent can therefore emit a sequence of individually
+correct frames with no through-line, no act, no callback and no question ever answered, and
+every gate stays green. The compile report will call it clean, because clean is the only thing
+it was ever asked to decide.
+
+**Why this is not an ADR yet.** There is no decision here, only an identified absence — and
+this file's own history is the precedent. The deictic-example question lived here as an entry
+until it was decided, became ADR-0012, and the entry then recorded that the argument had a home
+and nothing further belonged in this file. The same sequence applies. What is open:
+
+- Is an act a first-class noun in the plan, or a property derived from the sections?
+- What may a compiler check without becoming a critic? Rule 5 puts most of dramaturgy on the
+  soft side, and "your film is boring" is not a repair anyone can act on.
+- Does the agent declare the structure, or is the structure inferred from what it wrote?
+
+**The last question already has its answer implied.** ADR-0003 decision 4 keeps scene geometry
+out of the compiler — it may only be *told*, never work it out — and `capacityByComposition` is
+declared and checked, never computed. Dramaturgy would take the same shape: the plan states its
+acts and what each one opens, and the compiler checks the declaration against itself. A
+question opened in the first act and never returned to is a contradiction the plan supplies
+both halves of, exactly like a narration naming a value the frame collapsed. That is checkable
+with no taste in the compiler at all.
+
+**One consequence for the catalogue.** `typographic_statement` in the entry above is the
+*visible* half of this, and built alone it produces title cards that decorate rather than
+divide. The card is worth having either way. It is worth considerably more once there is
+something for it to be the boundary of.
+
 ---
 
 ## Deferred, by design
