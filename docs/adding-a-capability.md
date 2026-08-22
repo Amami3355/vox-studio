@@ -4,12 +4,13 @@
 **Scope:** what it costs to add a scene capability to the catalog, and what it costs to change
 one that already exists. Written because the knowledge lived only in session handoffs.
 
-The short version: **one folder of up to ten files, one line in `src/scenes/registry.ts`, then
+The short version: **one capability folder, one line in `src/scenes/registry.ts`, then
 `pnpm catalog`.** Copy `packages/video/src/scenes/_TemplateScene/`, which is a compiling stub
-of exactly that shape. It is deliberately not registered, so it publishes nothing.
+of the ten-file common shape. It is deliberately not registered, so it publishes nothing.
 
-Two of the ten are optional — see the table below. Delete one only when the capability
-genuinely has nothing to put in it; a stub file teaches the agent a rule that is not true.
+Two template files are optional, and `stress.ts` is an exceptional optional eleventh — see the
+table below. Delete an optional file when the capability genuinely has nothing to put in it;
+a stub file teaches the agent a rule that is not true.
 
 ## What you do not have to do
 
@@ -45,7 +46,7 @@ Capability names are hard-coded in two places, and neither of them is on the ren
 Do this before you change anything else, or you will be renaming around your own edits.
 
 Copy `packages/video/src/scenes/_TemplateScene/` to
-`packages/video/src/scenes/<YourScene>/`, then replace these tokens across the ten files
+`packages/video/src/scenes/<YourScene>/`, then replace these tokens across its ten files
 with your editor's rename-in-folder. Case matters, and there are about 58 of them, 25 in
 `index.ts` alone.
 
@@ -66,12 +67,13 @@ Then run `npx biome check --write packages/video/src/scenes/<YourScene>` and sea
 folder for `TODO`. Every one of them is a decision you still have to make. Registering a
 capability with placeholder prose still in it fails `catalog-contract.test.ts`.
 
-## The ten files
+## The ten template files and optional eleventh
 
 The template carries all ten, and `tests/template-scene.test.ts` fails if it ever stops
-carrying one. A **live** folder carries eight to eleven: the two template files marked
-optional below go when the capability has nothing true to put in them, and one file is not in
-the template at all because most capabilities never need it.
+carrying one. A **live** folder may drop the two template files marked optional below when
+the capability has nothing true to put in them, and may add a capability-specific `stress.ts`
+when generic schema-driven stress cannot build a valid worst case. This is the current shape,
+not an arbitrary maximum on capability-owned behaviour.
 
 | file | records | |
 | --- | --- | --- |

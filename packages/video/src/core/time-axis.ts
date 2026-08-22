@@ -23,7 +23,11 @@ export const parseUtcDate = (value: string): number | null => {
   const month = Number(match[2]);
   const day = Number(match[3]);
   if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return null;
-  return Date.UTC(year, month - 1, day);
+  /** `Date.UTC(25, ...)` means 1925 by legacy JavaScript rule; set the year explicitly. */
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getTime();
 };
 
 /** Sparse deterministic labels, always retaining the first and last observation. */

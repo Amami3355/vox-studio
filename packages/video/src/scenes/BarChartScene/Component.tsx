@@ -6,6 +6,7 @@ import type { SceneProps } from '../../core/types';
 import type { MotionProfile } from '../../design/motion';
 import { type Theme, emphasisColor } from '../../design/theme';
 import {
+  AccentRule,
   Backdrop,
   BarGroup,
   Callout,
@@ -248,18 +249,10 @@ const Header: React.FC<{
 }> = ({ title, accent, profile, maxStep }) => {
   const gap = useSpace(3);
   const bottom = useSpace(5);
-  const draw = useEntrance(0, profile);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap, marginBottom: bottom }}>
-      <div
-        style={{
-          width: Math.round(96 * Math.min(1, draw)),
-          height: 4,
-          background: accent,
-          borderRadius: 2,
-        }}
-      />
+      <AccentRule accent={accent} profile={profile} />
       <SceneTitle startFrame={2} profile={profile} maxStep={maxStep}>
         {title}
       </SceneTitle>

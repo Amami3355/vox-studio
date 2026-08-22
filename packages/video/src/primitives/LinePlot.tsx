@@ -7,6 +7,12 @@ import { utcTimeAxis } from '../core/time-axis';
 import { type TrendBaseline, trendAxis } from '../core/trend-axis';
 import { mix, rampColor } from '../design/theme';
 import { useDensity, useSpace, useTheme, useTypeSize } from './ThemeContext';
+import {
+  layoutDateLabels,
+  layoutLegendEntries,
+  pointIsRevealed,
+  wrapTextToWidth,
+} from './linePlotLayout';
 
 export type LinePlotPoint = { date: string; label: string };
 export type LinePlotSeries = { label: string; values: number[] };
@@ -114,9 +120,8 @@ export const LinePlot: React.FC<LinePlotProps> = ({
    * "collision-safe plot padding". The file already measures its date labels with the same
    * utility; the legend was the half that guessed.
    *
-   * A cursor, in the order the plan wrote the series, each entry as wide as its own marker
-   * plus its own text. `legendOverflows` is the honest report of the case where even that
-   * does not fit — see where it is used.
+   * A row packer, in the order the plan wrote the series, places each entry at the width of
+   * its own marker plus its own text. Its row count then becomes real plot padding.
    */
   const legendEntryWidth = useMemo(
     () =>
@@ -132,23 +137,13 @@ export const LinePlot: React.FC<LinePlotProps> = ({
       ),
     [series, theme, legendSize, gap],
   );
-  const legendStarts = legendEntryWidth.reduce<number[]>((starts, entryWidth, index) => {
-    const previous = starts[index - 1] ?? 0;
-    starts.push(index === 0 ? 0 : previous + (legendEntryWidth[index - 1] as number) + gap * 2.4);
-    return starts;
-  }, []);
-
-  const legendHeight = series.length > 1 ? Math.round((legendSize + gap * 1.5) * density) : gap;
-  const padding = {
-    top: legendHeight + gap * 2,
-    right: gap * 3,
-    bottom: axisSize * 2.6,
-    left: Math.ceil(yLabelWidth) + gap * 2.5,
-  };
-  const plotWidth = Math.max(1, width - padding.left - padding.right);
-  const plotHeight = Math.max(1, height - padding.top - padding.bottom);
-  const xAt = (index: number): number => padding.left + (xAxis.positions[index] ?? 0.5) * plotWidth;
-  const yAt = (value: number): number => padding.top + (1 - yAxis.ratio(value)) * plotHeight;
+  const paddingLeft = Math.ceil(yLabelWidth) + gap * 2.5;
+  const paddingRight = gap * 3;
+  const plotWidth = Math.max(1, width - paddingLeft - paddingRight);
+  const xAt = (index: number): number => paddingLeft + (xAxis.positions[index] ?? 0.5) * plotWidth;
+  const legendLayout = layoutLegendEntries(legendEntryWidth, plotWidth, gap * 2.4);
+  const legendRowPitch = Math.round((legendSize + gap * 1.5) * density);
+  const legendHeight = series.length > 1 ? legendLayout.rows * legendRowPitch : gap;
 
   const focusedPointIndex = focus?.label
     ? points.findIndex((point) => point.label === focus.label)
@@ -156,6 +151,41 @@ export const LinePlot: React.FC<LinePlotProps> = ({
   const annotationPointIndex = annotation
     ? points.findIndex((point) => point.label === annotation.label)
     : -1;
+  const requiredDateIndices = new Set([
+    0,
+    points.length - 1,
+    ...(focusedPointIndex >= 0 ? [focusedPointIndex] : []),
+    ...(annotationPointIndex >= 0 ? [annotationPointIndex] : []),
+  ]);
+  const dateCandidateIndices = [...new Set([...requiredDateIndices, ...xAxis.tickIndices])].filter(
+    (index) => index >= 0 && index < points.length,
+  );
+  const dateLabels = layoutDateLabels({
+    candidates: dateCandidateIndices.map((index) => ({
+      index,
+      x: xAt(index),
+      width: measureText({
+        text: points[index]?.label ?? '',
+        fontFamily: theme.type.body,
+        fontSize: axisSize,
+        fontWeight: theme.type.weight.medium,
+        letterSpacing: `${theme.type.tracking.wide * axisSize}px`,
+      }).width,
+    })),
+    required: requiredDateIndices,
+    left: paddingLeft,
+    right: width - paddingRight,
+    gap: gap * 2,
+  });
+  const dateLabelRows = Math.max(1, ...dateLabels.map((label) => label.lane + 1));
+  const padding = {
+    top: legendHeight + gap * 2,
+    right: paddingRight,
+    bottom: axisSize * 2.6 + (dateLabelRows - 1) * axisSize * 1.2,
+    left: paddingLeft,
+  };
+  const plotHeight = Math.max(1, height - padding.top - padding.bottom);
+  const yAt = (value: number): number => padding.top + (1 - yAxis.ratio(value)) * plotHeight;
   const markerStep = points.length > 16 ? Math.ceil(points.length / 12) : 1;
   const markerIndices = new Set(
     points.flatMap((_, index) =>
@@ -168,21 +198,6 @@ export const LinePlot: React.FC<LinePlotProps> = ({
         : [],
     ),
   );
-  const dateTickIndices = new Set([
-    0,
-    points.length - 1,
-    ...(focusedPointIndex >= 0 ? [focusedPointIndex] : []),
-    ...(annotationPointIndex >= 0 ? [annotationPointIndex] : []),
-  ]);
-  for (const candidate of xAxis.tickIndices) {
-    const separated = [...dateTickIndices].every(
-      (kept) =>
-        Math.abs((xAxis.positions[candidate] ?? 0) - (xAxis.positions[kept] ?? 0)) * plotWidth >=
-        widestDateLabel + gap * 2,
-    );
-    if (separated) dateTickIndices.add(candidate);
-  }
-
   const gridInk = mix(theme.color.inkMuted, theme.color.bg, 0.82);
   const axisInk = mix(theme.color.inkMuted, theme.color.bg, 0.28);
   const quietInk = mix(theme.color.inkMuted, theme.color.bg, 0.45);
@@ -247,6 +262,7 @@ export const LinePlot: React.FC<LinePlotProps> = ({
             <g key={tick}>
               <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke={gridInk} />
               <text
+                data-stress-contained="value tick"
                 x={padding.left - gap}
                 y={y}
                 textAnchor="end"
@@ -291,32 +307,31 @@ export const LinePlot: React.FC<LinePlotProps> = ({
           stroke={gridInk}
         />
 
-        {[...dateTickIndices]
-          .sort((a, b) => a - b)
-          .map((index) => (
-            <g key={points[index]?.date}>
-              <line
-                x1={xAt(index)}
-                x2={xAt(index)}
-                y1={height - padding.bottom}
-                y2={height - padding.bottom + gap * 0.65}
-                stroke={gridInk}
-              />
-              <text
-                x={xAt(index)}
-                y={height - padding.bottom + gap * 1.7}
-                textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
-                dominantBaseline="hanging"
-                fill={quietInk}
-                fontFamily={theme.type.body}
-                fontSize={axisSize}
-                fontWeight={theme.type.weight.medium}
-                letterSpacing={theme.type.tracking.wide * axisSize}
-              >
-                {points[index]?.label}
-              </text>
-            </g>
-          ))}
+        {dateLabels.map((label) => (
+          <g key={points[label.index]?.date}>
+            <line
+              x1={xAt(label.index)}
+              x2={xAt(label.index)}
+              y1={height - padding.bottom}
+              y2={height - padding.bottom + gap * 0.65}
+              stroke={gridInk}
+            />
+            <text
+              data-stress-contained="date label"
+              x={label.drawX}
+              y={height - padding.bottom + gap * 1.7 + label.lane * axisSize * 1.2}
+              textAnchor="middle"
+              dominantBaseline="hanging"
+              fill={quietInk}
+              fontFamily={theme.type.body}
+              fontSize={axisSize}
+              fontWeight={theme.type.weight.medium}
+              letterSpacing={theme.type.tracking.wide * axisSize}
+            >
+              {points[label.index]?.label}
+            </text>
+          </g>
+        ))}
 
         {series.length > 1 ? (
           <g aria-label="Legend">
@@ -328,7 +343,7 @@ export const LinePlot: React.FC<LinePlotProps> = ({
                 <g
                   key={entry.label}
                   data-legend-entry={entry.label}
-                  transform={`translate(${padding.left + (legendStarts[index] as number)}, ${legendSize})`}
+                  transform={`translate(${padding.left + (legendLayout.entries[index]?.x ?? 0)}, ${legendSize + (legendLayout.entries[index]?.row ?? 0) * legendRowPitch})`}
                 >
                   <line
                     x1={0}
@@ -340,6 +355,7 @@ export const LinePlot: React.FC<LinePlotProps> = ({
                     strokeLinecap="round"
                   />
                   <text
+                    data-stress-contained="legend label"
                     x={gap * 1.9}
                     y={0}
                     dominantBaseline="middle"
@@ -393,7 +409,7 @@ export const LinePlot: React.FC<LinePlotProps> = ({
                   focus.label === points[datum.pointIndex]?.label) ||
                 (annotation?.series === entry.label &&
                   annotation.label === points[datum.pointIndex]?.label);
-              const reached = (xAxis.positions[datum.pointIndex] ?? 0.5) <= progress + 0.001;
+              const reached = pointIsRevealed(xAxis.positions[datum.pointIndex] ?? 0.5, progress);
               if (!reached || (!ordinary && !selected)) return null;
               const pointLabel = points[datum.pointIndex]?.label;
               const selectionProgress = Math.max(
@@ -474,11 +490,16 @@ const FocusLabel: React.FC<{
   const size = useTypeSize(0);
   const gap = useSpace(2);
   const cardWidth = Math.min(440, Math.max(260, width * 0.27));
-  const metaLines = wrapToWidth(`${target.series} · ${target.pointLabel}`, cardWidth - gap * 2.8, {
+  const metaFace = {
     fontFamily: theme.type.body,
     fontSize: size * 0.95,
     fontWeight: theme.type.weight.medium,
-  });
+  };
+  const metaLines = wrapTextToWidth(
+    `${target.series} · ${target.pointLabel}`,
+    cardWidth - gap * 2.8,
+    (candidate) => measureText({ text: candidate, ...metaFace }).width,
+  );
   const cardHeight = size * (2.15 + Math.max(0, metaLines.length - 1) * 0.92);
   const x = clampCardX(target.x - cardWidth / 2, cardWidth, width, padding);
   const above = target.y - padding.top > cardHeight + gap;
@@ -504,6 +525,7 @@ const FocusLabel: React.FC<{
           stroke={mix(theme.color.inkMuted, theme.color.bg, 0.7)}
         />
         <text
+          data-stress-contained="focus metadata"
           x={gap}
           y={size * 0.85}
           fill={theme.color.inkMuted}
@@ -518,6 +540,7 @@ const FocusLabel: React.FC<{
           ))}
         </text>
         <text
+          data-stress-contained="focus value"
           x={gap}
           y={size * (1.75 + Math.max(0, metaLines.length - 1) * 0.92)}
           fill={theme.color.ink}
@@ -548,16 +571,26 @@ const AnnotationLabel: React.FC<{
   const cardWidth = Math.min(560, Math.max(360, width * 0.34));
   /** The card's inner width: its box less the left rule and the padding on both sides. */
   const inner = cardWidth - gap * 2.8;
-  const metadataLines = wrapToWidth(
-    `${target.series} · ${target.pointLabel} · ${formatValue(target.value, unit)}`,
-    inner,
-    { fontFamily: theme.type.body, fontSize: size * 0.82, fontWeight: theme.type.weight.medium },
-  );
-  const annotationLines = wrapToWidth(text, inner, {
+  const metadataFace = {
+    fontFamily: theme.type.body,
+    fontSize: size * 0.82,
+    fontWeight: theme.type.weight.medium,
+  };
+  const annotationFace = {
     fontFamily: theme.type.body,
     fontSize: size,
     fontWeight: theme.type.weight.medium,
-  });
+  };
+  const metadataLines = wrapTextToWidth(
+    `${target.series} · ${target.pointLabel} · ${formatValue(target.value, unit)}`,
+    inner,
+    (candidate) => measureText({ text: candidate, ...metadataFace }).width,
+  );
+  const annotationLines = wrapTextToWidth(
+    text,
+    inner,
+    (candidate) => measureText({ text: candidate, ...annotationFace }).width,
+  );
   const annotationStart = 1.05 + metadataLines.length * 0.9 + 0.35;
   const cardHeight =
     size * (annotationStart + Math.max(0, annotationLines.length - 1) * 1.12 + 0.8);
@@ -590,6 +623,7 @@ const AnnotationLabel: React.FC<{
         />
         <rect width={5} height={cardHeight} rx={2} fill={theme.color.accentAlt} />
         <text
+          data-stress-contained="annotation metadata"
           x={gap * 1.4}
           y={size * 1.05}
           fill={theme.color.inkMuted}
@@ -604,6 +638,7 @@ const AnnotationLabel: React.FC<{
           ))}
         </text>
         <text
+          data-stress-contained="annotation copy"
           x={gap * 1.4}
           y={size * annotationStart}
           fill={theme.color.ink}
@@ -646,39 +681,3 @@ type PlotPadding = { top: number; right: number; bottom: number; left: number };
  */
 const clampCardX = (desiredX: number, cardWidth: number, width: number, padding: PlotPadding) =>
   Math.min(width - padding.right - cardWidth, Math.max(padding.left, desiredX));
-
-type TextFace = { fontFamily: string; fontSize: number; fontWeight: number };
-
-/**
- * Wrap to a width in pixels, not to a count of characters.
- *
- * This wrapped at 32, 38 and 42 characters while the cards it wraps into are sized in
- * pixels — `Math.min(560, Math.max(360, width * 0.34))` — so the two agreed only by
- * coincidence, and the coincidence is per-string: "WWWWW" and "lllll" are the same five
- * characters and nowhere near the same width. ADR-0014 §6 asks for "the deterministic
- * layout utilities already owned by the design system", and this file already reaches for
- * exactly that when it sizes the date axis; the annotation cards were the half that did not.
- *
- * Greedy, and a word too long for the line still gets its own line rather than being cut —
- * an overhanging word is visible and a silently truncated one is not.
- */
-const wrapToWidth = (text: string, available: number, face: TextFace): string[] => {
-  const words = text.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
-  if (words.length === 0) return [];
-
-  const widthOf = (candidate: string) => measureText({ text: candidate, ...face }).width;
-
-  const lines: string[] = [];
-  let line = words[0] as string;
-  for (const word of words.slice(1)) {
-    const candidate = `${line} ${word}`;
-    if (widthOf(candidate) <= available) {
-      line = candidate;
-      continue;
-    }
-    lines.push(line);
-    line = word;
-  }
-  lines.push(line);
-  return lines;
-};

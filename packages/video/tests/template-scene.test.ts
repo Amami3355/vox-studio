@@ -31,7 +31,7 @@ import { capabilityIds, registry } from '../src/scenes/registry';
 const SCENES_DIR = join(import.meta.dirname, '..', 'src', 'scenes');
 const TEMPLATE_DIR = '_TemplateScene';
 const DOC_PATH = join(import.meta.dirname, '..', '..', '..', 'docs', 'adding-a-capability.md');
-const DOC_FILE_TABLE_HEADING = '## The ten files';
+const DOC_FILE_TABLE_HEADING = '## The ten template files and optional eleventh';
 
 const foldersIn = (dir: string): string[] =>
   readdirSync(dir).filter((entry) => statSync(join(dir, entry)).isDirectory());

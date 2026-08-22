@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildCatalogEntry } from '../src/catalog/build';
+import { motionProfileIds } from '../src/design/motion';
 import { registry, requireCapability } from '../src/scenes/registry';
 import {
   MAX_WORD_LENGTH,
@@ -135,11 +136,22 @@ describe('content is generated from the published schema, not written', () => {
       'degraded',
       'ceiling',
     ]);
-    expect((content.find((one) => one.id === 'ceiling')?.props.points as unknown[]).length).toBe(
-      36,
+    const ceiling = content.find((one) => one.id === 'ceiling');
+    const points = ceiling?.props.points as { label: string }[];
+    const series = ceiling?.props.series as { label: string }[];
+    expect(points).toHaveLength(36);
+    expect(points.every((point) => point.label.length === 24 && !point.label.includes(' '))).toBe(
+      true,
     );
-    expect(content.find((one) => one.id === 'ceiling')?.events).toContainEqual(
-      expect.objectContaining({ action: 'annotatePoint', frame: 180 }),
+    expect(series.every((entry) => entry.label.length === 32 && !entry.label.includes(' '))).toBe(
+      true,
+    );
+    expect(ceiling?.events).toContainEqual(
+      expect.objectContaining({
+        action: 'annotatePoint',
+        frame: 180,
+        payload: expect.objectContaining({ text: expect.stringMatching(/^\S{70}$/) }),
+      }),
     );
   });
 
@@ -173,7 +185,7 @@ describe('content is generated from the published schema, not written', () => {
   });
 });
 
-describe('the matrix is every layout by every composition by both profiles', () => {
+describe('the matrix is every layout by every composition by every motion profile', () => {
   const cases = stressCases();
 
   it('has a case for every declared arrangement of every capability', () => {
@@ -188,7 +200,13 @@ describe('the matrix is every layout by every composition by both profiles', () 
           stressContent(capability).length,
       0,
     );
-    expect(cases.length).toBe(arrangements * 2);
+    expect(cases.length).toBe(arrangements * motionProfileIds.length);
+  });
+
+  it('covers the complete published motion-profile vocabulary', () => {
+    expect([...new Set(cases.map((one) => one.profile))].sort()).toEqual(
+      [...motionProfileIds].sort(),
+    );
   });
 
   it('names each case by everything that varies in it', () => {

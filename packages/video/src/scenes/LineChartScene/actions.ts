@@ -3,6 +3,7 @@ import type { ActionDef } from '../../core/types';
 
 const seriesTarget = z.string().min(1).max(32).describe('Must match one `series.label`.');
 const pointTarget = z.string().min(1).max(24).describe('Must match one `points[].label`.');
+export const LINE_CHART_ANNOTATION_TEXT_MAX = 70;
 
 export const lineChartActions = {
   revealTrend: {
@@ -25,7 +26,11 @@ export const lineChartActions = {
       .object({
         series: seriesTarget,
         label: pointTarget,
-        text: z.string().min(1).max(70).describe('Concise annotation copy, up to 70 characters.'),
+        text: z
+          .string()
+          .min(1)
+          .max(LINE_CHART_ANNOTATION_TEXT_MAX)
+          .describe('Concise annotation copy, up to 70 characters.'),
       })
       .strict(),
   },

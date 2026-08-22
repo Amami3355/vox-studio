@@ -168,19 +168,43 @@ const overlappingLegend = (): string[] => {
       label: entry.getAttribute('data-legend-entry') ?? '',
       box: entry.getBoundingClientRect(),
     }))
-    .filter(({ box }) => box.width > 0)
-    .sort((a, b) => a.box.left - b.box.left);
+    .filter(({ box }) => box.width > 0);
 
-  return boxes.flatMap((entry, index) => {
-    const next = boxes[index + 1];
-    if (!next) return [];
-    const overlap = entry.box.right - next.box.left;
-    if (overlap <= CLIP_TOLERANCE_PX) return [];
-    return [
-      `legend entries overlap by ${Math.round(overlap)}px: "${entry.label}" over "${next.label}"`,
-    ];
-  });
+  return boxes.flatMap((entry, index) =>
+    boxes.slice(index + 1).flatMap((other) => {
+      const overlapX =
+        Math.min(entry.box.right, other.box.right) - Math.max(entry.box.left, other.box.left);
+      const overlapY =
+        Math.min(entry.box.bottom, other.box.bottom) - Math.max(entry.box.top, other.box.top);
+      if (overlapX <= CLIP_TOLERANCE_PX || overlapY <= CLIP_TOLERANCE_PX) return [];
+      return [
+        `legend entries overlap by ${Math.round(overlapX)}px × ${Math.round(overlapY)}px: "${entry.label}" over "${other.label}"`,
+      ];
+    }),
+  );
 };
+
+/** SVG text whose primitive promises containment but whose measured glyph box leaves its SVG. */
+const textOutsideItsSvg = (): string[] =>
+  [...document.querySelectorAll<SVGGraphicsElement>('[data-stress-contained]')].flatMap(
+    (element) => {
+      const svg = element.closest<SVGSVGElement>('svg');
+      if (!svg) return [];
+      const box = element.getBoundingClientRect();
+      const bounds = svg.getBoundingClientRect();
+      const outside =
+        bounds.left - box.left > CLIP_TOLERANCE_PX ||
+        box.right - bounds.right > CLIP_TOLERANCE_PX ||
+        bounds.top - box.top > CLIP_TOLERANCE_PX ||
+        box.bottom - bounds.bottom > CLIP_TOLERANCE_PX;
+      if (!outside) return [];
+      return [
+        `${element.getAttribute('data-stress-contained') ?? 'SVG text'} leaves its SVG: "${excerpt(
+          (element.textContent ?? '').trim(),
+        )}"`,
+      ];
+    },
+  );
 
 /**
  * Display type taking more of its scene than its role may.
@@ -266,7 +290,12 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
 
     waitForFonts()
       .then(() => {
-        const findings = [...clippedText(), ...oversizedDisplayType(), ...overlappingLegend()];
+        const findings = [
+          ...clippedText(),
+          ...oversizedDisplayType(),
+          ...overlappingLegend(),
+          ...textOutsideItsSvg(),
+        ];
         if (findings.length === 0) {
           continueRender(handle);
           return;

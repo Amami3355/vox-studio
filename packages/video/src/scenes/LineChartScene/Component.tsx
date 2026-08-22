@@ -4,6 +4,8 @@ import { resolveEvents } from '../../core/events';
 import type { SceneProps } from '../../core/types';
 import { type MotionProfile, springConfig, staggerFrames } from '../../design/motion';
 import {
+  ACCENT_RULE_HEIGHT,
+  AccentRule,
   Backdrop,
   CameraRig,
   EmptyState,
@@ -87,23 +89,13 @@ const LineChartFrame: React.FC<{
     box.height * MAX_HEADER_SHARE,
   );
   /** A stable allocation from the same measured fit that `SceneTitle` renders. */
-  const headerHeight = Math.ceil(
-    lineChartGeometry.accentRuleHeight + gap + titleFit.height + titleBottom,
-  );
+  const headerHeight = Math.ceil(ACCENT_RULE_HEIGHT + gap + titleFit.height + titleBottom);
   const plotHeight = Math.max(1, box.height - headerHeight - bottomGap);
 
   return (
     <>
       <div style={{ height: headerHeight, display: 'flex', flexDirection: 'column', gap }}>
-        <div
-          style={{
-            width: lineChartGeometry.accentRuleWidth * Math.min(1, progressFor(0)),
-            height: lineChartGeometry.accentRuleHeight,
-            flex: '0 0 auto',
-            borderRadius: theme.radius[1],
-            background: theme.color.accent,
-          }}
-        />
+        <AccentRule accent={theme.color.accent} profile={profile} />
         <SceneTitle startFrame={2} profile={profile} maxStep={lineChartGeometry.titleMaxStep}>
           {props.title}
         </SceneTitle>

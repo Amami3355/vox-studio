@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { validateScene, validateVideoPlan } from '../src/catalog/validate';
 import { compile } from '../src/compile';
 import { resolveEvents } from '../src/core/events';
-import { utcTimeAxis } from '../src/core/time-axis';
+import { parseUtcDate, utcTimeAxis } from '../src/core/time-axis';
 import { trendAxis } from '../src/core/trend-axis';
 import type { SceneInstance, TimedBeat } from '../src/core/types';
 import { lineChartSchema } from '../src/scenes/LineChartScene';
@@ -40,6 +40,18 @@ describe('line_chart schema and validation', () => {
 
     expect(canonical.baseline).toBe('zero');
     expect(comparison.series).toHaveLength(2);
+  });
+
+  it('keeps four-digit years below 100 in their authored century', () => {
+    const year25 = parseUtcDate('0025-01-01');
+    const year99 = parseUtcDate('0099-12-31');
+    const year100 = parseUtcDate('0100-01-01');
+
+    expect(year25).not.toBeNull();
+    expect(new Date(year25 as number).getUTCFullYear()).toBe(25);
+    expect(year99).not.toBeNull();
+    expect(new Date(year99 as number).getUTCFullYear()).toBe(99);
+    expect((year99 as number) < (year100 as number)).toBe(true);
   });
 
   it.each([

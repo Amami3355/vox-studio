@@ -39,6 +39,7 @@ import type {
   StressRegime,
   TimedEvent,
 } from '../../src/core/types';
+import { type MotionProfileId, motionProfileIds } from '../../src/design/motion';
 import { registry } from '../../src/scenes/registry';
 
 /**
@@ -321,14 +322,13 @@ export type StressCase = {
 };
 
 /**
- * The same two profiles `tests/render/safe-area.test.ts` sweeps, for the same reasons:
- * `cinematic` translates furthest, so it is the worst case for crossing a boundary, and
- * `pushIn` insets furthest, so it is the worst case for being cropped by one. The other
- * four are either strictly inside these two or have no camera at all.
+ * Every published profile. The safe-area suite can use the two profiles that bound camera
+ * geometry, but content stress also asks about profile-specific entrances and staggers; a
+ * geometric bound cannot stand in for behaviour the profile changes independently.
  */
-export const STRESS_PROFILES = ['cinematic', 'pushIn'] as const;
+export const STRESS_PROFILES: readonly MotionProfileId[] = motionProfileIds;
 
-export type StressProfile = (typeof STRESS_PROFILES)[number];
+export type StressProfile = MotionProfileId;
 
 /**
  * Two frames, because neither camera is at its extreme for the whole shot and they do not
@@ -338,7 +338,7 @@ export type StressProfile = (typeof STRESS_PROFILES)[number];
 const framesFor = (duration: number): number[] => [Math.round(duration * 0.25), duration - 1];
 
 /**
- * Every content case × every layout × every declared composition × both profiles.
+ * Every content case × every layout × every declared composition × every motion profile.
  *
  * A layout is how the scene arranges itself and a composition is how much frame it gets,
  * and `layouts.ts`'s claim that *"all three arrangements keep their identity in half a

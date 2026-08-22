@@ -37,7 +37,36 @@ const changedPixels = (
   return changed;
 };
 
+const countRgb = (
+  bitmap: Bitmap,
+  region: { x: number; y: number; width: number; height: number },
+  rgb: readonly [number, number, number],
+): number => {
+  let matches = 0;
+  for (let y = region.y; y < region.y + region.height; y += 1) {
+    for (let x = region.x; x < region.x + region.width; x += 1) {
+      const at = (y * bitmap.width + x) * bitmap.channels;
+      if (
+        bitmap.pixels[at] === rgb[0] &&
+        bitmap.pixels[at + 1] === rgb[1] &&
+        bitmap.pixels[at + 2] === rgb[2]
+      ) {
+        matches += 1;
+      }
+    }
+  }
+  return matches;
+};
+
 describe('LineChartScene runtime', () => {
+  it('holds every plot mark back before a driven reveal', async () => {
+    const held = decodePng(await still('example-line-driven', 75, 'editorialStatic'));
+
+    // Editorial Paper's first data-series colour. The title accent is deliberately outside
+    // this crop; any matching ink inside it belongs to a line or marker that leaked early.
+    expect(countRgb(held, { x: 180, y: 350, width: 1560, height: 580 }, [194, 60, 10])).toBe(0);
+  });
+
   it('draws a driven trend from left to right after its reveal', async () => {
     const [heldBytes, enteringBytes] = await Promise.all([
       still('example-line-driven', 75, 'editorialStatic'),
@@ -146,10 +175,10 @@ describe('LineChartScene runtime', () => {
       // Accepted 2026-08-22: the labelled zero rule bisects both the rising negative-to-
       // positive line and the alternating series; all three ceiling labels remain readable.
       //
-      // Re-accepted 2026-08-22 for the measured legend and the measured annotation wrap.
-      // Inspected at 1920×1080: the three ceiling keys read as one row ending well inside
-      // the plot, and both cards wrap to their own box rather than to a character count.
-      '22b539401d8dd8dc78bddc653209796d',
+      // Re-accepted 2026-08-22 after measured legend packing, collision-safe date lanes and
+      // unbreakable card wrapping. Inspected at 1920×1080: all labels and both cards remain
+      // readable and contained, with the plot clear of the header and frame edges.
+      'afe7cf6d7311f2825bb309d410ba56e3',
     );
   });
 

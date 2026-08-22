@@ -16,7 +16,7 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 
 ### Adding or changing a capability
 
-A scene capability is one folder of up to ten files under `packages/video/src/scenes/`, one line in
+A scene capability is one folder under `packages/video/src/scenes/`, one line in
 `src/scenes/registry.ts`, then `pnpm catalog`. Copy `src/scenes/_TemplateScene/`, which is a
 compiling stub of that shape and is deliberately unregistered. See
 `docs/adding-a-capability.md` — read it before touching a scene folder, and **update it in the

@@ -29,6 +29,7 @@
  * and none of those is a size anything publishes.
  */
 import type { SoftConstraints, StressShape } from '../../core/types';
+import { LINE_CHART_ANNOTATION_TEXT_MAX } from './actions';
 
 type Published = { propsSchema: Record<string, unknown>; constraints: SoftConstraints };
 
@@ -78,24 +79,23 @@ const prose = (length: number, seed = 0): string => {
   return out.slice(0, length).trimEnd().padEnd(length, 'x');
 };
 
+/** One measured worst-case token, with a stable prefix where uniqueness is required. */
+const unbreakable = (length: number, prefix = ''): string =>
+  `${prefix}${'W'.repeat(Math.max(0, length - prefix.length))}`;
+
 /**
- * `atCeiling` pads each label out to the published maximum; otherwise a label is just its
- * point's position, which is the shortest thing that can still be unique.
- *
- * The position leads rather than trails. `checks.ts` rejects duplicate point labels because
- * an action targeting one has to identify exactly one, and a label built as prose-then-index
- * loses the index to the truncation that holds it under the ceiling — every long label then
- * collides on the same prefix. Uniqueness has to survive the cut, so it goes in front of it.
+ * `atCeiling` makes each label one unbreakable token at the published maximum; otherwise a
+ * label is just its point's position, the shortest value that remains unique. The position
+ * leads the ceiling token so action targets remain unique under the worst measured shape.
  */
 const datedPoints = (count: number, labelLength?: number): { date: string; label: string }[] =>
   Array.from({ length: count }, (_, index) => {
     const position = `P${index + 1}`;
-    const filler =
-      labelLength === undefined ? '' : prose(Math.max(0, labelLength - position.length - 1), index);
+    const label = labelLength === undefined ? position : unbreakable(labelLength, position);
     return {
       // Distinct and parseable by construction: one month apart, rolling into the next year.
       date: `${2023 + Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}-01`,
-      label: filler === '' ? position : `${position} ${filler}`,
+      label,
     };
   });
 
@@ -125,7 +125,7 @@ const alignedSeries = (
     label:
       labelLength === undefined
         ? `Series ${seriesIndex + 1}`
-        : `S${seriesIndex + 1} ${prose(Math.max(0, labelLength - `S${seriesIndex + 1} `.length), seriesIndex)}`,
+        : unbreakable(labelLength, `S${seriesIndex + 1}`),
     values: Array.from({ length: pointCount }, (_, pointIndex) => {
       if (seriesIndex === 0) {
         return pointIndex === 0 ? WIDEST_FIGURE : pointIndex * 310_000 - 4_000_000;
@@ -169,7 +169,7 @@ export const lineChartStressContent = ({ propsSchema, constraints }: Published):
         title: atCeiling ? prose(titleMax) : `Line chart ${id}`,
         points,
         series,
-        unit: atCeiling ? prose(unitMax) : 'k',
+        unit: atCeiling ? unbreakable(unitMax) : 'k',
         ...(atCeiling && focused && last
           ? { focus: { series: focused.label, label: last.label } }
           : {}),
@@ -189,7 +189,7 @@ export const lineChartStressContent = ({ propsSchema, constraints }: Published):
                 payload: {
                   series: annotated.label,
                   label: midpoint.label,
-                  text: 'A late annotation remains attached at the hard density ceiling',
+                  text: unbreakable(LINE_CHART_ANNOTATION_TEXT_MAX),
                 },
               },
             ],

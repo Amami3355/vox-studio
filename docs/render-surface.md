@@ -21,9 +21,9 @@ Vox and Johnny Harris for pace only.** Pace never becomes a capability.
 | Z1 | Tokens | the `Theme` object and `motionProfiles` | every frame, every capability |
 | Z2 | Type & entrance | `AnimatedText` / `SceneTitle` / `Eyebrow` / `useEntrance` | every word drawn |
 | Z3 | Frame physics | `SlotFrame`, `CameraRig`, `Backdrop` | margin, density, camera, ground |
-| Z4 | Data marks | `BarGroup` | every chart |
+| Z4 | Data marks | `BarGroup`, `LinePlot` | every chart |
 | Z5 | Editorial marks | `Callout`, `EmptyState`, `Reveal` | annotation and degradation |
-| Z6 | Capability composition | the four `Component.tsx` + `layouts.ts` pairs | one capability each |
+| Z6 | Capability composition | the five `Component.tsx` + `layouts.ts` pairs | one capability each |
 | Z7 | Upstream deciders | `compile/`, `core/slots.ts` | which box a scene gets, and when |
 | Z8 | The judging loop | `pnpm grid`, `.scratch/still-cost/`, the controls | nothing — it is where you look |
 
@@ -105,7 +105,8 @@ prop is a ceiling on top of the fit, never a replacement for it.
 
 **Cost of intervening.** Cheap. Four files, no geometry, every scene picks it up.
 `@remotion/layout-utils` entered the package here, for `measureText`; Z4 is now its second
-caller, and `d3-scale` is the only other third-party dependency in the render surface.
+caller. `d3-scale` performs pure chart arithmetic there, and `@visx/shape` draws reusable SVG
+geometry behind `LinePlot`; ADR-0014 owns that dependency seam.
 
 **The trap worth knowing.** `overflowWrap` alone does not save a **flex item**: its minimum size
 defaults to min-content, which for an unbreakable word is the whole word, so it overflows before
@@ -137,13 +138,21 @@ tests, and `Backdrop` is the control frame those tests compare to — change it 
 
 ## Z4 — Data marks
 
-`primitives/Bar.tsx` (264) · `primitives/Gridlines.tsx` (120) · `core/scale.ts` (90)
+`primitives/Bar.tsx` · `primitives/Gridlines.tsx` · `core/scale.ts` ·
+`primitives/LinePlot.tsx` · `primitives/linePlotLayout.ts` · `core/time-axis.ts` ·
+`core/trend-axis.ts`
 
-The largest single design object in the package, and the one a data-editorial reference judges
-hardest. Not exposed to the agent; `BarChartScene` composes it.
+The data-editorial surface a reference judges hardest. None of it is exposed to the agent;
+`BarChartScene` composes the bar primitives and `LineChartScene` composes `LinePlot`.
 
-**Owns.** Both orientations, the axis, the reveal spring per bar, the highlight, the recede,
-the value labels and the category labels.
+**Owns.** Bar orientation, axes, value/category labels and bar emphasis; plus proportional UTC
+spacing, trend axes, straight paths, markers, legends, focus and attached annotations for lines.
+
+**`LinePlot` is the visual-library seam.** `core/time-axis.ts` and `core/trend-axis.ts` keep
+calendar/value arithmetic pure. `LinePlot` receives explicit dimensions and frame-derived
+progress, while `@visx/shape` supplies only static SVG path geometry. Its internal layout helper
+packs measured legends, preserves required date labels on collision-free lanes and wraps card
+copy without dropping unbreakable text. Remotion remains the only clock; ADR-0014 is the rule.
 
 **`Bar.tsx` no longer decides what the top of the plot is.** `core/scale.ts` does, through one
 function, `valueAxis(values)`, which returns the domain, where zero sits, and the round values
@@ -197,8 +206,8 @@ orientations, for consistency — is argued in `Gridlines.tsx`'s header. The hor
 therefore ignores `gridlines` entirely, and the compiler stays silent about it rather than
 warning: the value it is ignoring is usually the default, which the agent never wrote.
 
-**Cost of intervening.** Medium-high. Three files, and it is half of what the human evaluator
-was looking at, and the render contract tests measure its frames.
+**Cost of intervening.** Medium-high. Both data Primitives are measured by unit, render and stress
+contracts; a change to label geometry or axes can move accepted key frames.
 
 ## Z5 — Editorial marks
 
@@ -225,9 +234,8 @@ has not been seen against a real photograph or in the `left`/`right` composition
 
 ## Z6 — Capability composition
 
-`scenes/BarChartScene/` (Component 218 + layouts 80) · `scenes/ImageContextScene/` (Component 190
-+ layouts 51) · `scenes/QuoteScene/` (Component 219 + layouts 44) ·
-`scenes/StatCounterScene/` (Component 234 + layouts 60)
+`scenes/BarChartScene/` · `scenes/ImageContextScene/` · `scenes/QuoteScene/` ·
+`scenes/StatCounterScene/` · `scenes/LineChartScene/`
 
 The first two pairs are as of `229700c` and have since grown; `QuoteScene`'s are as of `bfac867`
 and `StatCounterScene`'s as of this change.

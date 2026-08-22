@@ -3,6 +3,7 @@ export * from './SlotFrame';
 export * from './CameraRig';
 export * from './Column';
 export * from './AnimatedText';
+export * from './AccentRule';
 export * from './titleFit';
 export * from './Reveal';
 export * from './Bar';
