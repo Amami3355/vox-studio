@@ -16,3 +16,11 @@ coverage/
 !.scratch/**/
 !.scratch/*.md
 !.scratch/**/*.md
+
+# The crew is a self-contained Python project; its environment, caches and build metadata
+# are local.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/

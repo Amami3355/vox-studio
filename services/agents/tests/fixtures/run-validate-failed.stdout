@@ -1,0 +1,1 @@
+{"protocolVersion":1,"command":"run.validate","outcome":"failed","run":null,"data":null,"artifacts":[],"error":{"code":"INVALID_INPUT","message":"Unexpected end of JSON input","details":null},"next":[]}

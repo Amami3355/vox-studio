@@ -1,0 +1,33 @@
+# The agent crew is a self-contained Python project. It is deliberately not a member of the
+# pnpm workspace: `pnpm typecheck`, `biome check` and the vitest suites do not see it, and it
+# does not see them. The only thing the two halves share is the vox.exe boundary.
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vox-crew"
+version = "0.1.0"
+description = "The Vox Studio agent crew: drives the Agent production interface from a Brief to a narrated preview."
+requires-python = ">=3.11"
+# The tracer bullet reaches the production boundary with the standard library alone. Adding a
+# dependency here would mean a bare `pytest` run needs a network install, which is exactly the
+# bar the crew's tests are held to.
+dependencies = []
+
+[project.optional-dependencies]
+# The ADK framework and the model client land with the first agent that thinks (the planner).
+# Declared here so the framework choice is recorded, installed only when an agent needs it.
+agents = ["google-adk>=1.0"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+vox-crew = "vox_crew.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

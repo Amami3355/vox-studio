@@ -19,6 +19,7 @@
     "proof:catalog-showcase": "tsx scripts/proof-catalog-showcase.ts",
     "proof:northbridge": "tsx scripts/proof-northbridge.ts",
     "verify:proof": "tsx scripts/verify-proof.ts",
+    "record:crew-fixtures": "tsx scripts/record-crew-fixtures.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
