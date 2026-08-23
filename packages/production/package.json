@@ -15,6 +15,7 @@
     "build:agent-distribution": "tsx scripts/build-agent-distribution.ts",
     "verify:agent-distribution": "tsx scripts/verify-agent-distribution.ts",
     "setup:codex-sandbox": "tsx scripts/setup-codex-sandbox.ts",
+    "proof:catalog-showcase": "tsx scripts/proof-catalog-showcase.ts",
     "proof:northbridge": "tsx scripts/proof-northbridge.ts",
     "verify:proof": "tsx scripts/verify-proof.ts",
     "typecheck": "tsc --noEmit"

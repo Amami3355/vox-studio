@@ -80,6 +80,8 @@ export const codexProofExecArguments = (workRoot: string, model: string, prompt:
   '--strict-config',
   '--cd',
   workRoot,
+  '--sandbox',
+  'workspace-write',
   '--model',
   model,
   ...agentOverrides(),
@@ -156,6 +158,19 @@ const compactProbe = (result: ProcessResult) => ({
   timedOut: result.timedOut,
 });
 
+export const sandboxWorkRootIsUsable = (input: {
+  expectedRoot: string;
+  cwdProbe: ProcessResult;
+  writeProbe: ProcessResult;
+  markerPresent: boolean;
+}): boolean =>
+  input.cwdProbe.exitCode === 0 &&
+  !input.cwdProbe.timedOut &&
+  input.writeProbe.exitCode === 0 &&
+  !input.writeProbe.timedOut &&
+  input.markerPresent &&
+  input.cwdProbe.stdout.trim().toLowerCase() === input.expectedRoot.toLowerCase();
+
 const verifySandbox = async (input: {
   codex: string;
   workRoot: string;
@@ -171,6 +186,13 @@ const verifySandbox = async (input: {
     access('C:\\Windows\\System32\\curl.exe'),
   ]);
   const marker = join(input.workRoot, '.codex-sandbox-write-probe');
+  const workingDirectory = await sandboxCommand(
+    input.codex,
+    input.workRoot,
+    input.environment,
+    ['cmd.exe', '/d', '/c', 'cd'],
+    5 * 60_000,
+  );
   const workRoot = await sandboxCommand(
     input.codex,
     input.workRoot,
@@ -178,11 +200,29 @@ const verifySandbox = async (input: {
     ['cmd.exe', '/d', '/c', 'type nul > .codex-sandbox-write-probe'],
     5 * 60_000,
   );
-  if (workRoot.exitCode !== 0 || workRoot.timedOut) {
+  const markerPresent = await access(marker).then(
+    () => true,
+    () => false,
+  );
+  if (
+    !sandboxWorkRootIsUsable({
+      expectedRoot: input.workRoot,
+      cwdProbe: workingDirectory,
+      writeProbe: workRoot,
+      markerPresent,
+    })
+  ) {
     await rm(marker, { force: true });
-    throw new Error(`PROOF_CODEX_SANDBOX_UNAVAILABLE:${JSON.stringify(compactProbe(workRoot))}`);
+    throw new Error(
+      `PROOF_CODEX_SANDBOX_UNAVAILABLE:${JSON.stringify({
+        workingDirectory: compactProbe(workingDirectory),
+        write: compactProbe(workRoot),
+        markerPresent,
+      })}`,
+    );
   }
   const probes = {
+    workingDirectory,
     workRoot,
     repository: await sandboxCommand(input.codex, input.workRoot, input.environment, [
       'cmd.exe',
@@ -229,7 +269,12 @@ const verifySandbox = async (input: {
   };
   const evidence: AgentSandboxEvidence = {
     backend: 'codex-windows-elevated',
-    workRootReadWrite: probes.workRoot.exitCode === 0 && !probes.workRoot.timedOut,
+    workRootReadWrite: sandboxWorkRootIsUsable({
+      expectedRoot: input.workRoot,
+      cwdProbe: probes.workingDirectory,
+      writeProbe: probes.workRoot,
+      markerPresent,
+    }),
     repositoryDenied: probes.repository.exitCode !== 0 && !probes.repository.timedOut,
     serviceDenied: probes.service.exitCode !== 0 && !probes.service.timedOut,
     credentialsDenied: probes.credentials.exitCode !== 0 && !probes.credentials.timedOut,

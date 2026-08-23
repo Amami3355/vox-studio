@@ -25,6 +25,13 @@ import { type RunCheckpoint, RunStore } from '../run-store/run-store';
 import { remainingSecretVariables, scrubAgentEnvironment } from './agent-environment';
 import { evaluateNorthbridgeAssertions, machineVerdict } from './assertions';
 import {
+  CATALOG_SHOWCASE_CAPABILITIES,
+  CATALOG_SHOWCASE_NON_CLAIMS,
+  CATALOG_SHOWCASE_PROOF_ID,
+  CATALOG_SHOWCASE_REQUEST,
+  catalogShowcasePlanViolations,
+} from './catalog-showcase';
+import {
   type FileInventoryEntry,
   inventoryFiles,
   scanReadableFiles,
@@ -98,7 +105,7 @@ export type NorthbridgeProofOptions = {
    * proofs ran; `long` is the ~3 minute variant. Defaults to `short` so no existing caller
    * changes behaviour.
    */
-  length?: 'short' | 'long';
+  length?: 'short' | 'long' | 'showcase';
   evidenceRoot?: string;
   renderer?: RenderAdapter;
   mediaProbe?: MediaProbe;
@@ -399,7 +406,11 @@ const commandTargetsRun = (workRoot: string, record: CommandRecord, runRoot: str
   return candidate !== null && relative(runRoot, candidate) === '';
 };
 
-const defaultHumanVerdict = (previewSha256: string | null, takeId: string | null) => ({
+const defaultHumanVerdict = (
+  previewSha256: string | null,
+  takeId: string | null,
+  scenario: 'northbridge' | 'catalog-showcase',
+) => ({
   humanVerdict: 'pending',
   evaluator: null,
   evaluatedAt: null,
@@ -407,14 +418,24 @@ const defaultHumanVerdict = (previewSha256: string | null, takeId: string | null
   previewSha256,
   takeId,
   verticalSliceReviewed: false,
-  rows: [
-    'narration intelligible, complete, continuous and fact-matching',
-    'March highlight perceptibly lands on the unique spoken word',
-    'opening, chart, hierarchy, transitions and ending are legible',
-    'placeholder is honest visible degradation',
-    'composition, typography, motion and pace are system-premium',
-    'complete preview is watchable and listenable without explanation',
-  ].map((criterion) => ({ criterion, verdict: 'pending', note: null })),
+  rows: (scenario === 'catalog-showcase'
+    ? [
+        'narration is intelligible, complete, continuous and matches every fictional fact',
+        'all eight catalogue capabilities are perceptibly distinct and synchronized to the voice',
+        'character, chronology, trend, comparison, statistic and quote remain legible',
+        'the image placeholder is honest visible degradation',
+        'composition, typography, motion and pace remain coherent across the full film',
+        'the complete preview is watchable and listenable without explanation',
+      ]
+    : [
+        'narration intelligible, complete, continuous and fact-matching',
+        'March highlight perceptibly lands on the unique spoken word',
+        'opening, chart, hierarchy, transitions and ending are legible',
+        'placeholder is honest visible degradation',
+        'composition, typography, motion and pace are system-premium',
+        'complete preview is watchable and listenable without explanation',
+      ]
+  ).map((criterion) => ({ criterion, verdict: 'pending', note: null })),
   note: 'Pending is incomplete, never pass. This verdict does not close gap 8.',
 });
 
@@ -424,18 +445,37 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
   }
   const seeded = new Set(options.seededViolations ?? []);
   const long = options.length === 'long';
-  const proofRequest = long ? NORTHBRIDGE_LONG_REQUEST : NORTHBRIDGE_REQUEST;
-  const proofId = long ? NORTHBRIDGE_LONG_PROOF_ID : NORTHBRIDGE_PROOF_ID;
+  const showcase = options.length === 'showcase';
+  const scenario = showcase ? 'catalog-showcase' : 'northbridge';
+  const proofRequest = showcase
+    ? CATALOG_SHOWCASE_REQUEST
+    : long
+      ? NORTHBRIDGE_LONG_REQUEST
+      : NORTHBRIDGE_REQUEST;
+  const proofId = showcase
+    ? CATALOG_SHOWCASE_PROOF_ID
+    : long
+      ? NORTHBRIDGE_LONG_PROOF_ID
+      : NORTHBRIDGE_PROOF_ID;
+  const proofSlug = showcase ? 'helios-bay-catalog-showcase' : 'northbridge-night-bus';
+  const nonClaims = showcase ? CATALOG_SHOWCASE_NON_CLAIMS : NORTHBRIDGE_NON_CLAIMS;
   /**
    * `durationBounds` is the acceptance window — the long Brief asks for 170–190 s and gets the
    * same proportional slack the short one gets. `targetSeconds` is what the Brief actually asks
    * for, and it sets the repair budget; the two are kept separate so widening the window for
    * slack never silently buys the agent more repair attempts.
    */
-  const { durationBounds, targetSeconds } = long
-    ? { durationBounds: [150, 210] as readonly [number, number], targetSeconds: 180 }
-    : { durationBounds: [20, 30] as readonly [number, number], targetSeconds: 25 };
-  const workingParent = await mkdtemp(join(tmpdir(), 'vox-northbridge-proof-'));
+  const { durationBounds, targetSeconds } = showcase
+    ? { durationBounds: [100, 140] as readonly [number, number], targetSeconds: 120 }
+    : long
+      ? { durationBounds: [150, 210] as readonly [number, number], targetSeconds: 180 }
+      : { durationBounds: [20, 30] as readonly [number, number], targetSeconds: 25 };
+  // The elevated Windows sandbox runs as a separate local account. It cannot traverse this
+  // user's Documents or AppData parents even when the leaf itself has a permissive ACL, so the
+  // disposable agent workspace must live under a neutral root-level parent.
+  const workingRootParent = 'C:\\vox-proof-workroots';
+  await mkdir(workingRootParent, { recursive: true });
+  const workingParent = await mkdtemp(join(workingRootParent, 'vox-proof-'));
   const workRoot = join(workingParent, 'agent');
   const trustedRoot = join(workingParent, 'trusted');
   const stagedEvidence = join(workingParent, 'evidence');
@@ -447,7 +487,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       join(
         repositoryRoot,
         '.scratch/agent-production-interface/proofs',
-        `${timestamp}-northbridge-night-bus`,
+        `${timestamp}-${proofSlug}`,
       ),
   );
   let host: ReturnType<typeof createProductionIpcHost> | null = null;
@@ -523,7 +563,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     const service = new ProductionCommandService({
       ledgerRoot: join(trustedRoot, 'ledger'),
       hmacKey: runHmacKey,
-      keyId: 'northbridge-proof-key-v1',
+      keyId: `${proofSlug}-proof-key-v1`,
       calibrationStore,
       network: {
         request: async () => {
@@ -544,7 +584,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
           temporaryRoot: trustedRoot,
         }),
       rendererVersion: 'remotion-4.0.508',
-      createRunId: () => `northbridge-proof-${++runNumber}`,
+      createRunId: () => `${proofSlug}-proof-${++runNumber}`,
     });
 
     let currentActor: 'agent' | 'harness' = 'agent';
@@ -555,9 +595,28 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       pipePath: `\\\\.\\pipe\\${trustedPipeName}`,
       secret: ipcSecret,
       service,
+      // A two-minute, eight-scene Remotion render exceeds the generic 120 s IPC idle timeout.
+      // Keep the authenticated request open long enough for the renderer to return its receipt.
+      socketTimeoutMs: 15 * 60_000,
       audit: {
         before: async (request) => {
           activeCommand = request.argv.slice(0, 3).join(' ');
+          if (showcase && activeCommand === 'production run record') {
+            const guardedRunRoot = runPathFrom(request.cwd, request.argv);
+            if (!guardedRunRoot) throw new Error('PROOF_SHOWCASE_RECORD_GATE:NO_RUN');
+            const guardedCheckpoint = JSON.parse(
+              await readFile(join(guardedRunRoot, 'run.json'), 'utf8'),
+            ) as RunCheckpoint;
+            const guardedPlanPath = guardedCheckpoint.bindings.plan?.snapshot.path;
+            if (!guardedPlanPath) throw new Error('PROOF_SHOWCASE_RECORD_GATE:NO_PLAN');
+            const guardedPlan = JSON.parse(
+              await readFile(resolve(guardedRunRoot, guardedPlanPath), 'utf8'),
+            ) as VideoPlan;
+            const violations = catalogShowcasePlanViolations(guardedPlan);
+            if (violations.length > 0) {
+              throw new Error(`PROOF_SHOWCASE_RECORD_GATE:${violations.join(',')}`);
+            }
+          }
           return {
             inventory: await inventoryFiles(workRoot),
             revision: await revisionAt(runPathFrom(request.cwd, request.argv)),
@@ -720,7 +779,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       ledgerRoot: join(trustedRoot, 'ledger'),
       runId: mainBefore.runId,
       hmacKey: runHmacKey,
-      keyId: 'northbridge-proof-key-v1',
+      keyId: `${proofSlug}-proof-key-v1`,
     });
     let inspected: RunCheckpoint | null = null;
     try {
@@ -871,6 +930,13 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     const northbridgeAsset = assetResolutions.find(
       (asset) => asset.sceneId === northbridgeScene?.id,
     );
+    const showcaseImageScene = scenes.find((scene) => scene.component === 'image_context');
+    const showcaseImageRequirement = showcaseImageScene?.props.assetRequirement as
+      | { type?: unknown; subject?: unknown }
+      | undefined;
+    const showcaseImageAsset = assetResolutions.find(
+      (asset) => asset.sceneId === showcaseImageScene?.id,
+    );
     const takeDurationSeconds = fold?.timedBeats.length
       ? Number(fold.timedBeats.at(-1)?.toMs ?? 0) / 1000
       : null;
@@ -985,6 +1051,19 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
             typeof northbridgeRequirement.subject === 'string' &&
             /bus/i.test(northbridgeRequirement.subject) &&
             /(?:stop|northbridge|dawn)/i.test(northbridgeRequirement.subject),
+          sceneCount: scenes.length,
+          eventDrivenCapabilities: [
+            ...new Set(
+              scenes
+                .filter((scene) => (scene.events?.length ?? 0) > 0)
+                .map((scene) => scene.component),
+            ),
+          ],
+          showcaseAssetRequirement:
+            showcaseImageRequirement?.type === 'image' &&
+            typeof showcaseImageRequirement.subject === 'string' &&
+            /(?:harbou?r|helios|wind|solar)/i.test(showcaseImageRequirement.subject),
+          showcasePlanCompliant: catalogShowcasePlanViolations(plan).length === 0,
         },
         preflight: {
           advisory:
@@ -997,7 +1076,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
           ),
         },
         assets: {
-          northbridgeStatus: northbridgeAsset?.status ?? null,
+          northbridgeStatus: (showcase ? showcaseImageAsset : northbridgeAsset)?.status ?? null,
           failedCount: assetResolutions.filter((asset) => asset.status === 'failed').length,
         },
         compilation: {
@@ -1026,7 +1105,12 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         },
         evidence: { transcriptRecords: transcript.length, commandRecords: commands.length },
       },
-      { durationBounds, targetSeconds },
+      {
+        durationBounds,
+        targetSeconds,
+        scenario,
+        expectedCapabilities: showcase ? CATALOG_SHOWCASE_CAPABILITIES : undefined,
+      },
     );
     const verdict = machineVerdict(assertions);
 
@@ -1097,9 +1181,10 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       defaultHumanVerdict(
         checkpoint.bindings.render?.preview.sha256 ?? null,
         checkpoint.bindings.take?.takeId ?? null,
+        scenario,
       ),
     );
-    const summary = `# Northbridge production-interface proof evidence
+    const summary = `# ${showcase ? 'Helios Bay catalogue showcase' : 'Northbridge production-interface'} proof evidence
 
 - Proof id: ${proofId}
 - Provider: ${options.provider}
@@ -1117,7 +1202,7 @@ ${
 
 ## Explicit non-claims
 
-${NORTHBRIDGE_NON_CLAIMS.map((claim) => `- ${claim}`).join('\n')}
+${nonClaims.map((claim) => `- ${claim}`).join('\n')}
 `;
     await writeFile(join(stagedEvidence, 'SUMMARY.md'), summary, 'utf8');
     await writeHashIndex(stagedEvidence);
@@ -1156,3 +1241,8 @@ ${NORTHBRIDGE_NON_CLAIMS.map((claim) => `- ${claim}`).join('\n')}
     if (!options.keepWorkingRoots) await rm(workingParent, { recursive: true, force: true });
   }
 };
+
+export type CatalogShowcaseProofOptions = Omit<NorthbridgeProofOptions, 'length'>;
+
+export const runCatalogShowcaseProof = (options: CatalogShowcaseProofOptions) =>
+  runNorthbridgeProof({ ...options, length: 'showcase' });

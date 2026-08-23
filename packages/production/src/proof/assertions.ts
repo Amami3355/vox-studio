@@ -52,6 +52,10 @@ export type NorthbridgeObservations = {
     highlightMarch: boolean;
     uniqueMarchWordAnchor: boolean;
     northbridgeAssetRequirement: boolean;
+    sceneCount: number;
+    eventDrivenCapabilities: string[];
+    showcaseAssetRequirement: boolean;
+    showcasePlanCompliant: boolean;
   };
   preflight: { advisory: boolean; minimumRiskCleared: boolean };
   assets: { northbridgeStatus: string | null; failedCount: number };
@@ -120,12 +124,73 @@ export const repairCycleBudget = (targetSeconds: number): number =>
  */
 export const evaluateNorthbridgeAssertions = (
   observed: NorthbridgeObservations,
-  options: { durationBounds?: readonly [number, number]; targetSeconds?: number } = {},
+  options: {
+    durationBounds?: readonly [number, number];
+    targetSeconds?: number;
+    scenario?: 'northbridge' | 'catalog-showcase';
+    expectedCapabilities?: readonly string[];
+  } = {},
 ): ProofAssertion[] => {
   const [minimumSeconds, maximumSeconds] = options.durationBounds ?? [20, 30];
   const durationWindow = `${minimumSeconds}..${maximumSeconds}`;
   const cycles = repairCycleBudget(options.targetSeconds ?? 25);
   const authoringVersions = cycles + 2;
+  const scenarioAssertions =
+    options.scenario === 'catalog-showcase'
+      ? [
+          item(
+            'scenario.current-catalog-capabilities',
+            [...(options.expectedCapabilities ?? [])].sort(),
+            [...observed.scenario.capabilities].sort(),
+            ['main-run/inputs'],
+          ),
+          item('scenario.exactly-eight-scenes', 8, observed.scenario.sceneCount, [
+            'main-run/inputs',
+          ]),
+          item(
+            'scenario.every-capability-event-driven',
+            [...(options.expectedCapabilities ?? [])].sort(),
+            [...observed.scenario.eventDrivenCapabilities].sort(),
+            ['main-run/inputs'],
+          ),
+          item(
+            'scenario.opening-image-requirement',
+            true,
+            observed.scenario.showcaseAssetRequirement,
+            ['main-run/inputs'],
+          ),
+          item('scenario.brief-compliance', true, observed.scenario.showcasePlanCompliant, [
+            'main-run/inputs',
+          ]),
+        ]
+      : [
+          item(
+            'scenario.both-capabilities',
+            ['bar_chart', 'image_context'],
+            [...observed.scenario.capabilities].sort(),
+            ['main-run/inputs'],
+          ),
+          item('scenario.highlight-march', true, observed.scenario.highlightMarch, [
+            'main-run/inputs',
+          ]),
+          item('scenario.unique-word-anchor', true, observed.scenario.uniqueMarchWordAnchor, [
+            'main-run/inputs',
+          ]),
+          item(
+            'scenario.opening-asset-requirement',
+            true,
+            observed.scenario.northbridgeAssetRequirement,
+            ['main-run/inputs'],
+          ),
+        ];
+  const assetAssertion =
+    options.scenario === 'catalog-showcase'
+      ? item('assets.showcase-placeholder', 'placeholder', observed.assets.northbridgeStatus, [
+          'main-run/run.json',
+        ])
+      : item('assets.northbridge-placeholder', 'placeholder', observed.assets.northbridgeStatus, [
+          'main-run/run.json',
+        ]);
   return [
     item('agent.unscripted-generalist', true, observed.authorship.unscripted, ['environment.json']),
     item(
@@ -226,29 +291,12 @@ export const evaluateNorthbridgeAssertions = (
       ['commands.jsonl'],
     ),
     item('record.one-take-used', 1, observed.run.newTakesUsed, ['main-run/run.json']),
-    item(
-      'scenario.both-capabilities',
-      ['bar_chart', 'image_context'],
-      [...observed.scenario.capabilities].sort(),
-      ['main-run/inputs'],
-    ),
-    item('scenario.highlight-march', true, observed.scenario.highlightMarch, ['main-run/inputs']),
-    item('scenario.unique-word-anchor', true, observed.scenario.uniqueMarchWordAnchor, [
-      'main-run/inputs',
-    ]),
-    item(
-      'scenario.opening-asset-requirement',
-      true,
-      observed.scenario.northbridgeAssetRequirement,
-      ['main-run/inputs'],
-    ),
+    ...scenarioAssertions,
     item('preflight.advisory-wording', true, observed.preflight.advisory, ['main-run/artifacts']),
     item('preflight.minimum-risk-cleared', true, observed.preflight.minimumRiskCleared, [
       'main-run/artifacts',
     ]),
-    item('assets.northbridge-placeholder', 'placeholder', observed.assets.northbridgeStatus, [
-      'main-run/run.json',
-    ]),
+    assetAssertion,
     item('assets.none-failed', 0, observed.assets.failedCount, ['main-run/run.json']),
     item('compile.green', true, observed.compilation.ok, ['main-run/artifacts']),
     item('compile.zero-errors', 0, observed.compilation.errorCount, ['main-run/artifacts']),

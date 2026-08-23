@@ -50,6 +50,10 @@ const passingObservations = (): NorthbridgeObservations => ({
     highlightMarch: true,
     uniqueMarchWordAnchor: true,
     northbridgeAssetRequirement: true,
+    sceneCount: 2,
+    eventDrivenCapabilities: ['image_context', 'bar_chart'],
+    showcaseAssetRequirement: false,
+    showcasePlanCompliant: false,
   },
   preflight: { advisory: true, minimumRiskCleared: true },
   assets: { northbridgeStatus: 'placeholder', failedCount: 0 },
@@ -177,5 +181,36 @@ describe('Northbridge machine assertions', () => {
     ).toBe(false);
     expect(assertions.find((assertion) => assertion.id === 'media.aac-audio')?.pass).toBe(false);
     expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('checks full catalogue breadth for the two-minute showcase variant', () => {
+    const observations = passingObservations();
+    const capabilities = [
+      'bar_chart',
+      'character_explainer',
+      'image_context',
+      'line_chart',
+      'quote',
+      'stat_counter',
+      'timeline',
+      'typographic_statement',
+    ];
+    observations.scenario = {
+      ...observations.scenario,
+      capabilities,
+      sceneCount: 8,
+      eventDrivenCapabilities: capabilities,
+      showcaseAssetRequirement: true,
+      showcasePlanCompliant: true,
+    };
+    observations.media.takeDurationSeconds = 120;
+    observations.media.previewDurationSeconds = 120;
+    const assertions = evaluateNorthbridgeAssertions(observations, {
+      durationBounds: [100, 140],
+      targetSeconds: 120,
+      scenario: 'catalog-showcase',
+      expectedCapabilities: capabilities,
+    });
+    expect(machineVerdict(assertions)).toBe('pass');
   });
 });

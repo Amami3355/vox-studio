@@ -7,7 +7,7 @@ export const NORTHBRIDGE_BRIEF =
   "Create a 20–30-second English editorial explainer about the fictional city of Northbridge's overnight-bus pilot, using only the supplied test facts. Open on a documentary image of a rain-soaked Northbridge bus stop before dawn, then show weekday boardings rising from 12,000 before the pilot to 15,000 in January and 18,000 in March. The narration must say “March” exactly once and the 18,000 March result must be singled out precisely when that word is spoken. End by explaining that the extra 6,000 trips widened access for late-shift workers. Treat Northbridge and all figures as fictional test data, not real-world claims.";
 
 export const NORTHBRIDGE_TASK_MESSAGE =
-  'Using vox and request.json, create a valid VideoPlan and produce the narrated preview MP4. Use the public contract discovery commands; do not seek external help.';
+  'Using only vox.exe and request.json in the current working directory, create a valid VideoPlan and produce the narrated preview MP4. First confirm the current directory contains both files, read request.json in full, and follow its brief exactly. Discover the public contracts through vox before authoring. Before run.record, reread request.json and verify that the narration, duration and catalogue coverage still match the brief. If the current directory or either required file is unavailable, stop without recording. Never inspect or use files outside the current working directory and do not seek external help.';
 
 /**
  * The long-form variant. It is a **separate** proof id on purpose: the short Brief above and

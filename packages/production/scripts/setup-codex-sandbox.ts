@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
-import { access, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { codexProofSandboxArguments } from '../src/proof/codex-agent';
 
-const root = await mkdtemp(join(tmpdir(), 'vox-codex-sandbox-'));
+const parent = 'C:\\vox-proof-workroots';
+await mkdir(parent, { recursive: true });
+const root = await mkdtemp(join(parent, 'vox-codex-sandbox-'));
 const marker = join(root, 'ready.txt');
 const codex = process.env.VOX_PROOF_CODEX_BIN ?? 'codex.exe';
 
