@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { arch, homedir, release, tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -22,15 +22,9 @@ import { type ProductionPipeBridge, startProductionPipeBridge } from '../ipc/pip
 import { DurationCalibrationStore, activeInitialCalibration } from '../preflight/calibration';
 import { type RenderAdapter, createRemotionRenderAdapter } from '../render/remotion';
 import { type RunCheckpoint, RunStore } from '../run-store/run-store';
-import { remainingSecretVariables, scrubAgentEnvironment } from './agent-environment';
+import { credentialStoreCandidates } from './agent-environment';
 import { evaluateNorthbridgeAssertions, machineVerdict } from './assertions';
-import {
-  CATALOG_SHOWCASE_CAPABILITIES,
-  CATALOG_SHOWCASE_NON_CLAIMS,
-  CATALOG_SHOWCASE_PROOF_ID,
-  CATALOG_SHOWCASE_REQUEST,
-  catalogShowcasePlanViolations,
-} from './catalog-showcase';
+import { catalogShowcasePlanViolations } from './catalog-showcase';
 import {
   type FileInventoryEntry,
   inventoryFiles,
@@ -41,15 +35,14 @@ import {
   writeJson,
   writeJsonLines,
 } from './evidence';
+import { NORTHBRIDGE_FIXTURE_PLAN, NORTHBRIDGE_TASK_MESSAGE } from './northbridge';
 import {
-  NORTHBRIDGE_FIXTURE_PLAN,
-  NORTHBRIDGE_LONG_PROOF_ID,
-  NORTHBRIDGE_LONG_REQUEST,
-  NORTHBRIDGE_NON_CLAIMS,
-  NORTHBRIDGE_PROOF_ID,
-  NORTHBRIDGE_REQUEST,
-  NORTHBRIDGE_TASK_MESSAGE,
-} from './northbridge';
+  type ProofScenarioKey,
+  firstImageScene,
+  imageSceneSpanningOpeningBeat,
+  proofScenario,
+} from './scenarios';
+import { verifyWorkRoot } from './workroot';
 
 const execFileAsync = promisify(execFile);
 const csc = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
@@ -72,7 +65,8 @@ export type AgentSandboxEvidence = {
   workRootReadWrite: boolean;
   repositoryDenied: boolean;
   serviceDenied: boolean;
-  credentialsDenied: boolean;
+  /** `null` when this machine holds no credential store to probe, so nothing was measured. */
+  credentialsDenied: boolean | null;
   credentialsEnvironmentDenied: boolean;
   directNetworkDenied: boolean;
   probes: Record<string, { exitCode: number; stdout: string; stderr: string; timedOut: boolean }>;
@@ -85,7 +79,12 @@ export type AgentDriver = (input: {
   launcherEnvironment: { VOX_PIPE_NAME: string; VOX_IPC_TOKEN: string };
   repositoryProbePath: string;
   serviceProbePath: string;
-  credentialsProbePath: string;
+  /**
+   * Credential stores that exist on this machine and that the agent must be denied. Possibly
+   * empty: a machine with no credential store cannot evidence this boundary, and the driver
+   * says so with `credentialsDenied: null` rather than reporting a denial it never measured.
+   */
+  credentialStoreProbePaths: string[];
 }) => Promise<{
   authorship: 'fixture-scripted' | 'fresh-generalist';
   unscripted: boolean;
@@ -101,11 +100,12 @@ export type AgentDriver = (input: {
 export type NorthbridgeProofOptions = {
   provider: 'fixture' | 'elevenlabs';
   /**
-   * Which frozen Brief to put in front of the agent. `short` is the 20–30 s Brief the paid
-   * proofs ran; `long` is the ~3 minute variant. Defaults to `short` so no existing caller
-   * changes behaviour.
+   * Which scenario to put in front of the agent. `short` is the 20–30 s Brief the paid proofs
+   * ran; `long` is the ~3 minute variant; `showcase` is the full-catalogue Helios Bay Brief.
+   * Defaults to `short` so no existing caller changes behaviour. Every value that differs
+   * between them lives in one record — see `scenarios.ts`.
    */
-  length?: 'short' | 'long' | 'showcase';
+  length?: ProofScenarioKey;
   evidenceRoot?: string;
   renderer?: RenderAdapter;
   mediaProbe?: MediaProbe;
@@ -409,7 +409,7 @@ const commandTargetsRun = (workRoot: string, record: CommandRecord, runRoot: str
 const defaultHumanVerdict = (
   previewSha256: string | null,
   takeId: string | null,
-  scenario: 'northbridge' | 'catalog-showcase',
+  rows: readonly string[],
 ) => ({
   humanVerdict: 'pending',
   evaluator: null,
@@ -418,24 +418,7 @@ const defaultHumanVerdict = (
   previewSha256,
   takeId,
   verticalSliceReviewed: false,
-  rows: (scenario === 'catalog-showcase'
-    ? [
-        'narration is intelligible, complete, continuous and matches every fictional fact',
-        'all eight catalogue capabilities are perceptibly distinct and synchronized to the voice',
-        'character, chronology, trend, comparison, statistic and quote remain legible',
-        'the image placeholder is honest visible degradation',
-        'composition, typography, motion and pace remain coherent across the full film',
-        'the complete preview is watchable and listenable without explanation',
-      ]
-    : [
-        'narration intelligible, complete, continuous and fact-matching',
-        'March highlight perceptibly lands on the unique spoken word',
-        'opening, chart, hierarchy, transitions and ending are legible',
-        'placeholder is honest visible degradation',
-        'composition, typography, motion and pace are system-premium',
-        'complete preview is watchable and listenable without explanation',
-      ]
-  ).map((criterion) => ({ criterion, verdict: 'pending', note: null })),
+  rows: rows.map((criterion) => ({ criterion, verdict: 'pending', note: null })),
   note: 'Pending is incomplete, never pass. This verdict does not close gap 8.',
 });
 
@@ -444,32 +427,9 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     throw new Error('PROOF_FRESH_GENERALIST_REQUIRED');
   }
   const seeded = new Set(options.seededViolations ?? []);
-  const long = options.length === 'long';
-  const showcase = options.length === 'showcase';
-  const scenario = showcase ? 'catalog-showcase' : 'northbridge';
-  const proofRequest = showcase
-    ? CATALOG_SHOWCASE_REQUEST
-    : long
-      ? NORTHBRIDGE_LONG_REQUEST
-      : NORTHBRIDGE_REQUEST;
-  const proofId = showcase
-    ? CATALOG_SHOWCASE_PROOF_ID
-    : long
-      ? NORTHBRIDGE_LONG_PROOF_ID
-      : NORTHBRIDGE_PROOF_ID;
-  const proofSlug = showcase ? 'helios-bay-catalog-showcase' : 'northbridge-night-bus';
-  const nonClaims = showcase ? CATALOG_SHOWCASE_NON_CLAIMS : NORTHBRIDGE_NON_CLAIMS;
-  /**
-   * `durationBounds` is the acceptance window — the long Brief asks for 170–190 s and gets the
-   * same proportional slack the short one gets. `targetSeconds` is what the Brief actually asks
-   * for, and it sets the repair budget; the two are kept separate so widening the window for
-   * slack never silently buys the agent more repair attempts.
-   */
-  const { durationBounds, targetSeconds } = showcase
-    ? { durationBounds: [100, 140] as readonly [number, number], targetSeconds: 120 }
-    : long
-      ? { durationBounds: [150, 210] as readonly [number, number], targetSeconds: 180 }
-      : { durationBounds: [20, 30] as readonly [number, number], targetSeconds: 25 };
+  const scenario = proofScenario(options.length ?? 'short');
+  const { proofId, slug: proofSlug, nonClaims, durationBounds, targetSeconds } = scenario;
+  const proofRequest = scenario.request;
   // The elevated Windows sandbox runs as a separate local account. It cannot traverse this
   // user's Documents or AppData parents even when the leaf itself has a permissive ACL, so the
   // disposable agent workspace must live under a neutral root-level parent.
@@ -503,6 +463,9 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     await compileCSharp(runner, resolve(packageRoot, 'tests/fixtures/RestrictedRunner.cs'));
     await compileCSharp(pipeBridgeExecutable, resolve(packageRoot, 'service/PipeBridge.cs'));
     await writeJson(join(workRoot, 'request.json'), proofRequest);
+    // The same invariant `bootstrap:workroot` enforces, checked at the point the work root is
+    // built rather than only in the assertion sheet an hour later.
+    await verifyWorkRoot(workRoot);
     const initialInventory = await inventoryFiles(workRoot);
 
     const acl = await execFileAsync('icacls.exe', [
@@ -534,9 +497,21 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       resolve(repositoryRoot, 'CONTEXT.md'),
     );
     const serviceProbe = await restrictedProbe('--probe-denied', trustedRoot);
-    const credentialsProbe = await restrictedProbe(
-      '--probe-denied',
-      resolve(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'auth.json'),
+    const credentialStoreProbePaths = (
+      await Promise.all(
+        credentialStoreCandidates(process.env, homedir()).map(async (path) =>
+          access(path).then(
+            () => path,
+            () => null,
+          ),
+        ),
+      )
+    ).filter((path): path is string => path !== null);
+    const credentialStoreProbes = await Promise.all(
+      credentialStoreProbePaths.map(async (path) => ({
+        path,
+        ...(await restrictedProbe('--probe-denied', path)),
+      })),
     );
     const identityProbe = await execFileAsync(runner, ['--identity'], {
       cwd: workRoot,
@@ -601,20 +576,21 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       audit: {
         before: async (request) => {
           activeCommand = request.argv.slice(0, 3).join(' ');
-          if (showcase && activeCommand === 'production run record') {
+          const recordGate = scenario.recordGate;
+          if (recordGate && activeCommand === 'production run record') {
             const guardedRunRoot = runPathFrom(request.cwd, request.argv);
-            if (!guardedRunRoot) throw new Error('PROOF_SHOWCASE_RECORD_GATE:NO_RUN');
+            if (!guardedRunRoot) throw new Error('PROOF_RECORD_GATE:NO_RUN');
             const guardedCheckpoint = JSON.parse(
               await readFile(join(guardedRunRoot, 'run.json'), 'utf8'),
             ) as RunCheckpoint;
             const guardedPlanPath = guardedCheckpoint.bindings.plan?.snapshot.path;
-            if (!guardedPlanPath) throw new Error('PROOF_SHOWCASE_RECORD_GATE:NO_PLAN');
+            if (!guardedPlanPath) throw new Error('PROOF_RECORD_GATE:NO_PLAN');
             const guardedPlan = JSON.parse(
               await readFile(resolve(guardedRunRoot, guardedPlanPath), 'utf8'),
             ) as VideoPlan;
-            const violations = catalogShowcasePlanViolations(guardedPlan);
+            const violations = recordGate(guardedPlan);
             if (violations.length > 0) {
-              throw new Error(`PROOF_SHOWCASE_RECORD_GATE:${violations.join(',')}`);
+              throw new Error(`PROOF_RECORD_GATE:${violations.join(',')}`);
             }
           }
           return {
@@ -694,10 +670,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       launcherEnvironment: { VOX_PIPE_NAME: pipeName, VOX_IPC_TOKEN: ipcSecret },
       repositoryProbePath: resolve(repositoryRoot, 'CONTEXT.md'),
       serviceProbePath: trustedRoot,
-      credentialsProbePath: resolve(
-        process.env.CODEX_HOME ?? join(homedir(), '.codex'),
-        'auth.json',
-      ),
+      credentialStoreProbePaths,
     });
 
     const mainRun = selectAgentRenderedRun(workRoot, commands);
@@ -917,25 +890,18 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     const scenes = plan.sections.flatMap((section) => section.scenes);
     const marchCount = plan.beats.flatMap((beat) => beat.text.match(/\bMarch\b/g) ?? []).length;
     const assetResolutions = checkpoint.bindings.compilation?.assetResolutions ?? [];
-    const openingBeatId = plan.beats[0]?.id;
-    const northbridgeScene = scenes.find(
-      (scene) =>
-        scene.component === 'image_context' &&
-        openingBeatId !== undefined &&
-        scene.spansBeats.includes(openingBeatId),
-    );
+    const northbridgeScene = imageSceneSpanningOpeningBeat(plan);
     const northbridgeRequirement = northbridgeScene?.props.assetRequirement as
       | { type?: unknown; subject?: unknown }
       | undefined;
-    const northbridgeAsset = assetResolutions.find(
-      (asset) => asset.sceneId === northbridgeScene?.id,
-    );
-    const showcaseImageScene = scenes.find((scene) => scene.component === 'image_context');
+    const showcaseImageScene = firstImageScene(plan);
     const showcaseImageRequirement = showcaseImageScene?.props.assetRequirement as
       | { type?: unknown; subject?: unknown }
       | undefined;
-    const showcaseImageAsset = assetResolutions.find(
-      (asset) => asset.sceneId === showcaseImageScene?.id,
+    // Which image the Brief actually named is a scenario fact, not a branch: Northbridge names
+    // the opening image, the showcase names one image among eight scenes.
+    const scoredImageAsset = assetResolutions.find(
+      (asset) => asset.sceneId === scenario.scoredImageScene(plan)?.id,
     );
     const takeDurationSeconds = fold?.timedBeats.length
       ? Number(fold.timedBeats.at(-1)?.toMs ?? 0) / 1000
@@ -947,25 +913,22 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
           kind: authoring.authorship,
           unscripted: authoring.unscripted,
         },
+        /**
+         * Only what the agent's own sandbox measured counts here. These used to fall back to the
+         * restricted-token probes below, which measure what *such a token* would be denied and
+         * say nothing about the process that actually authored the plan — so a driver that
+         * brought no sandbox passed the whole section while its process may have read the
+         * repository at will. The probes are still recorded in `permissions.json`, where they
+         * evidence the work root's ACL; they are no longer allowed to stand in for the agent.
+         */
         isolation: {
           initialFiles: initialInventory.map((entry) => entry.path).sort(),
-          workRootReadWrite:
-            authoring.sandboxEvidence?.workRootReadWrite ??
-            (workRootProbe.exitCode === 0 && workRootProbe.stdout === 'readwrite\n'),
-          repositoryDenied:
-            authoring.sandboxEvidence?.repositoryDenied ??
-            (repositoryProbe.exitCode === 0 && repositoryProbe.stdout === 'denied\n'),
-          serviceDenied:
-            authoring.sandboxEvidence?.serviceDenied ??
-            (serviceProbe.exitCode === 0 && serviceProbe.stdout === 'denied\n'),
-          credentialsDenied:
-            authoring.sandboxEvidence?.credentialsDenied ??
-            (credentialsProbe.exitCode === 0 && credentialsProbe.stdout === 'denied\n'),
-          // Without a spawned sandbox to interrogate, the honest fallback is to check the
-          // environment the harness would have handed over.
+          workRootReadWrite: authoring.sandboxEvidence?.workRootReadWrite ?? null,
+          repositoryDenied: authoring.sandboxEvidence?.repositoryDenied ?? null,
+          serviceDenied: authoring.sandboxEvidence?.serviceDenied ?? null,
+          credentialsDenied: authoring.sandboxEvidence?.credentialsDenied ?? null,
           credentialsEnvironmentDenied:
-            authoring.sandboxEvidence?.credentialsEnvironmentDenied ??
-            remainingSecretVariables(scrubAgentEnvironment(process.env)).length === 0,
+            authoring.sandboxEvidence?.credentialsEnvironmentDenied ?? null,
           writesContained: commands.every((record) =>
             [...record.created, ...record.changed].every((entry) => !entry.path.startsWith('../')),
           ),
@@ -1000,7 +963,9 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
               .map((event) => event.command),
             ...authoring.directNetworkEvents.map(() => 'agent-direct-network'),
           ],
-          directDenied: authoring.directNetworkDenied,
+          // A driver reporting on its own egress is not evidence. Only a sandbox that actually
+          // attempted a connection and was refused can settle this one.
+          directDenied: authoring.sandboxEvidence?.directNetworkDenied ?? null,
         },
         limits: {
           planVersions,
@@ -1076,7 +1041,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
           ),
         },
         assets: {
-          northbridgeStatus: (showcase ? showcaseImageAsset : northbridgeAsset)?.status ?? null,
+          northbridgeStatus: scoredImageAsset?.status ?? null,
           failedCount: assetResolutions.filter((asset) => asset.status === 'failed').length,
         },
         compilation: {
@@ -1108,8 +1073,8 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       {
         durationBounds,
         targetSeconds,
-        scenario,
-        expectedCapabilities: showcase ? CATALOG_SHOWCASE_CAPABILITIES : undefined,
+        scenario: scenario.assertionScenario,
+        expectedCapabilities: scenario.expectedCapabilities,
       },
     );
     const verdict = machineVerdict(assertions);
@@ -1153,7 +1118,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       workRootProbe,
       repositoryProbe,
       serviceProbe,
-      credentialsProbe,
+      credentialStoreProbes,
       identity: {
         restriction: 'SAFER_CONSTRAINED',
         output: identityProbe.stdout.trim(),
@@ -1162,7 +1127,10 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     });
     await writeJson(join(stagedEvidence, 'leak-scan.json'), leakScan);
     await writeJson(join(stagedEvidence, 'network-audit.json'), {
+      // What the driver says about its own egress, and whether anything actually measured it.
+      // The two are separate fields on purpose: only the second one is evidence.
       directPolicyDenied: authoring.directNetworkDenied,
+      directPolicyEvidencedBySandbox: authoring.sandboxEvidence !== null,
       directEvents: authoring.directNetworkEvents,
       serviceEvents: networkEvents,
     });
@@ -1181,10 +1149,10 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       defaultHumanVerdict(
         checkpoint.bindings.render?.preview.sha256 ?? null,
         checkpoint.bindings.take?.takeId ?? null,
-        scenario,
+        scenario.humanVerdictRows,
       ),
     );
-    const summary = `# ${showcase ? 'Helios Bay catalogue showcase' : 'Northbridge production-interface'} proof evidence
+    const summary = `# ${scenario.title} proof evidence
 
 - Proof id: ${proofId}
 - Provider: ${options.provider}

@@ -46,8 +46,24 @@ describe.sequential('Northbridge proof harness', () => {
     const result = await execute();
     expect(result.machineVerdict).toBe('fail');
     expect(result.humanVerdict).toBe('pending');
-    const failed = result.assertions.filter((assertion) => !assertion.pass);
+    const failed = result.assertions.filter((assertion) => assertion.outcome === 'fail');
     expect(failed.map((assertion) => assertion.id)).toEqual(['agent.unscripted-generalist']);
+    // The fixture driver spawns no sandbox, so it cannot evidence the agent's isolation. Those
+    // assertions used to pass from the restricted-token probes, which measure a different
+    // process entirely; now they say what is true, which is that nothing measured them.
+    expect(
+      result.assertions
+        .filter((assertion) => assertion.outcome === 'not-evidenced')
+        .map((assertion) => assertion.id)
+        .sort(),
+    ).toEqual([
+      'isolation.credentials-denied',
+      'isolation.credentials-environment-denied',
+      'isolation.repository-denied',
+      'isolation.service-denied',
+      'isolation.work-root-readwrite',
+      'network.agent-direct-denied',
+    ]);
     await expect(verifyProofBundle(result.evidenceRoot, { requirePass: false })).resolves.toEqual({
       machineVerdict: 'fail',
       humanVerdict: 'pending',

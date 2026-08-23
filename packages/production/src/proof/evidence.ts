@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { basename, extname, relative, resolve } from 'node:path';
-import type { ProofAssertion } from './assertions';
+import { type ProofAssertion, type ProofOutcome, machineVerdict, withOutcomes } from './assertions';
 
 export type FileInventoryEntry = { path: string; bytes: number; sha256: string };
 export type LeakScan = { pass: boolean; scanned: string[]; violations: string[] };
@@ -115,7 +115,7 @@ export const writeHashIndex = async (root: string): Promise<Record<string, strin
 export const verifyProofBundle = async (
   root: string,
   options: { requirePass?: boolean } = {},
-): Promise<{ machineVerdict: 'pass' | 'fail'; humanVerdict: 'pass' | 'fail' | 'pending' }> => {
+): Promise<{ machineVerdict: ProofOutcome; humanVerdict: 'pass' | 'fail' | 'pending' }> => {
   const absoluteRoot = resolve(root);
   const index = JSON.parse(
     await readFile(resolve(absoluteRoot, 'hash-index.json'), 'utf8'),
@@ -135,18 +135,22 @@ export const verifyProofBundle = async (
     }
   }
 
-  const assertions = JSON.parse(
-    await readFile(resolve(absoluteRoot, 'assertions.json'), 'utf8'),
-  ) as { machineVerdict: 'pass' | 'fail'; assertions: ProofAssertion[] };
-  if (!Array.isArray(assertions.assertions) || assertions.assertions.length === 0) {
+  const bundle = JSON.parse(await readFile(resolve(absoluteRoot, 'assertions.json'), 'utf8')) as {
+    machineVerdict: ProofOutcome;
+    assertions: Array<Omit<ProofAssertion, 'outcome'> & { outcome?: ProofOutcome }>;
+  };
+  if (!Array.isArray(bundle.assertions) || bundle.assertions.length === 0) {
     throw new Error('PROOF_ASSERTIONS_ABSENT');
   }
-  for (const assertion of assertions.assertions) {
+  const assertions = withOutcomes(bundle.assertions);
+  for (const assertion of assertions) {
     if (
       !assertion.id ||
       !Array.isArray(assertion.evidence) ||
       assertion.evidence.length === 0 ||
-      typeof assertion.pass !== 'boolean'
+      typeof assertion.pass !== 'boolean' ||
+      !['pass', 'fail', 'not-evidenced'].includes(assertion.outcome) ||
+      assertion.pass !== (assertion.outcome === 'pass')
     ) {
       throw new Error('PROOF_ASSERTION_MALFORMED');
     }
@@ -156,10 +160,10 @@ export const verifyProofBundle = async (
       });
     }
   }
-  const derivedMachineVerdict = assertions.assertions.every((assertion) => assertion.pass)
-    ? 'pass'
-    : 'fail';
-  if (assertions.machineVerdict !== derivedMachineVerdict) {
+  // Re-derived rather than trusted, and derived by the same function the harness used, so the
+  // bundle cannot record a verdict its own assertions do not support.
+  const derivedMachineVerdict = machineVerdict(assertions);
+  if (bundle.machineVerdict !== derivedMachineVerdict) {
     throw new Error('PROOF_MACHINE_VERDICT_MISMATCH');
   }
 

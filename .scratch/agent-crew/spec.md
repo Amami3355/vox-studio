@@ -19,12 +19,13 @@ own.
 A Python ADK agent crew, developed and run **locally on Windows first**, that
 takes a fresh editorial Brief and autonomously drives the existing Agent
 production interface end-to-end — from contract discovery through a rendered
-narrated preview MP4 — without ever seeing repository source. The crew runs
-inside an isolated workroot containing only the `vox.exe` launcher and the
-public contract projections, exactly like the proof agents before it. Its tools
-wrap the production command surface and return the service's JSON envelopes
-verbatim, so the crew learns from the same refusals (`means`/`repair`/`next`)
-the interface already publishes. Research arrives through Parallel tools behind
+narrated preview MP4 — without ever seeing repository source. The crew process
+lives outside an isolated workroot and works with its directory set to it,
+exactly like the proof agents before it: the workroot itself begins as `vox.exe`
+and the Brief's `request.json` and nothing else, and the crew earns the contract
+projections by asking for them. Its tools wrap the production command surface
+and return the service's JSON envelopes verbatim, so the crew learns from the
+same refusals (`means`/`repair`/`next`) the interface already publishes. Research arrives through Parallel tools behind
 a recordable interface. The existing proof harness — workroot setup, stubbed
 providers, assertion sheets — is the crew's test seam, so the crew is held to
 the same bar as the Codex driver it replaces.
@@ -33,14 +34,17 @@ the same bar as the Codex driver it replaces.
 
 These are yours, not the agent's. Nothing below is code.
 
-1. **Land the in-flight work.** The working tree carries the Helios Bay
-   showcase-proof changes the crew builds on (harness scenario routing, sandbox
-   hardening, workroots at `C:\vox-proof-workroots`). Commit them before crew
-   work starts so the crew effort begins from a clean tree.
+1. ~~**Land the in-flight work.**~~ **Done** — the Helios Bay showcase-proof
+   changes the crew builds on (harness scenario routing, sandbox hardening,
+   workroots at `C:\vox-proof-workroots`) landed in `be7ca5e`. The crew effort
+   begins from a clean tree.
 2. **Gemini access for local ADK.** Create a Google AI Studio API key
    (aistudio.google.com) and export it as `GOOGLE_API_KEY` in the shell that
-   runs the crew. Free tier is enough for development. (A billed GCP project
-   with Vertex AI is a cloud-phase item, but create the project now — it costs
+   runs the crew. Note that the harness deletes this variable today — review
+   decision 2 is the amendment that lets it through, and until it lands the crew
+   cannot reach a model. Do not assume the free tier carries a full run: review
+   decision 3 sets the budget the crew works within. (A billed GCP project with
+   Vertex AI is a cloud-phase item, but create the project now — it costs
    nothing and you will need it for Agent Engine later.)
 3. **Parallel account.** Sign up at parallel.ai, create an API key, and store
    it outside the repository (environment variable). This is the partner-track
@@ -95,9 +99,12 @@ These are yours, not the agent's. Nothing below is code.
 11. As an operator, I want the crew to accept placeholder degradation visibly
     rather than fighting it, so that a preview with placeholders is an honest
     intermediate state.
-12. As an operator, I want the whole crew to run inside an isolated workroot
-    containing only `vox.exe`, the contracts and its run directories, so that
-    code-blindness holds during local development, not just at proof time.
+12. As an operator, I want the crew to work only inside an isolated workroot
+    that begins as `vox.exe` and `request.json` and grows nothing but its run
+    directories, so that code-blindness holds during local development, not just
+    at proof time. Contract projections arrive on stdout inside the result
+    envelope and are held in the crew's context — never cached into the
+    workroot, which is what keeps "nothing but its run directories" true.
 13. As an operator, I want crew transcripts and every command envelope
     persisted per run inside the workroot, so that any run can be audited
     afterwards exactly like a proof evidence bundle.
@@ -144,13 +151,38 @@ These are yours, not the agent's. Nothing below is code.
   (`services/agents`), as a self-contained ADK project: Python 3.11+, `uv` for
   environment management, `google-adk` as the framework, `pytest` for tests.
   It is not a pnpm workspace member; the repo's TypeScript checks do not see
-  it.
+  it. The one exception is the harness driver shim — reaching the crew from the
+  proof harness needs a `createCrewAgentDriver: AgentDriver` beside the Codex
+  one, and that stays TypeScript inside `packages/production`.
 - **Transport (decided with the operator).** Local development uses the real
   code-blind boundary: the crew process runs with its working directory inside
   an isolated workroot, and every production operation is a `vox.exe`
   subprocess invocation, exactly as the proof drivers did. No stdio shim, no
-  second client interface. The existing sandbox/workroot setup and the agent
-  distribution build are generalised from "codex-proof" to crew-agnostic.
+  second client interface, and no local HTTP listener — ADR-0007 forbids TCP and
+  HTTP for this boundary, and the isolation evidence rests on the named pipe.
+  The agent distribution build is generalised from "codex-proof" to
+  crew-agnostic. **The sandbox is not a rename**: `setup-codex-sandbox.ts`
+  shells out to `codex sandbox`, and that mechanism is the sole producer of
+  `repositoryDenied`, `serviceDenied`, `credentialsDenied` and
+  `directNetworkDenied`. Replacing it is real work, not a search-and-replace,
+  and review decision 1 defers it rather than pretending otherwise.
+- **The deployment seam is the client, not the transport (ADR-0015).** The crew
+  depends on one Python production-client interface with two implementations: a
+  local one that spawns `vox.exe`, and an HTTP one for the cloud phase. Neither
+  tools, agent instructions nor tests may branch on which is active. The
+  client's methods are **payload-shaped from the first commit, in both
+  directions** — every path-shaped input the command surface takes (`--request`,
+  `--plan`, `--decision`, `--replacement-authorisation`) arrives as an object, a
+  Run is named by its id, and artifacts are retrieved through a client method
+  taking a Run id and an envelope's artifact descriptor rather than by joining a
+  run root to a relative path. The read-back direction matters most: the crew
+  reads the preview and the compile and Preflight reports off its own disk
+  today, and in the cloud that disk is not there. The local implementation is
+  the only module that knows a plan becomes `plan.json` and that `--plan` takes
+  a path. This is what makes the crew deployable later without touching an
+  agent: the cloud phase adds an implementation and deletes one module's path
+  handling. A tool that accepts or returns a path is a defect against this
+  decision even when it works locally.
 - **Crew shape — smallest crew that closes the loop.** Two agents first: a
   **researcher** (Parallel tools, brief triage, decline recommendation) and a
   **producer/orchestrator** (contract discovery, plan authoring, repair loop,
@@ -190,9 +222,75 @@ These are yours, not the agent's. Nothing below is code.
   must be deployable to Agent Engine later without structural change — no
   local-only shortcuts in tool interfaces.
 - **Acceptance bar.** (1) End-to-end Northbridge or showcase run passes the
-  existing assertion sheet with stubbed providers. (2) One real Helios Bay run
-  — live synthesis, one take — passes machine assertions and is submitted for
-  the standing human watch/listen verdict.
+  existing assertion sheet with stubbed providers — **excluding the isolation
+  assertions**, which crew runs do not evidence for this phase (review decision
+  1). (2) An unservable Brief produces a structured Decline naming the unmet
+  editorial need, with no Take recorded (review decision 4). (3) One real Helios
+  Bay run — live synthesis, one take — passes machine assertions and is
+  submitted for the standing human watch/listen verdict.
+
+## Review decisions — settled
+
+These four came out of reading the surfaces this spec builds on. Each changed
+what the work is, so each is settled here rather than left to be discovered in a
+ticket.
+
+1. **Local crew runs report `sandboxEvidence: null`, and the isolation
+   assertions are not evidence for this phase.** The alternative was a real
+   sandbox backend for a Python process tree, and it is more work than it looks:
+   `RestrictedRunner` will not do it as-is — it is a SAFER constrained token that
+   loads one managed assembly and constrains filesystem, not network — and the
+   existing backend is Codex's own (`setup-codex-sandbox.ts` shells out to `codex
+   sandbox`), which leaves with Codex. Taking the honest null now keeps the crew
+   phase moving; the real backend is cloud-phase work, where service separation
+   makes isolation structural rather than sandbox-enforced.
+
+   **What this costs, stated plainly so it is not rediscovered at submission
+   time.** With `sandboxEvidence: null` the harness falls back through `??` to the
+   `RestrictedRunner` probes, which measure what a restricted token *would* be
+   denied rather than what the crew process actually was, and `directNetworkDenied`
+   is whatever the driver returns. That section therefore passes vacuously: the
+   crew process can read the repository at will. So **code-blindness is convention,
+   not enforcement, for crew runs.** The project may claim the code-blind boundary
+   for the Codex proofs, which evidence it, and may not claim it for the crew.
+   Acceptance bar (1) is amended accordingly, to stop reading as if it did — this is a
+   claim-versus-evidence question before it is a test-coverage one, and story 26's
+   submission narrative depends on getting it right.
+
+2. **The environment scrub gains the crew runtime, and the credentials probe is
+   re-pointed at it.** `scrubAgentEnvironment` matches `API_?KEY`-shaped names and
+   whitelists only `^(CODEX|OPENAI)_`, so `GOOGLE_API_KEY` is deleted before the
+   crew spawns — prerequisite 2 currently asks the operator to export a variable
+   the harness removes. The crew cannot run without its key, so the amendment is
+   forced rather than chosen; it widens a deliberate boundary and the reasoning
+   goes in that file's existing comment, in its style. Separately, the harness
+   hardcodes `credentialsProbePath` to `CODEX_HOME/auth.json`, which proves nothing
+   about a runtime holding its credential in the environment: the crew's probe
+   tests the crew's actual credential or it is retired, because a probe that cannot
+   fail is worse than no probe.
+
+3. **The contract budget is solved by not re-sending, not by not fetching.** The
+   five projections total ~220 KB of JSON (catalog 107 KB, protocol 63 KB,
+   language 21 KB, plan 18 KB, checks 11 KB) — roughly 55–70k tokens, resident
+   across a repair loop the budget allows five `validate` and three Preflight
+   cycles for. Selective fetching does not solve this: **the catalog is the
+   planner's primary authoring input** — capability names, actions and anchors all
+   live there and nothing can be written before it is read — so the 107 KB
+   dominant term is the one item that cannot be deferred. Fetching `checks` only
+   when a refusal names it, and `language` and `plan` once, saves ~50 KB of 220 KB
+   and leaves the problem. The lever is **context caching**: the catalog is read
+   once and kept in a cached prefix across the repair loop rather than re-sent per
+   turn. Prerequisite 2's "free tier is enough for development" is struck; the
+   crew names a rate-limit and token budget it runs within.
+
+4. **A third scenario is added: an unservable Brief that must produce a Decline.**
+   Story 8 wants a structured Decline naming the unmet editorial need, and neither
+   Northbridge nor the showcase exercises it. Moving Decline out of scope was the
+   alternative and it is the worse trade: the scenario is cheap to fixture (a Brief
+   asking for something the catalog's `avoidWhen` already redirects), refusing well
+   is judge-visible as product behaviour rather than a crash, and the measurement
+   gate consumes Decline later regardless. The acceptance bar is amended
+   accordingly to name it.
 
 ## Testing Decisions
 
@@ -235,10 +333,15 @@ These are yours, not the agent's. Nothing below is code.
 - The cloud phases (production service on Cloud Run, crew on Agent Engine,
   plan-as-payload over HTTPS) are decided and deliberately deferred — see the
   conversation record and ADR-0007 for the trust boundary this spec preserves
-  locally.
-- The uncommitted Helios Bay harness work is a dependency, not a rival: its
-  scenario routing, assertion parameterisation and sandbox predicates are
-  exactly what the crew's acceptance tests consume.
+  locally, and **ADR-0015** for where the local-to-cloud seam is placed and why
+  it is not the transport. ADR-0015 also decides that the cloud run store keeps
+  POSIX semantics rather than object storage, which is the one cloud choice that
+  reaches back into this phase: `RunStore` uses `link`, `rename` and lock files,
+  and taking that decision now is what makes the local design correct rather
+  than provisional.
+- The Helios Bay harness work is a dependency, not a rival: its scenario
+  routing, assertion parameterisation and sandbox predicates are exactly what
+  the crew's acceptance tests consume. It landed in `be7ca5e`.
 - Keep the CONTEXT.md vocabulary in all crew-facing writing: Brief, Run,
   Take, Decline, Preflight, teaching surface. The crew's own artifacts should
   read like the rest of the repository.

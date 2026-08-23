@@ -2,7 +2,11 @@ import { execFile, spawn } from 'node:child_process';
 import { access, rm } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
-import { PRODUCTION_SECRET_VARIABLES, scrubAgentEnvironment } from './agent-environment';
+import {
+  PRODUCTION_SECRET_VARIABLES,
+  credentialStoreDenied,
+  scrubAgentEnvironment,
+} from './agent-environment';
 import type { AgentDriver, AgentSandboxEvidence } from './harness';
 import { NORTHBRIDGE_TASK_MESSAGE } from './northbridge';
 
@@ -176,13 +180,14 @@ const verifySandbox = async (input: {
   workRoot: string;
   repositoryProbePath: string;
   serviceProbePath: string;
-  credentialsProbePath: string;
+  /** Possibly empty: a machine with no credential store cannot evidence this boundary. */
+  credentialStoreProbePaths: string[];
   environment: NodeJS.ProcessEnv;
 }): Promise<AgentSandboxEvidence> => {
   await Promise.all([
     access(input.repositoryProbePath),
     access(input.serviceProbePath),
-    access(input.credentialsProbePath),
+    ...input.credentialStoreProbePaths.map((path) => access(path)),
     access('C:\\Windows\\System32\\curl.exe'),
   ]);
   const marker = join(input.workRoot, '.codex-sandbox-write-probe');
@@ -236,12 +241,22 @@ const verifySandbox = async (input: {
       '/c',
       `dir /b "${input.serviceProbePath}"`,
     ]),
-    credentials: await sandboxCommand(input.codex, input.workRoot, input.environment, [
-      'cmd.exe',
-      '/d',
-      '/c',
-      `type "${input.credentialsProbePath}"`,
-    ]),
+    ...Object.fromEntries(
+      await Promise.all(
+        input.credentialStoreProbePaths.map(
+          async (path) =>
+            [
+              `credentialStore:${path}`,
+              await sandboxCommand(input.codex, input.workRoot, input.environment, [
+                'cmd.exe',
+                '/d',
+                '/c',
+                `type "${path}"`,
+              ]),
+            ] as const,
+        ),
+      ),
+    ),
     network: await sandboxCommand(input.codex, input.workRoot, input.environment, [
       'curl.exe',
       '--silent',
@@ -277,7 +292,16 @@ const verifySandbox = async (input: {
     }),
     repositoryDenied: probes.repository.exitCode !== 0 && !probes.repository.timedOut,
     serviceDenied: probes.service.exitCode !== 0 && !probes.service.timedOut,
-    credentialsDenied: probes.credentials.exitCode !== 0 && !probes.credentials.timedOut,
+    // Null when this machine holds no credential store: a boundary nothing was pointed at was
+    // not tested, and reporting it as denied is exactly the vacuous pass this probe exists to
+    // avoid. Otherwise every store must have been refused.
+    credentialsDenied:
+      input.credentialStoreProbePaths.length === 0
+        ? null
+        : input.credentialStoreProbePaths.every((path) => {
+            const result = probes[`credentialStore:${path}` as keyof typeof probes];
+            return result !== undefined && credentialStoreDenied(result);
+          }),
     // Fail closed: every secret needs its own probe to have actually run and said ABSENT.
     // A missing, empty or errored probe is not evidence of absence.
     credentialsEnvironmentDenied: PRODUCTION_SECRET_VARIABLES.every((name) => {
@@ -300,7 +324,9 @@ const verifySandbox = async (input: {
     !evidence.workRootReadWrite ||
     !evidence.repositoryDenied ||
     !evidence.serviceDenied ||
-    !evidence.credentialsDenied ||
+    // `false` aborts; `null` does not, because there was nothing here to measure. The run still
+    // reports that gap: the assertion sheet scores an unmeasured boundary as not evidenced.
+    evidence.credentialsDenied === false ||
     // Aborts before the agent can reach the one quota-bearing command, so a credential leak
     // costs nothing instead of being discovered in the assertions after the money is spent.
     !evidence.credentialsEnvironmentDenied ||
@@ -383,7 +409,7 @@ export const createCodexAgentDriver =
     launcherEnvironment,
     repositoryProbePath,
     serviceProbePath,
-    credentialsProbePath,
+    credentialStoreProbePaths,
   }) => {
     const codex = await resolveCodex();
     // Scrub first, then re-apply the launcher capability: VOX_IPC_TOKEN is the authenticated
@@ -400,7 +426,7 @@ export const createCodexAgentDriver =
       workRoot,
       repositoryProbePath,
       serviceProbePath,
-      credentialsProbePath,
+      credentialStoreProbePaths,
       environment,
     });
     const version = await run(codex, ['--version'], { cwd: workRoot, env: environment });

@@ -4,6 +4,7 @@ import {
   evaluateNorthbridgeAssertions,
   machineVerdict,
   repairCycleBudget,
+  withOutcomes,
 } from '../src/proof/assertions';
 
 const passingObservations = (): NorthbridgeObservations => ({
@@ -181,6 +182,109 @@ describe('Northbridge machine assertions', () => {
     ).toBe(false);
     expect(assertions.find((assertion) => assertion.id === 'media.aac-audio')?.pass).toBe(false);
     expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('scores an unmeasured isolation boundary as not evidenced rather than as a pass', () => {
+    const observations = passingObservations();
+    observations.isolation.repositoryDenied = null;
+    const assertions = evaluateNorthbridgeAssertions(observations);
+    const repository = assertions.find(
+      (assertion) => assertion.id === 'isolation.repository-denied',
+    );
+    expect(repository?.outcome).toBe('not-evidenced');
+    expect(repository?.pass).toBe(false);
+    expect(repository?.observed).toBe('not-evidenced');
+    expect(machineVerdict(assertions)).toBe('not-evidenced');
+  });
+
+  it('scores a driver that brings no sandbox as not evidenced across the whole section', () => {
+    const observations = passingObservations();
+    observations.isolation = {
+      ...observations.isolation,
+      workRootReadWrite: null,
+      repositoryDenied: null,
+      serviceDenied: null,
+      credentialsDenied: null,
+      credentialsEnvironmentDenied: null,
+    };
+    observations.network.directDenied = null;
+    const assertions = evaluateNorthbridgeAssertions(observations);
+    expect(
+      assertions
+        .filter((assertion) => assertion.outcome === 'not-evidenced')
+        .map((assertion) => assertion.id)
+        .sort(),
+    ).toEqual([
+      'isolation.credentials-denied',
+      'isolation.credentials-environment-denied',
+      'isolation.repository-denied',
+      'isolation.service-denied',
+      'isolation.work-root-readwrite',
+      'network.agent-direct-denied',
+    ]);
+    // What the harness *can* measure about the work root stays measured.
+    expect(
+      assertions.find((assertion) => assertion.id === 'isolation.initial-two-files')?.outcome,
+    ).toBe('pass');
+    expect(
+      assertions.find((assertion) => assertion.id === 'isolation.write-containment')?.outcome,
+    ).toBe('pass');
+    expect(assertions.every((assertion) => assertion.outcome !== 'fail')).toBe(true);
+    expect(machineVerdict(assertions)).toBe('not-evidenced');
+  });
+
+  it('keeps a real failure louder than an unmeasured boundary', () => {
+    const observations = passingObservations();
+    observations.isolation.serviceDenied = null;
+    observations.network.commandViolations = ['production run compile'];
+    expect(machineVerdict(evaluateNorthbridgeAssertions(observations))).toBe('fail');
+  });
+
+  it('still fails an isolation boundary that was measured and breached', () => {
+    const observations = passingObservations();
+    observations.isolation.repositoryDenied = false;
+    const assertions = evaluateNorthbridgeAssertions(observations);
+    const repository = assertions.find(
+      (assertion) => assertion.id === 'isolation.repository-denied',
+    );
+    expect(repository?.outcome).toBe('fail');
+    expect(repository?.observed).toBe(false);
+    expect(machineVerdict(assertions)).toBe('fail');
+  });
+
+  it('marks every assertion with exactly one of the three outcomes', () => {
+    const assertions = evaluateNorthbridgeAssertions(passingObservations());
+    for (const assertion of assertions) {
+      expect(['pass', 'fail', 'not-evidenced']).toContain(assertion.outcome);
+      expect(assertion.pass).toBe(assertion.outcome === 'pass');
+    }
+  });
+
+  it('reads a bundle written before the third outcome existed as what it meant', () => {
+    const frozen = [
+      { id: 'a', expected: true, observed: true, pass: true, evidence: ['x'] },
+      { id: 'b', expected: true, observed: false, pass: false, evidence: ['x'] },
+    ];
+    const read = withOutcomes(frozen);
+    expect(read.map((assertion) => assertion.outcome)).toEqual(['pass', 'fail']);
+    // The frozen failure must still aggregate to a failure, not to an absent field.
+    expect(machineVerdict(read)).toBe('fail');
+    expect(machineVerdict(withOutcomes([frozen[0]!]))).toBe('pass');
+  });
+
+  it('leaves an outcome the bundle already carries alone', () => {
+    const read = withOutcomes([
+      {
+        id: 'a',
+        expected: true,
+        observed: 'not-evidenced',
+        outcome: 'not-evidenced',
+        pass: false,
+        evidence: ['x'],
+      },
+    ]);
+    expect(read[0]?.outcome).toBe('not-evidenced');
+    expect(machineVerdict(read)).toBe('not-evidenced');
   });
 
   it('checks full catalogue breadth for the two-minute showcase variant', () => {

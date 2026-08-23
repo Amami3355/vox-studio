@@ -1,9 +1,31 @@
 import { isDeepStrictEqual } from 'node:util';
 
+/**
+ * `not-evidenced` is the third outcome, and it exists because its absence made a whole section
+ * of this sheet vacuous. The isolation assertions used to fall back to probes measured against a
+ * restricted token — what such a token *would* be denied — whenever the driver supplied no
+ * sandbox of its own, so a driver that measured nothing passed every one of them while its
+ * process may have read the repository at will.
+ *
+ * A run may legitimately be unable to measure something. What it may not do is report the gap as
+ * a pass. `not-evidenced` is not a failure either: nothing was found wrong, nothing was shown
+ * right, and the bundle says which.
+ */
+export type ProofOutcome = 'pass' | 'fail' | 'not-evidenced';
+
+/**
+ * `null` means the run could not measure this, and is distinct from `false`, which means it
+ * measured a breach. Only observations that a driver can genuinely leave unmeasured use it —
+ * elsewhere `null` keeps its ordinary meaning of an absent value, which fails.
+ */
+export type EvidencedBoolean = boolean | null;
+
 export type ProofAssertion = {
   id: string;
   expected: unknown;
   observed: unknown;
+  outcome: ProofOutcome;
+  /** `false` for both `fail` and `not-evidenced`: neither is a pass. Read `outcome` to tell. */
   pass: boolean;
   evidence: string[];
 };
@@ -11,12 +33,14 @@ export type ProofAssertion = {
 export type NorthbridgeObservations = {
   authorship: { kind: 'fixture-scripted' | 'fresh-generalist'; unscripted: boolean };
   isolation: {
+    /** Measured by the harness on the work root itself, so it is evidenced for every driver. */
     initialFiles: string[];
-    workRootReadWrite: boolean;
-    repositoryDenied: boolean;
-    serviceDenied: boolean;
-    credentialsDenied: boolean;
-    credentialsEnvironmentDenied: boolean;
+    workRootReadWrite: EvidencedBoolean;
+    repositoryDenied: EvidencedBoolean;
+    serviceDenied: EvidencedBoolean;
+    credentialsDenied: EvidencedBoolean;
+    credentialsEnvironmentDenied: EvidencedBoolean;
+    /** Measured from the recorded commands, not from anything the agent reports about itself. */
     writesContained: boolean;
   };
   leakScan: { pass: boolean; violations: string[] };
@@ -26,7 +50,12 @@ export type NorthbridgeObservations = {
     agentDiscoveryObserved: boolean;
   };
   processContract: { envelopesValid: boolean; stderrValid: boolean; exitsValid: boolean };
-  network: { providerDispatchCount: number; commandViolations: string[]; directDenied: boolean };
+  network: {
+    providerDispatchCount: number;
+    commandViolations: string[];
+    /** Self-reported unless a sandbox measured it, so a driver with no sandbox leaves it null. */
+    directDenied: EvidencedBoolean;
+  };
   limits: {
     planVersions: number;
     validateCalls: number;
@@ -83,15 +112,34 @@ const item = (
   observed: unknown,
   evidence: string[],
   predicate?: (value: unknown) => boolean,
-): ProofAssertion => ({
-  id,
-  expected,
-  observed,
-  pass:
+): ProofAssertion => {
+  const pass =
     evidence.length > 0 &&
-    (predicate ? predicate(observed) : isDeepStrictEqual(observed, expected)),
-  evidence,
-});
+    (predicate ? predicate(observed) : isDeepStrictEqual(observed, expected));
+  return { id, expected, observed, outcome: pass ? 'pass' : 'fail', pass, evidence };
+};
+
+/**
+ * An assertion over something the run may have been unable to measure. The unmeasured case is
+ * written into the bundle as the word rather than as a missing field, so a reader of
+ * `assertions.json` sees the gap without having to know which fields were nullable.
+ */
+const evidencedItem = (
+  id: string,
+  expected: unknown,
+  observed: EvidencedBoolean,
+  evidence: string[],
+): ProofAssertion =>
+  observed === null
+    ? {
+        id,
+        expected,
+        observed: 'not-evidenced',
+        outcome: 'not-evidenced',
+        pass: false,
+        evidence,
+      }
+    : item(id, expected, observed, evidence);
 
 const between =
   (minimum: number, maximum: number) =>
@@ -199,17 +247,19 @@ export const evaluateNorthbridgeAssertions = (
       observed.isolation.initialFiles,
       ['initial-inventory.json'],
     ),
-    item('isolation.work-root-readwrite', true, observed.isolation.workRootReadWrite, [
+    evidencedItem('isolation.work-root-readwrite', true, observed.isolation.workRootReadWrite, [
       'permissions.json',
     ]),
-    item('isolation.repository-denied', true, observed.isolation.repositoryDenied, [
+    evidencedItem('isolation.repository-denied', true, observed.isolation.repositoryDenied, [
       'permissions.json',
     ]),
-    item('isolation.service-denied', true, observed.isolation.serviceDenied, ['permissions.json']),
-    item('isolation.credentials-denied', true, observed.isolation.credentialsDenied, [
+    evidencedItem('isolation.service-denied', true, observed.isolation.serviceDenied, [
       'permissions.json',
     ]),
-    item(
+    evidencedItem('isolation.credentials-denied', true, observed.isolation.credentialsDenied, [
+      'permissions.json',
+    ]),
+    evidencedItem(
       'isolation.credentials-environment-denied',
       true,
       observed.isolation.credentialsEnvironmentDenied,
@@ -237,7 +287,7 @@ export const evaluateNorthbridgeAssertions = (
     item('process.stderr-contract', true, observed.processContract.stderrValid, ['commands.jsonl']),
     item('process.exit-contract', true, observed.processContract.exitsValid, ['commands.jsonl']),
     item('network.record-only', [], observed.network.commandViolations, ['network-audit.json']),
-    item('network.agent-direct-denied', true, observed.network.directDenied, [
+    evidencedItem('network.agent-direct-denied', true, observed.network.directDenied, [
       'network-audit.json',
     ]),
     item('network.one-provider-dispatch', 1, observed.network.providerDispatchCount, [
@@ -343,5 +393,33 @@ export const evaluateNorthbridgeAssertions = (
   ];
 };
 
-export const machineVerdict = (assertions: ProofAssertion[]): 'pass' | 'fail' =>
-  assertions.length > 0 && assertions.every((assertion) => assertion.pass) ? 'pass' : 'fail';
+/**
+ * Reads a sheet that may predate the third outcome. Evidence bundles written before `outcome`
+ * existed carry only `pass`, and they are frozen: they must keep verifying and must keep meaning
+ * what they meant. `pass` maps onto the two outcomes it could then express without ambiguity, so
+ * an old bundle reads as itself rather than as malformed — and, importantly, an old failure is
+ * still read as a failure rather than as an absent field.
+ */
+export const withOutcomes = (
+  assertions: Array<Omit<ProofAssertion, 'outcome'> & { outcome?: ProofOutcome }>,
+): ProofAssertion[] =>
+  assertions.map((assertion) => ({
+    ...assertion,
+    outcome: assertion.outcome ?? (assertion.pass ? 'pass' : 'fail'),
+  }));
+
+/**
+ * The aggregate is the worst outcome present, with `fail` above `not-evidenced`: a run that both
+ * failed something and could not measure something else is a failure, not an unmeasured run. An
+ * empty sheet is a failure, because a sheet that asserts nothing has proved nothing.
+ *
+ * `not-evidenced` deliberately is not a pass. A crew phase that cannot evidence code-blindness
+ * still gets a verdict distinguishable from a run that was measured and found wanting, which is
+ * the whole point of keeping the third outcome instead of folding it into `fail`.
+ */
+export const machineVerdict = (assertions: ProofAssertion[]): ProofOutcome => {
+  if (assertions.length === 0) return 'fail';
+  if (assertions.some((assertion) => assertion.outcome === 'fail')) return 'fail';
+  if (assertions.some((assertion) => assertion.outcome === 'not-evidenced')) return 'not-evidenced';
+  return 'pass';
+};
