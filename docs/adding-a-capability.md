@@ -1,6 +1,6 @@
 # Adding a capability
 
-**Status:** procedure · 2026-08-16 · verified against `stat_counter`, the fourth capability
+**Status:** procedure · 2026-08-23 · gate timings measured on `timeline`, the sixth capability; file shape verified against `stat_counter`, the fourth
 **Scope:** what it costs to add a scene capability to the catalog, and what it costs to change
 one that already exists. Written because the knowledge lived only in session handoffs.
 
@@ -250,16 +250,56 @@ with no sentence beside it is a number nobody can re-check.
 
 ## Gates
 
-Run all six. Compare numbers, not exit codes.
+Two loops, and they are not interchangeable. The narrow one runs while you write; the six
+full gates run **once, at the end, before commit or merge**. A full sequential pass measured
+15 min 30 s on this machine (2026-08-23, `timeline` the sixth capability in the registry),
+and render plus stress are 91% of that. Running all six after every edit is the single
+easiest way to turn a one-day capability into a three-day one. Compare numbers, not exit
+codes.
+
+### While implementing: the narrow loop
+
+Seconds, not minutes, and scoped to the capability:
 
 ```
-pnpm catalog:check                     # both projections up to date
-pnpm -r typecheck                      # clean, 4 packages
-pnpm vitest run --no-file-parallelism   # unit tests, ~95 s
-pnpm test:render                       # render tests, ~110-280 s
-pnpm test:stress                       # the schemas' own ceilings, drawn; minutes
-npx biome check .                      # 9 errors is the pre-existing baseline, not zero
+pnpm vitest run packages/video/tests/<capability>.test.ts        # its unit file
+npx vitest run --config vitest.render.config.ts \
+  packages/video/tests/render/<capability>.test.ts               # one capability, ~14 s
+npx vitest run --config vitest.stress.config.ts \
+  packages/video/tests/stress/content-stress.test.ts -t "<capability-id> at"   # ~48 s
+pnpm catalog                        # ~4 s — rerun after any schema or registry change
 ```
+
+The stress `-t` matches the case label, which begins `<capability-id> at its …`
+(`tests/stress/cases.ts`), so keep the trailing ` at` and quote the whole filter. A
+capability's own render file is cheap; the sweeps that make the full gate expensive —
+`safe-area`, `occupies-regions`, `compiled-video` — are exactly the ones the narrow loop
+does not pay for.
+
+### Before commit or merge: all six, once
+
+```
+pnpm catalog:check                      # both projections up to date, ~4 s
+pnpm -r typecheck                       # clean, 4 packages, ~7 s
+pnpm vitest run --no-file-parallelism   # unit tests, ~84 s for 731
+pnpm test:render                        # render tests, ~377 s for 179 renders
+pnpm test:stress                        # the schemas' own ceilings, drawn; ~451 s for 1 155 cases
+npx biome check .                       # ~0.4 s; 9 errors is the pre-existing baseline, not zero
+```
+
+Where that time goes, from the same measured pass — three render files are three quarters
+of their gate, and none of them is about your capability. They sweep every registered
+capability's examples, so each capability added makes the full pass slower for every
+capability after it. The stress matrix multiplies the same way — content regime × layout ×
+composition × motion profile — which is why a multi-layout charts capability costs more
+future gate time than a single-layout one.
+
+| gate | the expensive part | measured |
+| --- | --- | ---: |
+| render | `safe-area.test.ts`, 92 tests | ~161 s |
+| render | `occupies-regions.test.ts`, 52 tests | ~66 s |
+| render | `service-render.test.ts`, one real H.264/AAC media, codecs inspected | ~59 s |
+| unit | `proof-harness.test.ts`, synthesises and inspects media | ~19.5 s |
 
 `test:stress` is change-scoped rather than universal — ADR-0003 makes it obligatory for a
 commit that touches a schema, a layout or `supportedCompositions`, with `catalog:check` as
@@ -282,3 +322,11 @@ actually looked at. `pnpm studio` opens Remotion Studio.
   header of `packages/video/scripts/measure-still-cost.mjs`.
 - **Biome's baseline is 9 errors**, all pre-existing formatting. A gate run exits 1 purely
   because of this.
+- **Do not run render and stress in parallel on Windows.** Both drive headless Chrome and
+  the compositor, and running them concurrently has produced `spawn EPERM` here. Chain
+  them, one after the other — each suite's internal parallelism is enough.
+- **The proof harness and `service-render.test.ts` need `ffprobe` on `PATH`.** It is not
+  global on this machine; Remotion ships one at
+  `node_modules/.pnpm/@remotion+compositor-win32-x64-msvc@*/node_modules/@remotion/compositor-win32-x64-msvc/ffprobe.exe`
+  — prefix that directory onto `PATH` for the gate. A missing `ffprobe` is an environment
+  failure, not a capability regression.
