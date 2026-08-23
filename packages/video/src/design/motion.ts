@@ -97,6 +97,48 @@ export const staggerFrames = (profile: MotionProfile): number =>
 export const springConfig = (profile: MotionProfile) => motion.spring[profile.spring];
 
 /**
+ * Reusable motion grammar for a whole graphic object that should feel alive without
+ * implying articulated movement.
+ *
+ * Scenes consume the normalised samples below and decide only how much of their own
+ * layout allowance to spend. Cadence, phase and easing live here in L0, alongside the
+ * other motion decisions, so a SceneCapability never invents a duration or curve.
+ */
+const graphicMotion = {
+  ambientCycleFrames: motion.duration.slow * 8,
+  accentWindowFrames: motion.duration.base * 2,
+  ambientVerticalShare: 0.5,
+  ambientTiltPhase: 1,
+} as const;
+
+export type AmbientGraphicMotion = {
+  horizontal: number;
+  vertical: number;
+  tilt: number;
+};
+
+/** One deterministic sample from the design system's restrained ambient loop. */
+export const ambientGraphicMotionAt = (frame: number): AmbientGraphicMotion => {
+  const phase = (frame / graphicMotion.ambientCycleFrames) * Math.PI * 2;
+  return {
+    horizontal: Math.sin(phase),
+    vertical: Math.cos(phase) * graphicMotion.ambientVerticalShare,
+    tilt: Math.sin(phase + graphicMotion.ambientTiltPhase),
+  };
+};
+
+/**
+ * A reversible emphasis envelope: zero at the event, one at the midpoint, and exactly
+ * zero again once the design-owned window has passed.
+ */
+export const graphicAccentAt = (frame: number, startFrame: number | null): number => {
+  if (startFrame === null) return 0;
+  const elapsed = frame - startFrame;
+  if (elapsed < 0 || elapsed > graphicMotion.accentWindowFrames) return 0;
+  return Math.sin((elapsed / graphicMotion.accentWindowFrames) * Math.PI);
+};
+
+/**
  * Pace is a rhythm token, not a duration. It scales how tightly events are packed
  * inside a scene; it never sets the scene length, which comes from the beats.
  */

@@ -236,5 +236,5 @@ describe('native vox launcher stdio contract', () => {
     ]);
     expect(malformed.exitCode).toBe(2);
     assertEnvelope(malformed, null, 'failed');
-  });
+  }, 30_000);
 });

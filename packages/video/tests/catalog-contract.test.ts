@@ -183,7 +183,10 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
   });
 
   /**
-   * A redirection names an id, and the agent will type what it is told.
+   * A redirection names a public authoring identifier, and the agent will type what it is
+   * told. Most targets are SceneCapability ids. A repair above scenes may instead name the
+   * exact VideoPlan field that owns it: `persistent`, for a Persistent element declared on
+   * the Section.
    *
    * Most targets here are deliberately unbuilt — `timeline`, `stat_donut`, `map` — and that
    * is the catalogue strategy working: a redirect says "not this scene" whether or not the
@@ -198,6 +201,7 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
    */
   it('redirects to well-formed ids, and never to a near-miss of a built one', () => {
     const built = registry.map((one) => one.meta.id);
+    const planTargets = ['persistent'];
     const normalise = (id: string) => id.toLowerCase().replace(/[^a-z]/g, '');
 
     for (const entry of capability.meta.avoidWhen) {
@@ -208,7 +212,7 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
       });
       expect({ entry, self: target === capability.meta.id }).toEqual({ entry, self: false });
 
-      if (built.includes(target)) continue;
+      if (built.includes(target) || planTargets.includes(target)) continue;
       const nearMiss = built.find((id) => normalise(id) === normalise(target));
       expect({ entry, nearMiss }).toEqual({ entry, nearMiss: undefined });
     }

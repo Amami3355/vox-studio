@@ -26,7 +26,7 @@ export const characterExplainerMeta: SceneMeta = {
     'attributing exact spoken words to a person → quote',
     'a claim that gains nothing from a character → typographic_statement',
     'comparing numeric categories → bar_chart',
-    'uninterrupted character continuity across unrelated scene kinds → persistent_element',
+    'uninterrupted character continuity across unrelated SceneCapabilities; use a Persistent element declared on the Section → persistent',
   ],
   supportsEvents: true,
   requiresAssets: true,

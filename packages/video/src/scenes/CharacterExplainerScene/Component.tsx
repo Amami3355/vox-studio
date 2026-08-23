@@ -3,7 +3,12 @@ import { Img, staticFile, useCurrentFrame } from 'remotion';
 import { ASSET_REQUIREMENT_FIELD } from '../../core/assets';
 import { resolveEvents } from '../../core/events';
 import type { AssetRef, SceneProps } from '../../core/types';
-import { type MotionProfile, motion, staggerFrames } from '../../design/motion';
+import {
+  type MotionProfile,
+  ambientGraphicMotionAt,
+  graphicAccentAt,
+  staggerFrames,
+} from '../../design/motion';
 import { type Theme, mix, scaleStep } from '../../design/theme';
 import {
   AnimatedText,
@@ -216,13 +221,12 @@ const CutoutFigure: React.FC<{
    * on the entrance would leave them a drift apart forever. The amplitude ramps with
    * the entrance, so the figure is still while it arrives and lives once it has.
    */
-  const cycle = motion.duration.slow * 8;
   const live = Math.min(1, entrance);
-  const phase = (frame / cycle) * Math.PI * 2;
+  const ambient = ambientGraphicMotionAt(frame);
   const ambientAmplitude = allowance * sideBySideGeometry.ambientShare;
-  const ambientX = Math.sin(phase) * ambientAmplitude * live;
-  const ambientY = Math.cos(phase) * ambientAmplitude * 0.5 * live;
-  const ambientTilt = Math.sin(phase + 1) * sideBySideGeometry.ambientTiltDegrees * live;
+  const ambientX = ambient.horizontal * ambientAmplitude * live;
+  const ambientY = ambient.vertical * ambientAmplitude * live;
+  const ambientTilt = ambient.tilt * sideBySideGeometry.ambientTiltDegrees * live;
 
   /**
    * The accent envelope: a single raised cosine over a window read off the motion
@@ -231,12 +235,7 @@ const CutoutFigure: React.FC<{
    * the window by overwriting the frame, and before the first accent lands there is
    * nothing to ease.
    */
-  const accentWindow = motion.duration.base * 2;
-  const accentElapsed = accentFrame === null ? -1 : frame - accentFrame;
-  const accent =
-    accentElapsed >= 0 && accentElapsed <= accentWindow
-      ? Math.sin((accentElapsed / accentWindow) * Math.PI)
-      : 0;
+  const accent = graphicAccentAt(frame, accentFrame);
   const accentScale = sideBySideGeometry.motionAllowance * sideBySideGeometry.accentShare;
   const tilt = ambientTilt + sideBySideGeometry.accentTiltDegrees * accent;
 

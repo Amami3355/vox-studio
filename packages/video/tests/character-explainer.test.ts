@@ -78,6 +78,14 @@ describe('CharacterExplainerScene catalog contract', () => {
     expect(avoid).toContain('→ quote');
     expect(avoid).toContain('→ typographic_statement');
   });
+
+  it('redirects continuity to the canonical Section-level mechanism', () => {
+    const guidance = getSceneSpec('character_explainer').avoidWhen.find((entry) =>
+      entry.endsWith('→ persistent'),
+    );
+
+    expect(guidance).toContain('Persistent element declared on the Section');
+  });
 });
 
 describe('CharacterExplainerScene asset requirement', () => {

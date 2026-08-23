@@ -1,6 +1,6 @@
 # Adding a capability
 
-**Status:** procedure · 2026-08-23 · gate timings measured on `timeline`, the sixth capability; file shape verified against `stat_counter`, the fourth
+**Status:** procedure · 2026-08-23 · gate timings measured on `character_explainer`, the eighth capability; file shape verified against `stat_counter`, the fourth
 **Scope:** what it costs to add a scene capability to the catalog, and what it costs to change
 one that already exists. Written because the knowledge lived only in session handoffs.
 
@@ -123,7 +123,11 @@ Write `meta.ts` and `schema.ts` first and get the wording approved before writin
 else. Action descriptions and error strings are published to the agent; changing them later
 means regenerating and re-reading every diff that quotes them.
 
-1. **`meta.ts`** — `avoidWhen` entries must contain `→`. The contract enforces the arrow.
+1. **`meta.ts`** — `avoidWhen` entries must contain `→`. The target is normally a
+   SceneCapability id. When the honest repair lives above scenes, target its exact public
+   VideoPlan field and name the canonical mechanism and owner before the arrow, for example
+   `use a Persistent element declared on the Section → persistent`. The contract enforces
+   the arrow and the identifier shape.
 2. **`schema.ts`** — `.strict()`, generous ceilings, a `.describe()` on every field.
 3. **`constraints.ts`** — at least one entry, each naming the degradation it buys.
 4. **`layouts.ts`** — start with one layout. A second arrangement with its own rhythm is a
@@ -252,8 +256,8 @@ with no sentence beside it is a number nobody can re-check.
 
 Two loops, and they are not interchangeable. The narrow one runs while you write; the six
 full gates run **once, at the end, before commit or merge**. A full sequential pass measured
-15 min 30 s on this machine (2026-08-23, `timeline` the sixth capability in the registry),
-and render plus stress are 91% of that. Running all six after every edit is the single
+22 min 6 s on this machine (2026-08-23, `character_explainer` the eighth capability in the
+registry), and render plus stress are 89% of that. Running all six after every edit is the single
 easiest way to turn a one-day capability into a three-day one. Compare numbers, not exit
 codes.
 
@@ -262,7 +266,7 @@ codes.
 Seconds, not minutes, and scoped to the capability:
 
 ```
-pnpm vitest run packages/video/tests/<capability>.test.ts        # its unit file
+pnpm run test -- packages/video/tests/<capability>.test.ts       # its unit file
 npx vitest run --config vitest.render.config.ts \
   packages/video/tests/render/<capability>.test.ts               # one capability, ~14 s
 npx vitest run --config vitest.stress.config.ts \
@@ -279,12 +283,12 @@ does not pay for.
 ### Before commit or merge: all six, once
 
 ```
-pnpm catalog:check                      # both projections up to date, ~4 s
-pnpm -r typecheck                       # clean, 4 packages, ~7 s
-pnpm vitest run --no-file-parallelism   # unit tests, ~84 s for 731
-pnpm test:render                        # render tests, ~377 s for 179 renders
-pnpm test:stress                        # the schemas' own ceilings, drawn; ~451 s for 1 155 cases
-npx biome check .                       # ~0.4 s; 9 errors is the pre-existing baseline, not zero
+pnpm catalog:check                      # both projections up to date, ~7 s
+pnpm -r typecheck                       # clean, 4 packages, ~31 s
+pnpm run test -- --no-file-parallelism  # unit tests, ~101 s for 781
+pnpm test:render                        # render tests, ~499 s for 195 renders
+pnpm test:stress                        # the schemas' own ceilings, drawn; ~687 s for 1 203 cases
+npx biome check .                       # repository-wide formatting and lint, ~1 s
 ```
 
 Where that time goes, from the same measured pass — three render files are three quarters
@@ -296,10 +300,10 @@ future gate time than a single-layout one.
 
 | gate | the expensive part | measured |
 | --- | --- | ---: |
-| render | `safe-area.test.ts`, 92 tests | ~161 s |
+| render | `safe-area.test.ts`, 98 tests | ~203 s |
 | render | `occupies-regions.test.ts`, 52 tests | ~66 s |
-| render | `service-render.test.ts`, one real H.264/AAC media, codecs inspected | ~59 s |
-| unit | `proof-harness.test.ts`, synthesises and inspects media | ~19.5 s |
+| render | `service-render.test.ts`, one real H.264/AAC media, codecs inspected | ~85 s |
+| unit | `proof-harness.test.ts`, synthesises and inspects media | ~22 s |
 
 `test:stress` is change-scoped rather than universal — ADR-0003 makes it obligatory for a
 commit that touches a schema, a layout or `supportedCompositions`, with `catalog:check` as
@@ -313,15 +317,16 @@ actually looked at. `pnpm studio` opens Remotion Studio.
 
 ## Traps
 
-- **PowerShell eats the `--`.** Use `pnpm vitest run --no-file-parallelism`, never
-  `pnpm test -- --no-file-parallelism`.
+- **Use the explicit script form when forwarding Vitest flags.** In PowerShell, run
+  `pnpm run test -- --no-file-parallelism`; the shorthand `pnpm test -- ...` can be parsed
+  as a pnpm option instead of being forwarded to Vitest.
 - **A scratch render script must live inside `packages/video/scripts/`.** Node resolves
   `@remotion/bundler` from the script's own location upward, so a script outside the package
   cannot import it. Point its output at `.scratch/`, which is gitignored.
 - **`renderStill` is ~30x cheaper than `renderMedia`** — see the measured baseline in the
   header of `packages/video/scripts/measure-still-cost.mjs`.
-- **Biome's baseline is 9 errors**, all pre-existing formatting. A gate run exits 1 purely
-  because of this.
+- **Biome is a clean gate.** Do not waive repository-wide errors as a baseline; this measured
+  pass completed with no diagnostics.
 - **Do not run render and stress in parallel on Windows.** Both drive headless Chrome and
   the compositor, and running them concurrently has produced `spawn EPERM` here. Chain
   them, one after the other — each suite's internal parallelism is enough.

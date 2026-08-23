@@ -163,15 +163,16 @@ describe('CharacterExplainerScene runtime', () => {
   }, 120_000);
 
   it('keeps the accepted key frames stable', async () => {
-    const [entrance, settled, accentPeak, edge, empty] = await Promise.all([
+    const [entrance, settled, accentPeak, square, edge, empty] = await Promise.all([
       renderHash(CANONICAL_EXAMPLE_ID, ENTRANCE_FRAME),
       renderHash(CANONICAL_EXAMPLE_ID, SETTLED_FRAME),
       renderHash('example-explainer-driven', ACCENT_PEAK_FRAME),
+      renderHash(CANONICAL_EXAMPLE_ID, SETTLED_FRAME, SQUARE_READY),
       renderHash('example-explainer-long', SETTLED_FRAME),
       renderHash('example-explainer-empty', SETTLED_FRAME),
     ]);
 
-    expect({ entrance, settled, accentPeak, edge, empty }).toEqual({
+    expect({ entrance, settled, accentPeak, square, edge, empty }).toEqual({
       // Accepted 2026-08-23, the first key frames for this capability. Reviewed on stills
       // at the frames named above, on `editorial-paper`, and the stills' own md5s match
       // these hashes — the script and the suite render the same bytes:
@@ -185,6 +186,9 @@ describe('CharacterExplainerScene runtime', () => {
       //   accentPeak — the same figure at the accent's peak: halo brighter and larger,
       //     cutout a touch scaled and tilted, copy untouched. This is the picture
       //     `accentCharacter` exists to produce, mid-window.
+      //   square     — the square stand-in fully contained and bottom-aligned inside the
+      //     same character allowance: head and both shoulders visible, no stretching or
+      //     contact with the live-frame edge. This is the accepted square regime.
       //   edge      — copy at the schema's own ceilings: a two-line label, a headline
       //     stepped down the scale onto five lines, a five-line paragraph, all legible
       //     and all inside the column, the figure unchanged beside them.
@@ -194,6 +198,7 @@ describe('CharacterExplainerScene runtime', () => {
       entrance: '2d915750f313a126f8efa40c429ef11a',
       settled: '064e465b1e7e3ce67f697d91e17509d8',
       accentPeak: 'e99d05c335e32088b149db760442f85b',
+      square: '4ee77487b1effb4bd319d0d6ed5a0cc8',
       edge: 'd91faf345ad26260d6db91861afa780a',
       empty: '1ccb2809080c0fa9c65883115389d112',
     });

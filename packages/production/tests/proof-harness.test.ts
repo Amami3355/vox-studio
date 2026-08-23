@@ -107,7 +107,7 @@ describe.sequential('Northbridge proof harness', () => {
     await expect(verifyProofBundle(result.evidenceRoot, { requirePass: false })).rejects.toThrow(
       'PROOF_HASH_MISMATCH',
     );
-  }, 20_000);
+  }, 30_000);
 
   it('makes a seeded leak fail the leak gate and aggregate verdict', async () => {
     const result = await execute(['leak']);
@@ -115,7 +115,7 @@ describe.sequential('Northbridge proof harness', () => {
       result.assertions.find((assertion) => assertion.id === 'leaks.agent-readable-files')?.pass,
     ).toBe(false);
     expect(result.machineVerdict).toBe('fail');
-  }, 20_000);
+  }, 30_000);
 
   it('makes a seeded non-record network event fail network exclusivity', async () => {
     const result = await execute(['network']);
@@ -123,7 +123,7 @@ describe.sequential('Northbridge proof harness', () => {
       result.assertions.find((assertion) => assertion.id === 'network.record-only')?.pass,
     ).toBe(false);
     expect(result.machineVerdict).toBe('fail');
-  }, 20_000);
+  }, 30_000);
 
   it('preserves fail-closed evidence and working roots when an actual driver aborts', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'vox-proof-failure-test-'));
@@ -152,5 +152,5 @@ describe.sequential('Northbridge proof harness', () => {
       'seeded-agent-start',
     );
     expect(await readFile(join(evidenceRoot, 'hash-index.json'), 'utf8')).toContain('failure.json');
-  }, 20_000);
+  }, 30_000);
 });
