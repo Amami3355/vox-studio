@@ -788,6 +788,270 @@
       ]
     },
     {
+      "id": "character_explainer",
+      "name": "CharacterExplainerScene",
+      "family": "character",
+      "summary": "One resolved character cutout that materially carries an explanation, given restrained graphic motion and paired with concise copy.",
+      "useWhen": [
+        "letting one recognisable figure or mascot visibly carry an explanation",
+        "personifying a concept through a guide who holds the frame while the copy explains it",
+        "giving a narrated emphasis a brief, repeatable visual reaction on the figure"
+      ],
+      "avoidWhen": [
+        "a person who only appears as documentary context → image_context",
+        "attributing exact spoken words to a person → quote",
+        "a claim that gains nothing from a character → typographic_statement",
+        "comparing numeric categories → bar_chart",
+        "uninterrupted character continuity across unrelated scene kinds → persistent_element"
+      ],
+      "supportsEvents": true,
+      "requiresAssets": true,
+      "occupiesRegions": [
+        "full"
+      ],
+      "supportedCompositions": [
+        "full"
+      ],
+      "minDurationFrames": 90,
+      "recommendedDurationFrames": 180,
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "default": "",
+            "description": "Optional short identity or role, like a caption name. Best under 24 characters.",
+            "type": "string",
+            "maxLength": 80
+          },
+          "headline": {
+            "default": "",
+            "description": "Optional concise claim the character carries. Best under 48 characters; longer copy drops down the type scale.",
+            "type": "string",
+            "maxLength": 120
+          },
+          "explanation": {
+            "default": "",
+            "description": "Optional supporting copy beside the character. Best under 160 characters; longer copy wraps onto more lines.",
+            "type": "string",
+            "maxLength": 240
+          },
+          "assetRequirement": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "character"
+                ],
+                "description": "This scene composes with a figure, never a plate or a document."
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "description": "Visual subject in natural language. Never a path or URI."
+              },
+              "treatment": {
+                "type": "string",
+                "enum": [
+                  "cutout",
+                  "illustration"
+                ],
+                "description": "A cutout or an illustration; a photograph or duotone does not read as a figure that can carry an explanation."
+              },
+              "orientation": {
+                "type": "string",
+                "enum": [
+                  "portrait",
+                  "square"
+                ],
+                "description": "Portrait or square; a landscape subject is a scene, not a figure."
+              },
+              "identityKey": {
+                "description": "Stable identity shared by requirements that must resolve to the same asset.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "type",
+              "subject",
+              "treatment",
+              "orientation"
+            ],
+            "additionalProperties": false,
+            "description": "Semantic character request resolved before compilation. One cutout or illustration, portrait or square; never a path or URI."
+          }
+        },
+        "required": [
+          "assetRequirement"
+        ],
+        "additionalProperties": false
+      },
+      "softConstraints": {
+        "label": {
+          "recommendedMax": 24,
+          "onExceed": "Shorten the label; it names the character, it is not a second headline."
+        },
+        "headline": {
+          "recommendedMin": 1,
+          "recommendedMax": 48,
+          "onEmpty": "The frame leans on the character, the label and the explanation; the copy column shows a designed pending note instead.",
+          "onExceed": "The headline steps down the type scale until the copy column fits it.",
+          "onExceedCode": "TITLE_DENSITY"
+        },
+        "explanation": {
+          "recommendedMax": 160,
+          "onExceed": "The explanation wraps onto more lines and recedes further behind the headline."
+        }
+      },
+      "layouts": [
+        {
+          "id": "sideBySide",
+          "description": "A dominant contained character cutout standing on one side of the frame, a bounded copy column on the other. The proportions are the layout’s, never the plan’s.",
+          "slots": [
+            "character",
+            "label",
+            "headline",
+            "explanation"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "revealCharacter",
+          "description": "Bring the character cutout onto the frame. Use it to hold the figure back until the narration reaches it.",
+          "payloadSchema": null
+        },
+        {
+          "id": "revealCopy",
+          "description": "Bring the label, headline and explanation in, one after the other. Independent of revealCharacter; either order is legal.",
+          "payloadSchema": null
+        },
+        {
+          "id": "accentCharacter",
+          "description": "A brief graphic pulse of the whole cutout — a restrained scale and tilt with its halo — that returns the figure to rest. It may repeat; the latest event restarts the gesture.",
+          "payloadSchema": null
+        }
+      ],
+      "examples": [
+        {
+          "id": "example-explainer-canonical",
+          "title": "Canonical figure-led explanation",
+          "note": "The shot this capability exists for: one educator carrying the claim while the copy explains it.",
+          "component": "character_explainer",
+          "layout": "sideBySide",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1",
+            "b2",
+            "b3"
+          ],
+          "props": {
+            "label": "Housing educator",
+            "headline": "Your rent has a chain of intermediaries",
+            "explanation": "From the landlord to the lender, every link in the chain takes its share before the month begins.",
+            "assetRequirement": {
+              "type": "character",
+              "subject": "Original editorial educator with an open explanatory gesture",
+              "treatment": "illustration",
+              "orientation": "portrait",
+              "identityKey": "character-explainer-reference"
+            }
+          }
+        },
+        {
+          "id": "example-explainer-driven",
+          "title": "Plan-driven entrances and a repeated accent — the figure follows the narration",
+          "note": "The copy lands first, the character enters a beat later, and two accents pulse the figure where the narration emphasises it. Same figure, copy and profile as the canonical example; only the events differ.",
+          "component": "character_explainer",
+          "layout": "sideBySide",
+          "motionProfile": "subtleDrift",
+          "spansBeats": [
+            "b1",
+            "b2",
+            "b3"
+          ],
+          "events": [
+            {
+              "at": "b1.start+short",
+              "action": "revealCopy"
+            },
+            {
+              "at": "b2.start",
+              "action": "revealCharacter"
+            },
+            {
+              "at": "b2.start+short",
+              "action": "accentCharacter"
+            },
+            {
+              "at": "b3.start",
+              "action": "accentCharacter"
+            }
+          ],
+          "props": {
+            "label": "Housing educator",
+            "headline": "Your rent has a chain of intermediaries",
+            "explanation": "From the landlord to the lender, every link in the chain takes its share before the month begins.",
+            "assetRequirement": {
+              "type": "character",
+              "subject": "Original editorial educator with an open explanatory gesture",
+              "treatment": "illustration",
+              "orientation": "portrait",
+              "identityKey": "character-explainer-reference"
+            }
+          }
+        },
+        {
+          "id": "example-explainer-long",
+          "title": "Edge case — copy past the recommended band",
+          "note": "Edge case for label, headline and explanation density: every field near its ceiling steps down or wraps inside the copy column while the same resolved figure carries the frame.",
+          "component": "character_explainer",
+          "layout": "sideBySide",
+          "motionProfile": "pushIn",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "label": "Mira Halvorsen, housing policy educator for the northern cities",
+            "headline": "Every repair proposed since 2015 has assumed a landlord and a lender who never both tightened at once",
+            "explanation": "Households that saved through the quiet years are now meeting landlords refinancing at higher rates and lenders pricing the risk back in, in the same season, for the first time in a decade.",
+            "assetRequirement": {
+              "type": "character",
+              "subject": "Original editorial educator with an open explanatory gesture",
+              "treatment": "illustration",
+              "orientation": "portrait",
+              "identityKey": "character-explainer-reference"
+            }
+          }
+        },
+        {
+          "id": "example-explainer-empty",
+          "title": "Empty case — no copy beside the character",
+          "note": "Empty copy remains renderable beside a valid character requirement: the unresolved figure shows its honest subject plate and the copy column a designed pending note.",
+          "component": "character_explainer",
+          "layout": "sideBySide",
+          "motionProfile": "editorialStatic",
+          "spansBeats": [
+            "b1"
+          ],
+          "props": {
+            "label": "",
+            "headline": "",
+            "explanation": "",
+            "assetRequirement": {
+              "type": "character",
+              "subject": "Resident guide illustration pending resolution",
+              "treatment": "cutout",
+              "orientation": "square"
+            }
+          }
+        }
+      ]
+    },
+    {
       "id": "image_context",
       "name": "ImageContextScene",
       "family": "context",

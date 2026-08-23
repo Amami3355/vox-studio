@@ -3,11 +3,12 @@
  *
  * "Repository-controlled" is the whole point: the media is committed, so a clone renders
  * the same frames as CI with no credentials, no network and no fixture wiring. That
- * constraint is also why the artwork is vector rather than photographic — an offline,
- * MIT-licensed repository cannot ship a stock photograph, and the increment needs the
- * *path* demonstrated, not the picture perfected. Each entry is a deliberate stand-in
+ * constraint is also why the stand-in artwork below is vector rather than photographic —
+ * an offline, MIT-licensed repository cannot ship a stock photograph, and those entries
+ * need the *path* demonstrated, not the picture perfected. Each is a deliberate stand-in
  * that a licensed or generated asset replaces later without touching a SceneInstance:
- * the identity key is the contract, the bytes are not.
+ * the identity key is the contract, the bytes are not. The one committed raster file is
+ * original artwork, which the same licence permits.
  *
  * Entries are matched by `identityKey`, so replacing the media here is the one edit
  * needed to change what every scene sharing that identity shows.
@@ -80,6 +81,35 @@ const NARRATOR_FIGURE =
   '%3Cpath%20d=%22M40%20300%20C40%20215%2088%20175%20150%20175%20C212%20175%20260%20215%20260%20300%20Z%22%20fill=%22%23FF5A1F%22/%3E' +
   '%3C/svg%3E';
 
+/**
+ * The committed evaluation asset for `character_explainer`, stored as the public-relative
+ * path `staticFile` addresses.
+ *
+ * Unlike the two inline stand-ins above, this is real committed media: a 1024 × 1536
+ * transparent PNG of an original editorial educator, three-quarter crop, both hands
+ * visible. The alpha channel is the point — hair, fingers and an open explanatory
+ * gesture expose containment and edge failures a solid geometric stand-in cannot, which
+ * is what makes it an evaluation fixture rather than decoration. The identity key is the
+ * contract and the bytes are not: it may be replaced behind the same key after review
+ * without touching a SceneInstance.
+ *
+ * The path is relative to `public/` and carries no scheme, which is how every committed
+ * file travels through this system — the voice-over does the same. The renderer's
+ * static base only exists inside the renderer, so a reference resolved here (in tests,
+ * or by the compiler) cannot prefix it; the draw site applies `staticFile` at the
+ * moment the uri meets an `<Img>`, where the base is known.
+ */
+const CHARACTER_EXPLAINER_REFERENCE = 'assets/characters/editorial-explainer-reference.png';
+
+/**
+ * The real files this library has committed, as `staticFile` sees them.
+ *
+ * The list is the library's own claim about its storage, and the disk half of `verify`
+ * below is checked against it: a uri that names a file the library never committed is
+ * not library media, however well-formed it looks.
+ */
+const publicFiles = [CHARACTER_EXPLAINER_REFERENCE] as const;
+
 const entries: LocalAssetEntry[] = [
   {
     requirement: {
@@ -101,30 +131,91 @@ const entries: LocalAssetEntry[] = [
     },
     ref: { status: 'ready', uri: NARRATOR_FIGURE },
   },
+  {
+    requirement: {
+      type: 'character',
+      subject: 'Original editorial educator with an open explanatory gesture',
+      treatment: 'illustration',
+      orientation: 'portrait',
+      identityKey: 'character-explainer-reference',
+    },
+    ref: { status: 'ready', uri: CHARACTER_EXPLAINER_REFERENCE },
+  },
 ];
 
 /**
  * What "verified" means for media the repository itself ships.
  *
- * There is no filesystem read here because there is no file: an inline `data:` URI is
- * verified by being decodable and non-empty. When the library grows to real files, this
- * is the one function that changes — the resolver keeps knowing nothing about storage.
+ * Two territories. An inline `data:` URI is verified by being decodable and non-empty.
+ * A file under `public/` travels as its public-relative path — the one form that means
+ * the same thing inside and outside the renderer — and is verified by existing on disk
+ * and being non-empty, checked wherever a filesystem is reachable. Inside the renderer
+ * there is none to ask, and none is needed: the bundler has already copied `public/`
+ * into the bundle and a missing file fails the image fetch, so the renderer cannot draw
+ * a broken file silently. The resolver keeps knowing nothing about storage either way.
  */
 const verify = (
   ref: Extract<AssetRef, { status: 'ready' }>,
   _requirement: AssetRequirement,
 ): LocalAssetVerification => {
-  const match = /^data:(image\/[a-z+]+)(?:;base64)?,(.+)$/i.exec(ref.uri);
-  if (!match) {
+  const inline = /^data:(image\/[a-z+]+)(?:;base64)?,(.+)$/i.exec(ref.uri);
+  if (inline) {
+    if ((inline[2] as string).length < 32) {
+      return { ok: false, reason: 'Library asset decodes to an empty image.' };
+    }
+    return { ok: true };
+  }
+
+  const publicPath = publicPathOf(ref.uri);
+  if (publicPath === null) {
     return {
       ok: false,
-      reason: `Library asset "${ref.uri.slice(0, 32)}…" is not an inline image.`,
+      reason: `Library asset "${ref.uri.slice(0, 32)}…" is not an inline image or a file under public/.`,
     };
   }
-  if ((match[2] as string).length < 32) {
-    return { ok: false, reason: 'Library asset decodes to an empty image.' };
+  if (!(publicFiles as readonly string[]).includes(publicPath)) {
+    return {
+      ok: false,
+      reason: `Library asset "${publicPath}" is not a file this library has committed.`,
+    };
+  }
+
+  /**
+   * `process.getBuiltinModule` is the one route to `node:fs` that costs the browser
+   * bundle nothing: there is no import for webpack to fail on, and `process` is absent
+   * in the renderer — where, per this function's header, the bundler and the image
+   * fetch are already the enforcement.
+   */
+  const fs =
+    typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
+      ? process.getBuiltinModule('node:fs')
+      : undefined;
+  if (!fs) return { ok: true };
+
+  let size = -1;
+  try {
+    size = fs.statSync(`${import.meta.dirname}/../../public/${publicPath}`).size;
+  } catch {
+    return { ok: false, reason: `Library asset "${publicPath}" is missing from public/.` };
+  }
+  if (size <= 0) {
+    return { ok: false, reason: `Library asset "${publicPath}" is empty on disk.` };
   }
   return { ok: true };
+};
+
+/**
+ * The public-relative path a committed-file uri addresses, or `null` when the uri is in
+ * neither territory the library ships.
+ *
+ * A scheme prefix (`data:`, `asset:`, `https:`) names another territory entirely, and an
+ * absolute path would be a location claim this library never makes — only the bare
+ * public-relative spelling is file territory here, which is what the draw site's
+ * `staticFile` expects to receive.
+ */
+const publicPathOf = (uri: string): string | null => {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(uri) || uri.startsWith('/')) return null;
+  return uri;
 };
 
 export const repositoryAssetLibrary: LocalAssetLibrary = { entries, verify };

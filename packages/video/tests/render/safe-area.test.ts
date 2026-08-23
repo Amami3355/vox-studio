@@ -187,6 +187,8 @@ describe('a declared composition renders into the rectangle it declared', () => 
       'bar_chart composed into left under pushIn',
       'bar_chart composed into right under cinematic',
       'bar_chart composed into right under pushIn',
+      'character_explainer composed into full under cinematic',
+      'character_explainer composed into full under pushIn',
       'image_context composed into full under cinematic',
       'image_context composed into full under pushIn',
       'image_context composed into left under cinematic',
