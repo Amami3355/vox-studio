@@ -67,6 +67,16 @@ def _codes(value: Any) -> Iterator[str]:
             yield from _codes(item)
 
 
+def _codes_named(report: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """The codes a report named, in the order it named them, without repeats.
+
+    One reader rather than two. `read_refusal` needs this before a `Refusal` exists, to narrow
+    the checks entries down to the codes in hand, and the finished `Refusal` publishes the same
+    tuple — so the two are the same call, not the same expression written twice.
+    """
+    return tuple(dict.fromkeys(_codes(report))) if report is not None else ()
+
+
 def _compact(value: Any) -> str:
     return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
 
@@ -82,17 +92,13 @@ class Refusal:
     advisory: bool = False
 
     @property
-    def command(self) -> str | None:
-        return self.envelope.command
-
-    @property
     def outcome(self) -> str:
         return self.envelope.outcome
 
     @property
     def codes(self) -> tuple[str, ...]:
         """The codes the report named, in the order it named them, without repeats."""
-        return tuple(dict.fromkeys(_codes(self.report))) if self.report is not None else ()
+        return _codes_named(self.report)
 
     def as_text(self) -> str:
         """The material an author repairs from, assembled and not rewritten.
@@ -111,6 +117,7 @@ class Refusal:
             else "Production refused the plan you authored. Repair it and answer with the "
             "whole repaired plan as JSON and nothing else."
         )
+
         def section(heading: str, body: str) -> str:
             return f"\n## {heading}\n\n```json\n{body}\n```\n"
 
@@ -173,7 +180,7 @@ def read_refusal(
         for code, meaning in (published.get(regime) or {}).items():
             entries[str(code)] = meaning
     protocol = surface.contract("protocol") if "protocol" in surface.categories else {}
-    named = tuple(dict.fromkeys(_codes(report))) if report is not None else ()
+    named = _codes_named(report)
     return Refusal(
         envelope=envelope,
         report=report,

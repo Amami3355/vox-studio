@@ -29,8 +29,12 @@ PROTOCOL_VERSION = 1
 
 # Every outcome that is not `succeeded` still leaves a Run the crew can act on, except
 # `failed`. `needs_repair` in particular is a refusal, not a crash: exit code 0, Run intact.
+# `paused` is the one an operator has to act on: production stopped before the network and is
+# waiting on an authorisation. These are outcomes an *envelope* carries; how a converged Run
+# ended is a different question with its own names, in `converge.py`.
 SUCCEEDED = "succeeded"
 NEEDS_REPAIR = "needs_repair"
+PAUSED = "paused"
 
 
 class MalformedEnvelope(ValueError):

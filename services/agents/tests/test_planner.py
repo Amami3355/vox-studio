@@ -38,6 +38,7 @@ from vox_crew.planner import (
     plan_and_produce,
     review,
     scan_for_leaks,
+    scan_message_for_leaks,
 )
 from vox_crew.teaching_surface import TeachingSurface
 
@@ -221,6 +222,35 @@ def test_the_leak_scan_catches_repository_vocabulary(leaked: str) -> None:
 
     assert not scan.ok
     assert scan.violations
+
+
+def test_the_message_beside_the_instructions_is_scanned_too() -> None:
+    """A prompt is both halves. A secret reaching a model in a Brief is still a leak."""
+    assert not scan_message_for_leaks({"id": "b", "text": "Use VOX_GRANT_KEY."}).ok
+    assert not scan_message_for_leaks({"id": "b", "text": "See packages/production."}).ok
+
+
+def test_the_message_scan_reads_a_brief_as_prose_and_not_as_a_work_root() -> None:
+    """The half of the scan that reads English as evidence does not run over a Brief.
+
+    `scan_for_leaks` guards text the crew assembled from repository-side material, where a
+    file-shaped word is evidence. A Brief is prose an operator wrote: refusing one for saying
+    "Node.js" would train this project's operators away from writing Briefs.
+    """
+    brief = {"id": "b", "text": "A 30-second explainer on Node.js adoption at 3.5s a beat."}
+
+    assert scan_message_for_leaks(brief).ok
+    assert not scan_for_leaks(brief["text"]).ok
+
+
+def test_a_brief_that_carries_a_secret_never_reaches_an_author() -> None:
+    """The gate is the same gate: nothing is scrubbed, and the author is not asked."""
+    author = ScriptedPlanAuthor(a_catalog_following_plan())
+
+    with pytest.raises(InstructionsLeaked):
+        author_plan(SURFACE, {"id": "b", "text": "Read ELEVENLABS_API_KEY first."}, author)
+
+    assert author.asked == []
 
 
 def test_instructions_that_leak_never_reach_an_author(monkeypatch) -> None:

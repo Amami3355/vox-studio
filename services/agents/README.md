@@ -134,9 +134,9 @@ agent could buy itself attempts by splitting its plan.
 identical input redispatched needs a `replacement grant required`, and an exhausted budget is
 `paused before network`. Every record envelope publishes `newTakesUsed` and `maxNewTakes` beside
 the disposition, so how much of the quota is gone is production's answer read off what it wrote —
-`run.dispatches`, `run.quota`, `run.takes` — rather than a count the crew kept beside it. The
-crew's own side of the rule is that `client.record` is called with one argument, always: a
-replacement grant is an operator's signature and the crew holds none.
+`run.dispatches`, `run.quota`, `run.quota_readings` — rather than a count the crew kept beside
+it. The crew's own side of the rule is that `client.record` is called with one argument, always:
+a replacement grant is an operator's signature and the crew holds none.
 
 *An exhausted budget is an outcome.* A Run ends `rendered`, `budget_exhausted` with the limit it
 hit named, `paused`, or `stopped` — the last covering a `failed` envelope, which carries no

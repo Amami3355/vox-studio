@@ -56,7 +56,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import Artifact, ProductionClient
-from .envelopes import NEEDS_REPAIR, MalformedEnvelope, NextCommand, ResultEnvelope
+from .envelopes import (
+    NEEDS_REPAIR,
+    PAUSED as PAUSED_BEFORE_NETWORK,
+    MalformedEnvelope,
+    NextCommand,
+    ResultEnvelope,
+)
 from .planner import AuthoredPlan, Finding, PlanAuthor, author_plan, repair_plan
 from .producer import READ_BACK, read_back_artifacts
 from .refusals import Refusal, read_refusal
@@ -66,10 +72,24 @@ from .teaching_surface import TeachingSurface, read_teaching_surface
 # production's own word for the ending it wrote, kept rather than translated: a paused Run is
 # a decision waiting on a human, and calling it `stopped` alongside a crash would put the one
 # ending an operator has to act on under the same name as the one they cannot.
+#
+# It is *defined from* the envelope outcome rather than spelled the same by hand, because these
+# are two different questions — how one command answered, and how a whole Run ended — that
+# agree on this one word. Written twice they could stop agreeing silently.
 RENDERED = "rendered"
 BUDGET_EXHAUSTED = "budget_exhausted"
-PAUSED = "paused"
+PAUSED = PAUSED_BEFORE_NETWORK
 STOPPED = "stopped"
+
+# The budget lines a Run can exhaust, named the way `RepairBudget` names its fields and the way
+# the assertion sheets name their limits. Constants rather than literals at the return sites:
+# `limit` is read by whoever audits the Run, and a typo in one of five string literals would be
+# a Run that ended for a reason nothing else in the repo knows.
+VALIDATE_CALLS = "validate_calls"
+PLAN_VERSIONS = "plan_versions"
+PREFLIGHT_CALLS = "preflight_calls"
+POST_RECORD_PLAN_VERSIONS = "post_record_plan_versions"
+NEW_TAKES = "new_takes"
 
 # The dispositions `run.record` publishes, split by what they cost. The three names are the
 # protocol's own enum; the split is `recording.verifiedMatchingTake` — "reuse without quota" —
@@ -110,13 +130,19 @@ class RepairBudget:
 
     cycles: int
     plan_versions: int
+    validate_calls: int
     preflight_calls: int
     post_record_plan_versions: int
 
 
 @dataclass(frozen=True, slots=True)
-class Take:
-    """What one `run.record` published: the Take it bound, and what the quota now stands at.
+class RecordingQuota:
+    """What one `run.record` published: where the quota stands, and which Take it spent on.
+
+    Not a Take. `CONTEXT.md` reserves that word for the recording itself — its `TimedBeat[]`,
+    its audio and the alignment both were derived from — and none of those are here; `take_id`
+    is a reference to one, not the thing. What is here is production's own `quota`, the name
+    the Run checkpoint gives these two numbers on the other side of the boundary.
 
     All four fields are the envelope's, none of them the crew's. `maxNewTakes` reaches
     production in the request and comes back on every record envelope beside the spend, so a
@@ -131,7 +157,7 @@ class Take:
 
     @property
     def dispatched(self) -> bool:
-        """Whether binding this Take cost a synthesis dispatch, or reused one already paid for."""
+        """Whether binding the Take cost a synthesis dispatch, or reused one already paid for."""
         return self.disposition in DISPATCHED
 
     @property
@@ -139,8 +165,8 @@ class Take:
         return self.new_takes_used <= self.max_new_takes
 
 
-def take_bound(envelope: ResultEnvelope) -> Take | None:
-    """The Take a record envelope published, or None where it published none.
+def quota_read(envelope: ResultEnvelope) -> RecordingQuota | None:
+    """The quota a record envelope published, or None where it published none.
 
     A paused or failed `run.record` carries `data: null` — there is no Take and no spend to
     read — and every other command publishes no quota at all. Both leave this None rather than
@@ -152,7 +178,7 @@ def take_bound(envelope: ResultEnvelope) -> Take | None:
         return None
     if not {"disposition", "takeId", "newTakesUsed", "maxNewTakes"} <= set(data):
         return None
-    return Take(
+    return RecordingQuota(
         disposition=str(data["disposition"]),
         take_id=str(data["takeId"]),
         new_takes_used=int(data["newTakesUsed"]),
@@ -207,26 +233,26 @@ class ConvergedRun:
         return self.outcome == PAUSED
 
     @property
-    def takes(self) -> tuple[Take, ...]:
-        """Every Take production published across the Run, in the order it published them.
+    def quota_readings(self) -> tuple[RecordingQuota, ...]:
+        """Every quota production published across the Run, in the order it published them.
 
         Derived rather than accumulated. The envelopes are already the record of what the Run
         cost, so a field beside them would be a second account of the same thing and the one
         that could disagree.
         """
         return tuple(
-            take for take in (take_bound(item) for item in self.envelopes) if take is not None
+            read for read in (quota_read(item) for item in self.envelopes) if read is not None
         )
 
     @property
     def dispatches(self) -> int:
         """How many synthesis dispatches this Run spent. On a compliant plan, one."""
-        return sum(1 for take in self.takes if take.dispatched)
+        return sum(1 for read in self.quota_readings if read.dispatched)
 
     @property
-    def quota(self) -> Take | None:
+    def quota(self) -> RecordingQuota | None:
         """Where the recording budget stood when production last said."""
-        return self.takes[-1] if self.takes else None
+        return self.quota_readings[-1] if self.quota_readings else None
 
     @property
     def decision(self) -> tuple[NextCommand, ...]:
@@ -271,7 +297,7 @@ class ConvergedRun:
         return next((item for item in self.artifacts if item.kind == kind), None)
 
 
-def target_seconds(brief: Mapping[str, Any], unstated: int = UNSTATED_SECONDS) -> int:
+def target_seconds(brief: Mapping[str, Any]) -> int:
     """The duration a Brief asks for, read out of the Brief.
 
     It is not a field. `productionRequestSchema` carries a Brief as an id and its text, so the
@@ -284,7 +310,7 @@ def target_seconds(brief: Mapping[str, Any], unstated: int = UNSTATED_SECONDS) -
     """
     found = ASKS_FOR.search(str(brief.get("text", "")))
     if found is None:
-        return unstated
+        return UNSTATED_SECONDS
     low = int(found.group("low"))
     high = int(found.group("high")) if found.group("high") else low
     seconds = (low + high) // 2
@@ -296,15 +322,19 @@ def repair_budget(seconds: int) -> RepairBudget:
 
     `2 + ceil(seconds / 60)` is `repairCycleBudget`, and the counts around it are the limits the
     assertion sheets hold a Run to: at most `cycles + 2` plan versions and validate calls, at
-    most `cycles` Preflight calls, and at most two plan versions after a Take exists. Repeating
-    the rule here rather than deriving it is the cost of the crew being a Python process that
-    cannot import the sheet it is judged by; a test pins the three Briefs' numbers so the two
-    cannot drift silently.
+    most `cycles` Preflight calls, and at most two plan versions after a Take exists. The first
+    two are the same number and are still two fields, because they are two assertions and the
+    sheet is free to move one without the other.
+
+    Repeating the rule here rather than deriving it is the cost of the crew being a Python
+    process that cannot import the sheet it is judged by; a test pins the three Briefs' numbers
+    so the two cannot drift silently.
     """
     cycles = 2 + math.ceil(seconds / 60)
     return RepairBudget(
         cycles=cycles,
         plan_versions=cycles + 2,
+        validate_calls=cycles + 2,
         preflight_calls=cycles,
         post_record_plan_versions=2,
     )
@@ -427,22 +457,41 @@ def converge(
         raise MalformedEnvelope("run init succeeded and named no Run.")
     run_id = opened.run.id
 
-    def repaired_against(refusal: Refusal) -> str | None:
+    def gather(envelope: ResultEnvelope, *, advisory: bool = False) -> Refusal:
+        """Everything production published about one envelope, read back through the client.
+
+        Bound to the Run rather than handed the same three arguments nine times: the client,
+        the Run id and the surface do not change across a convergence, and only the envelope
+        does. The one refusal that cannot use this is the one before a Run exists.
+        """
+        return read_refusal(client, run_id, envelope, surface, advisory=advisory)
+
+    def stopped_at(envelope: ResultEnvelope) -> ConvergedRun:
+        """The Run ends holding what production last said, which is what an operator reads."""
+        refusals.append(gather(envelope))
+        return ended(STOPPED, run_id)
+
+    def repaired_against(refusal: Refusal) -> ConvergedRun | None:
         """Asks for a repair, and keeps asking while one arrives that would cost the Take.
 
-        Returns the budget line that ran out, or None once a usable repair is in hand. A
-        withheld repair is still charged to the post-record budget: the model wrote a version,
-        and the sheets count what was authored rather than what survived the crew's reading.
-        That is also what makes this terminate — before a Take nothing can be withheld, and
-        after one every ask moves the budget whether or not the answer was submitted.
+        Returns the ended Run where a budget line ran out, or None once a usable repair is in
+        hand. A withheld repair is still charged: the model wrote a version, and the sheets
+        count what was authored rather than what survived the crew's reading. That is also what
+        makes this terminate — before a Take nothing can be withheld, and after one every ask
+        moves the budget whether or not the answer was submitted.
+
+        Both counts are read against `plan_versions` for that same reason. `limits.plan-versions`
+        counts versions the model authored, so one the crew read and declined to submit has
+        already been paid for; a gate over `versions` alone would let every withheld repair buy
+        one more ask than the sheet allows.
         """
         nonlocal after_take
         refusals.append(refusal)
         while True:
-            if len(versions) >= allowed.plan_versions:
-                return "plan_versions"
+            if len(versions) + len(withheld) >= allowed.plan_versions:
+                return ended(BUDGET_EXHAUSTED, run_id, PLAN_VERSIONS)
             if recorded is not None and after_take >= allowed.post_record_plan_versions:
-                return "post_record_plan_versions"
+                return ended(BUDGET_EXHAUSTED, run_id, POST_RECORD_PLAN_VERSIONS)
             proposed = repair_plan(surface, brief, versions[-1].plan, refusal, author)
             if recorded is not None:
                 after_take += 1
@@ -452,33 +501,31 @@ def converge(
             withheld.append(proposed)
 
     while True:
-        if validates >= allowed.plan_versions:
-            return ended(BUDGET_EXHAUSTED, run_id, "validate_calls")
+        if validates >= allowed.validate_calls:
+            return ended(BUDGET_EXHAUSTED, run_id, VALIDATE_CALLS)
         plan = versions[-1].plan
         validated = step(client.validate(run_id, plan))
         validates += 1
         submitted.append(plan)
         if validated.outcome == NEEDS_REPAIR:
-            spent = repaired_against(read_refusal(client, run_id, validated, surface))
-            if spent is not None:
-                return ended(BUDGET_EXHAUSTED, run_id, spent)
+            exhausted = repaired_against(gather(validated))
+            if exhausted is not None:
+                return exhausted
             continue
         if not validated.succeeded:
-            refusals.append(read_refusal(client, run_id, validated, surface))
-            return ended(STOPPED, run_id)
+            return stopped_at(validated)
 
         if preflights >= allowed.preflight_calls:
-            return ended(BUDGET_EXHAUSTED, run_id, "preflight_calls")
+            return ended(BUDGET_EXHAUSTED, run_id, PREFLIGHT_CALLS)
         preflighted = step(client.preflight(run_id))
         preflights += 1
         if not preflighted.succeeded:
-            refusals.append(read_refusal(client, run_id, preflighted, surface))
-            return ended(STOPPED, run_id)
-        advisory = read_refusal(client, run_id, preflighted, surface, advisory=True)
+            return stopped_at(preflighted)
+        advisory = gather(preflighted, advisory=True)
         if advisory.report is not None and preflight_risks(advisory.report):
-            spent = repaired_against(advisory)
-            if spent is not None:
-                return ended(BUDGET_EXHAUSTED, run_id, spent)
+            exhausted = repaired_against(advisory)
+            if exhausted is not None:
+                return exhausted
             continue
 
         # No `replacement_authorisation`, ever. The protocol publishes `identicalInputRedispatch:
@@ -486,17 +533,16 @@ def converge(
         # input. The crew holds none, so its whole side of that rule is that this call has one
         # argument — which is stronger than deciding each time whether to send one.
         took = step(client.record(run_id))
-        if took.outcome == PAUSED:
+        if took.outcome == PAUSED_BEFORE_NETWORK:
             # The Run is the operator's now. Production pauses before the network for exactly
             # two reasons — the budget is gone, or an identical input needs a grant — and both
             # are authorisations the crew may not give itself. It stops holding everything
             # production said, and `decision` hands over the command and the reason it named.
-            refusals.append(read_refusal(client, run_id, took, surface))
+            refusals.append(gather(took))
             return ended(PAUSED, run_id)
         if not took.succeeded:
-            refusals.append(read_refusal(client, run_id, took, surface))
-            return ended(STOPPED, run_id)
-        bound = take_bound(took)
+            return stopped_at(took)
+        bound = quota_read(took)
         if bound is not None and (
             not bound.within_quota or (bound.dispatched and recorded is not None)
         ):
@@ -507,23 +553,21 @@ def converge(
             # cap production itself named — means those two rules have parted company and a
             # Take was bought that nothing intended. Carrying on would mean converging inside
             # a quota the crew can no longer account for, so the Run ends with the line named.
-            return ended(BUDGET_EXHAUSTED, run_id, "new_takes")
+            return ended(BUDGET_EXHAUSTED, run_id, NEW_TAKES)
         recorded = plan
 
         compiled = step(client.compile(run_id))
         if compiled.outcome == NEEDS_REPAIR:
-            spent = repaired_against(read_refusal(client, run_id, compiled, surface))
-            if spent is not None:
-                return ended(BUDGET_EXHAUSTED, run_id, spent)
+            exhausted = repaired_against(gather(compiled))
+            if exhausted is not None:
+                return exhausted
             continue
         if not compiled.succeeded:
-            refusals.append(read_refusal(client, run_id, compiled, surface))
-            return ended(STOPPED, run_id)
+            return stopped_at(compiled)
 
         rendered = step(client.render(run_id))
         if not rendered.succeeded:
-            refusals.append(read_refusal(client, run_id, rendered, surface))
-            return ended(STOPPED, run_id)
+            return stopped_at(rendered)
 
         # The read-back is the producer's own rule — by descriptor, through the client, latest
         # publisher of a kind wins — and a Run that recompiled published two compile reports.

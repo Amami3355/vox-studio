@@ -107,8 +107,18 @@ LEAK_EXTENSIONS: tuple[str, ...] = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"
 
 # Keys that would mean the agent wrote physical time. The compiler is the only writer of it,
 # so any of these in an authored plan is a defect regardless of the value beside it.
-PHYSICAL_TIME = ("frame", "duration", "safearea", "safe_area", "timing", "fps", "second",
-                 "millisecond", "msec", "timestamp")
+PHYSICAL_TIME = (
+    "frame",
+    "duration",
+    "safearea",
+    "safe_area",
+    "timing",
+    "fps",
+    "second",
+    "millisecond",
+    "msec",
+    "timestamp",
+)
 
 # What a resolved reference looks like. An asset requirement is a subject in natural language;
 # any of these means the agent resolved it itself instead of describing what it needs.
@@ -260,6 +270,11 @@ def instructions(surface: TeachingSurface) -> str:
     return "".join(parts)
 
 
+def _markers(lowered: str) -> list[str]:
+    """Every marker the text names. Case-insensitive, and the half both scans share."""
+    return [f"marker:{marker}" for marker in LEAK_MARKERS if marker.lower() in lowered]
+
+
 def scan_for_leaks(text: str) -> LeakScan:
     """The proofs' leak-scan discipline, over a prompt instead of a work root.
 
@@ -268,11 +283,29 @@ def scan_for_leaks(text: str) -> LeakScan:
     """
     lowered = text.lower()
     named = r"\b[\w.-]+(?:" + "|".join(re.escape(item) for item in LEAK_EXTENSIONS) + r")\b"
-    violations = [f"marker:{marker}" for marker in LEAK_MARKERS if marker.lower() in lowered]
+    violations = _markers(lowered)
     violations += [f"source-file:{match}" for match in re.findall(named, lowered)]
     if re.search(r"\b[a-z]:[\\/]", lowered):
         violations.append("absolute-path")
     return LeakScan(tuple(dict.fromkeys(violations)))
+
+
+def scan_message_for_leaks(*parts: Any) -> LeakScan:
+    """The scan over the other half of a prompt: the Brief, and the plan handed back with it.
+
+    `scan_for_leaks` guards the instructions, which the crew assembles out of repository-side
+    material and which are therefore where a leak would originate. The task message is not
+    that material — a Brief is prose an operator wrote, and a plan is the model's own previous
+    answer returned unedited — so only the markers run over it.
+
+    The file-shaped and absolute-path heuristics deliberately do not. They read English as
+    evidence, and a Brief that says "Node.js" is not a leak; refusing one would train this
+    project's operators away from writing Briefs rather than away from leaking. The markers
+    are a different matter: `VOX_GRANT_KEY` or a `packages/production` path can reach a Brief
+    by accident, and this is the last place before a model sees it.
+    """
+    lowered = json.dumps(parts, ensure_ascii=False, default=str).lower()
+    return LeakScan(tuple(dict.fromkeys(_markers(lowered))))
 
 
 def _walk(value: Any, where: str) -> Iterator[tuple[str, str]]:
@@ -354,8 +387,14 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
         for element in section.get("persistent", ()) or ():
             if isinstance(element, Mapping):
                 _read_asset(element.get("assetRequirement"), f"{at}.persistent", report)
-                _read_anchors(element.get("placements", ()), anchor, scene_beat,
-                              section.get("spansBeats", ()) or (), f"{at}.persistent", report)
+                _read_anchors(
+                    element.get("placements", ()),
+                    anchor,
+                    scene_beat,
+                    section.get("spansBeats", ()) or (),
+                    f"{at}.persistent",
+                    report,
+                )
         for scene in section.get("scenes", ()) or ():
             if not isinstance(scene, Mapping):
                 continue
@@ -363,24 +402,39 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
             component = str(scene.get("component", ""))
             capability = capabilities.get(component)
             if capability is None:
-                report("UNKNOWN_CAPABILITY", f"{here}.component",
-                       f"{component!r} is not a capability the catalog publishes.")
+                report(
+                    "UNKNOWN_CAPABILITY",
+                    f"{here}.component",
+                    f"{component!r} is not a capability the catalog publishes.",
+                )
                 continue
             props = scene.get("props")
             if isinstance(props, Mapping):
                 _read_asset(props.get("assetRequirement"), f"{here}.props", report)
-            actions = {str(action["id"]) for action in capability.get("actions", ())
-                       if isinstance(action, Mapping) and "id" in action}
+            actions = {
+                str(action["id"])
+                for action in capability.get("actions", ())
+                if isinstance(action, Mapping) and "id" in action
+            }
             spans = scene.get("spansBeats", ()) or ()
             for index, event in enumerate(scene.get("events", ()) or ()):
                 if not isinstance(event, Mapping):
                     continue
                 named = str(event.get("action", ""))
                 if named not in actions:
-                    report("UNKNOWN_ACTION", f"{here}.events[{index}].action",
-                           f"{named!r} is not an action {component} publishes.")
-            _read_anchors(scene.get("events", ()) or (), anchor, scene_beat, spans,
-                          f"{here}.events", report)
+                    report(
+                        "UNKNOWN_ACTION",
+                        f"{here}.events[{index}].action",
+                        f"{named!r} is not an action {component} publishes.",
+                    )
+            _read_anchors(
+                scene.get("events", ()) or (),
+                anchor,
+                scene_beat,
+                spans,
+                f"{here}.events",
+                report,
+            )
 
     return tuple(findings)
 
@@ -400,16 +454,25 @@ def _read_anchors(
             continue
         at = item["at"]
         if not isinstance(at, str):
-            report("MALFORMED_PLAN", f"{where}[{index}].at",
-                   f"{at!r} is physical time, not an anchor.")
+            report(
+                "MALFORMED_PLAN",
+                f"{where}[{index}].at",
+                f"{at!r} is physical time, not an anchor.",
+            )
             continue
         match = anchor.match(at)
         if match is None:
-            report("UNKNOWN_ANCHOR", f"{where}[{index}].at",
-                   f"{at!r} is not one of the forms catalog.time publishes.")
+            report(
+                "UNKNOWN_ANCHOR",
+                f"{where}[{index}].at",
+                f"{at!r} is not one of the forms catalog.time publishes.",
+            )
         elif match.group("beat") not in reachable:
-            report("UNKNOWN_ANCHOR", f"{where}[{index}].at",
-                   f"{at!r} names a beat outside the ones its scene spans.")
+            report(
+                "UNKNOWN_ANCHOR",
+                f"{where}[{index}].at",
+                f"{at!r} names a beat outside the ones its scene spans.",
+            )
 
 
 def _read_asset(
@@ -420,8 +483,33 @@ def _read_asset(
         return
     subject = requirement.get("subject")
     if isinstance(subject, str) and RESOLVED_REFERENCE.search(subject):
-        report("MALFORMED_PLAN", f"{where}.assetRequirement.subject",
-               f"{subject!r} is a resolved reference, not a subject.")
+        report(
+            "MALFORMED_PLAN",
+            f"{where}.assetRequirement.subject",
+            f"{subject!r} is a resolved reference, not a subject.",
+        )
+
+
+def _refuse_if_leaked(text: str, what: str, *parts: Any) -> None:
+    """Refuses to send a prompt that carries repository vocabulary, in either half.
+
+    Raised rather than scrubbed. A prompt that had to be edited on its way out is a prompt
+    whose builder is wrong, and editing it here would hide that from whoever reads the run.
+    """
+    found = scan_for_leaks(text).violations + scan_message_for_leaks(*parts).violations
+    scan = LeakScan(tuple(dict.fromkeys(found)))
+    if not scan.ok:
+        raise InstructionsLeaked(
+            f"The {what} carry repository vocabulary and were not sent: "
+            + ", ".join(scan.violations)
+        )
+
+
+def _as_plan(answered: Any, verb: str) -> Mapping[str, Any]:
+    """What an author said, once it is known to be a plan object and not something else."""
+    if not isinstance(answered, Mapping):
+        raise PlanNotAuthored(f"An author {verb} with {type(answered).__name__}, not a plan.")
+    return answered
 
 
 def author_plan(
@@ -429,16 +517,9 @@ def author_plan(
 ) -> AuthoredPlan:
     """Builds the instructions, scans them, asks for a plan, and reads what came back."""
     text = instructions(surface)
-    scan = scan_for_leaks(text)
-    if not scan.ok:
-        raise InstructionsLeaked(
-            "The instructions carry repository vocabulary and were not sent: "
-            + ", ".join(scan.violations)
-        )
+    _refuse_if_leaked(text, "instructions", brief)
 
-    plan = author.author(text, brief)
-    if not isinstance(plan, Mapping):
-        raise PlanNotAuthored(f"An author answered with {type(plan).__name__}, not a plan.")
+    plan = _as_plan(author.author(text, brief), "answered")
     return AuthoredPlan(plan=plan, instructions=text, findings=review(plan, surface))
 
 
@@ -462,16 +543,9 @@ def repair_plan(
     the refusal after it differs from cycle to cycle.
     """
     text = instructions(surface) + refusal.as_text()
-    scan = scan_for_leaks(text)
-    if not scan.ok:
-        raise InstructionsLeaked(
-            "The repair instructions carry repository vocabulary and were not sent: "
-            + ", ".join(scan.violations)
-        )
+    _refuse_if_leaked(text, "repair instructions", brief, plan)
 
-    repaired = author.repair(text, brief, plan, refusal)
-    if not isinstance(repaired, Mapping):
-        raise PlanNotAuthored(f"An author repaired with {type(repaired).__name__}, not a plan.")
+    repaired = _as_plan(author.repair(text, brief, plan, refusal), "repaired")
     return AuthoredPlan(plan=repaired, instructions=text, findings=review(repaired, surface))
 
 
@@ -587,7 +661,7 @@ def _plan_from(answer: str) -> Mapping[str, Any]:
     try:
         plan = json.loads(body)
     except json.JSONDecodeError as error:
-        raise PlanNotAuthored(f"An author answered with something that is not JSON: {error}") from error
-    if not isinstance(plan, Mapping):
-        raise PlanNotAuthored(f"An author answered with {type(plan).__name__}, not a plan.")
-    return plan
+        raise PlanNotAuthored(
+            f"An author answered with something that is not JSON: {error}"
+        ) from error
+    return _as_plan(plan, "answered")

@@ -32,12 +32,13 @@ from vox_crew.converge import (
     RENDERED,
     REUSED,
     STOPPED,
-    Take,
+    RecordingQuota,
+    RepairBudget,
     beat_shape,
     converge,
     preflight_risks,
+    quota_read,
     repair_budget,
-    take_bound,
     take_preserved,
     target_seconds,
 )
@@ -533,6 +534,57 @@ def test_a_budget_the_caller_sets_is_the_budget_that_binds() -> None:
     assert client.calls.count("validate") == 7
 
 
+def test_the_validate_line_is_its_own_budget_and_names_itself_when_it_runs_out() -> None:
+    """Two assertions on the sheet, so two fields here, even where the numbers agree.
+
+    `limits.plan-versions` and `limits.validate-calls` are both `cycles + 2` today. They are
+    separate lines on the sheet and the sheet is free to move one without the other, so the
+    loop reads the one it is actually spending — and a Run that ends on it says so.
+    """
+    budget = RepairBudget(
+        cycles=3,
+        plan_versions=5,
+        validate_calls=1,
+        preflight_calls=3,
+        post_record_plan_versions=2,
+    )
+    client = a_client(validate=["run-validate-needs-repair.stdout"])
+    author = RepairingAuthor(a_catalog_following_plan())
+
+    run = converge(client, REQUEST, author, budget=budget)
+
+    assert run.outcome == BUDGET_EXHAUSTED
+    assert run.limit == "validate_calls"
+    assert client.calls.count("validate") == 1
+
+
+def test_a_withheld_version_spends_the_plan_version_budget_it_was_authored_against() -> None:
+    """`limits.plan-versions` counts what the model authored, so the gate has to count it too.
+
+    A version the crew read and declined to submit was still written by the model and still
+    charged to the sheet. Counting only `versions` here would let each withheld repair buy one
+    more ask than the sheet allows, and a Run could author `plan_versions + 1` while believing
+    itself inside the budget. The post-record line is set high so the plan-version line is the
+    one that binds.
+    """
+    budget = RepairBudget(
+        cycles=1,
+        plan_versions=2,
+        validate_calls=2,
+        preflight_calls=1,
+        post_record_plan_versions=5,
+    )
+    client = a_client(compile=["run-compile-needs-repair.stdout"])
+    author = RepairingAuthor(a_catalog_following_plan(), a_rewritten_plan())
+
+    run = converge(client, REQUEST, author, budget=budget)
+
+    assert run.outcome == BUDGET_EXHAUSTED
+    assert run.limit == "plan_versions"
+    assert len(run.versions) + len(run.withheld) == budget.plan_versions
+    assert client.submitted == [a_catalog_following_plan()]
+
+
 def test_an_author_that_keeps_costing_the_take_exhausts_the_post_record_budget() -> None:
     """Two plan versions after a Take, and withheld ones count: the model wrote them."""
     client = a_client(compile=["run-compile-needs-repair.stdout"])
@@ -595,7 +647,7 @@ def test_a_compliant_plan_spends_exactly_one_synthesis_dispatch() -> None:
     assert run.rendered
     assert run.dispatches == 1
     assert client.calls.count("record") == 1
-    assert [take.disposition for take in run.takes] == ["recorded"]
+    assert [take.disposition for take in run.quota_readings] == ["recorded"]
 
 
 def test_the_new_take_budget_is_the_one_production_published() -> None:
@@ -625,7 +677,7 @@ def test_an_identical_recording_input_is_rebound_rather_than_redispatched() -> N
     assert run.rendered
     assert client.calls.count("record") == 2
     assert run.dispatches == 1
-    assert [take.disposition for take in run.takes] == ["recorded", "reused"]
+    assert [take.disposition for take in run.quota_readings] == ["recorded", "reused"]
     assert run.quota is not None and run.quota.new_takes_used == 1
 
 
@@ -675,20 +727,20 @@ def test_a_second_dispatch_where_a_take_already_existed_ends_the_run() -> None:
 
 def test_a_spend_past_the_cap_production_named_is_over_the_quota() -> None:
     """The other arm of the same reading, as arithmetic rather than as an invented envelope."""
-    assert Take("recorded", "take-1", new_takes_used=1, max_new_takes=1).within_quota
-    assert not Take("recorded", "take-1", new_takes_used=2, max_new_takes=1).within_quota
+    assert RecordingQuota("recorded", "take-1", new_takes_used=1, max_new_takes=1).within_quota
+    assert not RecordingQuota("recorded", "take-1", new_takes_used=2, max_new_takes=1).within_quota
 
 
 def test_a_take_is_read_off_the_envelope_that_published_it() -> None:
     """And off nothing else: a command that binds no Take publishes no quota to read."""
-    bound = take_bound(parse_envelope(recorded("run-record-succeeded.stdout")))
-    reused = take_bound(parse_envelope(recorded("run-record-reused.stdout")))
+    bound = quota_read(parse_envelope(recorded("run-record-succeeded.stdout")))
+    reused = quota_read(parse_envelope(recorded("run-record-reused.stdout")))
 
-    assert bound == Take("recorded", "take-crew-fixture-1", 1, 1)
+    assert bound == RecordingQuota("recorded", "take-crew-fixture-1", 1, 1)
     assert bound.dispatched
     assert reused is not None and not reused.dispatched
-    assert take_bound(parse_envelope(recorded("run-compile-succeeded.stdout"))) is None
-    assert take_bound(parse_envelope(recorded("run-record-paused-budget.stdout"))) is None
+    assert quota_read(parse_envelope(recorded("run-compile-succeeded.stdout"))) is None
+    assert quota_read(parse_envelope(recorded("run-record-paused-budget.stdout"))) is None
 
 
 def test_the_dispositions_that_cost_a_dispatch_are_the_ones_the_contract_names() -> None:
@@ -952,7 +1004,7 @@ def test_the_loop_never_learns_where_a_run_lives() -> None:
         repair_budget,
         target_seconds,
         beat_shape,
-        take_bound,
+        quota_read,
     ):
         for parameter in inspect.signature(function).parameters.values():
             assert not any(
