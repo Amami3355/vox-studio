@@ -100,11 +100,11 @@ def produce(
             return ProducedRun(run_id, tuple(envelopes), envelope, ())
 
     return ProducedRun(
-        run_id, tuple(envelopes), None, _read_back(client, run_id, envelopes, read_back)
+        run_id, tuple(envelopes), None, read_back_artifacts(client, run_id, envelopes, read_back)
     )
 
 
-def _read_back(
+def read_back_artifacts(
     client: ProductionClient,
     run_id: str,
     envelopes: Sequence[ResultEnvelope],
@@ -113,7 +113,9 @@ def _read_back(
     """Fetches the wanted kinds by the descriptors the Run's own envelopes published.
 
     The last envelope to publish a kind wins, because a Run that recompiled published two
-    compile reports and the second is the one that describes it now.
+    compile reports and the second is the one that describes it now. That is exactly the rule
+    a repair loop needs and the reason this is public: `converge.py` ends a Run the same way,
+    and a second copy of the read-back would be the copy that drifted.
     """
     latest = {
         descriptor.kind: descriptor

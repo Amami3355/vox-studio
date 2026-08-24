@@ -32,6 +32,32 @@ Every other descriptor in these envelopes carries a well-formed placeholder dige
 nothing opens those artifacts. If a later ticket reads one back, give it a body here and put
 its real digest in the envelope.
 
+## What the repair loop needed that authoring did not
+
+Ticket 08 repairs from what production published, which means the *body* of a refusal and not
+only the envelope around it. `validation-report.json` was already here; three more arrived with
+the loop, and each exists because a criterion cannot be asserted without it.
+
+- `preflight-report-duration-risk.json` and `run-preflight-duration-risk.stdout` — Preflight
+  **succeeding** while reporting a scene whose whole estimate range sits below its capability
+  minimum. This is the fixture that makes "Preflight is consulted before any recording is
+  attempted" mean something: the envelope succeeds and `risksBlockRecord` is false, so a crew
+  that read the outcome rather than the report would record a Take against it and find out at
+  compile. The clear report beside it crosses only its *recommended* hold, which is a quality
+  warning and deliberately buys no repair.
+- `compile-report-needs-repair.json` and `run-compile-needs-repair.stdout` — the compiler
+  refusing **after** a Take exists, which is the only place take-preserving repair can be
+  asserted. Its one error is `BELOW_MIN_DURATION`, whose published repair is take-preserving by
+  construction: give the scene more narration time by merging Beats into its span, rather than
+  by rewriting what the Beats say.
+- `run-record-reused.stdout` — the same Take bound a second time, `disposition: "reused"`. It
+  is what proves a preserved Take actually cost nothing, where the assertion would otherwise
+  only be that the crew withheld a plan.
+
+The three new report bodies were written with the same canonical-JSON serialisation the
+existing ones round-trip through, so the digests in the envelopes that publish them are the
+digests of these exact bytes.
+
 These files are deliberately not `.stdout`: they are artifact bodies, not recorded stdout, and
 the contract test parses only the latter. Their bytes are the fixture in the same way the
 envelopes' are, so `biome.json` ignores this directory — reformatting a report here would

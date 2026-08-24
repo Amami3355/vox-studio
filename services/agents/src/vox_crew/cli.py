@@ -1,8 +1,10 @@
 """One command that runs the crew headless against a bootstrapped work root.
 
 Today it runs the tracer bullet: reach the production boundary, read the teaching surface, and
-show it. No model is in the loop yet — the planner arrives with the ticket that authors a
-plan — so what this proves is the path, not the thinking.
+show it. Authoring and converging exist above it and are driven from the tests, because both
+need a model credential the crew is never given; what this command proves is the path, not the
+thinking. Wiring it to a live author is the work of the ticket that gives the crew a Brief to
+run end to end.
 
 The split between the two streams is deliberate and worth keeping as the crew grows. Stdout
 carries production's envelopes and nothing else, in the order they arrived, byte for byte, so

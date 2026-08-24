@@ -4,7 +4,7 @@ This is where a model enters the loop. Everything before it was the crew learnin
 interface publishes; this module turns that into a prompt, asks for a plan, reads what comes
 back, and hands it to the sequence `producer.py` already holds.
 
-Three properties in it are load-bearing.
+Four properties in it are load-bearing.
 
 **The instructions are assembled, not written.** They are built from the categories the
 contract index published and the bodies those categories carry, so a category the contract
@@ -26,6 +26,13 @@ authority on a plan, and a crew that refused to submit on its own reading would 
 opinion above the interface's. They travel with the Run instead, for the repair loop and the
 evidence bundle to read.
 
+**A repair is authored, not composed.** `repair_plan` is `author_plan` with what production
+said placed after the same instructions, and it runs the same leak gate over the whole text.
+The crew writes no prose about a refusal — `refusals.py` gathers the envelope, the report and
+the published `means` and `repair` for the codes in it, and the author reads those. Rebuilding
+the instructions rather than growing them keeps the catalog one identical prefix across the
+whole loop, which is what the contract budget depends on.
+
 The live implementation of the author is the only thing here that needs the ADK framework, and
 it imports it when it is built rather than when this module is. That is what keeps a bare
 `pytest` run free of a network install.
@@ -43,6 +50,7 @@ from typing import Any
 from .client import ProductionClient
 from .envelopes import ResultEnvelope
 from .producer import READ_BACK, ProducedRun, produce
+from .refusals import Refusal
 from .teaching_surface import TeachingSurface, read_teaching_surface
 
 
@@ -189,6 +197,23 @@ class PlanAuthor(ABC):
     @abstractmethod
     def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
         """Answers with a VideoPlan for the Brief, authored against the instructions."""
+
+    @abstractmethod
+    def repair(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        refusal: Refusal,
+    ) -> Mapping[str, Any]:
+        """Answers with a repaired VideoPlan for the plan production would not take.
+
+        A second method rather than a longer `author`, because a repair is a function of four
+        things and authoring is a function of two: an author asked to repair without the plan
+        it wrote and what was said about it would be authoring again from scratch, which is
+        the one thing a repair may not be. Both are payload-shaped for the same reason —
+        `Refusal` carries envelopes and report bodies, and holds no client and no path.
+        """
 
 
 def _preamble() -> str:
@@ -417,6 +442,39 @@ def author_plan(
     return AuthoredPlan(plan=plan, instructions=text, findings=review(plan, surface))
 
 
+def repair_plan(
+    surface: TeachingSurface,
+    brief: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    refusal: Refusal,
+    author: PlanAuthor,
+) -> AuthoredPlan:
+    """`author_plan` again, with what production said in front of the instructions.
+
+    Deliberately the same shape and the same gate. The scan runs over the whole text, not only
+    over the part `author_plan` built, because the refusal is new text reaching a model and a
+    prompt is where code-blindness is lost quietly — that argument does not weaken because the
+    new text came from the service.
+
+    The authoring instructions are rebuilt rather than appended to a previous repair's, so the
+    catalog stays one identical prefix across the whole loop. That is what makes the contract
+    budget survive a repair: the largest thing in the prompt is sent once and cached, and only
+    the refusal after it differs from cycle to cycle.
+    """
+    text = instructions(surface) + refusal.as_text()
+    scan = scan_for_leaks(text)
+    if not scan.ok:
+        raise InstructionsLeaked(
+            "The repair instructions carry repository vocabulary and were not sent: "
+            + ", ".join(scan.violations)
+        )
+
+    repaired = author.repair(text, brief, plan, refusal)
+    if not isinstance(repaired, Mapping):
+        raise PlanNotAuthored(f"An author repaired with {type(repaired).__name__}, not a plan.")
+    return AuthoredPlan(plan=repaired, instructions=text, findings=review(repaired, surface))
+
+
 def plan_and_produce(
     client: ProductionClient,
     request: Mapping[str, Any],
@@ -478,6 +536,25 @@ class AdkPlanAuthor(PlanAuthor):
         )
 
     def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._ask(instructions, brief)
+
+    def repair(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        refusal: Refusal,
+    ) -> Mapping[str, Any]:
+        """The same ask, with the refused plan beside the Brief in the message.
+
+        The refusal itself is already in the instructions — `repair_plan` put it there, after
+        the catalog, so the prefix a repair is authored against is the prefix the first
+        authoring used. Nothing is composed here: the two keys below are the interface's own
+        nouns, and the plan is the model's own previous answer handed back unedited.
+        """
+        return self._ask(instructions, {"brief": brief, "plan": plan})
+
+    def _ask(self, instructions: str, message: Mapping[str, Any]) -> Mapping[str, Any]:
         import asyncio  # noqa: PLC0415
 
         from google.adk.runners import InMemoryRunner  # noqa: PLC0415
@@ -493,7 +570,7 @@ class AdkPlanAuthor(PlanAuthor):
                 user_id=self._name,
                 session_id=session.id,
                 new_message=types.Content(
-                    role="user", parts=[types.Part(text=json.dumps(brief, ensure_ascii=False))]
+                    role="user", parts=[types.Part(text=json.dumps(message, ensure_ascii=False))]
                 ),
             )
             if event.content

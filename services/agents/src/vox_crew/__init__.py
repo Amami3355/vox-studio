@@ -20,6 +20,20 @@ from .client import (
     ProductionUnavailable,
     UnknownRun,
 )
+from .converge import (
+    BUDGET_EXHAUSTED,
+    MARGIN_CLEAR,
+    RENDERED,
+    STOPPED,
+    ConvergedRun,
+    RepairBudget,
+    beat_shape,
+    converge,
+    preflight_risks,
+    repair_budget,
+    take_preserved,
+    target_seconds,
+)
 from .envelopes import (
     ArtifactDescriptor,
     EnvelopeError,
@@ -42,10 +56,12 @@ from .planner import (
     author_plan,
     instructions,
     plan_and_produce,
+    repair_plan,
     review,
     scan_for_leaks,
 )
-from .producer import READ_BACK, ProducedRun, produce
+from .producer import READ_BACK, ProducedRun, produce, read_back_artifacts
+from .refusals import Refusal, read_refusal
 from .teaching_surface import DiscoveryRefused, TeachingSurface, read_teaching_surface
 
 __all__ = [
@@ -57,12 +73,15 @@ __all__ = [
     "ArtifactOutsideRun",
     "AuthoredPlan",
     "AuthoredRun",
+    "BUDGET_EXHAUSTED",
+    "ConvergedRun",
     "DiscoveryRefused",
     "EnvelopeError",
     "Finding",
     "InstructionsLeaked",
     "LeakScan",
     "LocalProductionClient",
+    "MARGIN_CLEAR",
     "MalformedEnvelope",
     "NextCommand",
     "PlanAuthor",
@@ -72,16 +91,29 @@ __all__ = [
     "ProductionClientError",
     "ProductionUnavailable",
     "READ_BACK",
+    "RENDERED",
+    "Refusal",
+    "RepairBudget",
     "ResultEnvelope",
     "RunHandle",
+    "STOPPED",
     "TeachingSurface",
     "UnknownRun",
     "author_plan",
+    "beat_shape",
+    "converge",
     "instructions",
     "parse_envelope",
     "plan_and_produce",
+    "preflight_risks",
     "produce",
+    "read_back_artifacts",
+    "read_refusal",
     "read_teaching_surface",
+    "repair_budget",
+    "repair_plan",
     "review",
     "scan_for_leaks",
+    "take_preserved",
+    "target_seconds",
 ]

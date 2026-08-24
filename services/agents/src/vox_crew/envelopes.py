@@ -30,6 +30,7 @@ PROTOCOL_VERSION = 1
 # Every outcome that is not `succeeded` still leaves a Run the crew can act on, except
 # `failed`. `needs_repair` in particular is a refusal, not a crash: exit code 0, Run intact.
 SUCCEEDED = "succeeded"
+NEEDS_REPAIR = "needs_repair"
 
 
 class MalformedEnvelope(ValueError):

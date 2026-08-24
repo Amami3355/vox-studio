@@ -20,11 +20,11 @@ a reported outcome rather than an endless loop.
 
 **Blocked by:** 07 (The producer agent authors a plan from the teaching surface)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A refused plan is repaired from the refusal's own fields and resubmitted
-- [ ] Preflight is consulted before any recording is attempted
-- [ ] After a Take exists, repairs prefer Beat reassignment or merging over rewriting Beat text
-- [ ] Convergence stays inside the repair budget for the Brief's target duration
-- [ ] An exhausted budget is reported as an outcome, not an infinite loop
-- [ ] Crew instructions do not restate what refusals already teach
+- [x] A refused plan is repaired from the refusal's own fields and resubmitted
+- [x] Preflight is consulted before any recording is attempted
+- [x] After a Take exists, repairs prefer Beat reassignment or merging over rewriting Beat text
+- [x] Convergence stays inside the repair budget for the Brief's target duration
+- [x] An exhausted budget is reported as an outcome, not an infinite loop
+- [x] Crew instructions do not restate what refusals already teach

@@ -1,0 +1,1 @@
+{"errors":[{"code":"BELOW_MIN_DURATION","expected":["90"],"field":"spansBeats","message":"scene-headline compiles to 62 frames and typographic_statement needs 90.","sceneId":"scene-headline","sectionId":"sec-opening"}],"ok":false,"warnings":[]}

@@ -6,8 +6,9 @@ Preflight, record a Take, compile, render — or Decline, when the catalog canno
 Brief asks for.
 
 The producer half of that loop exists: the crew reaches the production boundary, asks for the
-teaching surface, authors a VideoPlan from it and carries it to a preview. The researcher, and
-converging on a refusal, arrive with the tickets that follow.
+teaching surface, authors a VideoPlan from it, repairs it against whatever production refuses,
+and carries it to a preview. The researcher, and the Decline, arrive with the tickets that
+follow.
 
 ## Running it
 
@@ -88,8 +89,50 @@ interface's. They travel with the Run for the repair loop and the evidence bundl
 
 *`PlanAuthor` is the model seam.* One interface, a live implementation (`AdkPlanAuthor`) and a
 scripted one in the tests, and nothing above it knows which it holds — `client.py`'s rule
-applied to the model, for the same reason. It takes instructions and a Brief and answers with a
-plan: no client, no path, and no opinion about the production sequence.
+applied to the model, for the same reason. It has two methods, because authoring is a function
+of an instruction set and a Brief while a repair is also a function of the plan that was
+refused and what was said about it; an author asked to repair without those would be authoring
+from scratch. Both are payload-shaped: no client, no path, and no opinion about the production
+sequence.
+
+**`refusals.py` gathers what production said, and never restates it.** A refusal already
+carries a report, published codes and a suggested next command, and the checks contract carries
+a `means` and a `repair` for every code in it. So this module composes nothing: it fetches the
+report by the descriptor the envelope published, looks up the published meanings of exactly the
+codes that report named, adds what the protocol category publishes about repair, and labels
+them with four headings. A summary in the crew's own words would be a paraphrase standing where
+the interface's words were available, and would go stale the first time a `repair` was reworded.
+
+Preflight is carried through the same shape even though it does not refuse. A scene it assesses
+below its minimum is the compiler's `BELOW_MIN_DURATION` seen while it is still free, in the
+same vocabulary, so it travels as a refusal with `advisory` set rather than as a second shape.
+
+**`converge.py` drives one Run until it renders or the budget is gone.** It is the producer's
+sequence with the judgement put back, and it is a second module rather than a loop around
+`produce` for two reasons. A Run is opened once, because the Take is the expensive thing inside
+it and `produce` opens a fresh Run per call. And Preflight has to be *consulted* — it publishes
+`risksBlockRecord: false` and succeeds while reporting duration risk, so reading its report
+happens between two of `produce`'s own steps.
+
+Three things about it are asserted rather than hoped for.
+
+*Take-preserving repair is enforced.* The protocol publishes exactly what a Take survives —
+ordered Beat texts, segmentation and voice settings unchanged — and exactly what to do instead:
+reassign or merge existing Beats before changing narration text. Once a Take exists, a repair
+that rewrites Beat text is not submitted at all. The plan's Beat text *is* the recording input,
+so sending one would stale the Take and turn the next `record` into a second dispatch against a
+`maxNewTakes` of one; the interface would refuse that correctly and the Take would still be
+gone.
+
+*The budget comes from the Brief.* `repair_budget` is the proof harness's own rule — two cycles
+plus one per minute the Brief asks for — read out of the Brief's own opening words, because a
+Brief carries an id and its text and its length lives nowhere else. Keyed on scenes or beats, an
+agent could buy itself attempts by splitting its plan.
+
+*An exhausted budget is an outcome.* A Run ends `rendered`, `budget_exhausted` with the limit it
+hit named, or `stopped` — the last covering a `failed` envelope, which carries no report to
+repair from, and a paused one, which is an authorisation the crew may not give itself. Nothing
+raises: an operator needs what production said, not an exception where the envelopes were.
 
 ## Working on it
 

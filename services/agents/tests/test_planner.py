@@ -134,6 +134,15 @@ class ScriptedPlanAuthor(PlanAuthor):
         self.asked.append((instructions, brief))
         return self._plan
 
+    def repair(self, instructions: str, brief: Any, plan: Any, refusal: Any) -> dict[str, Any]:
+        """Nothing in this ticket repairs, and the assertions below say so by failing here.
+
+        The seam has two methods because a repair is a function of four things; an author that
+        answered a refusal with the plan that was refused would converge on nothing. The loop
+        that does repair, and the second implementation that answers one, are ticket 08's.
+        """
+        raise AssertionError("Ticket 07 authors. It does not repair.")
+
 
 # --- The instructions ------------------------------------------------------------------
 
