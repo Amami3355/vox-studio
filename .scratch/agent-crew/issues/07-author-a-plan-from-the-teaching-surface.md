@@ -22,12 +22,12 @@ never as image binaries or resolved references.
 
 **Blocked by:** 01 (Carry a crew runtime's model credential through the environment scrub), 06 (The client drives a complete run with a scripted plan)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The producer agent authors a VideoPlan from a fresh Brief and submits it
-- [ ] Agent instructions are built from the published contract categories, with no repository vocabulary in them
-- [ ] A leak scan over the instructions passes
-- [ ] The plan contains no timings, frames or safe areas
-- [ ] Capability, action and anchor names all appear in the published catalog
-- [ ] Asset requirements are semantic, never binaries or resolved references
-- [ ] Both acceptance and refusal of the authored plan are handled without crashing
+- [x] The producer agent authors a VideoPlan from a fresh Brief and submits it
+- [x] Agent instructions are built from the published contract categories, with no repository vocabulary in them
+- [x] A leak scan over the instructions passes
+- [x] The plan contains no timings, frames or safe areas
+- [x] Capability, action and anchor names all appear in the published catalog
+- [x] Asset requirements are semantic, never binaries or resolved references
+- [x] Both acceptance and refusal of the authored plan are handled without crashing

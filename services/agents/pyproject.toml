@@ -16,8 +16,10 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-# The ADK framework and the model client land with the first agent that thinks (the planner).
-# Declared here so the framework choice is recorded, installed only when an agent needs it.
+# The ADK framework and the model client, landed with the first agent that thinks (the
+# planner). Still optional rather than required: only `AdkPlanAuthor` imports it, and it does so
+# when one is built rather than at module load, so a bare `pytest` needs no network install and
+# every test but one runs without it. Exercised here on google-adk 2.7.1, Python 3.14.4.
 agents = ["google-adk>=1.0"]
 dev = ["pytest>=8"]
 

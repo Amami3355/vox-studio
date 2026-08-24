@@ -5,9 +5,9 @@ preview: discover the contracts, author a VideoPlan, repair it against the compi
 Preflight, record a Take, compile, render — or Decline, when the catalog cannot serve what the
 Brief asks for.
 
-What exists today is the tracer bullet: a crew process that reaches the production boundary,
-asks for the teaching surface, and shows it. No model is in the loop yet. The researcher and
-the planner arrive with the tickets that follow.
+The producer half of that loop exists: the crew reaches the production boundary, asks for the
+teaching surface, authors a VideoPlan from it and carries it to a preview. The researcher, and
+converging on a refusal, arrive with the tickets that follow.
 
 ## Running it
 
@@ -56,13 +56,40 @@ reads. The projections are held in context and never written into the work root:
 keeps the work root evidence rather than just a directory.
 
 **`producer.py` drives one Run from a Brief to a preview.** Initialise, validate, Preflight,
-record, compile, render, then read the two reports and the preview back through the client.
-Today it is handed a fixture plan and no model is in the loop, which is what lets the whole
-client surface be exercised for zero tokens; when the planner arrives it authors the plan and
-calls the same sequence, because the sequence belongs to the interface rather than the model.
-A refusal stops the Run and comes back intact — `needs_repair` and `failed` carry the report,
-the `means`, the `repair` and the `next` suggestions that the repair loop is built from, and
-raising on them would replace all of it with a stack trace.
+record, compile, render, then read the two reports and the preview back through the client. It
+is handed a plan and does not care who wrote it — a fixture plan drives the whole client
+surface for zero tokens, and the planner calls the same sequence with an authored one, because
+the sequence belongs to the interface rather than the model. A refusal stops the Run and comes
+back intact — `needs_repair` and `failed` carry the report, the `means`, the `repair` and the
+`next` suggestions that the repair loop is built from, and raising on them would replace all of
+it with a stack trace.
+
+**`planner.py` is where a model enters the loop.** It assembles the instructions from the
+categories the index published and the bodies they carry, so a category the contract adds is a
+category the planner teaches and a capability the catalog gains is one the model can reach for.
+The crew's own prose is one short preamble.
+
+Three things about it are worth knowing before changing it.
+
+*A prompt is scanned before it is sent.* `scan_for_leaks` is the leak-scan discipline the
+proofs apply to a work root, applied to the text of a prompt, and `author_plan` runs it as a
+gate: instructions carrying repository vocabulary raise rather than reach a model. The crew is
+code-blind by convention in this phase, and a prompt is the easiest place to lose that quietly.
+What the interface publishes about itself is deliberately not scanned for — a contract it hands
+out is not a leak.
+
+*What comes back is read in the compiler's own words.* `review` reports findings whose codes,
+`means` and `repair` come from the published checks contract, so the crew names a defect the
+way the interface names it. It covers what the instructions are responsible for teaching —
+physical time, capability, action and anchor names, semantic asset requirements — and is not a
+second compiler. Findings do not stop a plan being submitted: the compiler is the only
+authority on a plan, and a crew that refused on its own reading would put its opinion above the
+interface's. They travel with the Run for the repair loop and the evidence bundle to read.
+
+*`PlanAuthor` is the model seam.* One interface, a live implementation (`AdkPlanAuthor`) and a
+scripted one in the tests, and nothing above it knows which it holds — `client.py`'s rule
+applied to the model, for the same reason. It takes instructions and a Brief and answers with a
+plan: no client, no path, and no opinion about the production sequence.
 
 ## Working on it
 
@@ -81,9 +108,16 @@ ElevenLabs quota, no network. Tool tests replay recorded envelopes — see
 `tests/fixtures/README.md` for where those come from and how to re-record them — and a network
 sentinel in `conftest.py` fails any test that reaches for egress.
 
-The ADK framework is declared as an optional dependency rather than a required one, and lands
-with the first agent that thinks. Until then the crew reaches production on the standard
-library alone, which is what lets a bare `pytest` run need no network install.
+The ADK framework is declared as an optional dependency rather than a required one. Only
+`AdkPlanAuthor` needs it, and it imports the framework when one is built rather than when
+`planner.py` is loaded, so a bare `pytest` still needs no network install and every test but
+one runs without it. Install it with `.venv/Scripts/python -m pip install -e ".[agents,dev]"`;
+`google-adk` 2.7.1 is what has been exercised here, on Python 3.14.4.
+
+Driving the live author additionally needs a model credential in the runtime's environment. The
+crew never holds one, so nothing in the test suite can reach a model: the furthest a keyless
+machine follows that path is `AdkPlanAuthor.agent(...)`, which builds the agent that would have
+been asked. That is why building it is a public seam rather than something `author` does inline.
 
 ## What this crew is not allowed to do
 

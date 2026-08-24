@@ -30,20 +30,43 @@ from .envelopes import (
     parse_envelope,
 )
 from .local_client import LocalProductionClient
+from .planner import (
+    AdkPlanAuthor,
+    AuthoredPlan,
+    AuthoredRun,
+    Finding,
+    InstructionsLeaked,
+    LeakScan,
+    PlanAuthor,
+    PlanNotAuthored,
+    author_plan,
+    instructions,
+    plan_and_produce,
+    review,
+    scan_for_leaks,
+)
 from .producer import READ_BACK, ProducedRun, produce
 from .teaching_surface import DiscoveryRefused, TeachingSurface, read_teaching_surface
 
 __all__ = [
+    "AdkPlanAuthor",
     "Artifact",
     "ArtifactCorrupted",
     "ArtifactDescriptor",
     "ArtifactMissing",
     "ArtifactOutsideRun",
+    "AuthoredPlan",
+    "AuthoredRun",
     "DiscoveryRefused",
     "EnvelopeError",
+    "Finding",
+    "InstructionsLeaked",
+    "LeakScan",
     "LocalProductionClient",
     "MalformedEnvelope",
     "NextCommand",
+    "PlanAuthor",
+    "PlanNotAuthored",
     "ProducedRun",
     "ProductionClient",
     "ProductionClientError",
@@ -53,7 +76,12 @@ __all__ = [
     "RunHandle",
     "TeachingSurface",
     "UnknownRun",
+    "author_plan",
+    "instructions",
     "parse_envelope",
+    "plan_and_produce",
     "produce",
     "read_teaching_surface",
+    "review",
+    "scan_for_leaks",
 ]

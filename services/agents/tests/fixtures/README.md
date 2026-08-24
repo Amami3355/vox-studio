@@ -8,9 +8,9 @@ Their bytes are the recording. Nothing here should be reformatted — verbatim p
 byte property, and prettifying these files would delete the thing they exist to prove. That is
 why they carry a `.stdout` extension and sit outside `biome check`'s reach.
 
-- `contract-index.stdout`, `contract-show-checks.stdout` are **recorded**: written by
-  `pnpm --filter @vox/production record:crew-fixtures`, straight from the handlers the
-  dispatcher calls. Re-record them when the contracts are rebuilt.
+- `contract-index.stdout` and the three `contract-show-*.stdout` files are **recorded**:
+  written by `pnpm --filter @vox/production record:crew-fixtures --category <name>`, straight
+  from the handlers the dispatcher calls. Re-record them when the contracts are rebuilt.
 - The `run-*.stdout` envelopes are **authored**, because producing them for real needs a Run,
   a ledger and a signing key. They are held to the contract by
   `packages/production/tests/crew-fixtures.test.ts`, which parses every file in this directory
@@ -37,7 +37,22 @@ the contract test parses only the latter. Their bytes are the fixture in the sam
 envelopes' are, so `biome.json` ignores this directory — reformatting a report here would
 change its digest and break the envelope that publishes it.
 
-Only `checks` is recorded among the five projections. The five total ~220 KB and duplicate
-generated contract data that drifts the moment the catalog is rebuilt; the client under test
-is indifferent to which projection it is carrying, and the crew's discovery test covers all
-five through the stub launcher.
+## Why all five projections are recorded
+
+`checks` was recorded alone at first. The client was the thing under test and was indifferent
+to what a projection carried, so committing ~220 KB of generated contract data that drifts the
+moment the catalog is rebuilt bought nothing.
+
+The planner is not indifferent to any of them. Its instructions *are* these bodies — it
+assembles the prompt from every category the index publishes — and two of the acceptance
+criteria are about that text: the leak scan over it, and the capability, action and anchor
+names an authored plan is read back against. Both are assertions about the contract the build
+publishes, and neither means anything against a stand-in. The protocol category is the sharpest
+case: it tells an agent a plan is submitted as `plan.json`, which is why the crew's leak-marker
+list may not contain that string, and only the recorded body proves it.
+
+Re-record all five when the contracts are rebuilt:
+
+```
+pnpm --filter @vox/production record:crew-fixtures --category <name>
+```
