@@ -1,0 +1,1 @@
+{"errors":[],"ok":true,"warnings":[{"code":"SLOT_RELOCATED","message":"The presenter cutout moved from cornerBR to left to clear the counter.","sceneId":"scene-figure","sectionId":"sec-evidence","severity":"info","suggestion":"Accept the safe placement, or choose a conflict-free preferred slot."}]}

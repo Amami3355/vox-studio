@@ -30,6 +30,7 @@ from .envelopes import (
     parse_envelope,
 )
 from .local_client import LocalProductionClient
+from .producer import READ_BACK, ProducedRun, produce
 from .teaching_surface import DiscoveryRefused, TeachingSurface, read_teaching_surface
 
 __all__ = [
@@ -43,13 +44,16 @@ __all__ = [
     "LocalProductionClient",
     "MalformedEnvelope",
     "NextCommand",
+    "ProducedRun",
     "ProductionClient",
     "ProductionClientError",
     "ProductionUnavailable",
+    "READ_BACK",
     "ResultEnvelope",
     "RunHandle",
     "TeachingSurface",
     "UnknownRun",
     "parse_envelope",
+    "produce",
     "read_teaching_surface",
 ]

@@ -21,11 +21,11 @@ throws on it has destroyed the thing later tickets need.
 
 **Blocked by:** 05 (A Python crew that reads the teaching surface)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A fixture plan drives a Run from initialise through to a rendered preview
-- [ ] Every production verb is reachable through the client
-- [ ] Request, plan, decision and replacement authorisation are all passed as objects
-- [ ] The preview, the compile report and the Preflight report are read back through artifact retrieval
-- [ ] A refused command returns its envelope intact rather than raising
-- [ ] Tests run against recorded fixtures with no service, key, quota or network
+- [x] A fixture plan drives a Run from initialise through to a rendered preview
+- [x] Every production verb is reachable through the client
+- [x] Request, plan, decision and replacement authorisation are all passed as objects
+- [x] The preview, the compile report and the Preflight report are read back through artifact retrieval
+- [x] A refused command returns its envelope intact rather than raising
+- [x] Tests run against recorded fixtures with no service, key, quota or network

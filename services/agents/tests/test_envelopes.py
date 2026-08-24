@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 
 import pytest
-from conftest import recorded
+from conftest import recorded, recorded_bytes
 from vox_crew.envelopes import ArtifactDescriptor, MalformedEnvelope, parse_envelope
 
 
@@ -67,11 +68,13 @@ def test_names_the_run_it_belongs_to() -> None:
 
 def test_reads_artifact_descriptors_as_objects() -> None:
     envelope = parse_envelope(recorded("run-render-succeeded.stdout"))
+    # The digest is the fixture preview's own, not a written-down constant: the envelope and
+    # the body beside it have to agree, because `fetch_artifact` checks one against the other.
     assert envelope.artifacts == (
         ArtifactDescriptor(
             kind="preview",
             path="artifacts/renders/" + "a1" * 32 + "/preview.mp4",
-            sha256="7c" * 32,
+            sha256=sha256(recorded_bytes("preview.mp4")).hexdigest(),
         ),
     )
     assert envelope.artifact("preview") is envelope.artifacts[0]

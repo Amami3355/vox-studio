@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import socket
 import sys
+from base64 import b64encode
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -51,6 +52,16 @@ def recorded(name: str) -> str:
     """
     with open(FIXTURES / name, encoding="utf-8", newline="") as recording:
         return recording.read()
+
+
+def recorded_bytes(name: str) -> bytes:
+    """An artifact body a fixture envelope publishes, as the bytes its descriptor hashes.
+
+    These sit under `fixtures/artifacts/`, outside the `.stdout` files the contract test
+    parses. They exist because `fetch_artifact` checks the digest: an envelope naming an
+    artifact nothing can produce would leave the read-back direction untestable.
+    """
+    return (FIXTURES / "artifacts" / name).read_bytes()
 
 
 @pytest.fixture
@@ -109,15 +120,43 @@ class Launcher:
         self._log.unlink(missing_ok=True)
 
 
+def _encoded(responses: dict[str, Any]) -> dict[str, Any]:
+    """Base64s the artifact bodies, because the response table travels as JSON.
+
+    Tests write artifacts as the bytes an envelope's descriptor hashes, which is the readable
+    thing to write and not a thing JSON carries.
+    """
+    return {
+        key: (
+            response
+            if "artifacts" not in response
+            else {
+                **response,
+                "artifacts": {
+                    path: b64encode(
+                        body if isinstance(body, bytes) else body.encode("utf-8")
+                    ).decode("ascii")
+                    for path, body in response["artifacts"].items()
+                },
+            }
+        )
+        for key, response in responses.items()
+    }
+
+
 @pytest.fixture
 def launcher(tmp_path: Path) -> Iterator[Any]:
-    """Builds a `Launcher` from a `{argv-joined: {stdout, exitCode}}` response table."""
+    """Builds a `Launcher` from a `{argv-prefix: {stdout, stderr, exitCode, artifacts}}` table.
+
+    A key matches the longest argv prefix it names, so a whole Run is scriptable without
+    knowing the directory the client will choose for it. `"*"` is the catch-all.
+    """
     log = tmp_path / "invocations.jsonl"
 
     def build(responses: dict[str, Any]) -> Launcher:
         script = tmp_path / f"responses-{len(list(tmp_path.glob('responses-*.json')))}.json"
         script.write_text(
-            json.dumps({"log": str(log), "responses": responses}),
+            json.dumps({"log": str(log), "responses": _encoded(responses)}),
             encoding="utf-8",
             newline="",
         )

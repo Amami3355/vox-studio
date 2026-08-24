@@ -55,6 +55,15 @@ index rather than a list in the crew, so a category the contract adds is a categ
 reads. The projections are held in context and never written into the work root: that is what
 keeps the work root evidence rather than just a directory.
 
+**`producer.py` drives one Run from a Brief to a preview.** Initialise, validate, Preflight,
+record, compile, render, then read the two reports and the preview back through the client.
+Today it is handed a fixture plan and no model is in the loop, which is what lets the whole
+client surface be exercised for zero tokens; when the planner arrives it authors the plan and
+calls the same sequence, because the sequence belongs to the interface rather than the model.
+A refusal stops the Run and comes back intact — `needs_repair` and `failed` carry the report,
+the `means`, the `repair` and the `next` suggestions that the repair loop is built from, and
+raising on them would replace all of it with a stack trace.
+
 ## Working on it
 
 The project is self-contained on purpose. It is not a pnpm workspace member — `pnpm typecheck`,
