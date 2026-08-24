@@ -20,12 +20,12 @@ ticket also proves the read-back direction of the client under real artifacts.
 
 **Blocked by:** 08 (The producer converges a refused plan)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A compliant plan produces exactly one synthesis dispatch
-- [ ] The new-Take budget is never exceeded
-- [ ] An identical recording input is never redispatched without an explicit authorisation
-- [ ] A paused outcome stops the crew and surfaces the operator decision rather than proceeding
-- [ ] Compile and render follow, ending at a narrated preview MP4
-- [ ] Placeholder degradation is reported and accepted, not fought
-- [ ] The preview and reports are read back through artifact retrieval, never by path
+- [x] A compliant plan produces exactly one synthesis dispatch
+- [x] The new-Take budget is never exceeded
+- [x] An identical recording input is never redispatched without an explicit authorisation
+- [x] A paused outcome stops the crew and surfaces the operator decision rather than proceeding
+- [x] Compile and render follow, ending at a narrated preview MP4
+- [x] Placeholder degradation is reported and accepted, not fought
+- [x] The preview and reports are read back through artifact retrieval, never by path

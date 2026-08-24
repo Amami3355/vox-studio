@@ -35,6 +35,16 @@ own rule, keyed on the duration the Brief asks for. A budget keyed on scenes or 
 an agent buy itself attempts by splitting its plan, and a budget keyed on a constant moves the
 wall every time the Brief gets longer. Exhausting it is an outcome with the limit named, not a
 loop that stops being interesting.
+
+**The recording quota is read, never kept.** `protocol.recording` publishes the whole rule set
+this loop obeys — `run.record` is the only network command, a verified matching Take is `reuse
+without quota`, an identical input redispatched needs a `replacement grant required`, and an
+exhausted budget is `paused before network`. Every one of those is enforced on production's
+side and reported on its envelopes, which publish `newTakesUsed` and `maxNewTakes` beside the
+disposition. So the crew's answer to "how much of the quota is gone" is production's answer,
+read off what it published rather than counted alongside it. A pause is where that leaves the
+crew nothing to do: an authorisation is a human's, so the Run ends and the decision is handed
+over in the words the envelope used.
 """
 
 from __future__ import annotations
@@ -46,16 +56,26 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import Artifact, ProductionClient
-from .envelopes import NEEDS_REPAIR, MalformedEnvelope, ResultEnvelope
+from .envelopes import NEEDS_REPAIR, MalformedEnvelope, NextCommand, ResultEnvelope
 from .planner import AuthoredPlan, Finding, PlanAuthor, author_plan, repair_plan
 from .producer import READ_BACK, read_back_artifacts
 from .refusals import Refusal, read_refusal
 from .teaching_surface import TeachingSurface, read_teaching_surface
 
-# How a converged Run ended. Three outcomes, and only one of them is a preview.
+# How a converged Run ended. Four outcomes, and only one of them is a preview. `paused` is
+# production's own word for the ending it wrote, kept rather than translated: a paused Run is
+# a decision waiting on a human, and calling it `stopped` alongside a crash would put the one
+# ending an operator has to act on under the same name as the one they cannot.
 RENDERED = "rendered"
 BUDGET_EXHAUSTED = "budget_exhausted"
+PAUSED = "paused"
 STOPPED = "stopped"
+
+# The dispositions `run.record` publishes, split by what they cost. The three names are the
+# protocol's own enum; the split is `recording.verifiedMatchingTake` — "reuse without quota" —
+# which is the sentence that makes `reused` the free one and the other two a provider call.
+REUSED = "reused"
+DISPATCHED = ("recorded", "replacement_recorded")
 
 # The assessment that means a scene is clear of a threshold across its whole estimate range.
 # One of the three names `protocol.preflight.assessments` publishes; a test holds it to that
@@ -92,6 +112,52 @@ class RepairBudget:
     plan_versions: int
     preflight_calls: int
     post_record_plan_versions: int
+
+
+@dataclass(frozen=True, slots=True)
+class Take:
+    """What one `run.record` published: the Take it bound, and what the quota now stands at.
+
+    All four fields are the envelope's, none of them the crew's. `maxNewTakes` reaches
+    production in the request and comes back on every record envelope beside the spend, so a
+    crew that tracked the quota in parallel would be keeping a second number to be wrong with
+    — the same reason `repair_budget` reads the Brief instead of being told its length.
+    """
+
+    disposition: str
+    take_id: str
+    new_takes_used: int
+    max_new_takes: int
+
+    @property
+    def dispatched(self) -> bool:
+        """Whether binding this Take cost a synthesis dispatch, or reused one already paid for."""
+        return self.disposition in DISPATCHED
+
+    @property
+    def within_quota(self) -> bool:
+        return self.new_takes_used <= self.max_new_takes
+
+
+def take_bound(envelope: ResultEnvelope) -> Take | None:
+    """The Take a record envelope published, or None where it published none.
+
+    A paused or failed `run.record` carries `data: null` — there is no Take and no spend to
+    read — and every other command publishes no quota at all. Both leave this None rather than
+    inventing zeroes, because a zero here would be the crew answering a question production
+    declined to answer.
+    """
+    data = envelope.data
+    if envelope.command != "run.record" or not isinstance(data, Mapping):
+        return None
+    if not {"disposition", "takeId", "newTakesUsed", "maxNewTakes"} <= set(data):
+        return None
+    return Take(
+        disposition=str(data["disposition"]),
+        take_id=str(data["takeId"]),
+        new_takes_used=int(data["newTakesUsed"]),
+        max_new_takes=int(data["maxNewTakes"]),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +201,71 @@ class ConvergedRun:
     def refusal(self) -> Refusal | None:
         """The last thing production said that the crew had to act on."""
         return self.refusals[-1] if self.refusals else None
+
+    @property
+    def paused(self) -> bool:
+        return self.outcome == PAUSED
+
+    @property
+    def takes(self) -> tuple[Take, ...]:
+        """Every Take production published across the Run, in the order it published them.
+
+        Derived rather than accumulated. The envelopes are already the record of what the Run
+        cost, so a field beside them would be a second account of the same thing and the one
+        that could disagree.
+        """
+        return tuple(
+            take for take in (take_bound(item) for item in self.envelopes) if take is not None
+        )
+
+    @property
+    def dispatches(self) -> int:
+        """How many synthesis dispatches this Run spent. On a compliant plan, one."""
+        return sum(1 for take in self.takes if take.dispatched)
+
+    @property
+    def quota(self) -> Take | None:
+        """Where the recording budget stood when production last said."""
+        return self.takes[-1] if self.takes else None
+
+    @property
+    def decision(self) -> tuple[NextCommand, ...]:
+        """What a paused Run is waiting on a human for, in the words production asked in.
+
+        The envelope's `next` already names the command an operator would run and carries the
+        reason as its text — budget exhausted, or a replacement grant required — and that
+        reason is the only thing separating the two pauses. So surfacing the decision is
+        handing those over. A sentence of the crew's own here would be a paraphrase standing
+        where the interface's words were, which is the rule `refusals.py` exists to keep.
+        """
+        refusal = self.refusal
+        return refusal.envelope.next if self.paused and refusal is not None else ()
+
+    @property
+    def degradations(self) -> tuple[str, ...]:
+        """The warnings the finished compile published, in the codes it published them under.
+
+        A preview carrying placeholders is an honest intermediate state, and the compiler says
+        so: `ASSET_PLACEHOLDER` is in the checks contract's `warnings` block, so it rides a
+        green compile and never reaches the loop as a refusal. Accepting it visibly is the
+        difference between that and ignoring it — so the finished Run reports every warning
+        its compile report named, and repairs none of them.
+
+        Every warning, not the placeholder alone: a crew reporting only the code it was asked
+        about would hide the next one, and the `warnings` block is the whole list of things a
+        Run may ship with.
+        """
+        report = self.artifact("compile_report")
+        if report is None:
+            return ()
+        body = report.json()
+        if not isinstance(body, Mapping):
+            return ()
+        return tuple(
+            str(warning.get("code", ""))
+            for warning in body.get("warnings") or ()
+            if isinstance(warning, Mapping)
+        )
 
     def artifact(self, kind: str) -> Artifact | None:
         return next((item for item in self.artifacts if item.kind == kind), None)
@@ -244,8 +375,9 @@ def converge(
     trail records what production said across the whole convergence rather than only the pass
     that happened to succeed.
 
-    Nothing raises on a refusal. A Run that ends refused, stopped or out of budget comes back
-    with the material that ended it, because that is what an operator has to read.
+    Nothing raises on a refusal. A Run that ends refused, stopped, paused or out of budget
+    comes back with the material that ended it, because that is what an operator has to read —
+    and a paused one comes back with the decision it is waiting on them for.
     """
     surface = read_teaching_surface(client, on_envelope)
     brief = request.get("brief", {})
@@ -349,14 +481,33 @@ def converge(
                 return ended(BUDGET_EXHAUSTED, run_id, spent)
             continue
 
+        # No `replacement_authorisation`, ever. The protocol publishes `identicalInputRedispatch:
+        # replacement grant required`, and a grant is an operator's signature over a recording
+        # input. The crew holds none, so its whole side of that rule is that this call has one
+        # argument — which is stronger than deciding each time whether to send one.
         took = step(client.record(run_id))
+        if took.outcome == PAUSED:
+            # The Run is the operator's now. Production pauses before the network for exactly
+            # two reasons — the budget is gone, or an identical input needs a grant — and both
+            # are authorisations the crew may not give itself. It stops holding everything
+            # production said, and `decision` hands over the command and the reason it named.
+            refusals.append(read_refusal(client, run_id, took, surface))
+            return ended(PAUSED, run_id)
         if not took.succeeded:
-            # A paused Run is the operator's, not the crew's: `maxNewTakes` is exhausted or a
-            # replacement grant is required, and both are authorisations the crew may not give
-            # itself. It stops holding everything production said, which is what an operator
-            # needs to decide with.
             refusals.append(read_refusal(client, run_id, took, surface))
             return ended(STOPPED, run_id)
+        bound = take_bound(took)
+        if bound is not None and (
+            not bound.within_quota or (bound.dispatched and recorded is not None)
+        ):
+            # The backstop under take-preserving repair, at the one place two independently
+            # derived rules have to agree. Nothing should reach it: a repair that would stale
+            # the Take is withheld above, and the interface enforces `maxNewTakes` on its own
+            # side. A dispatch arriving where a rebinding was expected — or a spend past the
+            # cap production itself named — means those two rules have parted company and a
+            # Take was bought that nothing intended. Carrying on would mean converging inside
+            # a quota the crew can no longer account for, so the Run ends with the line named.
+            return ended(BUDGET_EXHAUSTED, run_id, "new_takes")
         recorded = plan
 
         compiled = step(client.compile(run_id))

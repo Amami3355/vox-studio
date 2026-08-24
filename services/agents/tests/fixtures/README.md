@@ -63,6 +63,30 @@ the contract test parses only the latter. Their bytes are the fixture in the sam
 envelopes' are, so `biome.json` ignores this directory — reformatting a report here would
 change its digest and break the envelope that publishes it.
 
+## What the quota rules needed that the repair loop did not
+
+Ticket 09 binds the crew to `protocol.recording`, and two of its criteria are about outcomes no
+envelope that was already here could produce.
+
+- `run-record-paused-budget.stdout` and `run-record-paused-replacement.stdout` — the two
+  pauses, which are the same envelope apart from one sentence. `pauseRecording` in the service
+  is the only emitter and writes `outcome: 'paused'`, `data: null`, no artifacts, the stage
+  left where it was, and one `next` naming
+  `run.record --run . --replacement-authorisation <grant.json>` with the reason as its text.
+  The reason is the *only* thing distinguishing an exhausted budget from a required
+  replacement, so there are two files rather than one: a single fixture would let a crew that
+  composed its own explanation pass, and the criterion is that production's words travel.
+  Note that `commandDataSchemas['run.record']` is strict and a paused envelope carries no
+  `data`, so the contract test skips the payload and the envelope schema is the whole gate.
+- `compile-report-placeholder.json` and `run-compile-placeholder.stdout` — a **green** compile
+  whose report warns `ASSET_PLACEHOLDER`. The existing green compile carries `SLOT_RELOCATED`,
+  which proves a warning rides a successful compile but not that the specific degradation this
+  spec accepts does. A separate body was needed rather than an edited one, because editing the
+  existing report would change its digest and take the clean green compile away with it.
+
+Its report body uses the same canonical serialisation as the rest, so the digest in the
+envelope that publishes it is the digest of those exact bytes.
+
 ## Why all five projections are recorded
 
 `checks` was recorded alone at first. The client was the thing under test and was indifferent

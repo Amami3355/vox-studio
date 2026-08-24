@@ -129,10 +129,31 @@ plus one per minute the Brief asks for — read out of the Brief's own opening w
 Brief carries an id and its text and its length lives nowhere else. Keyed on scenes or beats, an
 agent could buy itself attempts by splitting its plan.
 
+*The recording quota is read, never kept.* `protocol.recording` publishes the whole rule set:
+`run.record` is the only network command, a verified matching Take is `reuse without quota`, an
+identical input redispatched needs a `replacement grant required`, and an exhausted budget is
+`paused before network`. Every record envelope publishes `newTakesUsed` and `maxNewTakes` beside
+the disposition, so how much of the quota is gone is production's answer read off what it wrote —
+`run.dispatches`, `run.quota`, `run.takes` — rather than a count the crew kept beside it. The
+crew's own side of the rule is that `client.record` is called with one argument, always: a
+replacement grant is an operator's signature and the crew holds none.
+
 *An exhausted budget is an outcome.* A Run ends `rendered`, `budget_exhausted` with the limit it
-hit named, or `stopped` — the last covering a `failed` envelope, which carries no report to
-repair from, and a paused one, which is an authorisation the crew may not give itself. Nothing
-raises: an operator needs what production said, not an exception where the envelopes were.
+hit named, `paused`, or `stopped` — the last covering a `failed` envelope, which carries no
+report to repair from. Nothing raises: an operator needs what production said, not an exception
+where the envelopes were.
+
+*A pause is a decision waiting on a human, and says so under its own name.* Production pauses
+before the network for two reasons — the budget is gone, or an identical input needs a grant —
+and the reason string is the only thing separating them. So the Run ends `paused` and
+`run.decision` hands over the `next` command and reason the envelope named, verbatim. Composing
+a sentence about a pause would be the paraphrase `refusals.py` exists to avoid.
+
+*Placeholder degradation is accepted visibly.* `ASSET_PLACEHOLDER` is in the checks contract's
+`warnings` block, so it rides a green compile and never reaches the loop as a refusal — fighting
+it would spend the repair budget on the thing the budget exists to protect. `run.degradations`
+reports every warning the finished compile published, in the compiler's own codes, which is the
+difference between accepting it and ignoring it.
 
 ## Working on it
 

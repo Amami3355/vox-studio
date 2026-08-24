@@ -40,10 +40,13 @@ from .teaching_surface import TeachingSurface
 # them, and it is the body the codes live in — an envelope's `data.report` is only the summary.
 REPORT_KINDS = ("validation_report", "compile_report", "preflight_report")
 
-# What the protocol category publishes that a repair is authored against. Both are read whole:
-# `repair` is where `takeRemainsReusableWhen` and `preferredDurationRepair` are written, and
-# `preflight` is where the assessment vocabulary and its authority are.
-GUIDANCE = ("repair", "preflight")
+# What the protocol category publishes that a repair is authored against. All three are read
+# whole: `repair` is where `takeRemainsReusableWhen` and `preferredDurationRepair` are written,
+# `preflight` is where the assessment vocabulary and its authority are, and `recording` is
+# where the quota rules a repair has to survive are — that a matching Take is reuse without
+# quota, and that redispatching an identical input needs a grant the crew does not hold. A
+# repair authored after a Take exists is authored against all three at once.
+GUIDANCE = ("repair", "preflight", "recording")
 
 
 def _codes(value: Any) -> Iterator[str]:

@@ -1,0 +1,1 @@
+{"protocolVersion":1,"command":"run.record","outcome":"paused","run":{"id":"0f6d4a3e-2c11-4c1a-9d7b-8a5f2e9c4d10","stage":"preflighted"},"data":null,"artifacts":[],"error":null,"next":[{"command":"run.record","args":["--run",".","--replacement-authorisation","<grant.json>"],"reason":"The Run has no remaining recording budget."}]}

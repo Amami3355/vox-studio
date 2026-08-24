@@ -26,18 +26,24 @@ from test_planner import CATEGORIES, SURFACE, a_catalog_following_plan
 from vox_crew.client import Artifact, ProductionClient
 from vox_crew.converge import (
     BUDGET_EXHAUSTED,
+    DISPATCHED,
     MARGIN_CLEAR,
+    PAUSED,
     RENDERED,
+    REUSED,
     STOPPED,
+    Take,
     beat_shape,
     converge,
     preflight_risks,
     repair_budget,
+    take_bound,
     take_preserved,
     target_seconds,
 )
 from vox_crew.envelopes import ArtifactDescriptor, ResultEnvelope, parse_envelope
 from vox_crew.planner import InstructionsLeaked, PlanAuthor, repair_plan, scan_for_leaks
+from vox_crew.producer import READ_BACK
 from vox_crew.refusals import Refusal, read_refusal
 
 # Every artifact body a fixture envelope publishes, keyed by the digest that names it. The
@@ -48,6 +54,7 @@ BODIES = (
     "preflight-report-duration-risk.json",
     "compile-report.json",
     "compile-report-needs-repair.json",
+    "compile-report-placeholder.json",
     "validation-report.json",
     "preview.mp4",
 )
@@ -78,6 +85,7 @@ class ScriptedClient(ProductionClient):
     def __init__(self, **script: list[str]) -> None:
         self.calls: list[str] = []
         self.submitted: list[Any] = []
+        self.authorisations: list[Any] = []
         self._script = {verb: list(names) for verb, names in script.items()}
 
     def _replay(self, verb: str) -> ResultEnvelope:
@@ -107,6 +115,7 @@ class ScriptedClient(ProductionClient):
         return self._replay("preflight")
 
     def record(self, run_id: str, replacement_authorisation: Any = None) -> ResultEnvelope:
+        self.authorisations.append(replacement_authorisation)
         return self._replay("record")
 
     def compile(self, run_id: str) -> ResultEnvelope:
@@ -567,6 +576,360 @@ def test_nothing_raises_on_an_ending_the_crew_did_not_want() -> None:
     assert run.envelopes[-1].raw == recorded("run-validate-failed.stdout")
 
 
+# --- The quota rules -----------------------------------------------------------------------
+
+
+def test_a_compliant_plan_spends_exactly_one_synthesis_dispatch() -> None:
+    """The ticket's first criterion, counted the way the harness counts it.
+
+    Nothing here is a counter the crew kept. `run.record` publishes its disposition beside
+    `newTakesUsed` and `maxNewTakes`, so how many dispatches a Run spent is read off the
+    envelopes it received — which is the answer the assertion sheet reaches from
+    `network-audit.json`, arrived at from the crew's side of the boundary.
+    """
+    client = a_client()
+    author = RepairingAuthor(a_catalog_following_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.rendered
+    assert run.dispatches == 1
+    assert client.calls.count("record") == 1
+    assert [take.disposition for take in run.takes] == ["recorded"]
+
+
+def test_the_new_take_budget_is_the_one_production_published() -> None:
+    """`maxNewTakes` travels out in the request and back on the envelope. The crew reads it.
+
+    Tracking it in parallel would give the crew a second number to be wrong with, for the
+    same reason the repair budget reads the Brief rather than being told what it is.
+    """
+    run = converge(a_client(), REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.quota is not None
+    assert run.quota.max_new_takes == REQUEST["production"]["maxNewTakes"]
+    assert run.quota.new_takes_used == 1
+    assert run.quota.within_quota
+
+
+def test_an_identical_recording_input_is_rebound_rather_than_redispatched() -> None:
+    """Two `record` calls, one dispatch: the second bound the Take the first paid for."""
+    client = a_client(
+        compile=["run-compile-needs-repair.stdout", "run-compile-succeeded.stdout"],
+        record=["run-record-succeeded.stdout", "run-record-reused.stdout"],
+    )
+    author = RepairingAuthor(a_catalog_following_plan(), a_repaired_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.rendered
+    assert client.calls.count("record") == 2
+    assert run.dispatches == 1
+    assert [take.disposition for take in run.takes] == ["recorded", "reused"]
+    assert run.quota is not None and run.quota.new_takes_used == 1
+
+
+def test_the_crew_never_hands_production_an_authorisation_of_its_own() -> None:
+    """The crew's whole side of the redispatch rule: it holds no grant, so it passes none.
+
+    A replacement grant is an operator's signature over a recording input. The client takes
+    one because an operator's decision has to reach production somehow, and the loop is not
+    where that decision is made.
+    """
+    client = a_client(
+        compile=["run-compile-needs-repair.stdout", "run-compile-succeeded.stdout"],
+        record=["run-record-succeeded.stdout", "run-record-reused.stdout"],
+    )
+
+    run = converge(
+        client, REQUEST, RepairingAuthor(a_catalog_following_plan(), a_repaired_plan())
+    )
+
+    assert run.rendered
+    assert client.authorisations == [None, None]
+
+
+def test_a_second_dispatch_where_a_take_already_existed_ends_the_run() -> None:
+    """The backstop under take-preserving repair, at the one place two rules have to agree.
+
+    Nothing should reach it: a repair that would stale the Take is withheld above, and the
+    interface enforces `maxNewTakes` on its own side. A `recorded` disposition arriving where
+    a `reused` one was expected means those two rules have parted company and a dispatch was
+    spent that nothing intended — so the Run ends there rather than carrying on inside a
+    quota it can no longer account for.
+    """
+    client = a_client(
+        compile=["run-compile-needs-repair.stdout", "run-compile-succeeded.stdout"],
+        record=["run-record-succeeded.stdout"],
+    )
+    author = RepairingAuthor(a_catalog_following_plan(), a_repaired_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.outcome == BUDGET_EXHAUSTED
+    assert run.limit == "new_takes"
+    assert not run.rendered
+    assert client.calls.count("record") == 2
+    assert "render" not in client.calls
+
+
+def test_a_spend_past_the_cap_production_named_is_over_the_quota() -> None:
+    """The other arm of the same reading, as arithmetic rather than as an invented envelope."""
+    assert Take("recorded", "take-1", new_takes_used=1, max_new_takes=1).within_quota
+    assert not Take("recorded", "take-1", new_takes_used=2, max_new_takes=1).within_quota
+
+
+def test_a_take_is_read_off_the_envelope_that_published_it() -> None:
+    """And off nothing else: a command that binds no Take publishes no quota to read."""
+    bound = take_bound(parse_envelope(recorded("run-record-succeeded.stdout")))
+    reused = take_bound(parse_envelope(recorded("run-record-reused.stdout")))
+
+    assert bound == Take("recorded", "take-crew-fixture-1", 1, 1)
+    assert bound.dispatched
+    assert reused is not None and not reused.dispatched
+    assert take_bound(parse_envelope(recorded("run-compile-succeeded.stdout"))) is None
+    assert take_bound(parse_envelope(recorded("run-record-paused-budget.stdout"))) is None
+
+
+def test_the_dispositions_that_cost_a_dispatch_are_the_ones_the_contract_names() -> None:
+    """Three dispositions, published as an enum, and exactly one of them binds without paying."""
+    published = SURFACE.contract("protocol")["schemas"]["commandData"]["run.record"]
+    names = published["properties"]["disposition"]["enum"]
+
+    assert set(DISPATCHED) | {REUSED} == set(names)
+    assert REUSED not in DISPATCHED
+    assert set(published["required"]) >= {"disposition", "newTakesUsed", "maxNewTakes"}
+
+
+def test_the_quota_rules_the_crew_obeys_are_the_ones_the_protocol_publishes() -> None:
+    """The whole of ticket 09 is written down in `protocol.recording`. This is that reading.
+
+    Pinning the published phrases is what makes the crew's behaviour reviewable against the
+    interface rather than against this file: a rule reworded on the other side fails here
+    instead of quietly meaning something else in the loop.
+    """
+    rules = SURFACE.contract("protocol")["recording"]
+
+    assert rules["onlyNetworkCommand"] == "run.record"
+    assert rules["verifiedMatchingTake"] == "reuse without quota"
+    assert rules["identicalInputRedispatch"] == "replacement grant required"
+    assert rules["exhaustedBudget"] == "paused before network"
+    assert rules["uncertainDispatch"] == "never retried automatically"
+
+
+# --- A pause is the operator's, not the crew's ----------------------------------------------
+
+
+def test_a_paused_outcome_stops_the_crew_rather_than_proceeding() -> None:
+    """The Run ends where production paused it, under production's own word for the ending."""
+    client = a_client(record=["run-record-paused-budget.stdout"])
+    author = RepairingAuthor(a_catalog_following_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.outcome == PAUSED
+    assert run.paused
+    assert not run.rendered
+    assert run.dispatches == 0
+    assert "compile" not in client.calls
+    assert "render" not in client.calls
+    assert author.repairs == []
+
+
+def test_a_pause_surfaces_the_operator_decision_in_the_words_production_used() -> None:
+    """The reason is the only thing separating the two pauses, and it travels verbatim.
+
+    `refusals.py` gathers and does not explain, and a pause is held to the same rule: the
+    envelope's `next` already names the command an operator would run and why, so surfacing
+    the decision means handing those over rather than composing a sentence about them.
+    """
+    exhausted = converge(
+        a_client(record=["run-record-paused-budget.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+    replacement = converge(
+        a_client(record=["run-record-paused-replacement.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+
+    for run in (exhausted, replacement):
+        assert len(run.decision) == 1
+        assert run.decision[0].command == "run.record"
+        assert "--replacement-authorisation" in run.decision[0].args
+        assert run.decision[0].reason in run.envelopes[-1].raw
+
+    assert exhausted.decision[0].reason == "The Run has no remaining recording budget."
+    assert replacement.decision[0].reason == (
+        "A later dispatch for this Recording input requires a replacement grant."
+    )
+
+
+def test_a_paused_run_is_not_a_failed_one() -> None:
+    """Both stop. Only one is a decision waiting on a human, and they say so apart."""
+    paused = converge(
+        a_client(record=["run-record-paused-replacement.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+    failed = converge(
+        a_client(validate=["run-validate-failed.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+
+    assert paused.outcome == PAUSED
+    assert failed.outcome == STOPPED
+    assert paused.decision != ()
+    assert failed.decision == ()
+    assert not failed.paused
+
+
+def test_the_crew_never_answers_a_pause_by_authorising_itself() -> None:
+    """A pause asks for a grant. The crew has none, and does not try the call a second time."""
+    client = a_client(record=["run-record-paused-replacement.stdout"])
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.paused
+    assert client.calls.count("record") == 1
+    assert client.authorisations == [None]
+
+
+def test_a_paused_run_still_carries_everything_production_said() -> None:
+    """An operator decides from the envelopes, so a pause returns them rather than raising."""
+    client = a_client(record=["run-record-paused-budget.stdout"])
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert [envelope.command for envelope in run.envelopes] == [
+        "run.init",
+        "run.validate",
+        "run.preflight",
+        "run.record",
+    ]
+    assert run.envelopes[-1].raw == recorded("run-record-paused-budget.stdout")
+    assert run.refusal is not None
+    assert run.refusal.envelope.outcome == "paused"
+    assert run.refusal.report is None
+    assert run.artifacts == ()
+
+
+# --- Placeholder degradation is accepted, not fought ----------------------------------------
+
+
+def test_placeholder_degradation_is_reported_on_the_finished_run() -> None:
+    """A preview with placeholders is an honest intermediate state, and a green compile.
+
+    `ASSET_PLACEHOLDER` sits in the checks contract's `warnings` block, so it never arrives
+    as a refusal. What is under test is that it reaches an operator anyway.
+    """
+    client = a_client(compile=["run-compile-placeholder.stdout"])
+    author = RepairingAuthor(a_catalog_following_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.rendered
+    assert run.degradations == ("ASSET_PLACEHOLDER",)
+
+
+def test_a_placeholder_warning_buys_no_repair_cycle() -> None:
+    """Fighting it would spend the budget on the thing the budget exists to protect."""
+    client = a_client(compile=["run-compile-placeholder.stdout"])
+    author = RepairingAuthor(a_catalog_following_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert author.repairs == []
+    assert len(run.versions) == 1
+    assert client.calls.count("validate") == 1
+    assert client.calls.count("compile") == 1
+    assert run.withheld == ()
+
+
+def test_a_degradation_is_named_in_the_code_the_contract_publishes_it_under() -> None:
+    """The crew reports the compiler's word for it, so rewording one does not need the crew."""
+    published = SURFACE.contract("checks")
+    client = a_client(compile=["run-compile-placeholder.stdout"])
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.degradations
+    for code in run.degradations:
+        assert code in published["warnings"]
+    assert published["warnings"]["ASSET_PLACEHOLDER"]["regime"] == "warning"
+
+
+def test_a_run_that_compiled_clean_of_placeholders_reports_what_it_did_carry() -> None:
+    """`degradations` is every warning the finished compile published, not a placeholder filter.
+
+    A crew reporting only the code it was asked about would hide the next one, and the
+    compiler's `warnings` block is the whole list of things a Run may ship with.
+    """
+    run = converge(a_client(), REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.degradations == ("SLOT_RELOCATED",)
+
+
+def test_a_run_that_never_compiled_has_no_degradations_to_report() -> None:
+    """Nothing is inferred where nothing was published."""
+    run = converge(
+        a_client(record=["run-record-paused-budget.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+
+    assert run.degradations == ()
+
+
+# --- Compile, render, and reading the result back -------------------------------------------
+
+
+def test_a_compliant_plan_ends_at_a_narrated_preview() -> None:
+    """Record, compile, render, in that order, and the Run stands at `rendered` afterwards."""
+    client = a_client()
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert [envelope.command for envelope in run.envelopes] == [
+        "run.init",
+        "run.validate",
+        "run.preflight",
+        "run.record",
+        "run.compile",
+        "run.render",
+    ]
+    assert run.envelopes[-1].run is not None
+    assert run.envelopes[-1].run.stage == "rendered"
+    preview = run.artifact("preview")
+    assert preview is not None and preview.kind == "preview"
+    assert preview.data == recorded_bytes("preview.mp4")
+
+
+def test_the_preview_and_the_reports_come_back_by_descriptor_and_never_by_path() -> None:
+    """The read-back direction, on a Run that actually rendered.
+
+    Every artifact is fetched with the descriptor an envelope published and checked against
+    the digest that descriptor named — which is what the client does in the cloud, where no
+    Run directory is anywhere near the crew.
+    """
+    client = a_client()
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    published = {
+        descriptor.kind: descriptor.sha256
+        for envelope in run.envelopes
+        for descriptor in envelope.artifacts
+    }
+    assert [artifact.kind for artifact in run.artifacts] == list(READ_BACK)
+    for artifact in run.artifacts:
+        assert artifact.sha256 == published[artifact.kind]
+        assert sha256(artifact.data).hexdigest() == artifact.sha256
+    assert client.calls[-len(READ_BACK) :] == ["fetch_artifact"] * len(READ_BACK)
+
+
 # --- The seam ------------------------------------------------------------------------------
 
 
@@ -583,7 +946,14 @@ def test_a_repair_is_handed_the_plan_and_the_refusal_and_nothing_else() -> None:
 
 
 def test_the_loop_never_learns_where_a_run_lives() -> None:
-    for function in (converge, read_refusal, repair_budget, target_seconds, beat_shape):
+    for function in (
+        converge,
+        read_refusal,
+        repair_budget,
+        target_seconds,
+        beat_shape,
+        take_bound,
+    ):
         for parameter in inspect.signature(function).parameters.values():
             assert not any(
                 word in parameter.name.lower() for word in ("path", "root", "dir", "file", "cwd")
