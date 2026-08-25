@@ -186,6 +186,10 @@ def quota_read(envelope: ResultEnvelope) -> RecordingQuota | None:
     )
 
 
+class BriefUnnamed(RuntimeError):
+    """A Run whose request does not carry the Brief it answered, asked to name it anyway."""
+
+
 @dataclass(frozen=True, slots=True)
 class ConvergedRun:
     """One Run, from discovery through however many repairs it took, and how it ended."""
@@ -209,9 +213,19 @@ class ConvergedRun:
 
     @property
     def brief(self) -> Mapping[str, Any]:
-        """The Brief this Run answered. A Run that cannot name one cannot be audited."""
+        """The Brief this Run answered. A Run that cannot name one cannot be audited.
+
+        Refused rather than answered with `{}`, for the reason `_as_plan` refuses: the evidence
+        bundle reads this property into a transcript, and an empty Brief written there would be
+        the crew recording that it answered one. `productionRequestSchema` requires a Brief, so
+        a request that reaches here without one never came back from `run.init`.
+        """
         brief = self.request.get("brief")
-        return brief if isinstance(brief, Mapping) else {}
+        if not isinstance(brief, Mapping):
+            raise BriefUnnamed(
+                f"The Run's request carries {type(brief).__name__}, not the Brief it answered."
+            )
+        return brief
 
     @property
     def authored(self) -> AuthoredPlan:

@@ -28,6 +28,7 @@ from vox_crew.converge import (
     converge,
 )
 from vox_crew.evidence import (
+    ARTIFACTS,
     ASSERTIONS,
     COMMANDS,
     ENVIRONMENT,
@@ -260,6 +261,27 @@ def test_the_artifacts_are_carried_under_the_kinds_production_named_them_by() ->
     assert files["artifacts/preview"] == recorded_bytes("preview.mp4")
 
 
+def test_the_bundle_carries_the_proof_bundles_own_file_names() -> None:
+    """The names are the criterion, not an implementation detail.
+
+    Everything else in this file reads the bundle through the constants, so renaming one would
+    leave the whole suite green while the bundle quietly stopped being readable beside a proof
+    bundle. These are the names `verifyProofBundle` and the proofs' own `walk` expect, written
+    out once as literals so that the rename has somewhere to fail.
+    """
+    files = assemble(a_rendered_run()).files
+
+    assert {name for name in files if not name.startswith("artifacts/")} == {
+        "SUMMARY.md",
+        "environment.json",
+        "commands.jsonl",
+        "agent-transcript.jsonl",
+        "assertions.json",
+        "hash-index.json",
+    }
+    assert ARTIFACTS == "artifacts"
+
+
 def test_a_run_that_never_rendered_carries_what_it_did_publish() -> None:
     """A paused Run has a Preflight report and no preview, and the bundle says exactly that."""
     files = assemble(a_paused_run()).files
@@ -309,6 +331,27 @@ def test_the_budget_the_limits_are_read_against_is_the_runs_own() -> None:
     assert items["limits.plan-versions"]["expected"] == f"<={run.budget.plan_versions}"
     assert items["limits.validate-calls"]["expected"] == f"<={run.budget.validate_calls}"
     assert items["limits.preflight-calls"]["expected"] == f"<={run.budget.preflight_calls}"
+
+
+def test_the_limits_restate_the_sheets_own_numbers_and_not_only_the_runs_fields() -> None:
+    """The assertion above is true of any budget, including a wrong one.
+
+    `evaluateNorthbridgeAssertions` bounds `limits.validate-calls` by `authoringVersions` and
+    `limits.preflight-calls` by `cycles`, where `cycles = 2 + ceil(targetSeconds / 60)` and
+    `authoringVersions = cycles + 2`. The crew reaches the same numbers through differently
+    named fields, so nothing but a literal catches the day one of the two derivations moves.
+    Ticket 12 scores this Run against the real sheet; this is what it should agree with.
+    """
+    items = {
+        item["id"]: item
+        for item in document(assemble(a_rendered_run()).files, ASSERTIONS)["assertions"]
+    }
+
+    # The Brief asks for 25 seconds: cycles = 3, authoringVersions = 5.
+    assert items["limits.plan-versions"]["expected"] == "<=5"
+    assert items["limits.validate-calls"]["expected"] == "<=5"
+    assert items["limits.preflight-calls"]["expected"] == "<=3"
+    assert items["limits.post-record-plan-versions"]["expected"] == "<=2"
 
 
 def test_what_the_run_never_reached_is_not_evidenced_rather_than_failed() -> None:
@@ -386,6 +429,28 @@ def test_the_machine_verdict_is_the_worst_outcome_present() -> None:
     """`fail` above `not-evidenced`, exactly as the sheet aggregates it."""
     assert document(assemble(a_rendered_run()).files, ASSERTIONS)["machineVerdict"] == PASS
     assert document(assemble(a_paused_run()).files, ASSERTIONS)["machineVerdict"] == FAIL
+
+
+def test_a_run_that_failed_nothing_and_could_not_measure_something_is_not_evidenced() -> None:
+    """The third outcome as an aggregate, which is the case ticket 12 is scored under.
+
+    Both branches above resolve to `pass` or `fail`, so the middle one — nothing found wrong
+    and something not shown right — was never reached by a test even though it is the verdict
+    the crew phase is expected to earn. A rendered Run whose compile report was not published
+    is the smallest way to reach it: nothing failed, and two assertions have no material.
+    """
+    run = a_rendered_run()
+    without_compile = replace(
+        run, artifacts=tuple(a for a in run.artifacts if a.kind != "compile_report")
+    )
+
+    files = assemble(without_compile).files
+
+    assert outcomes(files)["compile.green"] == NOT_EVIDENCED
+    assert outcomes(files)["run.rendered"] == PASS
+    assert FAIL not in set(outcomes(files).values())
+    assert document(files, ASSERTIONS)["machineVerdict"] == NOT_EVIDENCED
+    assert verify(files) == NOT_EVIDENCED
 
 
 # --- The bundle reads true afterwards ---------------------------------------------------------
@@ -490,6 +555,58 @@ def test_a_name_that_would_leave_the_root_is_refused(tmp_path: Path) -> None:
     assert not list(tmp_path.iterdir())
 
 
+def test_a_root_that_is_itself_a_link_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`resolve()` follows a linked root, which would land the bundle wherever it points.
+
+    The containment check below is relative to the resolved base, so it cannot see this: every
+    name would sit correctly inside a root that is somewhere else entirely. That is the one way
+    left for the crew to write outside its work root, and it is the rule the whole module is
+    written to keep.
+    """
+    root = tmp_path / "linked-root"
+    monkeypatch.setattr(Path, "is_symlink", lambda self: self.name == "linked-root")
+
+    with pytest.raises(BundleInvalid, match="link"):
+        write_bundle(root, assemble(a_rendered_run()))
+
+
+def test_a_bundle_file_that_is_a_link_is_refused_rather_than_followed(tmp_path: Path) -> None:
+    """The proofs' `walk` throws on any link it meets, and reading one back has to agree.
+
+    A link hashes as whatever it points at, so a bundle whose `commands.jsonl` is a link to a
+    file outside the root verifies perfectly while evidencing a Run nobody audited. That is the
+    hash index certifying bytes the bundle does not contain.
+    """
+    write_bundle(tmp_path, assemble(a_rendered_run()))
+    elsewhere = tmp_path.parent / "elsewhere.json"
+    elsewhere.write_bytes(b"{}\n")
+    link = tmp_path / "linked.json"
+    try:
+        link.symlink_to(elsewhere)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not let the test process create a symlink")
+
+    with pytest.raises(BundleInvalid, match="link"):
+        read_bundle(tmp_path)
+
+
+def test_the_link_refusal_does_not_depend_on_a_platform_that_grants_symlinks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same guard, provable where the test process may not create a link.
+
+    Windows withholds the privilege unless the session was elevated, which would leave the
+    check above skipped on the machine the crew is developed on and proved only in CI.
+    """
+    write_bundle(tmp_path, assemble(a_rendered_run()))
+    monkeypatch.setattr(Path, "is_symlink", lambda self: self.name == COMMANDS)
+
+    with pytest.raises(BundleInvalid, match="link"):
+        read_bundle(tmp_path)
+
+
 # --- Nothing the crew writes is repository knowledge -----------------------------------------
 
 
@@ -563,12 +680,8 @@ def _reindexed(files: dict[str, bytes]) -> dict[str, bytes]:
 
 
 def _a_bundle_named(name: str) -> Any:
-    from vox_crew.evidence import EvidenceBundle
-
     return EvidenceBundle(files={name: b"{}\n"}, verdict=PASS)
 
 
 def _run_with_brief(run: ConvergedRun, brief: dict[str, Any]) -> ConvergedRun:
-    from dataclasses import replace
-
     return replace(run, request={**REQUEST, "brief": brief})

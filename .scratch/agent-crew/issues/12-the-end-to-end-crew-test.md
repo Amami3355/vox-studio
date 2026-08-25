@@ -30,3 +30,8 @@ the scripted driver it replaces.
 - [ ] The existing assertion sheet scores the run, with no new assertion vocabulary for already-measured behaviour
 - [ ] Isolation assertions report as not evidenced, and the run passes on that basis
 - [ ] The run produces an evidence bundle that verifies after the fact
+- [ ] The crew driver is the first caller of `write_bundle`, so the run *persists* its transcript
+      and every command envelope in issue order — ticket 10 built the bundle and left the caller
+      here, and nothing persists one until this ticket does
+- [ ] The crew's own assertion restatement and `evaluateNorthbridgeAssertions` are held to each
+      other over the same Run, and a divergence is reported rather than reconciled silently

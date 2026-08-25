@@ -131,9 +131,12 @@ def machine_verdict(assertions: Sequence[Mapping[str, Any]]) -> str:
 def assemble(run: ConvergedRun, *, executed_at: str | None = None) -> EvidenceBundle:
     """Everything one Run leaves behind, as the bytes it leaves behind.
 
-    Pure: it holds no client, opens nothing and joins no path. Every artifact it carries was
-    already fetched by descriptor before it got here, which is what makes "captured by
-    retrieval, never by scanning" a property of the Run rather than a promise of this module.
+    It holds no client, opens nothing and joins no path. Every artifact it carries was already
+    fetched by descriptor before it got here, which is what makes "captured by retrieval, never
+    by scanning" a property of the Run rather than a promise of this module.
+
+    The one thing it does not read off the Run is the clock: `executed_at` defaults to now, so
+    two calls on one Run differ in that field alone. Pass it to get the same bytes twice.
     """
     commands = _commands(run)
     transcript = _transcript(run)
@@ -469,9 +472,7 @@ def _item(
     predicate: Callable[[Any], bool] | None = None,
 ) -> dict[str, Any]:
     """One assertion, evaluated. `pass` and `outcome` are two views of one answer."""
-    passed = bool(evidence) and (
-        predicate(observed) if predicate is not None else observed == expected
-    )
+    passed = predicate(observed) if predicate is not None else observed == expected
     return {
         "id": name,
         "expected": expected,
@@ -483,7 +484,14 @@ def _item(
 
 
 def _unmeasured(name: str, expected: Any, evidence: Sequence[str]) -> dict[str, Any]:
-    """An assertion this Run had no material for, written down as the word rather than a gap."""
+    """An assertion this Run had no material for, written down as the word rather than a gap.
+
+    The evidence named is `commands.jsonl` rather than the artifact that is missing, and it is
+    real evidence rather than a placeholder: the command log is what shows the Run never reached
+    the stage that would have published the report, which is the whole claim being made. Naming
+    the absent artifact instead would point an auditor at a file the bundle does not carry, and
+    both this and the proofs' verifier require every named file to be present.
+    """
     return {
         "id": name,
         "expected": expected,
@@ -617,9 +625,14 @@ def write_bundle(root: Path | str, bundle: EvidenceBundle) -> None:
     time is a directory whose hash index and whose contents came from two different Runs.
 
     Every name is resolved and checked before anything is written, so a bundle that would have
-    escaped leaves nothing behind at all.
+    escaped leaves nothing behind at all. A root that is itself a link is refused before that:
+    resolving one would move the whole bundle to wherever it points while every name still sat
+    correctly inside the resolved base, which is the one way left to write outside the work root.
     """
-    base = Path(root).resolve()
+    given = Path(root)
+    if given.is_symlink():
+        raise BundleInvalid(f"{given.name!r} is a link, and evidence is not written through one.")
+    base = given.resolve()
     if any(base.rglob("*")):
         raise BundleInvalid(f"{base.name!r} already holds a bundle, and evidence is not merged.")
     targets: dict[Path, bytes] = {}
@@ -634,10 +647,21 @@ def write_bundle(root: Path | str, bundle: EvidenceBundle) -> None:
 
 
 def read_bundle(root: Path | str) -> dict[str, bytes]:
-    """Reads a written bundle back as the bytes it was written as, keyed the same way."""
+    """Reads a written bundle back as the bytes it was written as, keyed the same way.
+
+    A link is refused rather than followed, which is what the proofs' `walk` does and for the
+    same reason: a link hashes as whatever it points at, so a bundle whose `commands.jsonl` is
+    a link to a file outside the root verifies perfectly while evidencing a Run nobody audited.
+    Refusing the read is the only place this can be caught — by the time `verify` has bytes,
+    the bytes are honest and it is the directory that lied.
+    """
     base = Path(root).resolve()
-    return {
-        path.relative_to(base).as_posix(): path.read_bytes()
-        for path in sorted(base.rglob("*"))
-        if path.is_file()
-    }
+    read: dict[str, bytes] = {}
+    for path in sorted(base.rglob("*")):
+        if path.is_symlink():
+            raise BundleInvalid(
+                f"{path.relative_to(base).as_posix()!r} is a link, and evidence is not followed."
+            )
+        if path.is_file():
+            read[path.relative_to(base).as_posix()] = path.read_bytes()
+    return read

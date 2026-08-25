@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from dataclasses import replace
 from hashlib import sha256
 from typing import Any
 
@@ -32,6 +33,7 @@ from vox_crew.converge import (
     RENDERED,
     REUSED,
     STOPPED,
+    BriefUnnamed,
     RecordingQuota,
     RepairBudget,
     beat_shape,
@@ -479,6 +481,7 @@ def test_the_budget_is_the_one_the_briefs_own_length_buys(
     budget = repair_budget(seconds)
     assert budget.cycles == cycles
     assert budget.plan_versions == cycles + 2
+    assert budget.validate_calls == cycles + 2
     assert budget.preflight_calls == cycles
     assert budget.post_record_plan_versions == 2
 
@@ -1106,6 +1109,19 @@ def test_the_run_carries_the_request_it_converged_on() -> None:
 
     assert run.request == REQUEST
     assert run.brief == REQUEST["brief"]
+
+
+def test_a_run_whose_request_names_no_brief_refuses_to_invent_one() -> None:
+    """The docstring's claim, in code. `productionRequestSchema` requires a Brief, so a request
+    without one never reached `run.init` — and a Run that returned `{}` here would put an empty
+    Brief into a transcript as though the crew had answered one. The evidence bundle reads this
+    property, and a bundle is the last place a fabricated value should be allowed to appear.
+    """
+    client = a_client()
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    with pytest.raises(BriefUnnamed):
+        _ = replace(run, request={"protocolVersion": 1}).brief
 
 
 def test_the_versions_authored_after_a_take_exists_are_derived_from_the_envelopes() -> None:

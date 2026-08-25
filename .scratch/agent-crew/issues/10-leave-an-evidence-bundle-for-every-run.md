@@ -37,6 +37,14 @@ two restatements can be held to each other.
 first caller that writes one: nothing in the crew converges yet, because converging needs a
 model credential the CLI is not given.
 
+**Said plainly, because the tick above does not say it:** no crew run persists a bundle today.
+`converge` is called only from tests and `cli.py` reads the teaching surface and stops, so there
+is no run in existence for "each run persists" to be true or false of. What this ticket built is
+the bundle and the two functions that write and read it, proved end to end — assemble, write,
+read back, verify — and what it did not build is a caller. **The first criterion is therefore
+carried by ticket 12**, where the crew driver is the first thing that both produces a Run and
+has somewhere to put it, and it is written into 12's own list rather than left implied here.
+
 **Status:** done
 
 - [x] Each run persists its transcript and every command envelope in issue order

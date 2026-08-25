@@ -41,10 +41,18 @@ descriptor an envelope published. A method that took or returned a path would wo
 strand the crew at deployment, which is why `tests/test_local_client.py` asserts against one
 structurally rather than leaving it to review.
 
-**`local_client.py` is the only module that knows a path exists.** It runs `vox.exe` with its
-working directory set to the work root, one subprocess per command, over the authenticated
-named pipe ADR-0007 requires. Payloads are staged where the work root keeps its invariant of
-growing nothing but its Run directories.
+**`local_client.py` is the only module that knows where production put a Run.** It runs
+`vox.exe` with its working directory set to the work root, one subprocess per command, over the
+authenticated named pipe ADR-0007 requires. Payloads are staged where the work root keeps its
+invariant of growing nothing but its Run directories.
+
+`evidence.py` is the one other module that opens a file, and the distinction is the one
+ADR-0015 turns on rather than an exception to it. It never learns a Run's disk — every artifact
+it carries arrived through `fetch_artifact`, by the descriptor an envelope published — and what
+it writes is the crew's *own* evidence, into a root it was handed. The work root is the crew's
+disk under both topologies while the Run's disk is only the crew's today, which is why the seam
+sits between the value and the directory: `assemble` is pure and joins no path, and only
+`write_bundle` and `read_bundle` below it know a directory exists.
 
 **`envelopes.py` keeps what the service said.** The parsed fields are a convenience for the
 code around the model; `raw` is what the model is shown. The crew learns from the interface's
@@ -155,6 +163,37 @@ it would spend the repair budget on the thing the budget exists to protect. `run
 reports every warning the finished compile published, in the compiler's own codes, which is the
 difference between accepting it and ignoring it.
 
+**`evidence.py` is what a Run leaves behind, so it can be read once the crew has gone.** A crew
+Run and a scripted proof run are the same claim made two ways, so the bundle uses the proof
+bundles' own names — `commands.jsonl`, `agent-transcript.jsonl`, the Run's artifacts,
+`assertions.json` and a hash index over the lot — and `verify` is the way back in: digests
+recomputed, the verdict re-derived from the assertions meant to support it, every named piece of
+evidence looked for among the files present, under the proofs' own failure codes.
+
+Three things about it are worth knowing before changing it.
+
+*It evaluates the assertions the crew observed, and no others.* The limits, the single dispatch,
+the take, the compile, Preflight and the stage reached, in the sheet's ids, its `ProofAssertion`
+shape and its aggregate rule. The scenario families are the harness's — a scenario is chosen
+there and the crew holds only a Brief — and the media and isolation families need instruments
+the crew does not hold. What a Run had no material for is `not-evidenced` rather than answered
+from a fallback, because a fallback is the exact defect the third outcome was added to stop and
+it would be worse coming from the party being judged. The restatement cannot be pinned against
+TypeScript from a Python process, so a test pins the sheet's literal numbers instead.
+
+*What the crew authored is scanned before it is written.* The bundle lands in the work root,
+where the proofs' leak scan reads every file it finds, so a marker in a transcript would fail
+`leaks.agent-readable-files` at the end of a paid Run. The full `scan_for_leaks` applies, and a
+bundle that would leak is refused rather than sanitised. The artifacts are not scanned: they are
+production's bytes, and scanning the copy would be the crew auditing production rather than
+itself.
+
+*A bundle root is written once and never followed.* An occupied root is refused rather than
+merged into, for the reason the proofs copy with `errorOnExist` — a directory written twice is
+two Runs under one hash index. A root that is itself a link is refused before it is resolved,
+and `read_bundle` refuses a link rather than following one, because a link hashes as whatever it
+points at and would let a bundle verify over bytes it does not contain.
+
 ## Working on it
 
 The project is self-contained on purpose. It is not a pnpm workspace member — `pnpm typecheck`,
@@ -187,7 +226,12 @@ been asked. That is why building it is a public seam rather than something `auth
 
 - **See repository source.** Everything it knows about the catalog, the plan schema, the
   compiler's checks and the command surface it asked for at run time.
-- **Write outside its work root**, or write anything into the work root but its Run directories.
+- **Write outside its work root**, or write anything into the work root but its Run directories
+  and the evidence bundles it is told to leave beside them. `write_bundle` is handed its root
+  rather than computing one: it refuses a root that is already occupied or is itself a link, and
+  resolves every name to check it lands inside before it writes anything. That the root is the
+  work root's is the caller's to get right, and it is the one part of this rule that lives in the
+  caller rather than in code.
 - **Spend a synthesis dispatch it was not authorised to spend.** `maxNewTakes` is absolute, and
   a paused Run is a stop-and-ask, not a retry.
 - **Claim the code-blind boundary.** Crew runs report `sandboxEvidence: null` and the isolation
