@@ -10,7 +10,8 @@ shim stays TypeScript and lives with the harness, because drivers belong to the 
 rather than to the crew.
 
 The isolation assertions are reported as **not evidenced** for this run, per review
-decision 1, and the run is a pass on that basis rather than despite it. The crew process
+decision 1, and nothing in that section fails on that basis rather than passing vacuously.
+The aggregate verdict is a separate matter, settled in the first Note below. The crew process
 is not sandboxed in this phase: code-blindness is convention here, not enforcement, and
 the sheet says so plainly instead of implying a boundary that was never tested.
 

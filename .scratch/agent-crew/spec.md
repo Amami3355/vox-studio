@@ -221,10 +221,15 @@ These are yours, not the agent's. Nothing below is code.
   (`GOOGLE_API_KEY`), selected via ADK's model configuration. The same crew
   must be deployable to Agent Engine later without structural change — no
   local-only shortcuts in tool interfaces.
-- **Acceptance bar.** (1) End-to-end Northbridge or showcase run passes the
-  existing assertion sheet with stubbed providers — **excluding the isolation
-  assertions**, which crew runs do not evidence for this phase (review decision
-  1). (2) An unservable Brief produces a structured Decline naming the unmet
+- **Acceptance bar.** (1) End-to-end Northbridge or showcase run is scored by
+  the existing assertion sheet with stubbed providers and earns every assertion
+  that is its to earn — **excluding the isolation assertions**, which crew runs
+  do not evidence for this phase (review decision 1), and **excluding
+  `agent.unscripted-generalist`** whenever the plan is handed in rather than
+  authored, which is what a free and deterministic run costs. The aggregate
+  machine verdict for such a run is therefore `fail`, on authorship and nothing
+  else; the sheet's own pass needs a model and is (3)'s to earn.
+  (2) An unservable Brief produces a structured Decline naming the unmet
   editorial need, with no Take recorded (review decision 4). (3) One real Helios
   Bay run — live synthesis, one take — passes machine assertions and is
   submitted for the standing human watch/listen verdict.

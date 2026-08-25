@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCrewAgentDriver, verifyCrewBundle } from '../src/proof/crew-agent';
 import { verifyProofBundle } from '../src/proof/evidence';
 import { runNorthbridgeProof } from '../src/proof/harness';
@@ -61,19 +61,29 @@ const NOT_THE_CREWS_TO_EARN = new Set([
 ]);
 
 describe.sequential('the crew through the proof harness', () => {
-  it('is scored by the existing sheet and passes everything but authorship and isolation', async () => {
+  /**
+   * One Run, read twice. The two assertions below ask different questions of the same run —
+   * how the sheet scored it, and what the crew's own bundle says about it — and running the
+   * whole proof once per question would spend the second fifteen minutes establishing that the
+   * harness is deterministic, which neither of them is about.
+   */
+  let result: Awaited<ReturnType<typeof runNorthbridgeProof>>;
+  let evidenceRoot: string;
+
+  beforeAll(async () => {
     const parent = await mkdtemp(join(tmpdir(), 'vox-crew-proof-'));
     roots.push(parent);
-    const evidenceRoot = join(parent, 'evidence');
-
-    const result = await runNorthbridgeProof({
+    evidenceRoot = join(parent, 'evidence');
+    result = await runNorthbridgeProof({
       provider: 'fixture',
       evidenceRoot,
       renderer: renderFixture,
       mediaProbe: probeFixture,
       agentDriver: createCrewAgentDriver({ plan: NORTHBRIDGE_FIXTURE_PLAN }),
     });
+  }, 900_000);
 
+  it('is scored by the existing sheet and passes everything but authorship and isolation', async () => {
     // Everything the crew is answerable for. Named this way rather than as a list of expected
     // ids, so an assertion added to the sheet is one the crew has to earn rather than one this
     // test quietly stops checking.
@@ -109,21 +119,9 @@ describe.sequential('the crew through the proof harness', () => {
       machineVerdict: 'fail',
       humanVerdict: 'pending',
     });
-  }, 900_000);
+  }, 120_000);
 
   it('leaves a crew bundle that verifies after the fact, about the same Run', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'vox-crew-proof-'));
-    roots.push(parent);
-    const evidenceRoot = join(parent, 'evidence');
-
-    const result = await runNorthbridgeProof({
-      provider: 'fixture',
-      evidenceRoot,
-      renderer: renderFixture,
-      mediaProbe: probeFixture,
-      agentDriver: createCrewAgentDriver({ plan: NORTHBRIDGE_FIXTURE_PLAN }),
-    });
-
     // The crew's bundle travelled out of a work root that no longer exists, and the crew's own
     // verifier reads it where it landed.
     //
@@ -149,9 +147,15 @@ describe.sequential('the crew through the proof harness', () => {
     for (const restated of shared as Array<{ id: string; expected: unknown; outcome: string }>) {
       const scored = sheet.get(restated.id);
       expect(restated.expected, `${restated.id} expected`).toEqual(scored?.expected);
-      if (restated.outcome !== 'not-evidenced') {
-        expect(restated.outcome, `${restated.id} outcome`).toBe(scored?.outcome);
+      if (restated.outcome === 'not-evidenced') {
+        // A crew that cannot observe something about itself says so, and that is not a
+        // divergence. Staying silent about one the sheet *failed* is: that is the two
+        // restatements disagreeing over a single Run, which is what this comparison exists to
+        // catch, and the guard that skipped every `not-evidenced` outcome could not see it.
+        expect(scored?.outcome, `${restated.id} is unevidenced by the crew`).not.toBe('fail');
+        continue;
       }
+      expect(restated.outcome, `${restated.id} outcome`).toBe(scored?.outcome);
     }
-  }, 900_000);
+  }, 120_000);
 });

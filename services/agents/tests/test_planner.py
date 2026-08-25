@@ -42,9 +42,25 @@ from vox_crew.planner import (
     scan_for_leaks,
     scan_message_for_leaks,
 )
+from vox_crew.refusals import Refusal
 from vox_crew.teaching_surface import TeachingSurface
 
 CATEGORIES = ("language", "plan", "catalog", "checks", "protocol")
+
+
+def a_refusal() -> Refusal:
+    """What production said about a plan, assembled the way `read_refusal` assembles it.
+
+    Built here rather than driven out of a client because this module tests the author seam and
+    not the read-back: what an author is handed is a payload, and `Refusal` is one. The bodies
+    are the recorded ones, so `codes` names what the compiler actually named.
+    """
+    return Refusal(
+        envelope=parse_envelope(recorded("run-validate-needs-repair.stdout")),
+        report=json.loads(recorded_bytes("validation-report.json")),
+        checks={},
+        guidance={},
+    )
 
 
 def stdout_for(category: str) -> str:
@@ -530,9 +546,14 @@ def test_a_handed_plan_refuses_to_answer_a_refusal_rather_than_resubmitting_itse
     crew that tried and failed rather than as an operator who handed it an unservable plan.
     """
     author = HandedPlanAuthor(a_catalog_following_plan())
+    refusal = a_refusal()
 
-    with pytest.raises(PlanNotRepairable):
-        author.repair(instructions(SURFACE), REQUEST["brief"], a_catalog_following_plan(), None)
+    with pytest.raises(PlanNotRepairable) as refused:
+        author.repair(instructions(SURFACE), REQUEST["brief"], a_catalog_following_plan(), refusal)
+
+    # The refusal it could not answer is named in what it raises, in production's own codes, so
+    # a bundle reading the failure says which refusal ended the Run rather than that one did.
+    assert ", ".join(refusal.codes) in str(refused.value)
 
 
 # --- A Run, authored -------------------------------------------------------------------

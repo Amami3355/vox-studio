@@ -609,7 +609,7 @@ class HandedPlanAuthor(PlanAuthor):
         handed it a plan production will not take. The refusal is the honest report of which of
         those actually happened, and it carries what production said.
         """
-        named = ", ".join(refusal.codes) if refusal is not None else ""
+        named = ", ".join(refusal.codes)
         raise PlanNotRepairable(
             f"A handed plan cannot answer a refusal{f' naming {named}' if named else ''}."
         )

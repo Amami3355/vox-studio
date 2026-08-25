@@ -27,9 +27,13 @@ python -m vox_crew --work-root C:\vox-proof-workroots\crew
 ```
 
 It converges on the Brief that work root carries and leaves an evidence bundle in
-`crew\evidence` beside the Run, whether or not the Run reached a preview. The exit code is the
-Run's: zero when it rendered, one when it ended any other way, two when the invocation named
-something that is not there.
+`crew\evidence` beside the Run, whether or not the Run reached a preview: a Run that ended
+`paused`, `stopped` or `budget_exhausted` is bundled exactly as a rendered one is. A
+convergence that *raises* leaves none — discovery refused, a prompt that leaked, an answer that
+was not a plan, a handed plan nobody can repair, an unreachable service — because there is no
+`ConvergedRun` to assemble one from, and what production said is already on stdout, which is
+the record that matters. The exit code is the Run's: zero when it rendered, one when it ended
+any other way, two when the invocation named something that is not there.
 
 Stdout carries production's envelopes and nothing else, in the order they arrived, byte for
 byte, so a run redirected to a file is a record of what the interface said. Everything the crew
