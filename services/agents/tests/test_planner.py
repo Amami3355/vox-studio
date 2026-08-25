@@ -31,8 +31,10 @@ from vox_crew.envelopes import parse_envelope
 from vox_crew.planner import (
     AdkPlanAuthor,
     AuthoredRun,
+    HandedPlanAuthor,
     InstructionsLeaked,
     PlanAuthor,
+    PlanNotRepairable,
     author_plan,
     instructions,
     plan_and_produce,
@@ -504,6 +506,33 @@ def test_the_live_author_builds_its_agent_from_the_instructions_it_was_given() -
 
     assert agent.instruction == text
     assert agent.model == "gemini-2.5-pro"
+
+
+def test_a_handed_plan_is_answered_as_the_plan_it_was_handed() -> None:
+    """The third implementation of the seam, and the only one that ships.
+
+    A machine with no model credential can still drive every part of the crew that is not the
+    model, and that is what the end-to-end test is: the convergence, the producer, the read-back
+    and the bundle, with the one non-deterministic party replaced by a plan an operator wrote.
+    """
+    plan = a_catalog_following_plan()
+
+    answered = HandedPlanAuthor(plan).author(instructions(SURFACE), REQUEST["brief"])
+
+    assert answered == plan
+
+
+def test_a_handed_plan_refuses_to_answer_a_refusal_rather_than_resubmitting_itself() -> None:
+    """A repair is the one thing a handed plan cannot be.
+
+    Answering with the plan that was just refused would spend the whole repair budget arriving
+    at the same refusal and end the Run as `budget-exhausted`, which reads in a bundle as a
+    crew that tried and failed rather than as an operator who handed it an unservable plan.
+    """
+    author = HandedPlanAuthor(a_catalog_following_plan())
+
+    with pytest.raises(PlanNotRepairable):
+        author.repair(instructions(SURFACE), REQUEST["brief"], a_catalog_following_plan(), None)
 
 
 # --- A Run, authored -------------------------------------------------------------------

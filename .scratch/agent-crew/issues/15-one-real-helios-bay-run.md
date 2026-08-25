@@ -21,6 +21,16 @@ is not something to self-report.
 
 **Blocked by:** 12 (The end-to-end crew test through the proof harness), 14 (The teaching surface is cached, and the budget is a number)
 
+**What ticket 12 leaves here.** `createCrewAgentDriver({ plan })` runs the crew against the
+harness today; omitting `plan` is the live path and needs no structural change to the driver.
+Two things do change with it. **`agent.unscripted-generalist` becomes earnable** — it is the one
+assertion the deterministic run fails, and it fails honestly because the plan was handed in.
+**The harness stops being able to find the plan**: it reads `workRoot/plan.json`, which exists
+only because a driver wrote it, and a crew that authors its own plan puts it inside the Run.
+That read becomes `checkpoint.bindings.plan.snapshot` — the plan the Run actually bound, which
+is the better source for every driver — and the harness's zero-budget probe needs a plan file of
+its own rather than the agent's.
+
 **Status:** ready-for-human
 
 - [ ] The showcase Brief runs end to end with live synthesis

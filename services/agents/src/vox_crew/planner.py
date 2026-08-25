@@ -67,6 +67,10 @@ class PlanNotAuthored(RuntimeError):
     """An author answered with something that is not a plan object."""
 
 
+class PlanNotRepairable(RuntimeError):
+    """A refusal reached an author that cannot answer one."""
+
+
 # What must never appear in a prompt. The repository-side entries mirror the markers the
 # proofs scan a work root for; the crew-side ones are this project's own module and class
 # names, which are exactly the knowledge an agent is not supposed to have.
@@ -568,6 +572,47 @@ def plan_and_produce(
         client, request, authored.plan, on_envelope=on_envelope, read_back=read_back
     )
     return AuthoredRun(surface=surface, authored=authored, produced=produced)
+
+
+@dataclass(frozen=True, slots=True)
+class HandedPlanAuthor(PlanAuthor):
+    """An author for a plan the crew did not write: it answers with the one it was handed.
+
+    This is the seam's third implementation and the only scripted one that ships, because it is
+    what makes a whole Run reproducible on a machine holding no model credential. Everything
+    around the model is still the crew's — discovery, the review, the convergence, the producer,
+    the read-back and the bundle — and the one non-deterministic party is replaced by a plan an
+    operator wrote. A Run driven this way is not the crew authoring; a bundle says so by
+    reporting the authorship it was given rather than inferring one.
+
+    `review` still runs over the handed plan, so an operator who hands in something the catalog
+    would not serve reads the same findings a model would have earned.
+    """
+
+    plan: Mapping[str, Any]
+
+    def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self.plan
+
+    def repair(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        refusal: Refusal,
+    ) -> Mapping[str, Any]:
+        """Refuses, because the one thing a handed plan cannot be is repaired.
+
+        Answering with the plan that was just refused would spend the repair budget arriving at
+        the same refusal every cycle and end the Run as `budget-exhausted` — which reads, in a
+        bundle, as a crew that tried and could not converge rather than as an operator who
+        handed it a plan production will not take. The refusal is the honest report of which of
+        those actually happened, and it carries what production said.
+        """
+        named = ", ".join(refusal.codes) if refusal is not None else ""
+        raise PlanNotRepairable(
+            f"A handed plan cannot answer a refusal{f' naming {named}' if named else ''}."
+        )
 
 
 class AdkPlanAuthor(PlanAuthor):

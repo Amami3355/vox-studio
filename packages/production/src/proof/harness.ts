@@ -95,6 +95,17 @@ export type AgentDriver = (input: {
   directNetworkDenied: boolean;
   directNetworkEvents: unknown[];
   sandboxEvidence: AgentSandboxEvidence | null;
+  /**
+   * An agent that kept evidence of its own says where it left it, and the harness carries the
+   * directory into the proof bundle before the work root is torn down. Absent for an agent
+   * that kept none.
+   *
+   * It travels rather than being verified here on purpose: an agent's bundle is written to its
+   * own shape and answers to its own verifier, and a harness that insisted on its own shape
+   * would be asking every future runtime to imitate this one. What the harness guarantees is
+   * that the bytes survive the run and are hashed into the index with everything else.
+   */
+  evidenceRoot?: string | null;
 }>;
 
 export type NorthbridgeProofOptions = {
@@ -762,6 +773,12 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     }
     const checkpoint =
       inspected ?? (JSON.parse(mainAfterInvalid.toString('utf8')) as RunCheckpoint);
+    // The scenario assertions are scored against this, and it is the one thing the harness
+    // reads from a name rather than from a descriptor: every driver so far writes the plan it
+    // submitted here. A driver whose agent authors its plan inside the Run — the crew, once a
+    // model writes one rather than being handed one — has nothing to leave at this name, and
+    // this read becomes `checkpoint.bindings.plan.snapshot` instead. It is left alone until
+    // then because moving it now would change what the frozen bundles were scored from.
     const plan = JSON.parse(await readFile(join(workRoot, 'plan.json'), 'utf8')) as VideoPlan;
     const preflightDescriptor = checkpoint.bindings.preflight?.report;
     const compileDescriptor = checkpoint.bindings.compilation?.report;
@@ -1081,6 +1098,15 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
 
     await cp(mainRunRoot, join(stagedEvidence, 'main-run'), { recursive: true });
     await cp(pausedRunRoot, join(stagedEvidence, 'paused-run'), { recursive: true });
+    // Whatever the agent kept for itself, carried out of a work root that is about to be
+    // deleted. Contained-path checked for the same reason every other agent-supplied locator
+    // is: this one names a directory and the harness is about to copy it.
+    if (authoring.evidenceRoot) {
+      const agentEvidence = resolve(workRoot, authoring.evidenceRoot);
+      if (!isContainedPath(workRoot, agentEvidence))
+        throw new Error('PROOF_AGENT_EVIDENCE_ESCAPED');
+      await cp(agentEvidence, join(stagedEvidence, 'agent-evidence'), { recursive: true });
+    }
     await cp(join(workRoot, 'invalid-grant.json'), join(stagedEvidence, 'invalid-grant.json'));
     await writeJson(join(stagedEvidence, 'environment.json'), {
       proofId,

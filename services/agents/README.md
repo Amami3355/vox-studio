@@ -26,9 +26,27 @@ service`, with the trusted configuration in its environment), then:
 python -m vox_crew --work-root C:\vox-proof-workroots\crew
 ```
 
+It converges on the Brief that work root carries and leaves an evidence bundle in
+`crew\evidence` beside the Run, whether or not the Run reached a preview. The exit code is the
+Run's: zero when it rendered, one when it ended any other way, two when the invocation named
+something that is not there.
+
 Stdout carries production's envelopes and nothing else, in the order they arrived, byte for
 byte, so a run redirected to a file is a record of what the interface said. Everything the crew
 has to say about them goes to stderr.
+
+Two flags change what the command is. `--plan plan.json` hands the crew a plan instead of
+asking a model for one: everything else is the same code — discovery, the review, the
+convergence, the producer, the read-back and the bundle — because `converge` takes a
+`PlanAuthor` and cannot tell which one it has. That is what makes a Run reproducible on a
+machine holding no model credential, and it is not the crew authoring: a bundle from such a run
+reports the authorship it was given rather than inferring one. `--discovery-only` reads the
+teaching surface and stops, which is the diagnostic for whether the boundary is alive and what
+it teaches.
+
+The Brief's file name is not a flag. A bootstrapped work root is the launcher and
+`request.json` and nothing else, and that invariant is what the proofs' initial-inventory
+assertion reads.
 
 ## How it is put together
 
@@ -179,7 +197,9 @@ there and the crew holds only a Brief — and the media and isolation families n
 the crew does not hold. What a Run had no material for is `not-evidenced` rather than answered
 from a fallback, because a fallback is the exact defect the third outcome was added to stop and
 it would be worse coming from the party being judged. The restatement cannot be pinned against
-TypeScript from a Python process, so a test pins the sheet's literal numbers instead.
+TypeScript from a Python process, so a test pins the sheet's literal numbers instead — and the
+proof harness's crew run holds the two restatements to each other over one Run, which is the
+only place they meet.
 
 *What the crew authored is scanned before it is written.* The bundle lands in the work root,
 where the proofs' leak scan reads every file it finds, so a marker in a transcript would fail
