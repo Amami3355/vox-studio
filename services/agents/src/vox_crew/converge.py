@@ -191,6 +191,7 @@ class ConvergedRun:
     """One Run, from discovery through however many repairs it took, and how it ended."""
 
     surface: TeachingSurface
+    request: Mapping[str, Any]
     run_id: str | None
     outcome: str
     budget: RepairBudget
@@ -205,6 +206,12 @@ class ConvergedRun:
     @property
     def rendered(self) -> bool:
         return self.outcome == RENDERED
+
+    @property
+    def brief(self) -> Mapping[str, Any]:
+        """The Brief this Run answered. A Run that cannot name one cannot be audited."""
+        brief = self.request.get("brief")
+        return brief if isinstance(brief, Mapping) else {}
 
     @property
     def authored(self) -> AuthoredPlan:
@@ -248,6 +255,30 @@ class ConvergedRun:
     def dispatches(self) -> int:
         """How many synthesis dispatches this Run spent. On a compliant plan, one."""
         return sum(1 for read in self.quota_readings if read.dispatched)
+
+    @property
+    def post_record_versions(self) -> int:
+        """How many plan versions were authored after a Take existed.
+
+        Derived from the envelopes for the same reason the quota is: `converge` counts these
+        while it runs, and a second count kept beside the envelopes would be the one that could
+        disagree. Every withheld version is one of them — nothing is withheld before a Take
+        exists — and a submitted one is post-record when the `run.validate` that carried it came
+        after the `run.record` that bound the Take.
+        """
+        bound = next(
+            (
+                index
+                for index, envelope in enumerate(self.envelopes)
+                if envelope.command == "run.record" and envelope.succeeded
+            ),
+            None,
+        )
+        if bound is None:
+            return len(self.withheld)
+        return len(self.withheld) + sum(
+            1 for envelope in self.envelopes[bound + 1 :] if envelope.command == "run.validate"
+        )
 
     @property
     def quota(self) -> RecordingQuota | None:
@@ -429,14 +460,24 @@ def converge(
         announce(envelope)
         return envelope
 
-    def ended(
-        outcome: str,
-        run: str | None,
-        limit: str | None = None,
-        artifacts: tuple[Artifact, ...] = (),
-    ) -> ConvergedRun:
+    def ended(outcome: str, run: str | None, limit: str | None = None) -> ConvergedRun:
+        """The Run, with what it published read back, however it ended.
+
+        The read-back is the producer's own rule — by descriptor, through the client, latest
+        publisher of a kind wins — and it runs on all four endings rather than on the preview
+        alone. A Run that paused after Preflight is holding a report production wrote for it,
+        and an ending that dropped it would leave an audit empty for exactly the outcomes an
+        operator has to act on. Which artifacts exist is then the Run's answer rather than the
+        ending's: a Run that never compiled has no compile report and says so by not carrying
+        one.
+
+        Nothing is caught here. A descriptor that cannot be read back or does not hash to what
+        it claimed is a defect on every path, and a failure path that quietly tolerated one
+        would be the path where it went unnoticed.
+        """
         return ConvergedRun(
             surface=surface,
+            request=request,
             run_id=run,
             outcome=outcome,
             budget=allowed,
@@ -445,7 +486,9 @@ def converge(
             withheld=tuple(withheld),
             refusals=tuple(refusals),
             envelopes=tuple(envelopes),
-            artifacts=artifacts,
+            artifacts=(
+                read_back_artifacts(client, run, envelopes, read_back) if run is not None else ()
+            ),
             limit=limit,
         )
 
@@ -569,8 +612,4 @@ def converge(
         if not rendered.succeeded:
             return stopped_at(rendered)
 
-        # The read-back is the producer's own rule — by descriptor, through the client, latest
-        # publisher of a kind wins — and a Run that recompiled published two compile reports.
-        # Writing it out a second time here is how the two would drift apart.
-        published = read_back_artifacts(client, run_id, envelopes, read_back)
-        return ended(RENDERED, run_id, artifacts=published)
+        return ended(RENDERED, run_id)

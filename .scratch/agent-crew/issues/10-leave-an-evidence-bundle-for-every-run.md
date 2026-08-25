@@ -26,12 +26,23 @@ what they should go on reading.
 
 **Blocked by:** 09 (The producer records, compiles and renders under the quota rules)
 
-**Status:** ready-for-agent
+**Note:** the bundle evaluates the assertions the crew observed and no others. The
+scenario families are the harness's — a scenario is chosen there and the crew holds only a
+Brief — and the media and isolation families are measured by instruments the crew does not
+hold. What it cannot measure it reports as `not-evidenced` rather than answering from a
+fallback. Ticket 12 scores the same Run against the whole sheet, which is the only place the
+two restatements can be held to each other.
 
-- [ ] Each run persists its transcript and every command envelope in issue order
-- [ ] Run artifacts are captured by descriptor through artifact retrieval, never by scanning the workroot
-- [ ] The workroot inventories, hash index and leak scan still read the crew's own directory
-- [ ] The bundle carries an assertion evaluation against the scenario's sheet
-- [ ] The bundle's shape matches the existing proof bundles
-- [ ] Nothing is written outside the workroot
-- [ ] A completed bundle can be verified after the fact without the crew present
+`assemble` and `write_bundle` are separate for ADR-0015's sake, and ticket 12's driver is the
+first caller that writes one: nothing in the crew converges yet, because converging needs a
+model credential the CLI is not given.
+
+**Status:** done
+
+- [x] Each run persists its transcript and every command envelope in issue order
+- [x] Run artifacts are captured by descriptor through artifact retrieval, never by scanning the workroot
+- [x] The workroot inventories, hash index and leak scan still read the crew's own directory
+- [x] The bundle carries an assertion evaluation against the scenario's sheet
+- [x] The bundle's shape matches the existing proof bundles
+- [x] Nothing is written outside the workroot
+- [x] A completed bundle can be verified after the fact without the crew present

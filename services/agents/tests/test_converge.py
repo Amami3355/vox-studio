@@ -865,7 +865,6 @@ def test_a_paused_run_still_carries_everything_production_said() -> None:
     assert run.refusal is not None
     assert run.refusal.envelope.outcome == "paused"
     assert run.refusal.report is None
-    assert run.artifacts == ()
 
 
 # --- Placeholder degradation is accepted, not fought ----------------------------------------
@@ -1075,3 +1074,73 @@ def test_a_converged_run_never_reaches_the_network() -> None:
     )
 
     assert run.rendered
+
+
+# --- What ticket 10 needs from a Run that did not render -------------------------------------
+
+
+def test_a_run_that_ends_before_a_preview_still_reads_back_what_it_published() -> None:
+    """Three of the four endings publish artifacts, and none of them rendered.
+
+    A paused Run has been through Preflight, so production is holding a report for it. Leaving
+    `artifacts` empty there would make an evidence bundle empty for exactly the endings an
+    operator has to read, and it would be empty by an accident of where the read-back sat
+    rather than because the Run published nothing.
+    """
+    client = a_client(record=["run-record-paused-budget.stdout"])
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.paused
+    assert [artifact.kind for artifact in run.artifacts] == ["preflight_report"]
+    report = run.artifact("preflight_report")
+    assert report is not None
+    assert report.data == recorded_bytes("preflight-report.json")
+
+
+def test_the_run_carries_the_request_it_converged_on() -> None:
+    """A Run that cannot say which Brief it answered cannot be audited against one."""
+    client = a_client()
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+
+    assert run.request == REQUEST
+    assert run.brief == REQUEST["brief"]
+
+
+def test_the_versions_authored_after_a_take_exists_are_derived_from_the_envelopes() -> None:
+    """`limits.post-record-plan-versions` counts them, and a withheld one is one of them.
+
+    Derived rather than kept, for the reason every other count on a `ConvergedRun` is: the
+    envelopes already say when the Take was bound, and a field counting alongside them would
+    be the account that could disagree.
+    """
+    client = a_client(
+        compile=["run-compile-needs-repair.stdout", "run-compile-succeeded.stdout"],
+        record=["run-record-succeeded.stdout", "run-record-reused.stdout"],
+    )
+    author = RepairingAuthor(a_catalog_following_plan(), a_rewritten_plan(), a_repaired_plan())
+
+    run = converge(client, REQUEST, author)
+
+    assert run.rendered
+    assert len(run.withheld) == 1
+    assert run.post_record_versions == 2
+
+
+def test_a_run_that_never_recorded_authored_no_post_record_versions() -> None:
+    """Nothing is withheld before a Take exists, and no validate follows a record that failed."""
+    client = a_client(
+        validate=["run-validate-needs-repair.stdout", "run-validate-succeeded.stdout"]
+    )
+
+    run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan(), a_repaired_plan()))
+    assert run.rendered
+    assert run.post_record_versions == 0
+
+    paused = converge(
+        a_client(record=["run-record-paused-budget.stdout"]),
+        REQUEST,
+        RepairingAuthor(a_catalog_following_plan()),
+    )
+    assert paused.post_record_versions == 0
