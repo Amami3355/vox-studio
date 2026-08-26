@@ -80,11 +80,29 @@ and no voice credit; the paid run is `--provider elevenlabs` (the default). Run 
 pinned default model, and escalate to `--model` with a pro model only if the rehearsal shows
 flash cannot reach brief-compliance — a claim earned on the default is the stronger result.
 
+**The rehearsal is done, and flash cleared the Brief first time.**
+`--provider fixture`, pinned default model, 2026-08-26: **51 assertions pass, none fail**, six
+`not-evidenced` for the reason above. `scenario.brief-compliance` passed, all eight capabilities
+appeared exactly once across exactly eight event-driven scenes, `compile.zero-errors` was 0, and
+the take measured 111.76 s inside the 100-140 window. The crew used **zero repair cycles** — one
+pass each of validate, preflight, record, compile and render, 12 agent commands in total. One
+provider dispatch, `fixture`, so no voice credit was spent.
+
+So the live run goes out on the pinned default. Do not reach for `--model` unless a live attempt
+shows flash cannot hold the Brief with a real voice in the loop; a claim earned on the default
+with no repairs is the stronger result. The rehearsal bundle is at
+`.scratch/agent-production-interface/proofs/2026-08-26T185603-783Z-helios-bay-catalog-showcase`.
+
 **Status:** ready-for-human
 
 - [ ] The showcase Brief runs end to end with live synthesis
 - [ ] Exactly one Take is recorded
-- [ ] Machine assertions pass and the evidence bundle verifies
+- [ ] No machine assertion fails, and the evidence bundle verifies. The aggregate verdict of
+      a crew run is `not-evidenced`, never `pass`: `spec.md` decision (1) settles that local
+      crew runs report `sandboxEvidence: null`, so the six isolation and direct-network
+      assertions score `not-evidenced` by design and code-blindness is convention rather
+      than enforcement here. Read this criterion as the failure count, not the verdict word —
+      the spec asks for exactly that, so it is not rediscovered at submission time.
 - [ ] The run stays inside the measured budget
 - [ ] The preview is watched and listened to end to end by a human
 - [ ] The human verdict is recorded alongside the evidence bundle
