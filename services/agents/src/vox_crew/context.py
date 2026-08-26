@@ -41,7 +41,7 @@ instructions the Run's last version was authored against.
 
 **Characters, not tokens.** The exact thing a Python process can measure offline is the length
 of the text it is about to send. A token count is a model's arithmetic over that text, and the
-only tokenizer that would answer for `gemini-2.5-pro` is either a network call or a
+only tokenizer that would answer for the authoring model is either a network call or a
 sentencepiece model this machine does not have — so a token budget would be a number no test
 could check. Characters are checked on every run of the suite; `tokens` converts them for the
 one audience that thinks in tokens, at a divisor chosen to over-estimate rather than to be

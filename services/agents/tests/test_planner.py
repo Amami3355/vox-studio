@@ -519,10 +519,27 @@ def test_the_live_author_builds_its_agent_from_the_instructions_it_was_given() -
     assert google_adk
     text = instructions(SURFACE)
 
-    agent = AdkPlanAuthor(model="gemini-2.5-pro").agent(text)
+    agent = AdkPlanAuthor(model="gemini-3.1-flash-lite").agent(text)
 
     assert agent.instruction == text
-    assert agent.model == "gemini-2.5-pro"
+    # Deliberately not the default, so this reads the model through rather than past it.
+    assert agent.model == "gemini-3.1-flash-lite"
+
+
+def test_the_live_author_pins_a_model_that_is_still_served() -> None:
+    """The default is a pin, and a rotted pin fails at the first turn of a paid run.
+
+    Google retires a family to new callers while `models.list()` still returns it, so the
+    catalogue cannot answer this and neither can a test without a credential. What a keyless
+    machine *can* do is refuse to hold a name from a family already known to be retired, which
+    is the failure that actually happened rather than a hypothetical one.
+    """
+    retired_families = ("gemini-1.", "gemini-2.")
+
+    default = AdkPlanAuthor.__init__.__kwdefaults__["model"]
+
+    assert not default.startswith(retired_families), f"{default} is retired to new callers"
+    assert "latest" not in default, "an alias cannot tell a bundle which model authored a plan"
 
 
 def test_a_handed_plan_is_answered_as_the_plan_it_was_handed() -> None:

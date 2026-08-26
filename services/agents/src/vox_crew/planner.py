@@ -722,12 +722,21 @@ class AdkPlanAuthor(PlanAuthor):
 
     Its credential comes from the environment the runtime was given and is never held here,
     read, or written anywhere the crew can reach.
+
+    **The default model is pinned, and a stale pin is a dead run rather than a slow one.**
+    Google retires a family to *new* callers while still returning it from `models.list()`:
+    on 2026-08-26 both `gemini-2.5-pro` and `gemini-2.5-flash` were listed and answered
+    `404 NOT_FOUND · no longer available to new users`. So a liveness check written against
+    the catalogue would pass and the first turn would still die. The pin is checked by asking
+    the model, never by looking it up. An alias like `gemini-pro-latest` would dodge the
+    retirement and is deliberately not used: a Run's bundle has to be able to say which model
+    authored the plan, and a floating name cannot.
     """
 
     def __init__(
         self,
         *,
-        model: str = "gemini-2.5-pro",
+        model: str = "gemini-3.6-flash",
         name: str = "producer",
         app_name: str = "vox-crew",
     ) -> None:
