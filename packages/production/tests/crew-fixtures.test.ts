@@ -1,7 +1,6 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { commandDataSchemas, resultEnvelopeSchema } from '../src/contracts/schemas';
+import { readCrewFixtures } from './crew-fixture-directory';
 
 /**
  * The crew's Python tests replay recorded stdout rather than running a service, which buys
@@ -15,16 +14,17 @@ import { commandDataSchemas, resultEnvelopeSchema } from '../src/contracts/schem
  * `data` an open record, so a fixture could satisfy it while carrying a report shape the
  * service would never emit — and the crew reads those reports. `commandDataSchemas` is the
  * authority on what each command puts there, so it is what the fixtures are held to.
+ *
+ * Whether a *recorded* fixture is still current is a different question, asked next door in
+ * `crew-fixture-freshness.test.ts`. A fixture recorded from an older catalog passes this file
+ * cleanly: it was a real envelope once.
  */
-
-const fixtures = resolve(import.meta.dirname, '../../../services/agents/tests/fixtures');
 
 describe('the crew replays envelopes this service could have written', () => {
   it('parses every recorded fixture against the current contract', async () => {
-    const names = (await readdir(fixtures)).filter((name) => name.endsWith('.stdout'));
-    expect(names.length).toBeGreaterThan(0);
-    for (const name of names) {
-      const raw = await readFile(join(fixtures, name), 'utf8');
+    const fixtures = await readCrewFixtures();
+    expect(fixtures.size).toBeGreaterThan(0);
+    for (const [name, raw] of fixtures) {
       expect(raw.endsWith('\n'), `${name} is not a terminated stdout line`).toBe(true);
       expect(raw.trimEnd().includes('\n'), `${name} is more than one line`).toBe(false);
       expect(() => resultEnvelopeSchema.parse(JSON.parse(raw)), name).not.toThrow();
@@ -32,11 +32,8 @@ describe('the crew replays envelopes this service could have written', () => {
   });
 
   it('parses every payload a fixture carries against the schema for its command', async () => {
-    const names = (await readdir(fixtures)).filter((name) => name.endsWith('.stdout'));
-    for (const name of names) {
-      const envelope = resultEnvelopeSchema.parse(
-        JSON.parse(await readFile(join(fixtures, name), 'utf8')),
-      );
+    for (const [name, raw] of await readCrewFixtures()) {
+      const envelope = resultEnvelopeSchema.parse(JSON.parse(raw));
       if (envelope.command === null || envelope.data === null) continue;
       expect(
         () =>

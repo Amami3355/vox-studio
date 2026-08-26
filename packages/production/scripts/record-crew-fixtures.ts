@@ -39,11 +39,14 @@ const out = resolve(
 // `--category` narrows the write to one projection and the index beside it. The default is
 // every fixture, because a partial re-record is what leaves one projection behind after a
 // catalog rebuild — the failure this script's own guard exists to catch.
-const only = flag('category');
-const narrowed = only === undefined ? null : showFixtureName(contractCategorySchema.parse(only));
+const requestedCategory = flag('category');
+const narrowedTo =
+  requestedCategory === undefined
+    ? null
+    : showFixtureName(contractCategorySchema.parse(requestedCategory));
 
 const fixtures = [...recordedCrewFixtures()].filter(
-  ([name]) => narrowed === null || name === INDEX_FIXTURE || name === narrowed,
+  ([name]) => narrowedTo === null || name === INDEX_FIXTURE || name === narrowedTo,
 );
 
 await mkdir(out, { recursive: true });
