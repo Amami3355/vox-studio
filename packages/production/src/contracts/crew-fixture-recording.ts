@@ -1,0 +1,98 @@
+import { handleContractIndex, handleContractShow } from './handlers';
+import { type ContractCategory, commandDataSchemas } from './schemas';
+
+/**
+ * What the crew's recorded fixtures should hold, derived from the handlers rather than stored
+ * beside them.
+ *
+ * Both the recorder and the guard that fails a stale recording read this, so there is one
+ * answer to "which files are recorded and what belongs in them" instead of a script and a test
+ * that agree until someone edits one of them.
+ *
+ * The comparison this enables is exact rather than approximate, and it can be: the contract
+ * commands take no run identity and no clock, so a handler's stdout is a pure function of the
+ * generated contracts. Recorded bytes and emitted bytes are directly comparable, which is why
+ * nothing here keeps a digest — a digest sidecar would be a second source of truth about
+ * bytes the handler is already the authority on.
+ */
+
+/** The command that re-records everything named here. Quoted into every drift message. */
+export const RECORD_FIXTURES_COMMAND = 'pnpm --filter @vox/production record:crew-fixtures';
+
+export const INDEX_FIXTURE = 'contract-index.stdout';
+
+export const showFixtureName = (category: ContractCategory): string =>
+  `contract-show-${category}.stdout`;
+
+/**
+ * The recorded byte string is the dispatcher's stdout, not the envelope object: one JSON line
+ * and the newline that terminates it. Verbatim pass-through is only testable against that.
+ */
+const stdout = (envelope: unknown): string => `${JSON.stringify(envelope)}\n`;
+
+/**
+ * The categories the contract index publishes, read out of the index envelope itself.
+ *
+ * Deliberately not `contractCategorySchema.options`: the index is what the crew assembles its
+ * instructions from, so a category that reaches an agent but has no fixture is the failure
+ * worth catching, and only the index knows which those are.
+ */
+export const publishedCategories = (): readonly ContractCategory[] =>
+  commandDataSchemas['contract.index']
+    .parse(handleContractIndex().data)
+    .categories.map(({ id }) => id);
+
+/** Every fixture the recorder writes, as the exact bytes it would write now. */
+export const recordedCrewFixtures = (): ReadonlyMap<string, string> =>
+  new Map([
+    [INDEX_FIXTURE, stdout(handleContractIndex())],
+    ...publishedCategories().map(
+      (category) => [showFixtureName(category), stdout(handleContractShow(category))] as const,
+    ),
+  ]);
+
+/**
+ * Where a recording stopped matching, in the terms someone diagnosing it needs.
+ *
+ * Lengths alone are not enough: a rebuilt catalog that rewords a summary in place leaves a
+ * fixture the same size as the one the handler emits, and "9217 bytes against 9217" tells
+ * whoever reads the failure nothing. The offset and the two excerpts name the edit.
+ */
+const difference = (recorded: string, emitted: string): string => {
+  const shared = Math.min(recorded.length, emitted.length);
+  let offset = 0;
+  while (offset < shared && recorded[offset] === emitted[offset]) offset += 1;
+  if (offset === shared) {
+    const verb = recorded.length > emitted.length ? 'runs past' : 'stops short of';
+    return `it ${verb} what the handler emits at offset ${shared} (${recorded.length} characters on disk, ${emitted.length} emitted)`;
+  }
+  const excerpt = (value: string): string => JSON.stringify(value.slice(offset, offset + 48));
+  return `they diverge at offset ${offset}, where the recording has ${excerpt(recorded)} and the handler emits ${excerpt(emitted)}`;
+};
+
+/**
+ * Every way the recorded fixtures on disk differ from what the handlers emit now, as messages
+ * naming the file and the command that fixes it.
+ *
+ * `onDisk` may carry the whole fixture directory. Only the names this module records are
+ * judged, which is what keeps the authored `run-*.stdout` envelopes — the ones nothing can
+ * regenerate — under the schema guard that already covers them and out of this one.
+ */
+export const crewFixtureDrift = (onDisk: ReadonlyMap<string, string>): readonly string[] => {
+  const drift: string[] = [];
+  for (const [name, emitted] of recordedCrewFixtures()) {
+    const recorded = onDisk.get(name);
+    if (recorded === undefined) {
+      drift.push(
+        `${name} is missing: the contract index publishes this category and the crew assembles its instructions from every category the index names. Run \`${RECORD_FIXTURES_COMMAND}\` to record it.`,
+      );
+      continue;
+    }
+    if (recorded !== emitted) {
+      drift.push(
+        `${name} was recorded from a different catalog: ${difference(recorded, emitted)}. Run \`${RECORD_FIXTURES_COMMAND}\` to refresh it.`,
+      );
+    }
+  }
+  return drift;
+};

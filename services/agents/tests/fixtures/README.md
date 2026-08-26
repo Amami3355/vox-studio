@@ -8,9 +8,13 @@ Their bytes are the recording. Nothing here should be reformatted — verbatim p
 byte property, and prettifying these files would delete the thing they exist to prove. That is
 why they carry a `.stdout` extension and sit outside `biome check`'s reach.
 
-- `contract-index.stdout` and the three `contract-show-*.stdout` files are **recorded**:
-  written by `pnpm --filter @vox/production record:crew-fixtures --category <name>`, straight
-  from the handlers the dispatcher calls. Re-record them when the contracts are rebuilt.
+- `contract-index.stdout` and the five `contract-show-*.stdout` files are **recorded**:
+  written by `pnpm --filter @vox/production record:crew-fixtures`, straight from the handlers
+  the dispatcher calls. Re-recording is not something this README asks for, because prose is
+  not a check: `packages/production/tests/crew-fixture-freshness.test.ts` compares these bytes
+  against what the handlers emit now, and a recording made from an older catalog fails the
+  build with the command that refreshes it. A category the index publishes with no file here
+  fails it too, which is how a new category arrives.
 - The `run-*.stdout` envelopes are **authored**, because producing them for real needs a Run,
   a ledger and a signing key. They are held to the contract by
   `packages/production/tests/crew-fixtures.test.ts`, which parses every file in this directory
@@ -101,8 +105,13 @@ publishes, and neither means anything against a stand-in. The protocol category 
 case: it tells an agent a plan is submitted as `plan.json`, which is why the crew's leak-marker
 list may not contain that string, and only the recorded body proves it.
 
-Re-record all five when the contracts are rebuilt:
+Re-record when the contracts are rebuilt. The bare command writes the index and every
+category the index publishes, which is the whole recorded set:
 
 ```
-pnpm --filter @vox/production record:crew-fixtures --category <name>
+pnpm --filter @vox/production record:crew-fixtures
 ```
+
+`--category <name>` narrows the write to one projection and the index beside it. It is for
+iterating on a single contract; a partial re-record after a catalog rebuild is exactly what
+leaves one projection behind, and the freshness test is what catches it.

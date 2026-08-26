@@ -6,16 +6,24 @@
  * surface actually emits, produced by the same handlers the dispatcher calls, so a change to
  * the envelope shape shows up as a fixture diff instead of as a green Python suite.
  *
- * Only the discovery commands are recorded here, and only the smallest projection among them.
- * The five projections total ~220 KB; committing them all would duplicate generated contract
- * data that drifts the moment the catalog is rebuilt, and the client is not what their
- * content tests. The other categories are exercised through the crew's stub launcher.
+ * Every projection the contract index publishes is recorded, not the smallest one. That was
+ * the policy while the fixtures were a convenience for the client, which was indifferent to
+ * what a projection carried; the planner assembles its instructions from all five, so a
+ * stand-in for any of them is a suite green against a catalog that does not exist.
+ *
+ * What to write is not decided here. `crew-fixture-recording.ts` holds the names and the
+ * bytes, and the guard that fails a stale recording reads the same module, so re-recording
+ * and checking can never disagree about what belongs on disk.
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { handleContractIndex, handleContractShow } from '../src/contracts/handlers';
-import { type ContractCategory, contractCategorySchema } from '../src/contracts/schemas';
+import {
+  INDEX_FIXTURE,
+  recordedCrewFixtures,
+  showFixtureName,
+} from '../src/contracts/crew-fixture-recording';
+import { contractCategorySchema } from '../src/contracts/schemas';
 
 const flag = (name: string): string | undefined => {
   const index = process.argv.indexOf(`--${name}`);
@@ -27,22 +35,26 @@ const flag = (name: string): string | undefined => {
 const out = resolve(
   flag('out') ?? resolve(import.meta.dirname, '../../../services/agents/tests/fixtures'),
 );
-const category: ContractCategory = contractCategorySchema.parse(flag('category') ?? 'checks');
 
-// The recorded byte string is the dispatcher's stdout, not the envelope object: one JSON line
-// and the newline that terminates it. Verbatim pass-through is only testable against that.
-const stdout = (envelope: unknown): string => `${JSON.stringify(envelope)}\n`;
+// `--category` narrows the write to one projection and the index beside it. The default is
+// every fixture, because a partial re-record is what leaves one projection behind after a
+// catalog rebuild — the failure this script's own guard exists to catch.
+const only = flag('category');
+const narrowed = only === undefined ? null : showFixtureName(contractCategorySchema.parse(only));
+
+const fixtures = [...recordedCrewFixtures()].filter(
+  ([name]) => narrowed === null || name === INDEX_FIXTURE || name === narrowed,
+);
 
 await mkdir(out, { recursive: true });
-const written = [
-  ['contract-index.stdout', stdout(handleContractIndex())],
-  [`contract-show-${category}.stdout`, stdout(handleContractShow(category))],
-] as const;
-
-for (const [name, contents] of written) {
+for (const [name, contents] of fixtures) {
   await writeFile(resolve(out, name), contents, 'utf8');
 }
 
 process.stdout.write(
-  `${JSON.stringify({ ok: true, out, files: written.map(([name, contents]) => ({ name, bytes: Buffer.byteLength(contents) })) })}\n`,
+  `${JSON.stringify({
+    ok: true,
+    out,
+    files: fixtures.map(([name, contents]) => ({ name, bytes: Buffer.byteLength(contents) })),
+  })}\n`,
 );
