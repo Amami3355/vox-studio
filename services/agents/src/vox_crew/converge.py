@@ -36,6 +36,13 @@ an agent buy itself attempts by splitting its plan, and a budget keyed on a cons
 wall every time the Brief gets longer. Exhausting it is an outcome with the limit named, not a
 loop that stops being interesting.
 
+**The context budget is the second wall, and it is read the same way.** `context.py` measures
+what a Run puts in front of a model; the instructions are assembled once, here, and every turn
+below is authored against that one object. A Run that would pass what it is budgeted ends
+`budget_exhausted` with `context.py`'s own line named, rather than overrunning quietly and
+being discovered on an invoice. The one exception is a prefix that does not fit before any turn
+has happened, which is refused outright — see `ContextBudgetExceeded`.
+
 **The recording quota is read, never kept.** `protocol.recording` publishes the whole rule set
 this loop obeys — `run.record` is the only network command, a verified matching Take is `reuse
 without quota`, an identical input redispatched needs a `replacement grant required`, and an
@@ -56,6 +63,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import Artifact, ProductionClient
+from .context import ContextBudget, ContextBudgetExceeded, ContextSpend, context_budget
 from .envelopes import (
     NEEDS_REPAIR,
     PAUSED as PAUSED_BEFORE_NETWORK,
@@ -63,7 +71,7 @@ from .envelopes import (
     NextCommand,
     ResultEnvelope,
 )
-from .planner import AuthoredPlan, Finding, PlanAuthor, author_plan, repair_plan
+from .planner import AuthoredPlan, Finding, PlanAuthor, author_plan, cache_prefix, repair_plan
 from .producer import READ_BACK, read_back_artifacts
 from .refusals import Refusal, read_refusal
 from .teaching_surface import TeachingSurface, read_teaching_surface
@@ -90,6 +98,9 @@ PLAN_VERSIONS = "plan_versions"
 PREFLIGHT_CALLS = "preflight_calls"
 POST_RECORD_PLAN_VERSIONS = "post_record_plan_versions"
 NEW_TAKES = "new_takes"
+# The context lines are `context.py`'s own — `resident_chars` and `fresh_chars` — passed
+# through as `limit` rather than restated here, so a Run that ended on one names it the way the
+# module that measured it names it.
 
 # The dispositions `run.record` publishes, split by what they cost. The three names are the
 # protocol's own enum; the split is `recording.verifiedMatchingTake` — "reuse without quota" —
@@ -190,6 +201,24 @@ class BriefUnnamed(RuntimeError):
     """A Run whose request does not carry the Brief it answered, asked to name it anyway."""
 
 
+def spend_of(
+    versions: Sequence[AuthoredPlan], withheld: Sequence[AuthoredPlan]
+) -> ContextSpend:
+    """What a set of authored versions cost to ask for.
+
+    Derived rather than accumulated, for the reason `quota_readings` is: every ask the crew
+    made left an `AuthoredPlan` behind, so a running total kept beside them would be a second
+    account of the same thing and the one that could disagree. Withheld versions count — the
+    model wrote them and they were paid for, which is the rule `limits.plan-versions` is
+    already read under.
+
+    A function rather than a `ConvergedRun` property alone, because the loop has to read the
+    same number mid-flight, and a gate that computed it a second way would be a gate that could
+    allow a turn the finished bundle then reports as an overrun.
+    """
+    return ContextSpend(tuple(version.ask for version in (*versions, *withheld)))
+
+
 @dataclass(frozen=True, slots=True)
 class ConvergedRun:
     """One Run, from discovery through however many repairs it took, and how it ended."""
@@ -199,6 +228,7 @@ class ConvergedRun:
     run_id: str | None
     outcome: str
     budget: RepairBudget
+    context: ContextBudget
     versions: tuple[AuthoredPlan, ...]
     submitted: tuple[Mapping[str, Any], ...]
     withheld: tuple[AuthoredPlan, ...]
@@ -252,6 +282,11 @@ class ConvergedRun:
     @property
     def paused(self) -> bool:
         return self.outcome == PAUSED
+
+    @property
+    def spend(self) -> ContextSpend:
+        """What this Run put in front of a model, derived from the versions it authored."""
+        return spend_of(self.versions, self.withheld)
 
     @property
     def quota_readings(self) -> tuple[RecordingQuota, ...]:
@@ -441,14 +476,20 @@ def converge(
     author: PlanAuthor,
     *,
     budget: RepairBudget | None = None,
+    context: ContextBudget | None = None,
     on_envelope: Callable[[ResultEnvelope], None] | None = None,
     read_back: Sequence[str] = READ_BACK,
 ) -> ConvergedRun:
-    """Discovery, authoring, and one Run driven until it renders or the budget is gone.
+    """Discovery, authoring, and one Run driven until it renders or a budget is gone.
 
     `on_envelope` sees every envelope in the order it arrived, refusals included, so an audit
     trail records what production said across the whole convergence rather than only the pass
     that happened to succeed.
+
+    Two budgets, and both end a Run the same way. `budget` is how many times production may be
+    asked; `context` is how much text may be put in front of a model, defaulting to what the
+    first allows — a Run budgeted more repair cycles is a Run allowed more turns to send fresh
+    text in. Passing the context budget rather than deriving it twice keeps the two in step.
 
     Nothing raises on a refusal. A Run that ends refused, stopped, paused or out of budget
     comes back with the material that ended it, because that is what an operator has to read —
@@ -457,10 +498,25 @@ def converge(
     surface = read_teaching_surface(client, on_envelope)
     brief = request.get("brief", {})
     allowed = budget if budget is not None else repair_budget(target_seconds(brief))
+    allowed_context = context if context is not None else context_budget(allowed.plan_versions)
+
+    # Assembled once, here, and read by every turn below. This is the caching: not a store the
+    # crew keeps, but the fact that there is one object to send and nothing downstream can
+    # build a second.
+    prefix = cache_prefix(surface)
+    if prefix.chars > allowed_context.resident_chars:
+        # Refused before a Run is opened, rather than ended as one. A prefix that does not fit
+        # is a fact about the crew's own prompt and is true of every turn a Run would take, so
+        # there is nothing a Run could be spent to discover — the same argument
+        # `InstructionsLeaked` is raised on, and the same place in the sequence.
+        raise ContextBudgetExceeded(
+            f"The teaching surface assembles to {prefix.chars} characters, past the "
+            f"{allowed_context.resident_chars} this Run is budgeted, so nothing was asked."
+        )
 
     announce = on_envelope if on_envelope is not None else lambda _: None
     envelopes: list[ResultEnvelope] = []
-    versions: list[AuthoredPlan] = [author_plan(surface, brief, author)]
+    versions: list[AuthoredPlan] = [author_plan(prefix, brief, author)]
     submitted: list[Mapping[str, Any]] = []
     withheld: list[AuthoredPlan] = []
     refusals: list[Refusal] = []
@@ -495,6 +551,7 @@ def converge(
             run_id=run,
             outcome=outcome,
             budget=allowed,
+            context=allowed_context,
             versions=tuple(versions),
             submitted=tuple(submitted),
             withheld=tuple(withheld),
@@ -549,7 +606,13 @@ def converge(
                 return ended(BUDGET_EXHAUSTED, run_id, PLAN_VERSIONS)
             if recorded is not None and after_take >= allowed.post_record_plan_versions:
                 return ended(BUDGET_EXHAUSTED, run_id, POST_RECORD_PLAN_VERSIONS)
-            proposed = repair_plan(surface, brief, versions[-1].plan, refusal, author)
+            # What the Run has already put in front of a model, read before it is asked again.
+            # Checked here rather than after the ask for the reason every other line is: a
+            # budget consulted once the money is gone is a report, not a budget.
+            passed = spend_of(versions, withheld).overrun(allowed_context)
+            if passed is not None:
+                return ended(BUDGET_EXHAUSTED, run_id, passed)
+            proposed = repair_plan(prefix, brief, versions[-1].plan, refusal, author)
             if recorded is not None:
                 after_take += 1
             if recorded is None or take_preserved(recorded, proposed.plan):

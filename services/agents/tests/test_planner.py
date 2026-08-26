@@ -36,6 +36,7 @@ from vox_crew.planner import (
     PlanAuthor,
     PlanNotRepairable,
     author_plan,
+    cache_prefix,
     instructions,
     plan_and_produce,
     review,
@@ -266,7 +267,7 @@ def test_a_brief_that_carries_a_secret_never_reaches_an_author() -> None:
     author = ScriptedPlanAuthor(a_catalog_following_plan())
 
     with pytest.raises(InstructionsLeaked):
-        author_plan(SURFACE, {"id": "b", "text": "Read ELEVENLABS_API_KEY first."}, author)
+        author_plan(cache_prefix(SURFACE), {"id": "b", "text": "Read ELEVENLABS_API_KEY first."}, author)
 
     assert author.asked == []
 
@@ -279,7 +280,7 @@ def test_instructions_that_leak_never_reach_an_author(monkeypatch) -> None:
     author = ScriptedPlanAuthor(a_catalog_following_plan())
 
     with pytest.raises(InstructionsLeaked):
-        author_plan(SURFACE, {"id": "b", "text": "t"}, author)
+        author_plan(cache_prefix(SURFACE), {"id": "b", "text": "t"}, author)
 
     assert author.asked == []
 

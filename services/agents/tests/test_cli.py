@@ -245,6 +245,42 @@ def test_a_refused_plan_nobody_can_repair_is_reported_rather_than_resubmitted(
     assert "UNKNOWN_ACTION" in capsys.readouterr().err
 
 
+def test_a_finished_run_reports_what_it_put_in_front_of_a_model(
+    work_root, launcher, capsys
+) -> None:
+    """The measurement reaches an operator without their having to open the bundle.
+
+    On stderr, like everything else the crew has to say. Stdout is production's envelopes and
+    a character count is not one of them.
+    """
+    a_converging_work_root(work_root)
+
+    run_crew(work_root, launcher, {**discovery(), **a_complete_run()})
+
+    said = capsys.readouterr().err
+    assert "1 model ask" in said
+    assert "characters sent" in said
+
+
+def test_a_teaching_surface_too_large_for_the_budget_is_reported_and_nothing_is_opened(
+    work_root, launcher, capsys, monkeypatch
+) -> None:
+    """The refusal `converge` raises reaches an operator as a message, not a traceback.
+
+    Reported the way a leaking prompt is reported, because it is the same kind of finding: the
+    crew's own prompt does not fit what it is budgeted, and no Run can be spent discovering it.
+    """
+    a_converging_work_root(work_root)
+    monkeypatch.setattr("vox_crew.context.RESIDENT_CHARS_ALLOWED", 10)
+
+    code, client = run_crew(work_root, launcher, {**discovery(), **a_complete_run()})
+
+    assert code == 1
+    assert "production run init" not in verbs(client)
+    said = capsys.readouterr().err
+    assert "vox-crew:" in said and "characters" in said
+
+
 # --- The tracer bullet, still there --------------------------------------------------------
 
 

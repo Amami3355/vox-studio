@@ -19,6 +19,7 @@ import pytest
 from conftest import recorded, recorded_bytes
 from test_complete_run import REQUEST, RUN_ID
 from test_converge import RepairingAuthor, a_client, a_catalog_following_plan, a_repaired_plan
+from vox_crew.context import tokens
 from vox_crew.converge import (
     BUDGET_EXHAUSTED,
     PAUSED,
@@ -46,6 +47,7 @@ from vox_crew.evidence import (
     verify,
     write_bundle,
 )
+from vox_crew.context import tokens
 from vox_crew.planner import scan_for_leaks
 
 
@@ -644,6 +646,43 @@ def test_the_environment_says_what_the_crew_did_not_measure() -> None:
     assert environment["runId"] == RUN_ID
     assert environment["outcome"] == RENDERED
     assert environment["limit"] is None
+
+
+def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
+    """The second criterion's recording half: consumption travels with the Run that spent it.
+
+    In the environment block rather than as an assertion, because the harness's sheet has no
+    line for it — this is a fact about what the Run was, which is what that block is for, and
+    inventing a sheet assertion the sheet does not have would be worse coming from the party
+    being judged.
+    """
+    run = a_repaired_run()
+
+    context = document(assemble(run).files, ENVIRONMENT)["context"]
+
+    assert context["asks"] == run.spend.asks_made
+    assert context["residentChars"] == run.spend.resident_chars
+    assert context["freshChars"] == run.spend.fresh_chars
+    assert context["sentChars"] == run.spend.sent_chars
+    assert context["uncachedChars"] == run.spend.uncached_chars
+    assert context["cached"] is True
+    assert context["budget"] == {
+        "residentChars": run.context.resident_chars,
+        "freshChars": run.context.fresh_chars,
+    }
+    # The figure the budget is stated in, beside the one a model is billed in.
+    assert context["sentTokens"] == tokens(run.spend.sent_chars)
+
+
+def test_the_summary_reports_the_spend_and_what_not_re_sending_the_catalog_saved() -> None:
+    """The page a person opens first says what the Run cost, not only how it ended."""
+    run = a_repaired_run()
+
+    summary = assemble(run).files[SUMMARY].decode("utf-8")
+
+    assert f"{run.spend.sent_chars:,}" in summary
+    assert f"{run.spend.saved_chars:,}" in summary
+    assert f"{run.spend.asks_made}" in summary
 
 
 def test_the_summary_names_the_families_this_bundle_does_not_evidence() -> None:

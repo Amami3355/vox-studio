@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from .client import ProductionClient, ProductionClientError
+from .context import RESIDENT_CHARS_ALLOWED, ContextBudgetExceeded, tokens
 from .converge import RENDERED, converge
 from .envelopes import MalformedEnvelope, ResultEnvelope
 from .evidence import BundleInvalid, EvidenceLeaked, assemble, write_bundle
@@ -47,6 +48,7 @@ from .planner import (
     PlanAuthor,
     PlanNotAuthored,
     PlanNotRepairable,
+    cache_prefix,
 )
 from .teaching_surface import DiscoveryRefused, read_teaching_surface
 
@@ -162,13 +164,23 @@ def _missing(arguments: Arguments, client: ProductionClient | None) -> str | Non
 
 
 def _discover(client: ProductionClient, show: Any, err: IO[str], work_root: Path) -> int:
-    """The diagnostic: what does the boundary teach, and is it there at all?"""
+    """The diagnostic: what does the boundary teach, is it there at all, and what will it cost?
+
+    The prefix is assembled here as well as counted. It is the one measurement that can be
+    taken without opening a Run or reaching a model, and it is the term that dominates every
+    Run's budget — so a catalog that has outgrown the allowance is answerable from a diagnostic
+    rather than from a convergence.
+    """
     surface = read_teaching_surface(client, show)
     held = sum(len(envelope.raw) for envelope in surface.envelopes)
+    resident = cache_prefix(surface).chars
     err.write(
         f"vox-crew: read {len(surface.categories)} contract projections "
         f"({', '.join(surface.categories)}), {held} bytes held in context and none written to "
         f"{work_root}.\n"
+        f"vox-crew: they assemble to {resident:,} characters (~{tokens(resident):,} tokens) of "
+        f"instructions, resident for a whole Run against an allowance of "
+        f"{RESIDENT_CHARS_ALLOWED:,}.\n"
     )
     return 0
 
@@ -210,7 +222,10 @@ def main(
         # said is already on stdout, which is the record that matters.
         err.write(f"vox-crew: {unrepairable}\n")
         return 1
-    except (InstructionsLeaked, PlanNotAuthored) as unusable:
+    except (ContextBudgetExceeded, InstructionsLeaked, PlanNotAuthored) as unusable:
+        # Three findings about the crew's own prompt rather than about the Run: it leaks, it
+        # does not fit the budget, or what came back is not a plan. None leaves a Run to write
+        # a bundle from, and all three are the operator's to act on.
         err.write(f"vox-crew: {unusable}\n")
         return 1
     except (ProductionClientError, MalformedEnvelope) as unreachable:
@@ -223,11 +238,15 @@ def main(
         err.write(f"vox-crew: the bundle was not written: {refused_bundle}\n")
         return 1
 
+    spend = run.spend
     err.write(
         f"vox-crew: Run {run.run_id} ended {run.outcome}"
         f"{f' at {run.limit}' if run.limit else ''}, "
         f"{len(run.envelopes)} envelopes, {len(run.artifacts)} artifacts read back, "
         f"evidence in {arguments.evidence}.\n"
+        f"vox-crew: {spend.asks_made} model ask{'' if spend.asks_made == 1 else 's'}, "
+        f"{spend.sent_chars:,} characters sent (~{tokens(spend.sent_chars):,} tokens), "
+        f"{spend.saved_chars:,} not re-sent because the teaching surface was cached.\n"
     )
     return 0 if run.outcome == RENDERED else 1
 

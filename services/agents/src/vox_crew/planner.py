@@ -29,9 +29,15 @@ evidence bundle to read.
 **A repair is authored, not composed.** `repair_plan` is `author_plan` with what production
 said placed after the same instructions, and it runs the same leak gate over the whole text.
 The crew writes no prose about a refusal — `refusals.py` gathers the envelope, the report and
-the published `means` and `repair` for the codes in it, and the author reads those. Rebuilding
-the instructions rather than growing them keeps the catalog one identical prefix across the
-whole loop, which is what the contract budget depends on.
+the published `means` and `repair` for the codes in it, and the author reads those.
+
+**The instructions are assembled once and kept.** `cache_prefix` builds them, and `author_plan`
+and `repair_plan` take that object rather than the surface it was built from — so a turn cannot
+assemble a second one, and the catalog is one identical prefix across the whole loop by
+construction rather than by two call sites happening to agree. That is what the contract budget
+depends on: the largest thing in the prompt is sent once and served from a cache afterwards,
+and only the refusal after it differs from cycle to cycle. Every ask records what it cost in
+`context.py`'s terms, so the Run can be audited against that budget rather than trusted to it.
 
 The live implementation of the author is the only thing here that needs the ADK framework, and
 it imports it when it is built rather than when this module is. That is what keeps a bare
@@ -48,6 +54,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import ProductionClient
+from .context import Ask
 from .envelopes import ResultEnvelope
 from .producer import READ_BACK, ProducedRun, produce
 from .refusals import Refusal
@@ -170,11 +177,18 @@ class Finding:
 
 @dataclass(frozen=True, slots=True)
 class AuthoredPlan:
-    """A plan a model wrote, the prompt it was written from, and what the crew can see in it."""
+    """A plan a model wrote, the prompt it was written from, what the crew can see in it, and
+    what asking cost.
+
+    `ask` is an account and not a second copy of the prompt: two numbers, the resident prefix
+    and what this turn added on top of it. `instructions` is already the text, and a Run
+    carrying six of those in an evidence bundle would carry six copies of the catalog.
+    """
 
     plan: Mapping[str, Any]
     instructions: str
     findings: tuple[Finding, ...]
+    ask: Ask
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,6 +288,34 @@ def instructions(surface: TeachingSurface) -> str:
     return "".join(parts)
 
 
+@dataclass(frozen=True, slots=True)
+class CachedPrefix:
+    """The teaching surface assembled into instructions once, and kept for a whole Run.
+
+    Every turn of the repair loop is authored against this same object, which is what makes the
+    catalog one identical prefix rather than five identical rebuilds — a provider serves an
+    identical prefix from its cache, and two call sites that each assembled their own would be
+    one edit away from disagreeing about what "identical" meant.
+
+    It carries the surface it was built from because everything downstream of authoring needs
+    both: `review` reads the catalog out of the surface, and `refusals.py` reads the checks and
+    protocol categories out of it. Passing them separately would let a Run review a plan against
+    a surface its instructions were not built from.
+    """
+
+    surface: TeachingSurface
+    text: str
+
+    @property
+    def chars(self) -> int:
+        return len(self.text)
+
+
+def cache_prefix(surface: TeachingSurface) -> CachedPrefix:
+    """Assembles the instructions, once. The only place a Run's prompt prefix is built."""
+    return CachedPrefix(surface=surface, text=instructions(surface))
+
+
 def _markers(lowered: str) -> list[str]:
     """Every marker the text names. Case-insensitive, and the half both scans share."""
     return [f"marker:{marker}" for marker in LEAK_MARKERS if marker.lower() in lowered]
@@ -310,6 +352,18 @@ def scan_message_for_leaks(*parts: Any) -> LeakScan:
     """
     lowered = json.dumps(parts, ensure_ascii=False, default=str).lower()
     return LeakScan(tuple(dict.fromkeys(_markers(lowered))))
+
+
+def message_text(message: Mapping[str, Any]) -> str:
+    """The half of a prompt the crew hands over beside the instructions, as it is sent.
+
+    One serialisation rather than two. `AdkPlanAuthor` sends exactly this string and the ask
+    measures exactly this string, so a Run's account is the text that reached the model rather
+    than an estimate of it. Compact, for the reason `instructions` is compact: the framing
+    whitespace buys a model nothing it cannot already read, and here it would be whitespace
+    billed once per repair cycle.
+    """
+    return json.dumps(message, separators=(",", ":"), ensure_ascii=False)
 
 
 def _walk(value: Any, where: str) -> Iterator[tuple[str, str]]:
@@ -517,40 +571,57 @@ def _as_plan(answered: Any, verb: str) -> Mapping[str, Any]:
 
 
 def author_plan(
-    surface: TeachingSurface, brief: Mapping[str, Any], author: PlanAuthor
+    prefix: CachedPrefix, brief: Mapping[str, Any], author: PlanAuthor
 ) -> AuthoredPlan:
-    """Builds the instructions, scans them, asks for a plan, and reads what came back."""
-    text = instructions(surface)
-    _refuse_if_leaked(text, "instructions", brief)
+    """Scans the cached instructions, asks for a plan, and reads what came back.
 
-    plan = _as_plan(author.author(text, brief), "answered")
-    return AuthoredPlan(plan=plan, instructions=text, findings=review(plan, surface))
+    Takes the prefix rather than the surface, so authoring cannot assemble a prompt of its own.
+    An authoring turn adds nothing to it: what is fresh is the Brief, and the ask says so.
+    """
+    _refuse_if_leaked(prefix.text, "instructions", brief)
+
+    plan = _as_plan(author.author(prefix.text, brief), "answered")
+    return AuthoredPlan(
+        plan=plan,
+        instructions=prefix.text,
+        findings=review(plan, prefix.surface),
+        ask=Ask(resident=prefix.chars, fresh=len(message_text(brief))),
+    )
 
 
 def repair_plan(
-    surface: TeachingSurface,
+    prefix: CachedPrefix,
     brief: Mapping[str, Any],
     plan: Mapping[str, Any],
     refusal: Refusal,
     author: PlanAuthor,
 ) -> AuthoredPlan:
-    """`author_plan` again, with what production said in front of the instructions.
+    """`author_plan` again, with what production said after the same instructions.
 
     Deliberately the same shape and the same gate. The scan runs over the whole text, not only
-    over the part `author_plan` built, because the refusal is new text reaching a model and a
+    over the part `cache_prefix` built, because the refusal is new text reaching a model and a
     prompt is where code-blindness is lost quietly — that argument does not weaken because the
     new text came from the service.
 
-    The authoring instructions are rebuilt rather than appended to a previous repair's, so the
-    catalog stays one identical prefix across the whole loop. That is what makes the contract
-    budget survive a repair: the largest thing in the prompt is sent once and cached, and only
-    the refusal after it differs from cycle to cycle.
+    The refusal goes *after* the cached prefix rather than in front of it. That ordering is the
+    whole caching arrangement: a provider serves the longest matching prefix, so text placed
+    before the catalog would push the catalog out of the cache on every cycle and turn one
+    resident 125 KB into six billed ones.
     """
-    text = instructions(surface) + refusal.as_text()
+    said = refusal.as_text()
+    text = prefix.text + said
     _refuse_if_leaked(text, "repair instructions", brief, plan)
 
     repaired = _as_plan(author.repair(text, brief, plan, refusal), "repaired")
-    return AuthoredPlan(plan=repaired, instructions=text, findings=review(repaired, surface))
+    return AuthoredPlan(
+        plan=repaired,
+        instructions=text,
+        findings=review(repaired, prefix.surface),
+        ask=Ask(
+            resident=prefix.chars,
+            fresh=len(said) + len(message_text({"brief": brief, "plan": plan})),
+        ),
+    )
 
 
 def plan_and_produce(
@@ -567,7 +638,7 @@ def plan_and_produce(
     report the repair loop is built from, and nothing raises.
     """
     surface = read_teaching_surface(client, on_envelope)
-    authored = author_plan(surface, request.get("brief", {}), author)
+    authored = author_plan(cache_prefix(surface), request.get("brief", {}), author)
     produced = produce(
         client, request, authored.plan, on_envelope=on_envelope, read_back=read_back
     )
@@ -689,7 +760,7 @@ class AdkPlanAuthor(PlanAuthor):
                 user_id=self._name,
                 session_id=session.id,
                 new_message=types.Content(
-                    role="user", parts=[types.Part(text=json.dumps(message, ensure_ascii=False))]
+                    role="user", parts=[types.Part(text=message_text(message))]
                 ),
             )
             if event.content

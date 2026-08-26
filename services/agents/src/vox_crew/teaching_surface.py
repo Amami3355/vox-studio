@@ -10,11 +10,12 @@ The projections are held here, in the crew's context, and nowhere else. They are
 into the work root — that is what keeps "nothing but its Run directories" true, and it is the
 difference between a work root that is evidence and one that is just a directory.
 
-The five projections are large (~220 KB together, and the catalog alone is half of it). They
-are read once and kept, so the repair loop can be run against a cached prefix rather than
-re-sending the catalog every turn. Nothing is dropped to save room: the catalog is the
-planner's primary authoring input, so the one item that dominates the budget is also the one
-that cannot be deferred.
+The five projections are large — they assemble into ~125,000 characters of instructions, and
+the catalog alone is half of that. They are read once and kept, and `planner.cache_prefix`
+assembles them once, so the repair loop runs against a cached prefix rather than re-sending
+the catalog every turn. Nothing is dropped to save room: the catalog is the planner's primary
+authoring input, so the one item that dominates the budget is also the one that cannot be
+deferred. `context.py` holds what that costs and what a Run is allowed to spend.
 """
 
 from __future__ import annotations

@@ -94,7 +94,7 @@ envelope that publishes it is the digest of those exact bytes.
 ## Why all five projections are recorded
 
 `checks` was recorded alone at first. The client was the thing under test and was indifferent
-to what a projection carried, so committing ~220 KB of generated contract data that drifts the
+to what a projection carried, so committing ~125 KB of generated contract data that drifts the
 moment the catalog is rebuilt bought nothing.
 
 The planner is not indifferent to any of them. Its instructions *are* these bodies — it

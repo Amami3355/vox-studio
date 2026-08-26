@@ -24,7 +24,14 @@ import pytest
 from conftest import recorded, recorded_bytes
 from test_complete_run import REQUEST, RUN_ID
 from test_planner import CATEGORIES, SURFACE, a_catalog_following_plan
+from vox_crew import planner
 from vox_crew.client import Artifact, ProductionClient
+from vox_crew.context import (
+    FRESH_CHARS,
+    ContextBudget,
+    ContextBudgetExceeded,
+    context_budget,
+)
 from vox_crew.converge import (
     BUDGET_EXHAUSTED,
     DISPATCHED,
@@ -45,7 +52,15 @@ from vox_crew.converge import (
     target_seconds,
 )
 from vox_crew.envelopes import ArtifactDescriptor, ResultEnvelope, parse_envelope
-from vox_crew.planner import InstructionsLeaked, PlanAuthor, repair_plan, scan_for_leaks
+from vox_crew.planner import (
+    InstructionsLeaked,
+    PlanAuthor,
+    cache_prefix,
+    instructions,
+    message_text,
+    repair_plan,
+    scan_for_leaks,
+)
 from vox_crew.producer import READ_BACK
 from vox_crew.refusals import Refusal, read_refusal
 
@@ -284,7 +299,9 @@ def test_repair_instructions_that_leak_never_reach_an_author(monkeypatch) -> Non
     author = RepairingAuthor(a_catalog_following_plan())
 
     with pytest.raises(InstructionsLeaked):
-        repair_plan(SURFACE, REQUEST["brief"], a_catalog_following_plan(), refusal, author)
+        repair_plan(
+            cache_prefix(SURFACE), REQUEST["brief"], a_catalog_following_plan(), refusal, author
+        )
 
     assert author.repairs == []
 
@@ -600,6 +617,162 @@ def test_an_author_that_keeps_costing_the_take_exhausts_the_post_record_budget()
     assert len(run.withheld) == 2
     assert client.submitted == [a_catalog_following_plan()]
     assert client.calls.count("record") == 1
+
+
+# --- The teaching surface is cached, and what that cost is reported --------------------------
+
+
+def a_run_that_repairs_once() -> tuple[ScriptedClient, RepairingAuthor]:
+    """The smallest convergence with two turns in it, which is what a cache is about."""
+    return (
+        a_client(validate=["run-validate-needs-repair.stdout", "run-validate-succeeded.stdout"]),
+        RepairingAuthor(a_catalog_following_plan(), a_repaired_plan()),
+    )
+
+
+def test_a_whole_convergence_assembles_the_teaching_surface_exactly_once(monkeypatch) -> None:
+    """The first criterion, counted rather than argued.
+
+    Two turns, one assembly. Counting is the assertion that actually distinguishes a cached
+    prefix from two rebuilds that happen to agree — comparing the texts would pass either way,
+    because assembling twice from one surface is deterministic.
+    """
+    assembled: list[Any] = []
+    real = planner.instructions
+
+    def counting(surface: Any) -> str:
+        assembled.append(surface)
+        return real(surface)
+
+    monkeypatch.setattr(planner, "instructions", counting)
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+
+    assert len(assembled) == 1
+    assert assembled[0] is run.surface
+    assert len(run.versions) == 2
+
+
+def test_every_turn_is_authored_against_that_one_prefix_byte_for_byte() -> None:
+    """A repair adds the refusal after the prefix and changes nothing in front of it.
+
+    That ordering is the caching arrangement, not a tidiness preference: a provider serves the
+    longest matching prefix, so text placed before the catalog would evict it every cycle.
+    """
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+
+    prefix = run.versions[0].instructions
+    assert prefix == instructions(run.surface)
+    for version in (*run.versions[1:], *run.withheld):
+        assert version.instructions.startswith(prefix)
+    assert run.spend.cached
+    assert run.spend.resident_chars == len(prefix)
+
+
+def test_caching_changes_what_is_sent_and_not_what_the_run_decides() -> None:
+    """The criterion that the outcomes are unchanged, at the one place caching could change one.
+
+    Everything downstream of authoring reads `AuthoredPlan.instructions` and the surface, and
+    the cached prefix is byte-for-byte what assembling per turn produced — so there is nothing
+    for a decision to differ on. The rest of this module is the characterisation: every ending
+    the loop has is driven here, and they are asserted against the same expectations they were
+    before a prefix was cached.
+    """
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+
+    assert run.outcome == RENDERED
+    assert client.submitted == [a_catalog_following_plan(), a_repaired_plan()]
+    assert [text for text, _ in author.asked] == [instructions(run.surface)]
+    assert [text for text, _, _, _ in author.repairs] == [
+        instructions(run.surface) + run.refusals[0].as_text()
+    ]
+
+
+def test_a_run_reports_what_it_put_in_front_of_a_model_and_what_the_cache_saved() -> None:
+    """The second criterion: the consumption is on the Run, derived from what it authored."""
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+    spend = run.spend
+
+    assert spend.asks_made == 2
+    assert spend.resident_chars == len(run.versions[0].instructions)
+    assert spend.fresh_chars == sum(version.ask.fresh for version in run.versions)
+    assert spend.sent_chars == spend.resident_chars + spend.fresh_chars
+    # Two turns uncached is two prefixes. The saving is exactly the one that was not re-sent.
+    assert spend.uncached_chars == 2 * spend.resident_chars + spend.fresh_chars
+    assert spend.saved_chars == spend.resident_chars
+
+
+def test_an_authoring_turn_is_charged_the_brief_and_a_repair_the_refusal_and_the_plan() -> None:
+    """What `fresh` is made of, against the text the crew actually hands over."""
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+    authored, repaired = run.versions
+
+    assert authored.ask.fresh == len(message_text(REQUEST["brief"]))
+    assert repaired.ask.fresh == len(run.refusals[0].as_text()) + len(
+        message_text({"brief": REQUEST["brief"], "plan": a_catalog_following_plan()})
+    )
+
+
+def test_a_run_that_would_pass_its_turn_budget_ends_before_asking_again() -> None:
+    """The sixth criterion. An overrun is an ending with the line named, not an invoice.
+
+    Checked before the ask rather than after it, which is what the empty repair list asserts:
+    a budget consulted once the money is gone is a report.
+    """
+    client, author = a_run_that_repairs_once()
+
+    run = converge(
+        client,
+        REQUEST,
+        author,
+        context=ContextBudget(resident_chars=10**9, fresh_chars=1),
+    )
+
+    assert run.outcome == BUDGET_EXHAUSTED
+    assert run.limit == FRESH_CHARS
+    assert author.repairs == []
+    assert run.spend.overrun(run.context) == FRESH_CHARS
+
+
+def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
+    """The other half of the sixth criterion, and the reason it is a refusal rather than an end.
+
+    A prefix too large is true of every turn a Run would take, so there is nothing a Run could
+    be spent to discover. Nothing is asked and nothing is opened — the same shape as a prompt
+    that leaks.
+    """
+    client, author = a_run_that_repairs_once()
+
+    with pytest.raises(ContextBudgetExceeded) as refused:
+        converge(
+            client,
+            REQUEST,
+            author,
+            context=ContextBudget(resident_chars=10, fresh_chars=10**9),
+        )
+
+    assert author.asked == []
+    assert "init" not in client.calls
+    # Both figures, so whoever reads it knows by how much rather than only that it happened.
+    assert "10" in str(refused.value)
+
+
+def test_the_context_budget_defaults_to_the_asks_the_repair_budget_allows() -> None:
+    """Two budgets keyed on one reading of the Brief, rather than two readings that can part."""
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+
+    assert run.context == context_budget(run.budget.plan_versions)
 
 
 # --- Endings the crew may not repair -------------------------------------------------------

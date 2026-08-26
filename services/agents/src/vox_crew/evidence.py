@@ -50,6 +50,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from .context import tokens
 from .converge import MARGIN_CLEAR, RENDERED, ConvergedRun
 from .planner import scan_for_leaks
 
@@ -295,6 +296,33 @@ def _transcript(run: ConvergedRun) -> list[dict[str, Any]]:
     return [{"ordinal": ordinal, **record} for ordinal, record in enumerate(records, start=1)]
 
 
+def _context(run: ConvergedRun) -> dict[str, Any]:
+    """What the Run put in front of a model, and what the budget allowed it to.
+
+    Characters are the measurement and tokens are the conversion, both reported: the crew can
+    count the first exactly on every Run and the second is what a model is billed in, so a
+    bundle carrying only one of them would either be unauditable or be an estimate presented
+    as a count. `uncachedChars` is what the same Run would have cost re-sending the teaching
+    surface every turn — the figure that says whether the caching is still earning its keep.
+    """
+    spend = run.spend
+    return {
+        "asks": spend.asks_made,
+        "cached": spend.cached,
+        "residentChars": spend.resident_chars,
+        "freshChars": spend.fresh_chars,
+        "sentChars": spend.sent_chars,
+        "sentTokens": tokens(spend.sent_chars),
+        "uncachedChars": spend.uncached_chars,
+        "savedChars": spend.saved_chars,
+        "budget": {
+            "residentChars": run.context.resident_chars,
+            "freshChars": run.context.fresh_chars,
+        },
+        "overrun": spend.overrun(run.context),
+    }
+
+
 def _environment(run: ConvergedRun, executed_at: str | None) -> dict[str, Any]:
     """What the Run was, and what it did not measure about itself.
 
@@ -318,6 +346,7 @@ def _environment(run: ConvergedRun, executed_at: str | None) -> dict[str, Any]:
             "preflightCalls": run.budget.preflight_calls,
             "postRecordPlanVersions": run.budget.post_record_plan_versions,
         },
+        "context": _context(run),
         "quota": (
             None
             if quota is None
@@ -351,7 +380,10 @@ def _summary(run: ConvergedRun, verdict: str) -> str:
         f"- Machine verdict: {verdict}\n"
         f"- Plan versions authored: {len(run.versions) + len(run.withheld)} "
         f"({len(run.withheld)} withheld)\n"
-        f"- Synthesis dispatches: {run.dispatches}\n",
+        f"- Synthesis dispatches: {run.dispatches}\n"
+        f"- Model asks: {run.spend.asks_made}, {run.spend.sent_chars:,} characters sent "
+        f"(~{tokens(run.spend.sent_chars):,} tokens); "
+        f"{run.spend.saved_chars:,} not re-sent because the teaching surface was cached\n",
     ]
     if run.decision:
         sections.append(

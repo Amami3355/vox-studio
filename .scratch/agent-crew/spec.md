@@ -275,18 +275,47 @@ ticket.
    fail is worse than no probe.
 
 3. **The contract budget is solved by not re-sending, not by not fetching.** The
-   five projections total ~220 KB of JSON (catalog 107 KB, protocol 63 KB,
-   language 21 KB, plan 18 KB, checks 11 KB) — roughly 55–70k tokens, resident
-   across a repair loop the budget allows five `validate` and three Preflight
-   cycles for. Selective fetching does not solve this: **the catalog is the
-   planner's primary authoring input** — capability names, actions and anchors all
-   live there and nothing can be written before it is read — so the 107 KB
-   dominant term is the one item that cannot be deferred. Fetching `checks` only
-   when a refusal names it, and `language` and `plan` once, saves ~50 KB of 220 KB
-   and leaves the problem. The lever is **context caching**: the catalog is read
-   once and kept in a cached prefix across the repair loop rather than re-sent per
-   turn. Prerequisite 2's "free tier is enough for development" is struck; the
-   crew names a rate-limit and token budget it runs within.
+   five generated contract files total ~220 KB of JSON (catalog 107 KB, protocol
+   63 KB, language 21 KB, plan 18 KB, checks 11 KB). Selective fetching does not
+   solve this: **the catalog is the planner's primary authoring input** —
+   capability names, actions and anchors all live there and nothing can be written
+   before it is read — so the dominant term is the one item that cannot be
+   deferred. Fetching `checks` only when a refusal names it, and `language` and
+   `plan` once, saves a fraction and leaves the problem. The lever is **context
+   caching**: the catalog is read once and kept in a cached prefix across the
+   repair loop rather than re-sent per turn. Prerequisite 2's "free tier is enough
+   for development" is struck; the crew names a rate-limit and token budget it
+   runs within.
+
+   **Measured, ticket 14.** The 220 KB is the generated files on disk, and it is
+   not what a model receives. What the crew assembles and sends is each category's
+   *projection*, serialised compact: **124,690 characters, ~42k tokens** (catalog
+   64,371, protocol 24,108, language 18,504, checks 9,037, plan 7,387, and the
+   crew's preamble and headings). The placeholder estimate of 55–70k tokens was
+   over the wrong artifact and by roughly a third. The budget is therefore stated
+   in characters, which the crew can count exactly and offline on every Run, with
+   tokens as a deliberately conservative conversion at 3 characters per token:
+
+   - **Resident prefix: 150,000 characters (~50k tokens)**, sent once per Run.
+     About a fifth of headroom over the measured 124,690, which is room for the
+     catalog to gain capabilities without a Run being refused for it.
+   - **Fresh text: 20,000 characters per plan version.** The largest refusal the
+     fixtures record is 5,248 characters and a showcase Brief handed back with an
+     eight-scene plan is ~10,000 more.
+   - A **showcase Run** is budgeted six plan versions, so **270,000 characters
+     (~90k tokens)** in total. Its measured worst case is 203,069 characters
+     (~68k tokens). Uncached — re-sending the teaching surface every turn — the
+     same Run would send 826,519 characters (~276k tokens), so **caching removes
+     75% of the spend**.
+   - **Rate consumption is one model request per plan version, issued one at a
+     time**: at most six for a showcase Brief, four for the short one.
+
+   Both lines are enforced rather than reported. A prefix that does not fit is
+   refused before a Run is opened; a loop that would pass its turn allowance ends
+   `budget_exhausted` with the line named. `services/agents/tests/test_context.py`
+   re-measures the resident term against the recorded projections on every run of
+   the suite, so a catalog that outgrows the allowance fails the build rather than
+   an invoice.
 
 4. **A third scenario is added: an unservable Brief that must produce a Decline.**
    Story 8 wants a structured Decline naming the unmet editorial need, and neither
