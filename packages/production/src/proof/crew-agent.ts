@@ -37,11 +37,12 @@ const crewInterpreter = resolve(repositoryRoot, 'services/agents/.venv/Scripts/p
 export const CREW_EVIDENCE = 'crew-evidence';
 
 /**
- * The plan file the crew is handed, and the one the harness scores. Both halves read this
- * name: the crew is told to author from it, and the harness reads `plan.json` out of the work
- * root when it evaluates the scenario assertions. A crew that authored its own plan would put
- * it inside the Run instead, which is why the live path needs the harness to read the plan
- * through the Run's bound snapshot before it can be scored.
+ * The plan file the crew is handed on the deterministic path, and nothing else reads it.
+ *
+ * The harness scores the plan the Run is bound to (`readBoundPlan`), so this name is now a
+ * detail between this driver and the crew rather than a contract the harness depends on. That
+ * is what makes the live path possible: a crew whose model authors the plan submits it from
+ * wherever it kept it and leaves nothing here, and the harness scores it all the same.
  */
 export const CREW_PLAN = 'plan.json';
 
@@ -49,6 +50,7 @@ export const crewProofArguments = (input: {
   workRoot: string;
   evidence: string;
   plan?: string;
+  model?: string;
 }): string[] => [
   '-m',
   'vox_crew',
@@ -57,6 +59,9 @@ export const crewProofArguments = (input: {
   '--evidence',
   input.evidence,
   ...(input.plan === undefined ? [] : ['--plan', input.plan]),
+  // Absent unless a run chose one, so the crew's own pinned default is the single place the
+  // model name lives. The crew refuses the two together: a handed plan reaches no model.
+  ...(input.model === undefined ? [] : ['--model', input.model]),
 ];
 
 /**
@@ -83,6 +88,16 @@ export const crewProofEnvironment = (
   // to pick an encoding from the console it was started under.
   PYTHONIOENCODING: 'utf-8',
 });
+
+/**
+ * The agent identity the harness records for a crew run: the runtime, and the model when this
+ * run chose one. An unnamed model is the crew's pinned default, and the crew's own bundle is
+ * where that name is written down — the harness never guesses at it.
+ */
+export const crewAgentName = (plan: unknown, model?: string): string =>
+  plan !== undefined
+    ? 'vox-crew/handed-plan'
+    : `vox-crew/adk${model === undefined ? '' : `:${model}`}`;
 
 /**
  * What a run may claim about who wrote the plan. A handed plan is scripted however much of the
@@ -159,6 +174,12 @@ export const createCrewAgentDriver =
        * deterministic.
        */
       plan?: unknown;
+      /**
+       * The model the crew should author on, when this run wants something other than the
+       * crew's pinned default. Meaningless with `plan` — the crew refuses the pair — and left
+       * unset for the deterministic run, which reaches no model at all.
+       */
+      model?: string;
       interpreter?: string;
       evidence?: string;
       timeoutMs?: number;
@@ -181,6 +202,7 @@ export const createCrewAgentDriver =
         workRoot,
         evidence,
         plan: options.plan === undefined ? undefined : CREW_PLAN,
+        model: options.model,
       }),
       {
         cwd: workRoot,
@@ -200,7 +222,10 @@ export const createCrewAgentDriver =
     return {
       ...crewAuthorship(options.plan),
       humanHints: 0,
-      model: options.plan === undefined ? 'vox-crew/adk' : 'vox-crew/handed-plan',
+      // What the bundle records as the agent. A named model is part of that identity: two
+      // showcase runs on different models are different runs, and a bundle that called them
+      // both `vox-crew/adk` could not say which one authored the plan it carries.
+      model: crewAgentName(options.plan, options.model),
       modelVersion: version.stdout.trim(),
       transcriptComplete: transcript.length > 0,
       // Self-reported, and the sheet treats it as such: `network.agent-direct-denied` reads

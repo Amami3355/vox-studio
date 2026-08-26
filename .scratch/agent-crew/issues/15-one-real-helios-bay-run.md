@@ -31,6 +31,32 @@ That read becomes `checkpoint.bindings.plan.snapshot` — the plan the Run actua
 is the better source for every driver — and the harness's zero-budget probe needs a plan file of
 its own rather than the agent's.
 
+**What is already built, before a credential is spent.** Everything above is done, and none
+of it needed a key:
+
+- The harness reads the plan its Run is **bound** to (`readBoundPlan`) rather than
+  `workRoot/plan.json`. Unconditional, no fallback: `run validate` binds a snapshot that parses
+  equal to the plan it was handed (`validate-command.test.ts`), so the binding is the better
+  source for every driver, not only the crew. It was also a latent fragility for the Codex
+  path, whose task message never named `plan.json` at all.
+- The zero-budget probe validates against `plan-paused.json`, which the harness writes from
+  that same parse, beside the `request-paused.json` it already wrote.
+- A driver that leaves no plan file behind is exercised in `proof-harness.test.ts` — the live
+  crew's shape, at fixture cost. It fails with `ENOENT` against the old read.
+- `pnpm --filter @vox/production proof:crew-showcase` is the runner: the showcase scenario, the
+  crew driver with no `plan`, live synthesis, working roots kept.
+- `vox-crew --model NAME` chooses the author's model for one invocation, so the showcase run can
+  ask for a pro model without the pinned default moving. Refused alongside `--plan`, which
+  reaches no model at all. `createCrewAgentDriver({ model })` passes it through and the bundle
+  records `vox-crew/adk:<model>`.
+
+**What is left is the run itself, and one decision before it.**
+`catalogShowcasePlanViolations` is a hard pre-spend gate that throws inside the IPC audit hook,
+and `ipc/host.ts:104` destroys the socket on a throwing hook — so a first-attempt miss is a dead
+pipe, exit 1, and no evidence bundle. It fires after compile and before synthesis, so no voice
+credit is at risk, only model tokens. Whether it should instead surface as a refusal the crew
+can repair from, or whether a cheap dry authoring pass on flash is the way in, is not decided.
+
 **Status:** ready-for-human
 
 - [ ] The showcase Brief runs end to end with live synthesis

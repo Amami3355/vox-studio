@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { type CommandFixture, VALID_PLAN, createCommandFixture } from './command-fixture';
 
@@ -86,5 +87,32 @@ describe('run validate', () => {
     expect((status.envelope.data as { staleStages: string[] }).staleStages).toContain(
       'preflighted',
     );
+  });
+
+  /**
+   * The fact the proof harness reads plans through the binding rather than from a name in the
+   * work root: what a Run binds is the plan it was handed, and a reader that goes through the
+   * descriptor sees the same plan an agent submitted.
+   *
+   * The two are deliberately **not** compared as bytes. The snapshot is written in canonical
+   * form — keys sorted, whitespace fixed — so a handed file and its snapshot differ in bytes
+   * whenever the agent's own formatting differs, and they do here. The claim that matters is
+   * that they parse to the same plan, because every reader of either one parses it first.
+   */
+  it('binds a snapshot that parses equal to the plan it was handed', async () => {
+    fixture = await createCommandFixture();
+    await fixture.service.init({ requestPath: fixture.requestPath, out: fixture.runRoot });
+    await fixture.service.validate({ runRoot: fixture.runRoot, planPath: fixture.planPath });
+
+    const checkpoint = JSON.parse(await readFile(join(fixture.runRoot, 'run.json'), 'utf8')) as {
+      bindings: { plan?: { snapshot: { path: string } } };
+    };
+    const snapshotPath = checkpoint.bindings.plan?.snapshot.path;
+    expect(snapshotPath).toBeDefined();
+    const snapshot = await readFile(resolve(fixture.runRoot, snapshotPath!), 'utf8');
+    const handed = await readFile(fixture.planPath, 'utf8');
+
+    expect(JSON.parse(snapshot)).toEqual(JSON.parse(handed));
+    expect(snapshot).not.toBe(handed);
   });
 });

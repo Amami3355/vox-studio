@@ -32,11 +32,13 @@ direct-network assertions report `not-evidenced` because nothing measured them. 
 whole content of bar (1) that a free run can carry: **the pass itself needs a model, and it is
 ticket 15 that earns it.** The same driver takes the live author with no structural change.
 
-**Note — the harness reads the submitted plan from `workRoot/plan.json`.** Every driver so far
+**Note — the harness read the submitted plan from `workRoot/plan.json`.** ~~Every driver so far
 leaves it there, and this one does too because it is the plan it handed in. A crew that authors
 its own plan puts it inside the Run instead, so before the live path can be scored that read
-becomes `checkpoint.bindings.plan.snapshot`. Named in `harness.ts` at the site, and carried by
-ticket 15.
+becomes `checkpoint.bindings.plan.snapshot`.~~ **Done under ticket 15**: the harness reads the
+plan its Run is bound to (`readBoundPlan`), unconditionally, and its zero-budget probe writes
+its own plan file from the same parse. Nothing here changes — this driver still hands the crew
+a `plan.json` — but the harness no longer depends on that name.
 
 **Status:** done
 

@@ -412,6 +412,38 @@ const selectAgentRenderedRun = (workRoot: string, commands: CommandRecord[]) => 
   return { argument, root };
 };
 
+/**
+ * The plan a Run is bound to, read through the Run's own checkpoint.
+ *
+ * The harness used to read `plan.json` out of the work root, which worked only for as long as
+ * every driver happened to leave its plan at that name. An agent that authors its plan inside
+ * the Run — the crew, once a model writes one — leaves nothing there, and an agent free to name
+ * its own file was never obliged to. The binding is the Run's own answer to which plan it is
+ * about, so it is the only source that is true for every driver.
+ *
+ * This is the read the record gate already performs, and it is now the only shape in the file.
+ * A Run with no plan binding is a harness bug rather than a plan to be found elsewhere, so it
+ * refuses by name instead of falling back to a guess.
+ */
+export const readBoundPlan = async (
+  runRoot: string,
+  checkpoint: RunCheckpoint,
+): Promise<VideoPlan> => {
+  const snapshot = checkpoint.bindings.plan?.snapshot;
+  if (!snapshot) throw new Error('PROOF_NO_BOUND_PLAN');
+  return JSON.parse(await readFile(resolve(runRoot, snapshot.path), 'utf8')) as VideoPlan;
+};
+
+/**
+ * The plan file the harness writes for its own zero-budget probe, alongside `request-paused.json`.
+ *
+ * The probe needs a plan on disk because `run validate` takes one by path, and the plan it
+ * should validate is the one the agent actually bound — a probe run against some other plan
+ * would be measuring a different Run. So the harness writes the bound plan out under a name it
+ * owns, rather than reaching for whatever the agent may or may not have left behind.
+ */
+export const PAUSED_PROBE_PLAN = 'plan-paused.json';
+
 const commandTargetsRun = (workRoot: string, record: CommandRecord, runRoot: string): boolean => {
   const candidate = runPathFrom(workRoot, record.argv);
   return candidate !== null && relative(runRoot, candidate) === '';
@@ -685,6 +717,15 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     });
 
     const mainRun = selectAgentRenderedRun(workRoot, commands);
+    // The plan this proof is about, parsed once, here, and used twice: the zero-budget probe
+    // below validates against it, and the scenario assertions are scored from it. Reading it
+    // now rather than after the harness's own probes is safe and deliberate — the plan binding
+    // is fixed once the agent stops running, and `verifyCompilePrerequisiteReports` refuses a
+    // Run whose plan identity moved under it (`PLAN_BINDING_MISMATCH`).
+    const authoredCheckpoint = JSON.parse(
+      await readFile(join(mainRun.root, 'run.json'), 'utf8'),
+    ) as RunCheckpoint;
+    const plan = await readBoundPlan(mainRun.root, authoredCheckpoint);
     currentActor = 'harness';
     const categoriesSeenByAgent = new Set(
       commands
@@ -707,6 +748,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       production: { ...proofRequest.production, maxNewTakes: 0 },
     };
     await writeJson(join(workRoot, 'request-paused.json'), pausedRequest);
+    await writeJson(join(workRoot, PAUSED_PROBE_PLAN), plan);
     await invoke([
       'production',
       'run',
@@ -716,7 +758,15 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       '--out',
       'run-paused',
     ]);
-    await invoke(['production', 'run', 'validate', '--run', 'run-paused', '--plan', 'plan.json']);
+    await invoke([
+      'production',
+      'run',
+      'validate',
+      '--run',
+      'run-paused',
+      '--plan',
+      PAUSED_PROBE_PLAN,
+    ]);
     await invoke(['production', 'run', 'preflight', '--run', 'run-paused']);
     const pausedEnvelope = await invoke(['production', 'run', 'record', '--run', 'run-paused']);
     const pausedCheckpoint = JSON.parse(
@@ -773,13 +823,6 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
     }
     const checkpoint =
       inspected ?? (JSON.parse(mainAfterInvalid.toString('utf8')) as RunCheckpoint);
-    // The scenario assertions are scored against this, and it is the one thing the harness
-    // reads from a name rather than from a descriptor: every driver so far writes the plan it
-    // submitted here. A driver whose agent authors its plan inside the Run — the crew, once a
-    // model writes one rather than being handed one — has nothing to leave at this name, and
-    // this read becomes `checkpoint.bindings.plan.snapshot` instead. It is left alone until
-    // then because moving it now would change what the frozen bundles were scored from.
-    const plan = JSON.parse(await readFile(join(workRoot, 'plan.json'), 'utf8')) as VideoPlan;
     const preflightDescriptor = checkpoint.bindings.preflight?.report;
     const compileDescriptor = checkpoint.bindings.compilation?.report;
     const foldDescriptor = checkpoint.bindings.take?.fold;

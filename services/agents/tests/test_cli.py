@@ -368,3 +368,48 @@ def test_no_handed_plan_means_the_live_author_and_a_model_credential(work_root) 
     arguments = cli.parse_arguments(["--work-root", str(work_root)])
 
     assert isinstance(cli.author_for(arguments), AdkPlanAuthor)
+
+
+def test_the_default_model_is_the_authors_own(work_root) -> None:
+    """An invocation that names no model asks for none, rather than restating the pin here.
+
+    The pin and the test that keeps it served both live at the author. A default repeated in
+    the command would be a second place to update when a family is retired, and the one that
+    would be missed.
+    """
+    arguments = cli.parse_arguments(["--work-root", str(work_root)])
+
+    assert arguments.model is None
+
+
+def test_an_invocation_can_choose_the_model_that_authors_the_plan(work_root) -> None:
+    """The showcase run wants a pro model; the default is flash and stays flash.
+
+    Without this the seam `AdkPlanAuthor(model=...)` exists but nothing can reach it, and the
+    only way to run the showcase on a different model would be to edit the default — which is
+    exactly the change the pinning test refuses.
+    """
+    pytest.importorskip("google.adk")
+    arguments = cli.parse_arguments(
+        ["--work-root", str(work_root), "--model", "gemini-3.1-flash-lite"]
+    )
+    author = cli.author_for(arguments)
+
+    assert isinstance(author, AdkPlanAuthor)
+    # Read through the author rather than off it: what matters is the model the agent is built
+    # on, which is the value that reaches the framework.
+    assert author.agent("instructions").model == "gemini-3.1-flash-lite"
+
+
+def test_choosing_a_model_for_a_handed_plan_is_refused(work_root) -> None:
+    """A handed plan reaches no model at all, so naming one is a misunderstanding, not a no-op.
+
+    Accepting it silently would let a run be launched believing it had chosen an author it
+    never had, and the bundle would say `handed-plan` while the operator read a model name.
+    """
+    a_converging_work_root(work_root)
+
+    with pytest.raises(SystemExit):
+        cli.parse_arguments(
+            ["--work-root", str(work_root), "--plan", "plan.json", "--model", "gemini-3.6-pro"]
+        )

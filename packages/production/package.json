@@ -17,6 +17,7 @@
     "setup:codex-sandbox": "tsx scripts/setup-codex-sandbox.ts",
     "bootstrap:workroot": "tsx scripts/bootstrap-workroot.ts",
     "proof:catalog-showcase": "tsx scripts/proof-catalog-showcase.ts",
+    "proof:crew-showcase": "tsx scripts/proof-crew-showcase.ts",
     "proof:northbridge": "tsx scripts/proof-northbridge.ts",
     "verify:proof": "tsx scripts/verify-proof.ts",
     "record:crew-fixtures": "tsx scripts/record-crew-fixtures.ts",

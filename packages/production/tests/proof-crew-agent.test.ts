@@ -28,6 +28,33 @@ describe('crew proof driver arguments', () => {
     expect(args).not.toContain('--plan');
     expect(args).toContain('--work-root');
   });
+
+  /**
+   * A showcase run wants a stronger model than the crew's default without that default
+   * moving: the pin is what lets a bundle name the model that authored a plan, and an alias
+   * or a shifting default could not. So the choice travels with the invocation.
+   */
+  it('carries a chosen model to the author, and asks for none when none is chosen', () => {
+    expect(
+      crewProofArguments({
+        workRoot: 'C:\\proof-work',
+        evidence: 'evidence',
+        model: 'gemini-3.6-pro',
+      }),
+    ).toEqual([
+      '-m',
+      'vox_crew',
+      '--work-root',
+      'C:\\proof-work',
+      '--evidence',
+      'evidence',
+      '--model',
+      'gemini-3.6-pro',
+    ]);
+    expect(crewProofArguments({ workRoot: 'C:\\proof-work', evidence: 'evidence' })).not.toContain(
+      '--model',
+    );
+  });
 });
 
 describe('crew proof driver environment', () => {

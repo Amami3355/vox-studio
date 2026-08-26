@@ -17,7 +17,8 @@ work root nobody bootstrapped.
 environment. With one, the plan is handed in and the model is never reached — every other part
 of the crew is the same code either way, because `converge` takes a `PlanAuthor` and cannot tell
 which one it has. That is what makes the deterministic end-to-end run a proof of the live path
-rather than a rehearsal of it.
+rather than a rehearsal of it. `--model` chooses which model the live author asks, for one
+invocation, so a run that wants a stronger model than the pinned default does not move the pin.
 
 The split between the two streams is deliberate and worth keeping as the crew grows. Stdout
 carries production's envelopes and nothing else, in the order they arrived, byte for byte, so
@@ -63,6 +64,7 @@ class Arguments:
     plan: Path | None
     evidence: Path
     discovery_only: bool
+    model: str | None
 
     @property
     def request(self) -> Path:
@@ -104,6 +106,16 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
         help="Read the teaching surface and stop, without opening a Run or writing anything.",
     )
     parser.add_argument(
+        "--model",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Author the plan on this model instead of the author's pinned default. A pinned "
+            "name, never an alias: a Run's bundle has to be able to say which model wrote its "
+            "plan. Meaningless with --plan, and refused there rather than ignored."
+        ),
+    )
+    parser.add_argument(
         "--launcher",
         action="append",
         default=None,
@@ -114,6 +126,11 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
         ),
     )
     parsed = parser.parse_args(argv)
+    # A handed plan never reaches a model, so a model named alongside one is a
+    # misunderstanding of which author the invocation is asking for. Accepting it silently
+    # would let a run be launched believing it chose an author it never had.
+    if parsed.plan is not None and parsed.model is not None:
+        parser.error("--model asks for an author a handed --plan never reaches.")
     work_root = parsed.work_root
     return Arguments(
         work_root=work_root,
@@ -121,6 +138,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
         plan=None if parsed.plan is None else work_root / parsed.plan,
         evidence=work_root / parsed.evidence,
         discovery_only=parsed.discovery_only,
+        model=parsed.model,
     )
 
 
@@ -130,9 +148,15 @@ def author_for(arguments: Arguments) -> PlanAuthor:
     A public seam for the same reason `AdkPlanAuthor.agent` is one: on a machine holding no
     model credential this is the furthest the live path can be followed, and a test that could
     only reach it through a whole convergence could not follow it at all.
+
+    An invocation that names no model asks for none, rather than restating the author's pin
+    here: the pinned default and the test that keeps it served both live at the author, and a
+    second copy of the name would be the one nobody updates when a family is retired.
     """
     if arguments.plan is None:
-        return AdkPlanAuthor()
+        if arguments.model is None:
+            return AdkPlanAuthor()
+        return AdkPlanAuthor(model=arguments.model)
     return HandedPlanAuthor(json.loads(arguments.plan.read_text(encoding="utf-8")))
 
 
