@@ -131,6 +131,12 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
     # would let a run be launched believing it chose an author it never had.
     if parsed.plan is not None and parsed.model is not None:
         parser.error("--model asks for an author a handed --plan never reaches.")
+    # The rule the pinned default is held to, applied to a model an invocation names: a Run's
+    # bundle has to be able to say which model wrote its plan, and a floating alias cannot.
+    # `latest` is the whole rule because it is the alias convention — a `-preview` or `-exp`
+    # name is unstable but it still names one model, which is what a bundle records.
+    if parsed.model is not None and "latest" in parsed.model:
+        parser.error("--model needs a pinned name; an alias cannot tell a bundle what authored a plan.")
     work_root = parsed.work_root
     return Arguments(
         work_root=work_root,

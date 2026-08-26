@@ -421,9 +421,10 @@ const selectAgentRenderedRun = (workRoot: string, commands: CommandRecord[]) => 
  * its own file was never obliged to. The binding is the Run's own answer to which plan it is
  * about, so it is the only source that is true for every driver.
  *
- * This is the read the record gate already performs, and it is now the only shape in the file.
- * A Run with no plan binding is a harness bug rather than a plan to be found elsewhere, so it
- * refuses by name instead of falling back to a guess.
+ * Both of the harness's plan readers go through here — the scoring read below and the record
+ * gate's pre-spend check — so there is one implementation of it rather than two that agree
+ * until they don't. A Run with no plan binding is a harness bug rather than a plan to be found
+ * elsewhere, so it refuses by name instead of falling back to a guess.
  */
 export const readBoundPlan = async (
   runRoot: string,
@@ -626,11 +627,11 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
             const guardedCheckpoint = JSON.parse(
               await readFile(join(guardedRunRoot, 'run.json'), 'utf8'),
             ) as RunCheckpoint;
-            const guardedPlanPath = guardedCheckpoint.bindings.plan?.snapshot.path;
-            if (!guardedPlanPath) throw new Error('PROOF_RECORD_GATE:NO_PLAN');
-            const guardedPlan = JSON.parse(
-              await readFile(resolve(guardedRunRoot, guardedPlanPath), 'utf8'),
-            ) as VideoPlan;
+            // The binding is checked here rather than left to `readBoundPlan`, because the gate
+            // owes its caller a `PROOF_RECORD_GATE:*` reason and a bare `PROOF_NO_BOUND_PLAN`
+            // would not say which of the harness's two readers failed.
+            if (!guardedCheckpoint.bindings.plan) throw new Error('PROOF_RECORD_GATE:NO_PLAN');
+            const guardedPlan = await readBoundPlan(guardedRunRoot, guardedCheckpoint);
             const violations = recordGate(guardedPlan);
             if (violations.length > 0) {
               throw new Error(`PROOF_RECORD_GATE:${violations.join(',')}`);

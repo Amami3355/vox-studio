@@ -47,8 +47,10 @@ of it needed a key:
   crew driver with no `plan`, live synthesis, working roots kept.
 - `vox-crew --model NAME` chooses the author's model for one invocation, so the showcase run can
   ask for a pro model without the pinned default moving. Refused alongside `--plan`, which
-  reaches no model at all. `createCrewAgentDriver({ model })` passes it through and the bundle
-  records `vox-crew/adk:<model>`.
+  reaches no model at all, and refused for a floating alias — the same rule the pinned default
+  is held to, enforced at the crew rather than at any caller.
+  `createCrewAgentDriver({ model })` passes it through and the bundle records
+  `vox-crew/adk:<model>`.
 
 **What is left is the run itself, and one decision before it.**
 `catalogShowcasePlanViolations` is a hard pre-spend gate that throws inside the IPC audit hook,

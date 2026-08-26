@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCTION_SECRET_VARIABLES } from '../src/proof/agent-environment';
-import { crewAuthorship, crewProofArguments, crewProofEnvironment } from '../src/proof/crew-agent';
+import {
+  crewAgentName,
+  crewAuthorship,
+  crewProofArguments,
+  crewProofEnvironment,
+} from '../src/proof/crew-agent';
 
 describe('crew proof driver arguments', () => {
   it('points the crew at the work root and names where the bundle goes', () => {
@@ -109,5 +114,24 @@ describe('what a crew run may claim about its authorship', () => {
       authorship: 'fixture-scripted',
       unscripted: false,
     });
+  });
+});
+
+/**
+ * The string that lands in the bundle's `environment.json` as the agent that produced the Run.
+ * Two showcase runs on different models are different runs, and a bundle that named them both
+ * `vox-crew/adk` could not say which one authored the plan it carries — so the chosen model is
+ * part of the identity, and the crew's pinned default is deliberately not spelled out here.
+ */
+describe('the agent a crew run is recorded as', () => {
+  it('names the chosen model, and says only the runtime when none was chosen', () => {
+    expect(crewAgentName(undefined, 'gemini-3.6-pro')).toBe('vox-crew/adk:gemini-3.6-pro');
+    // No model named means the crew's own default authored it. The harness does not know that
+    // name and does not guess at it: the crew's bundle is where it is written down.
+    expect(crewAgentName(undefined)).toBe('vox-crew/adk');
+  });
+
+  it('names the handed plan rather than a model that was never reached', () => {
+    expect(crewAgentName({ beats: [] })).toBe('vox-crew/handed-plan');
   });
 });

@@ -25,15 +25,13 @@
 import { createCrewAgentDriver } from '../src/proof/crew-agent';
 import { runCatalogShowcaseProof } from '../src/proof/harness';
 
+// Only the shape of the invocation is checked here. What counts as an acceptable model name is
+// the crew's rule and is enforced there, next to the pinned default it is derived from — a
+// second copy in this language would be the one that drifts.
 const modelIndex = process.argv.indexOf('--model');
 const model = modelIndex >= 0 ? process.argv[modelIndex + 1] : undefined;
 if (modelIndex >= 0 && (model === undefined || model.startsWith('--'))) {
-  throw new TypeError('proof:crew-showcase --model needs a pinned model name.');
-}
-// An alias would author a plan no bundle could attribute, which is the same reason the crew's
-// own default refuses one. Rejected here rather than at the crew, so it costs nothing.
-if (model?.includes('latest')) {
-  throw new TypeError('proof:crew-showcase refuses a floating model alias; pin a version.');
+  throw new TypeError('proof:crew-showcase --model needs a model name.');
 }
 
 const result = await runCatalogShowcaseProof({

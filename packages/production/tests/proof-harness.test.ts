@@ -7,13 +7,6 @@ import { PAUSED_PROBE_PLAN, readBoundPlan, runNorthbridgeProof } from '../src/pr
 import { NORTHBRIDGE_FIXTURE_PLAN } from '../src/proof/northbridge';
 import type { RunCheckpoint } from '../src/run-store/run-store';
 
-/**
- * The 60s budget on the proofs below is for a busy machine, not an assertion about how long
- * the work should take: each one runs a whole proof — a real service, a real launcher, a Run
- * carried to a rendered preview. Thirty seconds left too little headroom and timed out
- * whenever the full suite ran alongside them.
- */
-
 const roots: string[] = [];
 afterAll(async () => {
   await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
@@ -50,6 +43,12 @@ const execute = async (seededViolations: Array<'leak' | 'network'> = []) => {
   });
 };
 
+/**
+ * The 60s budget on each test here is for a busy machine, not an assertion about how long the
+ * work should take: every one of them runs a whole proof — a real service, a real launcher, a
+ * Run carried to a rendered preview. Thirty seconds left too little headroom and timed out
+ * whenever the full suite ran alongside them.
+ */
 describe.sequential('Northbridge proof harness', () => {
   it('produces a hash-complete non-claiming fixture evidence bundle', async () => {
     const result = await execute();

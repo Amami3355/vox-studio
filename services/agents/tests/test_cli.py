@@ -401,6 +401,19 @@ def test_an_invocation_can_choose_the_model_that_authors_the_plan(work_root) -> 
     assert author.agent("instructions").model == "gemini-3.1-flash-lite"
 
 
+def test_a_floating_alias_is_refused_as_a_chosen_model(work_root) -> None:
+    """The rule the pinned default is held to, applied to the model an invocation names.
+
+    `--model` would otherwise be an unvalidated path around it: the author's docstring argues
+    that an alias cannot tell a bundle which model wrote a plan, and that argument is about
+    every model the crew authors on, not only the default. `latest` is the whole rule because
+    it is Google's alias convention — a `-preview` or `-exp` name is unstable but it still
+    names one model, which is what a bundle has to be able to record.
+    """
+    with pytest.raises(SystemExit):
+        cli.parse_arguments(["--work-root", str(work_root), "--model", "gemini-pro-latest"])
+
+
 def test_choosing_a_model_for_a_handed_plan_is_refused(work_root) -> None:
     """A handed plan reaches no model at all, so naming one is a misunderstanding, not a no-op.
 

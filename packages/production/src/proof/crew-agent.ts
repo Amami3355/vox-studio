@@ -93,6 +93,11 @@ export const crewProofEnvironment = (
  * The agent identity the harness records for a crew run: the runtime, and the model when this
  * run chose one. An unnamed model is the crew's pinned default, and the crew's own bundle is
  * where that name is written down — the harness never guesses at it.
+ *
+ * It asks the same question of `plan` that `crewAuthorship` does and is deliberately not folded
+ * into it: one answers what a run may *claim* about who wrote the plan, which the assertion
+ * sheet scores, and this one answers what to *record* as the agent, which nothing scores. They
+ * would move for different reasons.
  */
 export const crewAgentName = (plan: unknown, model?: string): string =>
   plan !== undefined
@@ -165,21 +170,22 @@ const crewTranscript = async (bundleRoot: string): Promise<unknown[]> => {
     .map((line) => JSON.parse(line) as unknown);
 };
 
+/**
+ * Which author this run is asking for, as a choice rather than as two independent options.
+ *
+ * A plan and a model together is the one combination the crew refuses — a handed plan reaches
+ * no model — and expressing it here means that refusal is a type error at the call site rather
+ * than an argparse exit 2 in the middle of a run that has already bootstrapped a work root and
+ * spawned an interpreter.
+ *
+ * Neither is a handed plan: the crew authors one through its model, which needs that runtime's
+ * credential in this process's environment and is neither free nor deterministic.
+ */
+export type CrewAuthoring = { plan: unknown; model?: never } | { plan?: never; model?: string };
+
 export const createCrewAgentDriver =
   (
-    options: {
-      /**
-       * The plan to hand the crew. Omit it and the crew authors one through its model, which
-       * needs that runtime's credential in this process's environment and is neither free nor
-       * deterministic.
-       */
-      plan?: unknown;
-      /**
-       * The model the crew should author on, when this run wants something other than the
-       * crew's pinned default. Meaningless with `plan` — the crew refuses the pair — and left
-       * unset for the deterministic run, which reaches no model at all.
-       */
-      model?: string;
+    options: CrewAuthoring & {
       interpreter?: string;
       evidence?: string;
       timeoutMs?: number;
