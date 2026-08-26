@@ -303,19 +303,45 @@ ticket.
      fixtures record is 5,248 characters and a showcase Brief handed back with an
      eight-scene plan is ~10,000 more.
    - A **showcase Run** is budgeted six plan versions, so **270,000 characters
-     (~90k tokens)** in total. Its measured worst case is 203,069 characters
-     (~68k tokens). Uncached — re-sending the teaching surface every turn — the
-     same Run would send 826,519 characters (~276k tokens), so **caching removes
-     75% of the spend**.
+     (~90k tokens)** in total. Its measured worst case puts **826,492 characters
+     (~276k tokens)** in front of a model across six turns, of which **623,450
+     (75%) is the same prefix re-sent unchanged**. Charged once, that is 203,042
+     characters (~68k tokens) — the figure the budget is set against.
    - **Rate consumption is one model request per plan version, issued one at a
-     time**: at most six for a showcase Brief, four for the short one.
+     time**: at most six for a showcase Brief, five for the short one
+     (`repair_budget(25).plan_versions == 5`).
 
-   Both lines are enforced rather than reported. A prefix that does not fit is
-   refused before a Run is opened; a loop that would pass its turn allowance ends
-   `budget_exhausted` with the line named. `services/agents/tests/test_context.py`
-   re-measures the resident term against the recorded projections on every run of
-   the suite, so a catalog that outgrows the allowance fails the build rather than
-   an invoice.
+   Both lines are enforced rather than reported, and priced before a turn is
+   asked for rather than after. A first ask that does not fit is refused before a
+   Run is opened; a repair that would cross the turn allowance is refused and the
+   Run ends `budget_exhausted` with the line named.
+   `services/agents/tests/test_context.py` re-measures the resident term against
+   the recorded projections on every run of the suite, so a catalog that outgrows
+   the allowance fails the build rather than an invoice.
+
+   **What "cached" does and does not mean here, and what ticket 15 must settle.**
+   The crew's side of caching is an identical prefix, placed first, assembled once
+   — the *precondition* for a provider serving it from cache. That is as far as
+   this ticket can go, and the code, the bundle and the CLI are all worded to
+   claim no more: `cacheableChars` is an eligibility, `cacheServed` is `null`, and
+   the bundle carries an explicit non-claim. Two things are worth recording:
+
+   - Identical prefixes are still **transmitted** every turn. A cache saves the
+     model's work and the bill, not the bytes on the wire.
+   - **ADK's own `ContextCacheConfig` cannot engage as the crew is built.** It
+     documents that caching "begins on the second turn of a session at the
+     earliest", and `AdkPlanAuthor` opens a fresh session per ask — deliberately,
+     because the repair loop rebuilds the whole prompt instead of growing a
+     conversation, which is what keeps the prefix identical. So the mechanism
+     actually available is Gemini's *implicit* prefix caching, a provider default
+     this code does not turn on. Wiring `ContextCacheConfig` as things stand would
+     be a switch that could never fire — the "probe that cannot fail" decision 2
+     already rejects. Holding one session across a Run would change what the model
+     sees on every turn after the first; that is a design decision of its own.
+
+   The first live Run is where a served cache becomes observable, in the SDK's
+   `usage_metadata.cached_content_token_count`. **That reading is ticket 15's**,
+   and it is the only thing that can turn the eligibility above into a measurement.
 
 4. **A third scenario is added: an unservable Brief that must produce a Decline.**
    Story 8 wants a structured Decline naming the unmet editorial need, and neither

@@ -29,10 +29,10 @@ python -m vox_crew --work-root C:\vox-proof-workroots\crew
 It converges on the Brief that work root carries and leaves an evidence bundle in
 `crew\evidence` beside the Run, whether or not the Run reached a preview: a Run that ended
 `paused`, `stopped` or `budget_exhausted` is bundled exactly as a rendered one is. A
-convergence that *raises* leaves none — discovery refused, a prompt that leaked, an answer that
-was not a plan, a handed plan nobody can repair, an unreachable service — because there is no
-`ConvergedRun` to assemble one from, and what production said is already on stdout, which is
-the record that matters. The exit code is the Run's: zero when it rendered, one when it ended
+convergence that *raises* leaves none — discovery refused, a prompt that leaked, a first ask
+too large for the Run's context budget, an answer that was not a plan, a handed plan nobody can
+repair, an unreachable service — because there is no `ConvergedRun` to assemble one from, and
+what production said is already on stdout, which is the record that matters. The exit code is the Run's: zero when it rendered, one when it ended
 any other way, two when the invocation named something that is not there.
 
 Stdout carries production's envelopes and nothing else, in the order they arrived, byte for
@@ -170,8 +170,30 @@ a replacement grant is an operator's signature and the crew holds none.
 
 *An exhausted budget is an outcome.* A Run ends `rendered`, `budget_exhausted` with the limit it
 hit named, `paused`, or `stopped` — the last covering a `failed` envelope, which carries no
-report to repair from. Nothing raises: an operator needs what production said, not an exception
-where the envelopes were.
+report to repair from. Nothing about a Run raises: an operator needs what production said, not
+an exception where the envelopes were. The one exception is not about a Run — a first ask too
+large for the context budget is refused before `run.init`, because it is true of every turn and
+no Run can be spent discovering it.
+
+**`context.py` is what a Run puts in front of a model, and the budget it works within.** An
+`Ask` is two numbers — the resident instructions prefix and what that turn added on top of it —
+and a `ContextSpend` is derived from the versions a Run authored, the way `quota_readings` is
+derived from its envelopes rather than counted beside them. `authoring_ask` and `repair_ask`
+price a turn *before* it is asked for, which is what lets a budget refuse one instead of
+reporting it afterwards.
+
+It measures characters, not tokens. Characters are what a Python process can count exactly and
+offline, so the guard runs on every `pytest`; a token budget would need a Gemma tokenizer that
+is either a network call or a `sentencepiece` model this machine does not have, and would be a
+number no test could check. `tokens` converts at three characters per token, chosen low so the
+figure is an upper bound.
+
+*The word "cached" is used carefully here.* `cache_prefix` makes every turn's prefix identical,
+which is the precondition for a provider serving it from a cache — not evidence that one did.
+The bundle reports `cacheableChars` as an eligibility, writes `cacheServed: null`, and carries
+an explicit non-claim. ADK's `ContextCacheConfig` cannot engage as the crew is built, because
+it starts caching on a session's second turn and `AdkPlanAuthor` opens a fresh session per ask;
+the module docstring says why that session model is deliberate and what changing it would cost.
 
 *A pause is a decision waiting on a human, and says so under its own name.* Production pauses
 before the network for two reasons — the budget is gone, or an identical input needs a grant —

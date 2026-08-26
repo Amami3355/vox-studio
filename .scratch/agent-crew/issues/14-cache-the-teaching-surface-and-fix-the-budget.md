@@ -21,11 +21,32 @@ what it re-sends changes.
 
 **Blocked by:** 12 (The end-to-end crew test through the proof harness)
 
-**Status:** ready-for-agent
+**Status:** done, with the fourth criterion carried to 15 — see below
 
-- [ ] The catalog is read once and reused across the repair loop rather than re-sent per turn
-- [ ] Token and rate consumption for a complete run is measured and recorded
-- [ ] The measured figure replaces the placeholder budget in the spec
+- [x] The catalog is read once and reused across the repair loop rather than re-sent per turn
+- [x] Token and rate consumption for a complete run is measured and recorded
+- [x] The measured figure replaces the placeholder budget in the spec
 - [ ] The crew stays inside that budget for a full showcase run
-- [ ] Run outcomes are unchanged by the caching
-- [ ] Exceeding the budget is a reported outcome rather than a silent overrun
+- [x] Run outcomes are unchanged by the caching
+- [x] Exceeding the budget is a reported outcome rather than a silent overrun
+
+## What the fourth criterion actually got, and why it is not ticked
+
+**A bound, not a run.** `services/agents/tests/test_context.py` constructs the worst turn a
+showcase Brief can reach — six plan versions from the real `repair_budget`, the resident prefix
+assembled from the recorded projections, the largest refusal the fixtures hold, and a
+showcase-sized plan handed back — and asserts no overrun. Every term but two is measured from
+material the build already pins; the Brief's length and the plan's size are named constants with
+their provenance, because they live on the TypeScript side.
+
+That is the strongest free evidence there is, and it is not what the criterion says. A live
+showcase run is **ticket 15's**, and it has to be: 15 is blocked on this ticket's measured
+figure, so a criterion here that required 15's run would be circular. The tick belongs there.
+
+**One thing 15 must also read.** The crew's side of caching is an identical prefix, which is the
+*precondition* for a provider serving one — not evidence that it did, and nothing here reports
+it as such (`cacheServed` is `null`, and the bundle carries a non-claim). ADK's
+`ContextCacheConfig` cannot engage as the crew is built: it starts caching on a session's second
+turn and `AdkPlanAuthor` opens a fresh session per ask. So the mechanism available is Gemini's
+implicit prefix caching, and `usage_metadata.cached_content_token_count` on the first live Run is
+the only thing that can confirm it. Spec decision 3 records this in full.

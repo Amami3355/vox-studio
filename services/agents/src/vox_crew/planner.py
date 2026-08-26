@@ -34,10 +34,12 @@ the published `means` and `repair` for the codes in it, and the author reads tho
 **The instructions are assembled once and kept.** `cache_prefix` builds them, and `author_plan`
 and `repair_plan` take that object rather than the surface it was built from — so a turn cannot
 assemble a second one, and the catalog is one identical prefix across the whole loop by
-construction rather than by two call sites happening to agree. That is what the contract budget
-depends on: the largest thing in the prompt is sent once and served from a cache afterwards,
-and only the refusal after it differs from cycle to cycle. Every ask records what it cost in
-`context.py`'s terms, so the Run can be audited against that budget rather than trusted to it.
+construction rather than by two call sites happening to agree. Only the refusal after it
+differs from cycle to cycle, which is what makes the prefix reusable at all. What that does and
+does not establish is set out in `context.py`: an identical prefix is the precondition for a
+provider serving it from a cache, and this crew has never observed one do so. `authoring_ask`
+and `repair_ask` price a turn before it is asked for, so a budget can refuse one rather than
+report it.
 
 The live implementation of the author is the only thing here that needs the ADK framework, and
 it imports it when it is built rather than when this module is. That is what keeps a bare
@@ -570,6 +572,34 @@ def _as_plan(answered: Any, verb: str) -> Mapping[str, Any]:
     return answered
 
 
+def authoring_ask(prefix: CachedPrefix, brief: Mapping[str, Any]) -> Ask:
+    """What asking for a plan will cost, priced before anything is asked.
+
+    Public and separate from `author_plan` so a budget can be consulted *before* the money is
+    spent rather than after. The alternative — the caller adding up the same two lengths — is
+    the rule written twice, and the copy that could allow a turn the finished bundle then
+    reports as an overrun.
+    """
+    return Ask(resident=prefix.chars, fresh=len(message_text(brief)))
+
+
+def repair_ask(
+    prefix: CachedPrefix,
+    brief: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    refusal: Refusal,
+) -> Ask:
+    """What asking for this repair will cost, priced before it is asked for.
+
+    Every term is known in advance: the refusal is already gathered and the plan is already
+    written, so a repair can be budgeted rather than regretted.
+    """
+    return Ask(
+        resident=prefix.chars,
+        fresh=len(refusal.as_text()) + len(message_text({"brief": brief, "plan": plan})),
+    )
+
+
 def author_plan(
     prefix: CachedPrefix, brief: Mapping[str, Any], author: PlanAuthor
 ) -> AuthoredPlan:
@@ -585,7 +615,7 @@ def author_plan(
         plan=plan,
         instructions=prefix.text,
         findings=review(plan, prefix.surface),
-        ask=Ask(resident=prefix.chars, fresh=len(message_text(brief))),
+        ask=authoring_ask(prefix, brief),
     )
 
 
@@ -617,10 +647,7 @@ def repair_plan(
         plan=repaired,
         instructions=text,
         findings=review(repaired, prefix.surface),
-        ask=Ask(
-            resident=prefix.chars,
-            fresh=len(said) + len(message_text({"brief": brief, "plan": plan})),
-        ),
+        ask=repair_ask(prefix, brief, plan, refusal),
     )
 
 

@@ -2,10 +2,36 @@
 
 The crew's prompt is dominated by one thing. The five projections assemble into roughly 125 KB
 of instructions, the catalog is half of that, and every turn of the repair loop is authored
-against the whole of it — so a Run that re-sent the teaching surface per turn would spend six
-times the catalog to answer one Brief. It does not: `planner.cache_prefix` assembles the
-instructions once and every turn reads that same object, which is what lets a provider serve
-the prefix from its cache rather than reading it again.
+against the whole of it — so a Run answering one Brief puts six times the catalog in front of
+a model. `planner.cache_prefix` assembles it once and every turn reads that same object, which
+makes those six prefixes byte-identical.
+
+**What that does and does not establish.** An identical prefix, placed first, is the
+*precondition* for a provider serving it from a cache instead of reading it again. It is not
+the same as having observed one do so, and the crew must not report it as though it were.
+Two things are worth writing down because they are easy to assume the other way:
+
+- Identical prefixes are still **transmitted** every turn. What a cache saves is the model's
+  work and the bill, not the bytes on the wire. `cacheable_chars` below is named for what it
+  is: the spend an identical prefix makes *eligible* for reuse.
+- The crew is not wired to ADK's own `ContextCacheConfig`, and wiring it as things stand would
+  be a switch that could never fire. ADK's cache "begins on the second turn of a session at
+  the earliest", and `AdkPlanAuthor` opens a fresh session per ask — deliberately, because the
+  repair loop rebuilds the whole prompt rather than growing a conversation, which is what keeps
+  the prefix identical in the first place. So what the arrangement can reach is Gemini's
+  *implicit* prefix caching, which is a provider default and not something this code turns on.
+  Making the crew hold one session across a Run would change what the model sees on every turn
+  after the first; it is a design decision of its own and not this module's to take.
+
+Nothing here claims a cache was served. `assemble` writes an explicit non-claim saying so, and
+the first live Run is where it becomes answerable.
+
+**This module's vocabulary does not belong in `CONTEXT.md`.** It was tried, and the build
+refused it correctly: the repository glossary is *generated into the `language` contract*, which
+is one of the five projections published to an agent. So a "resident prefix" entry there would
+teach a model about the crew's own budget accounting — implementation detail reaching a prompt,
+which is the thing the leak scan exists to stop — and would grow the very prefix it describes.
+The terms are defined here and in `services/agents/README.md`, which agents never read.
 
 This module is the account of that. It is deliberately small and holds no text: an `Ask`
 records how large the resident prefix was and how much that turn added on top of it, and a
@@ -133,10 +159,17 @@ class ContextSpend:
         return len(self.asks)
 
     @property
-    def cached(self) -> bool:
-        """Whether every turn read one prefix, which is the first criterion's instrument.
+    def one_prefix(self) -> bool:
+        """Whether every turn read a prefix of one size — the cache precondition, not the cache.
 
-        Lengths rather than bytes: this is an account, not a second copy of the prompt. That a
+        Deliberately not called `cached`. In a Run driven by `converge` this is true by
+        construction, because every `Ask` is priced against the same `CachedPrefix`, so as
+        *evidence* it is a probe that cannot fail and the bundle must not present it as one. It
+        is kept because it is a real invariant with a real way of breaking: a future caller that
+        authored some turns against one prefix and some against another would show up here, and
+        the field is what a reader checks before believing `cacheable_chars`.
+
+        Lengths rather than bytes: this is an account, not a second copy of the prompt. That the
         prefix is the same *object* across a convergence is asserted where it is built, by
         counting how many times a whole Run assembles one.
         """
@@ -153,17 +186,39 @@ class ContextSpend:
 
     @property
     def sent_chars(self) -> int:
-        """What the Run cost with the prefix served from a cache after the first turn."""
+        """What the Run would cost with the prefix charged once, which is the point of caching."""
         return self.resident_chars + self.fresh_chars
 
     @property
-    def uncached_chars(self) -> int:
-        """What the same Run would have cost re-sending the teaching surface every turn."""
+    def distinct_chars(self) -> int:
+        """Every turn's prompt in full: what a Run costs with nothing reused."""
         return sum(ask.chars for ask in self.asks)
 
     @property
-    def saved_chars(self) -> int:
-        return self.uncached_chars - self.sent_chars
+    def cacheable_chars(self) -> int:
+        """The spend an identical prefix makes eligible for reuse, not a saving observed.
+
+        Every turn after the first re-sends the same prefix, so this is what a provider serving
+        it from cache would not have to read again. Whether one did is the provider's answer and
+        the crew has never had it — see this module's opening note.
+        """
+        return self.distinct_chars - self.sent_chars
+
+    def as_sentence(self) -> str:
+        """What this Run cost, in one line, for whoever is reading rather than parsing.
+
+        Here rather than at each reader, because the command's stderr and the bundle's summary
+        report the same three numbers and were reporting them in two near-identical format
+        strings — which is one reworded phrase away from a Run whose two accounts of itself
+        read differently.
+        """
+        asks = f"{self.asks_made} model ask{'' if self.asks_made == 1 else 's'}"
+        return (
+            f"{asks}, {self.distinct_chars:,} characters "
+            f"(~{tokens(self.distinct_chars):,} tokens) put in front of a model, of which "
+            f"{self.cacheable_chars:,} is the teaching surface re-sent unchanged and eligible "
+            "for a provider cache the crew does not measure"
+        )
 
     def overrun(self, budget: ContextBudget) -> str | None:
         """Which line this spend has passed, or None.

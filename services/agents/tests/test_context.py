@@ -19,7 +19,7 @@ pretending to be exact.
 
 from __future__ import annotations
 
-import json
+from collections.abc import Mapping
 from typing import Any
 
 from conftest import recorded, recorded_bytes
@@ -39,7 +39,7 @@ from vox_crew.context import (
 )
 from vox_crew.converge import repair_budget, target_seconds
 from vox_crew.envelopes import ArtifactDescriptor, parse_envelope
-from vox_crew.planner import instructions
+from vox_crew.planner import instructions, message_text
 from vox_crew.refusals import read_refusal
 
 # What a showcase Brief asks for, in the words a Brief asks in. Only the duration matters
@@ -95,9 +95,14 @@ def largest_recorded_refusal() -> int:
     )
 
 
-def message_chars(*parts: Any) -> int:
-    """What the crew hands an author beside the instructions, sized the way it is serialised."""
-    return len(json.dumps(parts, ensure_ascii=False, default=str))
+def message_chars(message: Mapping[str, Any] | str) -> int:
+    """What the crew hands an author beside the instructions, sized the way it is *sent*.
+
+    Through `planner.message_text` rather than a `json.dumps` of this test's own. A second
+    serialisation here would drift from production's the first time either changed, and this
+    guard would go on passing against text nobody sends.
+    """
+    return len(message_text(message))  # type: ignore[arg-type]
 
 
 # --- the account --------------------------------------------------------------------------
@@ -117,12 +122,12 @@ def test_a_spend_charges_the_resident_prefix_once_however_many_turns_read_it() -
     assert spend.sent_chars == 1060
 
 
-def test_a_spend_also_says_what_the_same_run_would_have_cost_uncached() -> None:
-    """The saving is reported rather than argued. It is the reason this ticket exists."""
+def test_a_spend_says_what_reached_a_model_and_how_much_of_it_was_the_repeated_prefix() -> None:
+    """An eligibility, not a saving. Whether a provider served it is nobody here's to say."""
     spend = ContextSpend(tuple(Ask(resident=1000, fresh=10) for _ in range(6)))
 
-    assert spend.uncached_chars == 6060
-    assert spend.saved_chars == 5000
+    assert spend.distinct_chars == 6060
+    assert spend.cacheable_chars == 5000
 
 
 def test_an_empty_spend_is_zero_rather_than_an_error() -> None:
@@ -132,13 +137,13 @@ def test_an_empty_spend_is_zero_rather_than_an_error() -> None:
     assert spend.asks_made == 0
     assert spend.resident_chars == 0
     assert spend.sent_chars == 0
-    assert spend.uncached_chars == 0
-    assert spend.saved_chars == 0
-    assert spend.cached
+    assert spend.distinct_chars == 0
+    assert spend.cacheable_chars == 0
+    assert spend.one_prefix
 
 
-def test_a_spend_whose_turns_read_different_prefixes_is_not_cached() -> None:
-    """The instrument for the first criterion: a prefix that changed between turns was re-sent.
+def test_a_spend_whose_turns_read_different_prefixes_reports_more_than_one() -> None:
+    """The invariant behind the first criterion: two prefixes are not one reusable prefix.
 
     Lengths rather than bytes, because this is an account and not a second copy of a 124 KB
     prompt. Byte identity is asserted where the prefix is built, by counting how many times a
@@ -146,7 +151,7 @@ def test_a_spend_whose_turns_read_different_prefixes_is_not_cached() -> None:
     """
     spend = ContextSpend((Ask(resident=1000, fresh=10), Ask(resident=1200, fresh=10)))
 
-    assert not spend.cached
+    assert not spend.one_prefix
     assert spend.resident_chars == 1200
 
 
@@ -224,4 +229,4 @@ def test_a_showcase_run_at_its_worst_stays_inside_the_budget() -> None:
     )
 
     assert spend.overrun(context_budget(asks)) is None
-    assert spend.cached
+    assert spend.one_prefix

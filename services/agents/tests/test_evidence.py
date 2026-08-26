@@ -664,24 +664,27 @@ def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
     assert context["residentChars"] == run.spend.resident_chars
     assert context["freshChars"] == run.spend.fresh_chars
     assert context["sentChars"] == run.spend.sent_chars
-    assert context["uncachedChars"] == run.spend.uncached_chars
-    assert context["cached"] is True
+    assert context["distinctChars"] == run.spend.distinct_chars
+    assert context["cacheableChars"] == run.spend.cacheable_chars
+    assert context["onePrefix"] is True
+    # Null rather than false: the crew has no instrument for this, and false would be a claim.
+    assert context["cacheServed"] is None
     assert context["budget"] == {
-        "residentChars": run.context.resident_chars,
-        "freshChars": run.context.fresh_chars,
+        "residentChars": run.context_budget.resident_chars,
+        "freshChars": run.context_budget.fresh_chars,
     }
     # The figure the budget is stated in, beside the one a model is billed in.
     assert context["sentTokens"] == tokens(run.spend.sent_chars)
 
 
-def test_the_summary_reports_the_spend_and_what_not_re_sending_the_catalog_saved() -> None:
+def test_the_summary_reports_the_spend_and_how_much_of_it_is_the_repeated_prefix() -> None:
     """The page a person opens first says what the Run cost, not only how it ended."""
     run = a_repaired_run()
 
     summary = assemble(run).files[SUMMARY].decode("utf-8")
 
-    assert f"{run.spend.sent_chars:,}" in summary
-    assert f"{run.spend.saved_chars:,}" in summary
+    assert f"{run.spend.distinct_chars:,}" in summary
+    assert f"{run.spend.cacheable_chars:,}" in summary
     assert f"{run.spend.asks_made}" in summary
 
 

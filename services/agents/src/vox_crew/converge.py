@@ -63,7 +63,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from .client import Artifact, ProductionClient
-from .context import ContextBudget, ContextBudgetExceeded, ContextSpend, context_budget
+from .context import (
+    ContextBudget,
+    ContextBudgetExceeded,
+    ContextSpend,
+    context_budget as default_context_budget,
+)
 from .envelopes import (
     NEEDS_REPAIR,
     PAUSED as PAUSED_BEFORE_NETWORK,
@@ -71,7 +76,16 @@ from .envelopes import (
     NextCommand,
     ResultEnvelope,
 )
-from .planner import AuthoredPlan, Finding, PlanAuthor, author_plan, cache_prefix, repair_plan
+from .planner import (
+    AuthoredPlan,
+    Finding,
+    PlanAuthor,
+    author_plan,
+    authoring_ask,
+    cache_prefix,
+    repair_ask,
+    repair_plan,
+)
 from .producer import READ_BACK, read_back_artifacts
 from .refusals import Refusal, read_refusal
 from .teaching_surface import TeachingSurface, read_teaching_surface
@@ -228,7 +242,7 @@ class ConvergedRun:
     run_id: str | None
     outcome: str
     budget: RepairBudget
-    context: ContextBudget
+    context_budget: ContextBudget
     versions: tuple[AuthoredPlan, ...]
     submitted: tuple[Mapping[str, Any], ...]
     withheld: tuple[AuthoredPlan, ...]
@@ -476,7 +490,7 @@ def converge(
     author: PlanAuthor,
     *,
     budget: RepairBudget | None = None,
-    context: ContextBudget | None = None,
+    context_budget: ContextBudget | None = None,
     on_envelope: Callable[[ResultEnvelope], None] | None = None,
     read_back: Sequence[str] = READ_BACK,
 ) -> ConvergedRun:
@@ -498,20 +512,32 @@ def converge(
     surface = read_teaching_surface(client, on_envelope)
     brief = request.get("brief", {})
     allowed = budget if budget is not None else repair_budget(target_seconds(brief))
-    allowed_context = context if context is not None else context_budget(allowed.plan_versions)
+    allowed_context = (
+        context_budget
+        if context_budget is not None
+        else default_context_budget(allowed.plan_versions)
+    )
 
     # Assembled once, here, and read by every turn below. This is the caching: not a store the
     # crew keeps, but the fact that there is one object to send and nothing downstream can
     # build a second.
     prefix = cache_prefix(surface)
-    if prefix.chars > allowed_context.resident_chars:
-        # Refused before a Run is opened, rather than ended as one. A prefix that does not fit
-        # is a fact about the crew's own prompt and is true of every turn a Run would take, so
-        # there is nothing a Run could be spent to discover — the same argument
-        # `InstructionsLeaked` is raised on, and the same place in the sequence.
+    # The first turn priced before it is asked for, through the same reader the loop uses
+    # below. Written as a comparison here instead, it would be the budget rule stated twice —
+    # and the gate that allowed a turn the finished bundle then reports as an overrun.
+    #
+    # Refused before a Run is opened, rather than ended as one. A prefix that does not fit is a
+    # fact about the crew's own prompt and is true of every turn a Run would take, so there is
+    # nothing a Run could be spent to discover — the same argument `InstructionsLeaked` is
+    # raised on, and the same place in the sequence.
+    priced = ContextSpend((authoring_ask(prefix, brief),))
+    unaffordable = priced.overrun(allowed_context)
+    if unaffordable is not None:
         raise ContextBudgetExceeded(
-            f"The teaching surface assembles to {prefix.chars} characters, past the "
-            f"{allowed_context.resident_chars} this Run is budgeted, so nothing was asked."
+            f"The first ask does not fit this Run's context budget ({unaffordable}): "
+            f"{priced.resident_chars} characters of instructions against "
+            f"{allowed_context.resident_chars}, and {priced.fresh_chars} of Brief against "
+            f"{allowed_context.fresh_chars}. Nothing was asked."
         )
 
     announce = on_envelope if on_envelope is not None else lambda _: None
@@ -551,7 +577,7 @@ def converge(
             run_id=run,
             outcome=outcome,
             budget=allowed,
-            context=allowed_context,
+            context_budget=allowed_context,
             versions=tuple(versions),
             submitted=tuple(submitted),
             withheld=tuple(withheld),
@@ -606,10 +632,14 @@ def converge(
                 return ended(BUDGET_EXHAUSTED, run_id, PLAN_VERSIONS)
             if recorded is not None and after_take >= allowed.post_record_plan_versions:
                 return ended(BUDGET_EXHAUSTED, run_id, POST_RECORD_PLAN_VERSIONS)
-            # What the Run has already put in front of a model, read before it is asked again.
-            # Checked here rather than after the ask for the reason every other line is: a
-            # budget consulted once the money is gone is a report, not a budget.
-            passed = spend_of(versions, withheld).overrun(allowed_context)
+            # What the Run has spent, plus what the next turn *will* cost, read before it is
+            # asked for. Every term of a repair is known in advance — the refusal is gathered
+            # and the plan is written — so the turn that would cross the line is the turn that
+            # is refused, rather than the one after it. A budget consulted once the money is
+            # gone is a report, not a budget.
+            spent = spend_of(versions, withheld)
+            next_ask = repair_ask(prefix, brief, versions[-1].plan, refusal)
+            passed = ContextSpend((*spent.asks, next_ask)).overrun(allowed_context)
             if passed is not None:
                 return ended(BUDGET_EXHAUSTED, run_id, passed)
             proposed = repair_plan(prefix, brief, versions[-1].plan, refusal, author)

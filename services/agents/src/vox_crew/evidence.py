@@ -93,6 +93,10 @@ NON_CLAIMS = (
     "cannot read.",
     "There is no human verdict. A crew bundle is machine evidence and the watch-and-listen "
     "verdict is a person's, recorded where the proofs record it.",
+    "Prefix caching is not evidenced. Every turn was authored against one identical prefix, "
+    "which is what a provider needs in order to serve it from a cache — but no provider has "
+    "told this crew that one did, so `context.cacheableChars` is an eligibility and never a "
+    "saving, and `context.cacheServed` is null rather than false.",
 )
 
 
@@ -302,24 +306,32 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
     Characters are the measurement and tokens are the conversion, both reported: the crew can
     count the first exactly on every Run and the second is what a model is billed in, so a
     bundle carrying only one of them would either be unauditable or be an estimate presented
-    as a count. `uncachedChars` is what the same Run would have cost re-sending the teaching
-    surface every turn — the figure that says whether the caching is still earning its keep.
+    as a count.
+
+    `distinctChars` is what actually reached a model — every turn's prompt in full. `sentChars`
+    is what the same Run costs if the identical prefix is served from a cache, and
+    `cacheableChars` is the difference. That difference is an eligibility, not a saving: the
+    crew has never been told by a provider that a prefix was served from cache, and the
+    non-claim beside it says so. Reporting it as a saving is the one thing this block must not
+    do — it would be the crew evidencing an outcome it has no instrument for.
     """
     spend = run.spend
     return {
         "asks": spend.asks_made,
-        "cached": spend.cached,
+        "onePrefix": spend.one_prefix,
         "residentChars": spend.resident_chars,
         "freshChars": spend.fresh_chars,
+        "distinctChars": spend.distinct_chars,
+        "distinctTokens": tokens(spend.distinct_chars),
         "sentChars": spend.sent_chars,
         "sentTokens": tokens(spend.sent_chars),
-        "uncachedChars": spend.uncached_chars,
-        "savedChars": spend.saved_chars,
+        "cacheableChars": spend.cacheable_chars,
+        "cacheServed": None,
         "budget": {
-            "residentChars": run.context.resident_chars,
-            "freshChars": run.context.fresh_chars,
+            "residentChars": run.context_budget.resident_chars,
+            "freshChars": run.context_budget.fresh_chars,
         },
-        "overrun": spend.overrun(run.context),
+        "overrun": spend.overrun(run.context_budget),
     }
 
 
@@ -381,9 +393,7 @@ def _summary(run: ConvergedRun, verdict: str) -> str:
         f"- Plan versions authored: {len(run.versions) + len(run.withheld)} "
         f"({len(run.withheld)} withheld)\n"
         f"- Synthesis dispatches: {run.dispatches}\n"
-        f"- Model asks: {run.spend.asks_made}, {run.spend.sent_chars:,} characters sent "
-        f"(~{tokens(run.spend.sent_chars):,} tokens); "
-        f"{run.spend.saved_chars:,} not re-sent because the teaching surface was cached\n",
+        f"- Context: {run.spend.as_sentence()}\n",
     ]
     if run.decision:
         sections.append(

@@ -238,15 +238,12 @@ def main(
         err.write(f"vox-crew: the bundle was not written: {refused_bundle}\n")
         return 1
 
-    spend = run.spend
     err.write(
         f"vox-crew: Run {run.run_id} ended {run.outcome}"
         f"{f' at {run.limit}' if run.limit else ''}, "
         f"{len(run.envelopes)} envelopes, {len(run.artifacts)} artifacts read back, "
         f"evidence in {arguments.evidence}.\n"
-        f"vox-crew: {spend.asks_made} model ask{'' if spend.asks_made == 1 else 's'}, "
-        f"{spend.sent_chars:,} characters sent (~{tokens(spend.sent_chars):,} tokens), "
-        f"{spend.saved_chars:,} not re-sent because the teaching surface was cached.\n"
+        f"vox-crew: {run.spend.as_sentence()}.\n"
     )
     return 0 if run.outcome == RENDERED else 1
 

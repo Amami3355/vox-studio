@@ -259,7 +259,7 @@ def test_a_finished_run_reports_what_it_put_in_front_of_a_model(
 
     said = capsys.readouterr().err
     assert "1 model ask" in said
-    assert "characters sent" in said
+    assert "put in front of a model" in said
 
 
 def test_a_teaching_surface_too_large_for_the_budget_is_reported_and_nothing_is_opened(

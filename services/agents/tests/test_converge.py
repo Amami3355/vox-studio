@@ -55,6 +55,7 @@ from vox_crew.envelopes import ArtifactDescriptor, ResultEnvelope, parse_envelop
 from vox_crew.planner import (
     InstructionsLeaked,
     PlanAuthor,
+    authoring_ask,
     cache_prefix,
     instructions,
     message_text,
@@ -668,7 +669,7 @@ def test_every_turn_is_authored_against_that_one_prefix_byte_for_byte() -> None:
     assert prefix == instructions(run.surface)
     for version in (*run.versions[1:], *run.withheld):
         assert version.instructions.startswith(prefix)
-    assert run.spend.cached
+    assert run.spend.one_prefix
     assert run.spend.resident_chars == len(prefix)
 
 
@@ -705,8 +706,8 @@ def test_a_run_reports_what_it_put_in_front_of_a_model_and_what_the_cache_saved(
     assert spend.fresh_chars == sum(version.ask.fresh for version in run.versions)
     assert spend.sent_chars == spend.resident_chars + spend.fresh_chars
     # Two turns uncached is two prefixes. The saving is exactly the one that was not re-sent.
-    assert spend.uncached_chars == 2 * spend.resident_chars + spend.fresh_chars
-    assert spend.saved_chars == spend.resident_chars
+    assert spend.distinct_chars == 2 * spend.resident_chars + spend.fresh_chars
+    assert spend.cacheable_chars == spend.resident_chars
 
 
 def test_an_authoring_turn_is_charged_the_brief_and_a_repair_the_refusal_and_the_plan() -> None:
@@ -722,25 +723,29 @@ def test_an_authoring_turn_is_charged_the_brief_and_a_repair_the_refusal_and_the
     )
 
 
-def test_a_run_that_would_pass_its_turn_budget_ends_before_asking_again() -> None:
+def test_a_run_that_cannot_afford_its_next_repair_ends_before_asking_for_it() -> None:
     """The sixth criterion. An overrun is an ending with the line named, not an invoice.
 
-    Checked before the ask rather than after it, which is what the empty repair list asserts:
-    a budget consulted once the money is gone is a report.
+    The budget here affords exactly the authoring turn and not a character more, so the first
+    ask happens and the repair is then priced, found unaffordable, and never made. The empty
+    repair list is the assertion that matters: the turn that would have crossed the line is the
+    turn that was refused, not the one after it.
     """
     client, author = a_run_that_repairs_once()
+    authoring = authoring_ask(cache_prefix(SURFACE), REQUEST["brief"])
 
     run = converge(
         client,
         REQUEST,
         author,
-        context=ContextBudget(resident_chars=10**9, fresh_chars=1),
+        context_budget=ContextBudget(resident_chars=10**9, fresh_chars=authoring.fresh),
     )
 
     assert run.outcome == BUDGET_EXHAUSTED
     assert run.limit == FRESH_CHARS
     assert author.repairs == []
-    assert run.spend.overrun(run.context) == FRESH_CHARS
+    # The Run stayed inside what it was budgeted. It ended because the *next* turn would not.
+    assert run.spend.overrun(run.context_budget) is None
 
 
 def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
@@ -757,7 +762,7 @@ def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
             client,
             REQUEST,
             author,
-            context=ContextBudget(resident_chars=10, fresh_chars=10**9),
+            context_budget=ContextBudget(resident_chars=10, fresh_chars=10**9),
         )
 
     assert author.asked == []
@@ -772,7 +777,7 @@ def test_the_context_budget_defaults_to_the_asks_the_repair_budget_allows() -> N
 
     run = converge(client, REQUEST, author)
 
-    assert run.context == context_budget(run.budget.plan_versions)
+    assert run.context_budget == context_budget(run.budget.plan_versions)
 
 
 # --- Endings the crew may not repair -------------------------------------------------------
