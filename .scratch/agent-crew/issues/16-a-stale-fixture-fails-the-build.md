@@ -39,12 +39,12 @@ should say what is true now.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A recorded contract fixture that no longer matches what its handler emits fails the build
-- [ ] The failure names the exact command that re-records it
-- [ ] A category the contract index publishes with no recorded fixture fails the build
-- [ ] The authored run envelopes are unaffected and stay under the schema guard they have
-- [ ] Rebuilding the contracts and re-recording turns the build green again with no other edit
-- [ ] Removing the check or staling a fixture by hand is demonstrated to turn it red
-- [ ] The recorder and the fixtures README describe the recording policy that is actually in force
+- [x] A recorded contract fixture that no longer matches what its handler emits fails the build
+- [x] The failure names the exact command that re-records it
+- [x] A category the contract index publishes with no recorded fixture fails the build
+- [x] The authored run envelopes are unaffected and stay under the schema guard they have
+- [x] Rebuilding the contracts and re-recording turns the build green again with no other edit
+- [x] Removing the check or staling a fixture by hand is demonstrated to turn it red
+- [x] The recorder and the fixtures README describe the recording policy that is actually in force
