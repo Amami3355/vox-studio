@@ -49,7 +49,20 @@ const requiredNarrationFragments = [
   ['hillside', 'hillside'],
 ] as const;
 
-/** Trusted, pre-spend guard for the catalogue showcase brief. */
+/**
+ * Which of the showcase Brief's demands a plan misses, scored rather than enforced.
+ *
+ * This was once also a blocking pre-spend gate in the harness's IPC audit hook. It is not any
+ * more, and the reason is that it was always a second evaluation of an assertion that already
+ * existed: `scenario.brief-compliance` scores this same function over the finished Run. The
+ * blocking copy added no protection — `run-store.ts` caps recording dispatches at
+ * `maxNewTakes` whatever the plan says — and cost the run its diagnostic value, because a
+ * throwing audit hook destroys the socket before the plan is ever compiled.
+ *
+ * Keeping it purely as an assertion also keeps the proof honest. The demands below are the
+ * answer key to the Brief; a refusal carrying them would have been the harness teaching the
+ * author what to write, which is not something `agent.unscripted-generalist` can survive.
+ */
 export const catalogShowcasePlanViolations = (plan: VideoPlan): string[] => {
   const violations: string[] = [];
   const scenes = plan.sections.flatMap((section) => section.scenes);
@@ -73,9 +86,13 @@ export const catalogShowcasePlanViolations = (plan: VideoPlan): string[] => {
   ) {
     violations.push('image-requirement');
   }
+  // Duration is deliberately not judged here. The Brief asks for 110–130 seconds and never
+  // translates that into words, so a word window is an uncalibrated guess at a speaking rate
+  // the Brief never states — and one that can reject a plan for a reason that was never about
+  // the film. `media.take-duration` measures the artifact itself against the scenario's real
+  // window, and Preflight's calibrated per-scene assessment is the early warning the crew
+  // already repairs against. Two of those three authorities were enough; this was the third.
   const narration = plan.beats.map((beat) => beat.text).join(' ');
-  const words = narration.trim().split(/\s+/u).filter(Boolean).length;
-  if (words < 230 || words > 310) violations.push(`word-count:${words}`);
   const normalizedNarration = narration
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/gu, ' ')

@@ -177,6 +177,37 @@ describe.sequential('Northbridge proof harness', () => {
     );
     expect(await readFile(join(evidenceRoot, 'hash-index.json'), 'utf8')).toContain('failure.json');
   }, 60_000);
+
+  /**
+   * A `before` hook that throws is the one harness failure the transport cannot report:
+   * `ipc/host.ts` destroys the socket and answers nothing, so the caller sees a broken
+   * connection and the reason dies in that catch. Every such throw is a harness bug — an
+   * unreadable work root, a probe path that moved — and on a paid run they have to survive
+   * into the evidence rather than be guessed at from a dead pipe.
+   */
+  it('records why a crashing audit hook killed the socket, which the host cannot report', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'vox-proof-audit-crash-'));
+    roots.push(parent);
+    const evidenceRoot = join(parent, 'evidence');
+    await expect(
+      runNorthbridgeProof({
+        provider: 'fixture',
+        evidenceRoot,
+        renderer: renderFixture,
+        mediaProbe: probeFixture,
+        keepWorkingRoots: true,
+        seededViolations: ['audit-crash'],
+      }),
+    ).rejects.toThrow('PROOF_FAILED_EVIDENCE_PRESERVED');
+    const failure = JSON.parse(await readFile(join(evidenceRoot, 'failure.json'), 'utf8')) as {
+      workingParent: string;
+      auditFailures: Array<{ command: string; message: string }>;
+    };
+    roots.push(failure.workingParent);
+    expect(failure.auditFailures).toHaveLength(1);
+    expect(failure.auditFailures[0]?.command).toBe('production run record');
+    expect(failure.auditFailures[0]?.message).toBe('PROOF_SEEDED_AUDIT_CRASH');
+  }, 60_000);
 });
 
 /**

@@ -52,12 +52,33 @@ of it needed a key:
   `createCrewAgentDriver({ model })` passes it through and the bundle records
   `vox-crew/adk:<model>`.
 
-**What is left is the run itself, and one decision before it.**
-`catalogShowcasePlanViolations` is a hard pre-spend gate that throws inside the IPC audit hook,
-and `ipc/host.ts:104` destroys the socket on a throwing hook — so a first-attempt miss is a dead
-pipe, exit 1, and no evidence bundle. It fires after compile and before synthesis, so no voice
-credit is at risk, only model tokens. Whether it should instead surface as a refusal the crew
-can repair from, or whether a cheap dry authoring pass on flash is the way in, is not decided.
+**The gate decision is made. What is left is the run itself.**
+`catalogShowcasePlanViolations` no longer blocks anything. It was a second evaluation of an
+assertion that already existed — `scenario.brief-compliance` scores the same function over the
+finished Run — and the blocking copy bought nothing the trusted service was not already
+enforcing (`run-store.ts:964` caps dispatches at `maxNewTakes`) while costing the run its whole
+diagnostic value: a throwing audit hook destroys the socket, so the run died *before* it ever
+compiled. Note the correction — earlier notes said the gate fired after compile; `converge.py`
+sequences `validate:657 → preflight:670 → record:685 → compile:709`, and the gate hooked
+`record`.
+
+Three things followed from removing it:
+
+- **The word window went with it.** The Brief asks for 110–130 seconds and never translates
+  that into words, so a 230–310 word check was an uncalibrated guess at a speaking rate the
+  Brief never states. `media.take-duration` measures the artifact against the scenario's real
+  window and Preflight's calibration is the crew's early warning.
+- **The unscripted claim is protected structurally.** With no refusal there is no channel
+  through which the proof's answer key could reach the author. That was the risk in surfacing
+  the gate as a repairable refusal, and it is now impossible rather than merely avoided.
+- **A crashing audit hook is no longer silent.** Its reason is recorded into `failure.json`
+  rather than dying in `ipc/host.ts`'s catch, which is what made a harness bug and a gate
+  refusal indistinguishable.
+
+**Rehearse before spending.** `--provider fixture` runs the whole pipeline with the real model
+and no voice credit; the paid run is `--provider elevenlabs` (the default). Run live on the
+pinned default model, and escalate to `--model` with a pro model only if the rehearsal shows
+flash cannot reach brief-compliance — a claim earned on the default is the stronger result.
 
 **Status:** ready-for-human
 

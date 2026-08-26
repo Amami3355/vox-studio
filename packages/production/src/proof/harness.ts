@@ -121,7 +121,7 @@ export type NorthbridgeProofOptions = {
   renderer?: RenderAdapter;
   mediaProbe?: MediaProbe;
   agentDriver?: AgentDriver;
-  seededViolations?: Array<'leak' | 'network'>;
+  seededViolations?: Array<'leak' | 'network' | 'audit-crash'>;
   keepWorkingRoots?: boolean;
 };
 
@@ -499,6 +499,11 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
   const networkEvents: Array<{ command: string; kind: string; provider: string }> = [];
   const commands: CommandRecord[] = [];
   const transcript: unknown[] = [];
+  // Why the audit hook threw, kept because the transport cannot carry it: `ipc/host.ts`
+  // destroys the socket on a throwing `before` and answers nothing, so the caller learns only
+  // that the connection broke. These are harness bugs rather than anything a Run did, and the
+  // failure record below is the one place they can still be read.
+  const auditFailures: Array<{ command: string; at: string; message: string }> = [];
   try {
     const launcher = join(workRoot, 'vox.exe');
     const runner = join(trustedRoot, 'restricted-runner.exe');
@@ -620,30 +625,26 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       audit: {
         before: async (request) => {
           activeCommand = request.argv.slice(0, 3).join(' ');
-          const recordGate = scenario.recordGate;
-          if (recordGate && activeCommand === 'production run record') {
-            const guardedRunRoot = runPathFrom(request.cwd, request.argv);
-            if (!guardedRunRoot) throw new Error('PROOF_RECORD_GATE:NO_RUN');
-            const guardedCheckpoint = JSON.parse(
-              await readFile(join(guardedRunRoot, 'run.json'), 'utf8'),
-            ) as RunCheckpoint;
-            // The binding is checked here rather than left to `readBoundPlan`, because the gate
-            // owes its caller a `PROOF_RECORD_GATE:*` reason and a bare `PROOF_NO_BOUND_PLAN`
-            // would not say which of the harness's two readers failed.
-            if (!guardedCheckpoint.bindings.plan) throw new Error('PROOF_RECORD_GATE:NO_PLAN');
-            const guardedPlan = await readBoundPlan(guardedRunRoot, guardedCheckpoint);
-            const violations = recordGate(guardedPlan);
-            if (violations.length > 0) {
-              throw new Error(`PROOF_RECORD_GATE:${violations.join(',')}`);
+          try {
+            if (seeded.has('audit-crash') && activeCommand === 'production run record') {
+              throw new Error('PROOF_SEEDED_AUDIT_CRASH');
             }
+            return {
+              inventory: await inventoryFiles(workRoot),
+              revision: await revisionAt(runPathFrom(request.cwd, request.argv)),
+              networkCount: networkEvents.length,
+              inputHashes: await inputHashes(request.cwd, request.argv),
+              actor: currentActor,
+            };
+          } catch (error) {
+            const failure = error instanceof Error ? error : new Error(String(error));
+            auditFailures.push({
+              command: activeCommand,
+              at: new Date().toISOString(),
+              message: failure.message,
+            });
+            throw failure;
           }
-          return {
-            inventory: await inventoryFiles(workRoot),
-            revision: await revisionAt(runPathFrom(request.cwd, request.argv)),
-            networkCount: networkEvents.length,
-            inputHashes: await inputHashes(request.cwd, request.argv),
-            actor: currentActor,
-          };
         },
         after: async ({ request, result, context, startedAtMs, endedAtMs }) => {
           const before = context as {
@@ -1261,6 +1262,7 @@ ${nonClaims.map((claim) => `- ${claim}`).join('\n')}
         failedAt: new Date().toISOString(),
         provider: options.provider,
         error: { name: failure.name, message: failure.message },
+        auditFailures,
         workingParent,
         workingRootsPreserved: true,
       });

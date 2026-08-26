@@ -35,7 +35,6 @@ describe('proof scenario table', () => {
     expect(scenario.durationBounds).toEqual([20, 30]);
     expect(scenario.targetSeconds).toBe(25);
     expect(scenario.expectedCapabilities).toBeUndefined();
-    expect(scenario.recordGate).toBeNull();
   });
 
   it('keeps the long variant on a separate proof id at its own duration', () => {
@@ -46,7 +45,7 @@ describe('proof scenario table', () => {
     expect(scenario.targetSeconds).toBe(180);
   });
 
-  it('keeps the showcase scenario with its breadth requirement and pre-spend gate', () => {
+  it('keeps the showcase scenario with its breadth requirement', () => {
     const scenario = proofScenario('showcase');
     expect(scenario.proofId).toBe('helios-bay-catalog-showcase-proof-v1');
     expect(scenario.slug).toBe('helios-bay-catalog-showcase');
@@ -54,7 +53,6 @@ describe('proof scenario table', () => {
     expect(scenario.durationBounds).toEqual([100, 140]);
     expect(scenario.targetSeconds).toBe(120);
     expect(scenario.expectedCapabilities).toEqual(CATALOG_SHOWCASE_CAPABILITIES);
-    expect(scenario.recordGate).not.toBeNull();
   });
 
   it('defaults to the short scenario so no existing caller changes behaviour', () => {
@@ -89,11 +87,6 @@ describe('proof scenario table', () => {
     expect(PROOF_SCENARIOS.short.scoredImageScene(plan)).toBeUndefined();
     // The showcase names one image among eight scenes, wherever it falls.
     expect(PROOF_SCENARIOS.showcase.scoredImageScene(plan)?.id).toBe('image');
-  });
-
-  it('refuses a plan the showcase Brief does not support, before anything is spent', () => {
-    const violations = PROOF_SCENARIOS.showcase.recordGate?.(planWithImageSecond()) ?? [];
-    expect(violations).toContain('capabilities');
   });
 
   it('recognises only the keys the table defines', () => {

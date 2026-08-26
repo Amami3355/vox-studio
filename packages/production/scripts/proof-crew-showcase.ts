@@ -14,12 +14,16 @@
  * **Working roots are kept.** A run this expensive is not re-run to find out what it did, so
  * the roots survive it whatever the verdict.
  *
- * **A dead pipe means the pre-spend gate fired.** `catalogShowcasePlanViolations` is checked
- * inside the IPC audit hook, and a throwing hook destroys the socket rather than answering:
- * the crew sees a broken connection, exits non-zero, and writes no bundle. It fires after
- * compile and before synthesis, so a plan that misses the showcase requirements costs model
- * tokens and no voice credit. Whether that gate should instead surface as a refusal the crew
- * can repair from is ticket 15's decision, and it is not made here.
+ * **A Brief-violating plan is scored, not blocked.** `catalogShowcasePlanViolations` was once
+ * enforced inside the IPC audit hook, where a throwing hook destroys the socket and the run
+ * died before it ever compiled. It is now only `scenario.brief-compliance` on the assertion
+ * sheet, so the same plan runs to a rendered preview and fails by name in a bundle you can
+ * read and watch. Recording spend is capped by `maxNewTakes`, not by that check.
+ *
+ * **`--provider fixture` is the rehearsal and spends no voice credit.** The crew still authors
+ * through a real model, the whole pipeline runs, and every assertion scores except the claim
+ * itself — `agent.unscripted-generalist` is claim-eligible only under `elevenlabs`. Run it
+ * before spending, because a plan that fails now costs a synthesis dispatch and a render.
  */
 
 import { createCrewAgentDriver } from '../src/proof/crew-agent';
@@ -34,8 +38,17 @@ if (modelIndex >= 0 && (model === undefined || model.startsWith('--'))) {
   throw new TypeError('proof:crew-showcase --model needs a model name.');
 }
 
+// Spending is the default, and the rehearsal is the flag. The other way round would make a
+// forgotten argument the difference between a dress rehearsal and a paid run that nobody
+// meant to start.
+const providerIndex = process.argv.indexOf('--provider');
+const provider = providerIndex >= 0 ? process.argv[providerIndex + 1] : 'elevenlabs';
+if (provider !== 'elevenlabs' && provider !== 'fixture') {
+  throw new TypeError('proof:crew-showcase --provider takes `elevenlabs` or `fixture`.');
+}
+
 const result = await runCatalogShowcaseProof({
-  provider: 'elevenlabs',
+  provider,
   // No `plan`: the crew authors its own, which is the whole point of this run and the one
   // assertion — `agent.unscripted-generalist` — the deterministic crew run cannot earn.
   agentDriver: createCrewAgentDriver({ model }),

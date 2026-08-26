@@ -19,7 +19,6 @@ import {
   CATALOG_SHOWCASE_NON_CLAIMS,
   CATALOG_SHOWCASE_PROOF_ID,
   CATALOG_SHOWCASE_REQUEST,
-  catalogShowcasePlanViolations,
 } from './catalog-showcase';
 import {
   NORTHBRIDGE_LONG_PROOF_ID,
@@ -62,12 +61,6 @@ export type ProofScenario = {
   expectedCapabilities?: readonly string[];
   /** The rows a human is asked to judge, in the order they are watched for. */
   humanVerdictRows: readonly string[];
-  /**
-   * Refuses a plan before the one quota-bearing command, so a Brief-violating plan costs nothing
-   * instead of being discovered in the assertions after the money is spent. `null` when the
-   * scenario has no pre-spend gate beyond the ordinary contract checks.
-   */
-  recordGate: ((plan: VideoPlan) => string[]) | null;
   /**
    * Which `image_context` scene's asset resolution the assertions score. The Northbridge Brief
    * names the *opening* image specifically; the showcase Brief has one image among eight scenes
@@ -113,7 +106,6 @@ export const PROOF_SCENARIOS: Readonly<Record<ProofScenarioKey, ProofScenario>> 
     durationBounds: [20, 30],
     targetSeconds: 25,
     humanVerdictRows: northbridgeHumanVerdictRows,
-    recordGate: null,
     scoredImageScene: imageSceneSpanningOpeningBeat,
   },
   long: {
@@ -127,7 +119,6 @@ export const PROOF_SCENARIOS: Readonly<Record<ProofScenarioKey, ProofScenario>> 
     durationBounds: [150, 210],
     targetSeconds: 180,
     humanVerdictRows: northbridgeHumanVerdictRows,
-    recordGate: null,
     scoredImageScene: imageSceneSpanningOpeningBeat,
   },
   showcase: {
@@ -149,7 +140,6 @@ export const PROOF_SCENARIOS: Readonly<Record<ProofScenarioKey, ProofScenario>> 
       'composition, typography, motion and pace remain coherent across the full film',
       'the complete preview is watchable and listenable without explanation',
     ],
-    recordGate: catalogShowcasePlanViolations,
     scoredImageScene: firstImageScene,
   },
 };
