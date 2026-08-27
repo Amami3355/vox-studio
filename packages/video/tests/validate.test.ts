@@ -357,6 +357,70 @@ describe('validateVideoPlan — an action lands on the word it points at', () =>
    * is the rule, because the narrator is saying the phrase across all of them and which one
    * the picture cuts on is an editorial choice the plan is entitled to make.
    */
+  /**
+   * The landing rule, asked about a value the narration says in a different case.
+   *
+   * A chart label is Title Case and prose lowercases it mid-sentence, so `"Harbour battery"`
+   * against *"…the harbour battery opening…"* is not an exotic input — it is what the shipped
+   * capabilities and ordinary English produce together, and it is what the Run that provoked
+   * `DEICTIC_OPPORTUNITY_MISSED` actually contained.
+   *
+   * Both halves of this check compared exactly, and the pair was unsatisfiable. `checkWordAnchors`
+   * holds an anchor to a word the beat speaks, so only `word:london` resolves; this rule read the
+   * payload's `"London"` and refused that anchor as landing on a different word. An author caught
+   * between them cannot write anything that satisfies both, and the `expected` list it was handed
+   * named the anchor the other check rejects.
+   */
+  const cased = (at: string): VideoPlan => ({
+    beats: [
+      { id: 'b1', text: 'Rents rose faster than wages.' },
+      { id: 'b2', text: 'The city of london is the extreme case.' },
+    ],
+    sections: [
+      {
+        id: 'sec1',
+        spansBeats: ['b1', 'b2'],
+        scenes: [
+          base({ id: 's1', spansBeats: ['b1'], events: [] }),
+          base({
+            id: 's2',
+            spansBeats: ['b2'],
+            props: {
+              title: 'Share of income spent on rent',
+              unit: '%',
+              data: [{ label: 'London', value: 47 }],
+            },
+            events: [{ at, action: 'highlightBar', payload: { label: 'London' } }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  it('accepts the anchor that resolves, when the beat speaks the value in another case', () => {
+    const report = validateVideoPlan(cased('b2.word:london'));
+
+    expect(report.errors.map((e) => e.code)).toEqual([]);
+  });
+
+  it('offers an anchor the word-anchor check would accept, not the props spelling', () => {
+    const report = validateVideoPlan(cased('b2.start'));
+    const error = report.errors.find((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED');
+
+    expect(error?.expected).toContain('b2.word:london');
+    expect(error?.expected).not.toContain('b2.word:London');
+  });
+
+  /**
+   * The falsification for the pair above. Matching loosely must not make the rule blind: a
+   * different word is still a different word, whatever its case.
+   */
+  it('still refuses an anchor on a word that is not the value, in any case', () => {
+    const report = validateVideoPlan(cased('b2.word:extreme'));
+
+    expect(report.errors.some((e) => e.code === 'DEICTIC_ANCHOR_REQUIRED')).toBe(true);
+  });
+
   it('accepts a multi-word value anchored to any token of the phrase', () => {
     expect(validateVideoPlan(pointing('b2.word:New', 'New York')).ok).toBe(true);
     expect(validateVideoPlan(pointing('b2.word:York', 'New York')).ok).toBe(true);

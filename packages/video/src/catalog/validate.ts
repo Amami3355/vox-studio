@@ -413,7 +413,7 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
     errors.push(...checkSentenceBoundaries(section, textOf));
     errors.push(...checkPlacements(section, domain));
     errors.push(...checkWordAnchors(section, textOf));
-    errors.push(...checkDeicticLanding(section));
+    errors.push(...checkDeicticLanding(section, textOf));
     warnings.push(...checkDeicticOpportunity(section, textOf));
 
     let previousProfile: string | undefined;
@@ -585,9 +585,35 @@ const checkWordAnchors = (
  * Whether the beat actually speaks that word is `checkWordAnchors`'s question, not this
  * one. This check asks only that the anchor point at the thing the payload names; that the
  * named word exists, once, is the other half and it reports separately.
+ *
+ * **Case is folded, and the two checks were unsatisfiable together until it was.** A chart
+ * label is Title Case and prose lowercases it mid-sentence, so `"Harbour battery"` against
+ * "…the harbour battery opening…" is what the shipped capabilities and ordinary English
+ * produce together rather than an exotic input. Comparing exactly made the pair a deadlock:
+ * `checkWordAnchors` resolves only `word:harbour`, and this rule read the payload's
+ * `"Harbour"` and refused that anchor as landing on a different word. Nothing the author
+ * could write satisfied both, and the `expected` list handed them the anchor the other check
+ * rejects.
+ *
+ * That is why `expected` is built from the words the *beat* speaks and not from the payload's
+ * tokens. Naming a repair the next check refuses is worse than naming none: the author spends
+ * a cycle discovering the rules contradict each other. A token the beat does not speak at all
+ * keeps the payload's spelling — that plan is wrong in a way this check cannot repair, and
+ * `checkWordAnchors` is the one that says so.
  */
-const checkDeicticLanding = (section: VideoPlanSection): CompilerError[] => {
+const checkDeicticLanding = (
+  section: VideoPlanSection,
+  textOf: Map<string, string>,
+): CompilerError[] => {
   const errors: CompilerError[] = [];
+
+  /** The beat's own spelling of a word it speaks, or the token as written when it does not. */
+  const asSpoken = (beatId: string, token: string): string => {
+    const text = textOf.get(beatId);
+    if (text === undefined) return token;
+    const spoken = tokenise(text).map((word) => word.text);
+    return spoken.find((word) => word.toLowerCase() === token.toLowerCase()) ?? token;
+  };
 
   for (const scene of section.scenes ?? []) {
     const capability = findCapability(scene.component);
@@ -617,7 +643,12 @@ const checkDeicticLanding = (section: VideoPlanSection): CompilerError[] => {
 
         const tokens = tokenise(value).map((word) => word.text);
         if (tokens.length === 0) continue;
-        if (landsOn !== undefined && tokens.includes(landsOn)) continue;
+        if (
+          landsOn !== undefined &&
+          tokens.some((token) => token.toLowerCase() === landsOn.toLowerCase())
+        ) {
+          continue;
+        }
 
         const beats = parsed.beatId === 'scene' ? (scene.spansBeats ?? []) : [parsed.beatId];
         const missed =
@@ -631,7 +662,9 @@ const checkDeicticLanding = (section: VideoPlanSection): CompilerError[] => {
           sectionId: section.id,
           field: `events[${index}].at`,
           message: `Action "${event.action}" points at "${value}" through its "${field}", and "${event.at}" does not land on it. A pointing gesture says "this one", which is only true while the narrator is saying the thing pointed at — ${missed}. Anchor the event to the word it names, or use an action that makes no such claim.`,
-          expected: beats.flatMap((beat) => tokens.map((token) => `${beat}.word:${token}`)),
+          expected: beats.flatMap((beat) =>
+            tokens.map((token) => `${beat}.word:${asSpoken(beat, token)}`),
+          ),
         });
       }
     }
