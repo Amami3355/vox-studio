@@ -283,12 +283,11 @@ n=1-against-n=1 swing on the record.
 
 ## Further Notes
 
-The draft-review tool that makes the pre-submission channel possible landed immediately before
-this ticket. Before it, a finding could only reach the author after submission, which is why
-"tell the author it missed a gesture" was not previously a cheap thing to propose.
-
-The three unreviewed changes standing on this branch are worth clearing before or alongside
-this work, since this ticket adds a fourth and touches the same seams.
+The draft-review tool that makes the pre-submission channel possible is ticket 18, which
+landed immediately before this one. Before it, a finding could only reach the author after
+submission, which is why "tell the author it missed a gesture" was not previously a cheap thing
+to propose. Ticket 18 also settles where `review` reads the check registry from, which
+this ticket extends from the registry's errors to its warnings.
 
 Two numbers worth carrying: the prefix is 44 anchors, 35 Boundary and 9 Word, of which two
 demonstrate a pointing gesture; and the catalog projection is 52% of the prefix and 30

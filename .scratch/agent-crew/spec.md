@@ -231,8 +231,14 @@ These are yours, not the agent's. Nothing below is code.
   else; the sheet's own pass needs a model and is (3)'s to earn.
   (2) An unservable Brief produces a structured Decline naming the unmet
   editorial need, with no Take recorded (review decision 4). (3) One real Helios
-  Bay run — live synthesis, one take — passes machine assertions and is
-  submitted for the standing human watch/listen verdict.
+  Bay run — live synthesis, one take — earns every assertion that is its to
+  earn and is submitted for the standing human watch/listen verdict.
+  **Review decision 1 binds (3) exactly as it binds (1):** a crew run does not
+  evidence the isolation boundary, so its six isolation rows score
+  `not-evidenced` and never `pass`, and the aggregate verdict of such a run is
+  read as `51 pass / 6 not-evidenced` rather than as a clean sheet. (1) said this
+  and (3) did not, which left the ticket amending itself against a spec that
+  still asked it for a verdict a crew run cannot give.
 
 ## Review decisions — settled
 
@@ -292,12 +298,19 @@ ticket.
    *projection*, serialised compact: **124,690 characters, ~42k tokens** (catalog
    64,371, protocol 24,108, language 18,504, checks 9,037, plan 7,387, and the
    crew's preamble and headings). The placeholder estimate of 55–70k tokens was
-   over the wrong artifact and by roughly a third. The budget is therefore stated
+   over the wrong artifact and by roughly a third.
+
+   **Re-measured once the author was given a tool.** 124,690 is the scripted
+   prefix and is unchanged — that is the point of adding the tool paragraph only
+   for an author that holds one, and it is what keeps every measurement taken
+   before the tool comparable. A live author's prefix is **125,039**: the same
+   text plus 349 characters describing the tool it may call. Both sit far inside
+   the resident line. The budget is therefore stated
    in characters, which the crew can count exactly and offline on every Run, with
    tokens as a deliberately conservative conversion at 3 characters per token:
 
    - **Resident prefix: 150,000 characters (~50k tokens)**, sent once per Run.
-     About a fifth of headroom over the measured 124,690, which is room for the
+     About a fifth of headroom over the measured 125,039, which is room for the
      catalog to gain capabilities without a Run being refused for it.
    - **Fresh text: 20,000 characters per plan version.** The largest refusal the
      fixtures record is 5,248 characters and a showcase Brief handed back with an
@@ -311,7 +324,20 @@ ticket.
      time**: at most six for a showcase Brief, five for the short one
      (`repair_budget(25).plan_versions == 5`).
 
-   Both lines are enforced rather than reported, and priced before a turn is
+     **Amended once the author was given a tool.** An author holding one answers
+     a single ask over several model calls — it reads the prefix, calls the tool,
+     and reads the prefix again with the answer appended — so a plan version is
+     no longer one request. The rule the spec was reaching for survives in a
+     stronger form: **a Run may take at most `MODEL_CALLS_PER_ASK` calls per plan
+     version**, four, being the first call plus three the author may spend
+     reading a finding and trying again. An author holding no tool takes exactly
+     one and is priced as it always was. The line is enforced by
+     `ContextSpend.overrun`, which reads it *before* the character line it would
+     also blow: a Run that passed it spent its budget looping against a tool
+     rather than on plan versions, and that is the finding rather than where the
+     characters went.
+
+   All three lines are enforced rather than reported, and priced before a turn is
    asked for rather than after. A first ask that does not fit is refused before a
    Run is opened; a repair that would cross the turn allowance is refused and the
    Run ends `budget_exhausted` with the line named.

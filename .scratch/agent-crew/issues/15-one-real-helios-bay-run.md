@@ -44,7 +44,12 @@ of it needed a key:
 - A driver that leaves no plan file behind is exercised in `proof-harness.test.ts` — the live
   crew's shape, at fixture cost. It fails with `ENOENT` against the old read.
 - `pnpm --filter @vox/production proof:crew-showcase` is the runner: the showcase scenario, the
-  crew driver with no `plan`, live synthesis, working roots kept.
+  crew driver with no `plan`, working roots kept. **It rehearses by default and spends only
+  when told to: `-- --provider elevenlabs` is the live run.** That default was the other way
+  round while `catalogShowcasePlanViolations` blocked a Brief-violating plan before synthesis;
+  once that check moved to the assertion sheet, nothing else stood between a bad plan and a
+  dispatch, so the default is what stands there now. A rehearsal is a full run — the crew
+  authors through a real model and every assertion scores — and it costs no voice credit.
 - `vox-crew --model NAME` chooses the author's model for one invocation, so the showcase run can
   ask for a pro model without the pinned default moving. Refused alongside `--plan`, which
   reaches no model at all, and refused for a floating alias — the same rule the pinned default
@@ -97,12 +102,16 @@ with no repairs is the stronger result. The rehearsal bundle is at
 
 - [ ] The showcase Brief runs end to end with live synthesis
 - [ ] Exactly one Take is recorded
-- [ ] No machine assertion fails, and the evidence bundle verifies. The aggregate verdict of
-      a crew run is `not-evidenced`, never `pass`: `spec.md` decision (1) settles that local
-      crew runs report `sandboxEvidence: null`, so the six isolation and direct-network
-      assertions score `not-evidenced` by design and code-blindness is convention rather
-      than enforcement here. Read this criterion as the failure count, not the verdict word —
-      the spec asks for exactly that, so it is not rediscovered at submission time.
-- [ ] The run stays inside the measured budget
+- [ ] No machine assertion fails, and the evidence bundle verifies. **The sheet reads exactly
+      `51 pass / 6 not-evidenced`, and the six are the isolation and direct-network rows** —
+      that count is the criterion, not "some not-evidenced is expected", which would accept a
+      row going dark for an unrelated reason. The aggregate verdict of a crew run is
+      `not-evidenced`, never `pass`: `spec.md` decision (1) settles that local crew runs report
+      `sandboxEvidence: null`, so those six score `not-evidenced` by design and code-blindness
+      is convention rather than enforcement here. Read this criterion as the failure count, not
+      the verdict word — the spec now asks for exactly that in bar (3) as well as bar (1), so
+      it is not rediscovered at submission time.
+- [ ] The run stays inside the measured budget, rate line included: at most four model calls
+      per plan version, which `ContextSpend.overrun` enforces rather than reports
 - [ ] The preview is watched and listened to end to end by a human
 - [ ] The human verdict is recorded alongside the evidence bundle
