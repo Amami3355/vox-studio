@@ -110,9 +110,42 @@ prose written without thinking about where it lands.
 - **Measuring or claiming a token saving.** The crew counts characters, offline, for reasons
   `context.py` records, and this ticket does not reopen them.
 
+## Further Notes
+
+**The framework's caching behaviour, checked rather than inherited (2026-08-27).** The
+load-bearing claim above — that the framework's context cache begins on a session's second turn
+— was verified against `google-adk 2.7.1`, the version installed in `services/agents/.venv` and
+the one the crew is written against. It holds, and it is stronger than the docstring that
+carried it.
+
+`ContextCacheConfig`'s own class docstring states it outright: *"Caching begins on the second
+turn of a session at the earliest and requires the cacheable prefix to reach the model-specific
+minimum: 2048 tokens for Gemini 2.5 or 4096 tokens for Gemini 3. Short or single-turn sessions
+are therefore never cached."* Its `min_tokens` field repeats the mechanism: *"No cache is
+created on the first request of a session; caching begins on the second turn once a previous
+token count is known."*
+
+It is enforced, not merely documented. `models/gemini_context_cache_manager.py` skips cache
+creation whenever `llm_request.cacheable_contents_token_count is None` — logging *"No previous
+token count available, skipping cache creation for initial request"* — and declines to create a
+cache with no previous fingerprint to match. The gate reads a fact about the *previous*
+response, so a session that never has one cannot pass it.
+
+**Which way the finding falls: toward this ticket, not away from it.** `AdkPlanAuthor` opens a
+fresh session per ask, so every session this crew opens is single-turn — the case the framework
+names explicitly as never cached. Nor is it configurable into reach: `min_tokens` only raises a
+floor, and Gemini's model-specific minimum applies underneath it regardless. The eligibility the
+bundle publishes is therefore not merely unobserved but unreachable, which is what the Problem
+Statement assumed and could not show.
+
+The published documentation (`google/adk-docs`, `docs/context/caching.md`) does not contradict
+this. It documents the configuration surface and leaves the turn rule to the class reference,
+which is the same text as the installed source. The installed package is the better source here
+in any case, being the code that actually runs.
+
 **Blocked by:** None (can start immediately)
 
-- [ ] The framework's context-caching behaviour is checked against current documentation and the finding recorded
+- [x] The framework's context-caching behaviour is checked against current documentation and the finding recorded
 - [ ] The bundle publishes the identical-prefix property under a name that describes it
 - [ ] The wording beside it says caching is unreachable under the current session model, and why
 - [ ] The claim that the repair loop avoids re-sending the catalog is corrected where it is made
