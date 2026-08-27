@@ -98,11 +98,39 @@ shows flash cannot hold the Brief with a real voice in the loop; a claim earned 
 with no repairs is the stronger result. The rehearsal bundle is at
 `.scratch/agent-production-interface/proofs/2026-08-26T185603-783Z-helios-bay-catalog-showcase`.
 
-**Status:** ready-for-human
+**The verdict is signed, and it needed a script.** `human-verdict.json` is written `pending` at
+seal time and is one of the 51 hashed entries in `hash-index.json`, so hand-editing it fails
+`PROOF_HASH_MISMATCH` before the verdict logic is ever reached. **No bundle had ever carried a
+signed verdict** — all seven on disk were `pending` — which is the likeliest reason this ticket
+sat at `ready-for-human`, and not anything about the film. Exempting the file from the index was
+the alternative and was rejected: the bundle would then stop attesting the one thing a human puts
+into it. So `pnpm --filter @vox/production sign:verdict <dir> --input <verdict.json>` rewrites the
+verdict *and* re-hashes it, and it is the only thing that may. Three properties make that safe,
+all held by `proof-sign-verdict.test.ts`: it verifies the whole bundle **before** it writes, so
+signing can never be the step that launders one somebody edited; it moves only the two hashes it
+actually changed, never re-sealing the index from current contents; and it leaves the artifact
+bindings, the criteria and `verticalSliceReviewed` exactly as sealed — gap 8 is a separate watch
+and the sealed note says so. `--template` prints an input file with the six criteria already in
+order, so notes cannot be filed against the wrong rows.
 
-- [ ] The showcase Brief runs end to end with live synthesis
-- [ ] Exactly one Take is recorded
-- [ ] No machine assertion fails, and the evidence bundle verifies. **The sheet reads exactly
+**`verify:proof` is not this ticket's gate, and cannot be.** It runs `requirePass: true`, which
+demands `machineVerdict === 'pass'` — and the third criterion below is that a crew run's aggregate
+is `not-evidenced`, never `pass`. `environment.directNetworkPolicy.denied` is `false` for the same
+measurement reason, a second condition the gate can never meet. Signing the bundle and then
+running `verify:proof` still throws `PROOF_VERDICT_NOT_PASS`, and the verdict is not why. The gate
+is `verifyProofBundle` without `requirePass`, which the signing script runs on itself afterwards;
+on the signed bundle, re-run in a fresh process, it returns
+`{ machineVerdict: 'not-evidenced', humanVerdict: 'pass' }`. **There is no standing command that
+runs that check** — `verify:proof` is `requirePass`-only, so a crew bundle has no re-verification
+script of its own.
+
+**Status:** done
+
+- [x] The showcase Brief runs end to end with live synthesis — `2026-08-27T175345-435Z`,
+      `provider: elevenlabs`, `agent: fresh-generalist`, one provider dispatch
+- [x] Exactly one Take is recorded — `record.one-take-used` observed `1`, `record.same-take` and
+      `take.verified` both pass
+- [x] No machine assertion fails, and the evidence bundle verifies. **The sheet reads exactly
       `51 pass / 6 not-evidenced`, and the six are the isolation and direct-network rows** —
       that count is the criterion, not "some not-evidenced is expected", which would accept a
       row going dark for an unrelated reason. The aggregate verdict of a crew run is
@@ -111,7 +139,13 @@ with no repairs is the stronger result. The rehearsal bundle is at
       is convention rather than enforcement here. Read this criterion as the failure count, not
       the verdict word — the spec now asks for exactly that in bar (3) as well as bar (1), so
       it is not rediscovered at submission time.
-- [ ] The run stays inside the measured budget, rate line included: at most four model calls
-      per plan version, which `ContextSpend.overrun` enforces rather than reports
-- [ ] The preview is watched and listened to end to end by a human
-- [ ] The human verdict is recorded alongside the evidence bundle
+- [x] The run stays inside the measured budget, rate line included: at most four model calls
+      per plan version, which `ContextSpend.overrun` enforces rather than reports — one plan
+      version, `reviewCalls: 2`, and an overrun would have stopped the run rather than annotated it
+- [x] The preview is watched and listened to end to end by a human — Mourad Amami, laptop display
+      and headphones, 2026-08-27
+- [x] The human verdict is recorded alongside the evidence bundle — `pass` on all six rows.
+      **The notes quote the evaluator rather than paraphrase him**: the whole spoken verdict was
+      *"all is good. I watched."* plus *"the anchor words are where they should be"* against row 2,
+      and six invented observations attributed to a person is not a thing a proof bundle may
+      contain. `SUMMARY.md` states the same verdict, so the bundle does not contradict itself.
