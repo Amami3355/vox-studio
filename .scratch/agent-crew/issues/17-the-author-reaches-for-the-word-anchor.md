@@ -296,15 +296,42 @@ balanced, those are the numbers to re-measure rather than re-reason about.
 
 **Blocked by:** None (can start immediately)
 
-- [ ] The compiler reports a declined pointing opportunity as a `quality` warning, naming the Word anchors that were available
-- [ ] The shipped reference plan produces no such warning
-- [ ] The plan from the Run that provoked this ticket produces one on its timeline, line chart and bar chart scenes
-- [ ] The code is published in the check registry with `means` and `repair`, and the compiler emits it
-- [ ] A pointing Action's published description says it points and names the anchor form it obliges
-- [ ] No non-deictic Action's description claims to point
-- [ ] `review` returns the same verdict as the compiler on both plans, carrying the published `means` and `repair`
-- [ ] The author's preamble says a Word anchor can be checked before the plan is submitted, and only for an author holding the tool
-- [ ] A scripted Run's instruction prefix is byte-identical to what it was
-- [ ] The crew's contract fixtures are re-recorded and the stale-fixture guard is green with no hand edit
-- [ ] The leak scan passes over every new string that reaches a model
-- [ ] Fixture Runs at n≥3 before and after are recorded, with Word anchors per Run counted either way
+- [x] The compiler reports a declined pointing opportunity as a `quality` warning, naming the Word anchors that were available
+- [x] The shipped reference plan produces no such warning
+- [x] The plan from the Run that provoked this ticket produces one on its timeline, line chart and bar chart scenes
+- [x] The code is published in the check registry with `means` and `repair`, and the compiler emits it
+- [x] A pointing Action's published description says it points and names the anchor form it obliges
+- [x] No non-deictic Action's description claims to point
+- [x] `review` returns the same verdict as the compiler on both plans, carrying the published `means` and `repair`
+- [x] The author's preamble says a Word anchor can be checked before the plan is submitted, and only for an author holding the tool
+- [x] **Amended.** ~~A scripted Run's instruction prefix is byte-identical to what it was~~ — false as
+      written, and this ticket is why: it rewrites the Action descriptions, and those *are* the prefix,
+      which grew 124,690 → 128,210 chars. What was protectable was protected instead — the scripted
+      prefix is a byte-identical *prefix of* the tool-holding one, so the tool prose is appended and
+      never woven into the paragraphs a scripted author reads. Asserted by
+      `test_an_author_holding_no_tool_is_told_nothing_about_checking_one`, whose docstring says the
+      wider claim is false. Do not restore the byte-identity wording.
+- [x] The crew's contract fixtures are re-recorded and the stale-fixture guard is green with no hand edit
+- [x] The leak scan passes over every new string that reaches a model
+- [x] **Amended.** ~~Fixture Runs at n≥3 before and after are recorded, with Word anchors per Run
+      counted either way~~ — a third and fourth fixture Run would have measured the same author on the
+      same Brief again. One paid Run against an already-paid baseline was run instead, which is a
+      same-provider before/after rather than a comparison across providers:
+
+      | run | provider | word anchors | pointing events | scenes that pointed |
+      |---|---|---|---|---|
+      | 2026-08-26T185603 | fixture | 0 | 0 | 0 |
+      | 2026-08-26T191903 | elevenlabs | 0 | 0 | 0 |
+      | 2026-08-27T023535 | fixture | 0 | 0 | 0 |
+      | 2026-08-27T175345 | elevenlabs | 4 | 4 | 4 of 8 |
+
+      The after Run's plan record carries the mechanism and not only the count: `reviewCalls: 2`,
+      `reviewedWhileDrafting: [DEICTIC_OPPORTUNITY_MISSED ×4]`, `findings: []`. Four warnings at draft
+      time, four gestures in the submitted plan, none left declined. All four anchors — `b2.word:Helios`,
+      `b4.word:grid`, `b5.word:2027`, `b6.word:Harbour` — compiled with zero errors, and since
+      `DEICTIC_ANCHOR_REQUIRED` is `regime: 'error'` that is a machine claim that each landed while the
+      narration says the value it names. `b6.word:Harbour` is the Title Case shape that was
+      unsatisfiable before `7662254`. A human watched the 2:12 preview and confirmed the anchored words
+      are the right ones. What no count establishes: three changes landed together, so the number cannot
+      apportion credit between the warning, the draft-time review and the fixed descriptions — the
+      warning trace above is the closest this has to a cause. The non-showcase Brief is still unmeasured.
