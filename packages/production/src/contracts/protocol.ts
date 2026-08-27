@@ -12,9 +12,15 @@ export const CONTRACT_CATEGORIES: readonly {
     contractVersion: 1,
   },
   {
+    /**
+     * Version 4 removed the compiler checks, which the `checks` category publishes.
+     *
+     * The summary followed the document: two categories that both claimed the checks were the
+     * readable symptom of publishing one document twice.
+     */
     id: 'catalog',
-    summary: 'Scene capabilities, semantic time and compiler checks.',
-    contractVersion: 3,
+    summary: 'Scene capabilities and semantic time.',
+    contractVersion: 4,
   },
   { id: 'checks', summary: 'Compiler error and warning meanings and repairs.', contractVersion: 1 },
   {

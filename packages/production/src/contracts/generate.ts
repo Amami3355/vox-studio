@@ -77,6 +77,17 @@ export const buildContractProjections = (inputs: {
   const catalog = assertObject(inputs.catalog, 'catalog');
   const checks = assertObject(catalog.checks, 'checks');
 
+  /**
+   * The catalog is published without the checks, because the category beside it is what
+   * publishes them.
+   *
+   * The source keeps them where they are authored — inside the manifest, beside the capabilities
+   * whose refusals they explain — and the lift happens here, at projection time, so nothing about
+   * the video package's catalog moves. What a consumer reads is the decision: each document in
+   * one place, so reading the whole contract does not mean reading the checks twice.
+   */
+  const { checks: _publishedBesideIt, ...catalogWithoutChecks } = catalog;
+
   const protocol = {
     ...PRODUCTION_CONTRACT,
     schemas: {
@@ -95,7 +106,7 @@ export const buildContractProjections = (inputs: {
   const rawContracts: Record<string, JsonObject> = {
     language: { entries: parseGlossary(inputs.contextMarkdown) },
     plan,
-    catalog,
+    catalog: catalogWithoutChecks,
     checks,
     protocol,
   };

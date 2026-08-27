@@ -11,7 +11,7 @@
     },
     {
       "id": "catalog",
-      "summary": "Scene capabilities, semantic time and compiler checks."
+      "summary": "Scene capabilities and semantic time."
     },
     {
       "id": "checks",

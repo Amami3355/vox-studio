@@ -17,6 +17,11 @@ import {
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
+const sourceCatalog = (): Record<string, unknown> =>
+  JSON.parse(
+    readFileSync(resolve(repositoryRoot, 'packages/video/src/catalog/catalog.json'), 'utf8'),
+  );
+
 const fresh = () =>
   buildContractProjections({
     contextMarkdown: readFileSync(resolve(repositoryRoot, 'CONTEXT.md'), 'utf8'),
@@ -26,9 +31,7 @@ const fresh = () =>
         'utf8',
       ),
     ),
-    catalog: JSON.parse(
-      readFileSync(resolve(repositoryRoot, 'packages/video/src/catalog/catalog.json'), 'utf8'),
-    ),
+    catalog: sourceCatalog(),
   });
 
 describe('production contract projections', () => {
@@ -43,9 +46,49 @@ describe('production contract projections', () => {
     }
   });
 
-  it('publishes checks as an exact view of catalog v4', () => {
+  it('publishes the same five categories, in the same order, under the same ids', () => {
+    expect(index.categories.map(({ id }) => id)).toEqual([
+      'language',
+      'plan',
+      'catalog',
+      'checks',
+      'protocol',
+    ]);
+  });
+
+  /**
+   * The property that would have caught the catalog publishing the checks category's document
+   * verbatim beside it: a category may not carry what another category exists to publish.
+   *
+   * Containment rather than equality, because that is the shape the duplication took — the
+   * repeated document was a section of a larger one, so comparing whole projections would have
+   * gone on passing. A consumer that reads the whole contract pays for every repeat.
+   */
+  it('never carries one category document inside another', () => {
+    const documents = Object.entries(fresh().categories).map(
+      ([id, { contract }]) => [id, JSON.stringify(contract)] as const,
+    );
+
+    for (const [id, document] of documents) {
+      for (const [otherId, other] of documents) {
+        if (id === otherId) continue;
+        expect(
+          document.includes(other),
+          `the ${id} projection carries the ${otherId} projection's published document`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('publishes the checks as an exact view of catalog v4, and the catalog without them', () => {
+    const source = sourceCatalog();
+
     expect(catalog.contract.manifestVersion).toBe(4);
-    expect(checks.contract).toEqual(catalog.contract.checks);
+    expect(checks.contract).toEqual(source.checks);
+    expect(Object.hasOwn(catalog.contract, 'checks')).toBe(false);
+    // Subtraction that went exactly far enough: the catalog is the source less the checks,
+    // every capability, action, anchor form and semantic time rule still published.
+    expect({ ...catalog.contract, checks: source.checks }).toEqual(source);
   });
 
   it('parses CONTEXT.md into unique non-empty glossary entries', () => {
