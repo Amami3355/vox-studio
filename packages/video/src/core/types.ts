@@ -369,6 +369,21 @@ type CompilerWarningFields = {
   field?: string;
   message: string;
   suggestion?: string;
+  /**
+   * The values that would have satisfied this warning, where it can compute them.
+   *
+   * The same field a `CompilerError` carries and for the same reason: a report that names a
+   * problem and leaves the reader to find the alternatives is a research task, and one that
+   * lists them is a substitution. It arrived on the warning side with
+   * `DEICTIC_OPPORTUNITY_MISSED`, which is the first warning whose whole value is the list —
+   * it reports a gesture the author *could* have made, and "could have" is a claim about
+   * specific anchors or it is a scolding.
+   *
+   * Optional, and most warnings have nothing to put here. A soft limit exceeded has no
+   * enumerable set of satisfying values, and inventing one would make this field mean
+   * something different per code.
+   */
+  expected?: string[];
 };
 
 export type CompilerWarning = {
@@ -418,6 +433,7 @@ const runtimeCompileReportSchema = z
           ...compilerLocationSchema,
           message: z.string().min(1),
           suggestion: z.string().optional(),
+          expected: z.array(z.string()).optional(),
         })
         .strict(),
     ),

@@ -7,8 +7,10 @@ import {
   validateVideoPlan,
 } from '../src/catalog/tools';
 import type { PersistentElement, Placement, SceneInstance } from '../src/core/types';
+import { shippedPlans } from '../src/plans';
 import { barChartSchema } from '../src/scenes/BarChartScene';
 import { registry } from '../src/scenes/registry';
+import declinedGestures from './fixtures/declined-gestures.plan.json';
 
 /** The three-beat plan most partition tests vary one section of. */
 const withScenes = (scenes: SceneInstance[]): VideoPlan => ({
@@ -490,6 +492,252 @@ describe('validateVideoPlan — an action lands on the word it points at', () =>
     const report = validateVideoPlan(stamping('b2.word:squeeze'));
 
     expect(report.errors.some((e) => e.code === 'EVENT_BEFORE_ELEMENT_REVEALED')).toBe(false);
+  });
+});
+
+/**
+ * The gesture that was available and not taken.
+ *
+ * `DEICTIC_ANCHOR_REQUIRED` above judges a pointing action the author *chose*. This judges
+ * the choice itself, and it exists because the measurement said the author never gets that
+ * far: across the eight scenes of the Run that provoked this rule it took the non-deictic
+ * sibling every time — `annotate` over `highlightBar`, `annotatePoint` over `focusPoint` —
+ * so the landing rule had nothing to fire on and the plan was, by the compiler's lights,
+ * correct. Nothing had ever cost the author anything for declining the gesture.
+ *
+ * A warning and not an error, and that is a decision rather than caution. An annotation's
+ * timing legitimately follows the sentence that *justifies* it, which may be a beat away,
+ * and the actions that decline to declare a deictic field already record that reasoning.
+ * Promoting this would delete a real editorial freedom.
+ *
+ * The cases below are the shape of the prototype that settled the rule's third condition,
+ * and neither half is worth much alone: a rule that fires on the defect but also on the
+ * shipped reference plan is a rule nobody can read a finding out of.
+ */
+describe('validateVideoPlan — a pointing opportunity declined', () => {
+  /**
+   * A bar chart that annotates where it could have highlighted, over a beat that speaks
+   * one of its own labels. Every condition of the rule is met, so this is the positive.
+   */
+  const declining = (events: SceneInstance['events']): VideoPlan => ({
+    beats: [
+      { id: 'b1', text: 'Rents rose faster than wages.' },
+      { id: 'b2', text: 'London is the extreme case, and New York is close behind.' },
+    ],
+    sections: [
+      {
+        id: 'sec1',
+        spansBeats: ['b1', 'b2'],
+        scenes: [
+          base({ id: 's1', spansBeats: ['b1'], events: [] }),
+          base({
+            id: 's2',
+            spansBeats: ['b2'],
+            props: {
+              title: 'Share of income spent on rent',
+              unit: '%',
+              data: [
+                { label: 'London', value: 47 },
+                { label: 'New York', value: 44 },
+              ],
+            },
+            events,
+          }),
+        ],
+      },
+    ],
+  });
+
+  const annotating = declining([
+    { at: 'b2.start', action: 'annotate', payload: { label: 'London', text: 'the extreme case' } },
+  ]);
+
+  const missed = (plan: VideoPlan) =>
+    validateVideoPlan(plan).warnings.find((w) => w.code === 'DEICTIC_OPPORTUNITY_MISSED');
+
+  it('reports a scene that could have pointed and did not', () => {
+    const warning = missed(annotating);
+
+    expect(warning).toBeDefined();
+    expect(warning?.severity).toBe('quality');
+    expect(warning?.sceneId).toBe('s2');
+  });
+
+  /**
+   * The half that makes the finding actionable rather than a scolding. A report that says
+   * "you could have pointed" and leaves the author to work out where is a research task;
+   * naming the anchors makes it a substitution, which is why this is asserted in the shape
+   * `DEICTIC_ANCHOR_REQUIRED` already uses.
+   */
+  it('names the word anchors that were available', () => {
+    expect(missed(annotating)?.expected).toContain('b2.word:London');
+  });
+
+  it('stays silent on a scene that points at something once', () => {
+    const plan = declining([
+      { at: 'b2.word:London', action: 'highlightBar', payload: { label: 'London' } },
+      { at: 'b2.start', action: 'annotate', payload: { label: 'New York', text: 'close behind' } },
+    ]);
+
+    expect(missed(plan)).toBeUndefined();
+  });
+
+  it('stays silent on a scene with no events at all', () => {
+    expect(missed(declining([]))).toBeUndefined();
+  });
+
+  /**
+   * The condition that kept the rule off the shipped reference plan. A looser reading —
+   * "any token of the props appears in the beat" — fired twice on it, matching stop-words
+   * out of headline and caption prose. Whole leaf values are what excludes prose: a
+   * headline is a leaf value of three or more tokens that is not spoken verbatim, while a
+   * chart label is a leaf value that is.
+   */
+  it('stays silent when nothing in the props is actually spoken', () => {
+    const plan = declining([
+      { at: 'b2.start', action: 'annotate', payload: { label: 'Berlin', text: 'for contrast' } },
+    ]);
+    const scene = plan.sections[0]?.scenes[1] as SceneInstance;
+    scene.props = {
+      title: 'Share of income spent on rent',
+      unit: '%',
+      data: [
+        { label: 'Berlin', value: 33 },
+        { label: 'Lisbon', value: 44 },
+      ],
+    };
+
+    expect(missed(plan)).toBeUndefined();
+  });
+
+  /**
+   * A multi-word label lands on any one of its tokens, exactly as the landing rule already
+   * decides for a value it holds an event to. The two rules disagreeing about what "New
+   * York" can be anchored to would make the suggestion refuse.
+   */
+  it('offers every token of a multi-word value the beat speaks', () => {
+    const warning = missed(annotating);
+
+    expect(warning?.expected).toContain('b2.word:New');
+    expect(warning?.expected).toContain('b2.word:York');
+  });
+
+  /**
+   * Suggesting an anchor onto a word the beat says twice would be suggesting
+   * `AMBIGUOUS_ANCHOR` — a repair that refuses is worse than no repair, because the author
+   * spends a cycle discovering that the rule contradicts the one next door.
+   */
+  it('offers no anchor onto a word the beat speaks twice', () => {
+    const plan = declining([
+      { at: 'b2.start', action: 'annotate', payload: { label: 'London', text: 'the extreme' } },
+    ]);
+    const beat = plan.beats[1] as { text: string };
+    beat.text = 'London is the extreme case, and London is still climbing.';
+
+    expect(missed(plan)?.expected ?? []).not.toContain('b2.word:London');
+  });
+
+  /**
+   * The anchor is written with the beat's own casing and not the payload's.
+   *
+   * `checkWordAnchors` compares a named word to the tokenised beat text exactly, and
+   * `resolveAnchor` does the same against a take. So a scene whose props say "London" over
+   * a beat that says "london" can point at it — the value is spoken — but only through
+   * `word:london`. Naming the token the *payload* spells would hand the author an anchor
+   * that fails the check next door.
+   */
+  it('writes the anchor as the beat speaks it, not as the props spell it', () => {
+    const plan = declining([
+      { at: 'b2.start', action: 'annotate', payload: { label: 'London', text: 'the extreme' } },
+    ]);
+    const beat = plan.beats[1] as { text: string };
+    beat.text = 'The city of london is the extreme case.';
+
+    const expected = missed(plan)?.expected ?? [];
+    expect(expected).toContain('b2.word:london');
+    expect(expected).not.toContain('b2.word:London');
+  });
+
+  /**
+   * The falsification. `quote` publishes no pointing action at all, so there was no
+   * opportunity to decline — if this fires, the rule is reading "the scene did not point"
+   * rather than "the scene could have".
+   */
+  it('leaves a capability that publishes no pointing action alone', () => {
+    const plan = declining([]);
+    const scene = plan.sections[0]?.scenes[1] as SceneInstance;
+    scene.component = 'quote';
+    scene.layout = 'centered';
+    scene.props = { quote: 'London is the extreme case', attribution: 'New York' };
+    scene.events = [{ at: 'b2.start', action: 'revealQuote' }];
+
+    expect(missed(plan)).toBeUndefined();
+  });
+});
+
+/**
+ * The rule, asked of the two plans that settled it.
+ *
+ * The unit cases above build a plan per condition, which is the only way to say what each
+ * condition does. It is also the way a rule gets written that fires on exactly the plans it
+ * was written against. These two are real: one is what the repository ships and the other is
+ * what a model actually produced, and they are asserted together because neither half is
+ * worth much alone. A rule that finds the defect and also fires on the shipped plan is a
+ * rule nobody can read a finding out of; a rule that stays quiet on the shipped plan and
+ * also on the defect is not a rule at all.
+ *
+ * These numbers are the ticket's measurement and they are load-bearing. If a later change
+ * moves them, the question is whether the rule got better or whether one of these plans did.
+ */
+describe('DEICTIC_OPPORTUNITY_MISSED — the two plans it was measured on', () => {
+  const declining = (plan: VideoPlan): string[] =>
+    validateVideoPlan(plan)
+      .warnings.filter((w) => w.code === 'DEICTIC_OPPORTUNITY_MISSED')
+      .map((w) => w.sceneId ?? '?');
+
+  /**
+   * The shipped reference plan: multi-capability, with a persistent placement, and the plan
+   * a looser third condition fired twice on. Its silence is the falsification for the whole
+   * rule — nothing else here says the rule discriminates.
+   */
+  it('says nothing about the plan the repository ships', () => {
+    for (const shipped of shippedPlans) {
+      expect(declining(shipped.plan)).toEqual([]);
+    }
+  });
+
+  /**
+   * The Run that provoked the ticket. Eight scenes, fifteen events, every one of them at a
+   * boundary; `annotate` where `highlightBar` was available, `annotatePoint` where
+   * `focusPoint` was, `annotate` where `focusEvent` was.
+   *
+   * `image_context` is in this plan and stays quiet, which is the interesting part of the
+   * count. It publishes `emphasize` and used none, so it clears the first two conditions —
+   * but its payload is authored stamp copy rather than a reference into the scene's own
+   * data, so its props name nothing the beats speak. There is no sense in which it *missed*
+   * a gesture the material does not support.
+   */
+  it('finds the declined gesture in each of the three scenes that had one', () => {
+    const plan = declinedGestures as VideoPlan;
+
+    expect(validateVideoPlan(plan).ok).toBe(true);
+    expect(declining(plan)).toEqual(['scene-timeline', 'scene-line', 'scene-bar']);
+  });
+
+  /**
+   * The anchors that make the finding a substitution. Each of these is a word its own beat
+   * speaks exactly once, spelled as the beat spells it, so the author can copy one into the
+   * event's `at` and have both `checkWordAnchors` and the landing rule accept it.
+   */
+  it('names anchors the plan could have been repaired with', () => {
+    const warnings = validateVideoPlan(declinedGestures as VideoPlan).warnings.filter(
+      (w) => w.code === 'DEICTIC_OPPORTUNITY_MISSED',
+    );
+    const offered = new Map(warnings.map((w) => [w.sceneId, w.expected ?? []]));
+
+    expect(offered.get('scene-bar')).toContain('b18.word:Hillside');
+    expect(offered.get('scene-timeline')).toContain('b11.word:harbour');
+    expect(offered.get('scene-line')).toContain('b14.word:2027');
   });
 });
 

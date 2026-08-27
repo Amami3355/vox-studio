@@ -414,6 +414,7 @@ export const validateVideoPlan = (plan: VideoPlan): CompileReport => {
     errors.push(...checkPlacements(section, domain));
     errors.push(...checkWordAnchors(section, textOf));
     errors.push(...checkDeicticLanding(section));
+    warnings.push(...checkDeicticOpportunity(section, textOf));
 
     let previousProfile: string | undefined;
 
@@ -637,6 +638,139 @@ const checkDeicticLanding = (section: VideoPlanSection): CompilerError[] => {
   }
 
   return errors;
+};
+
+/** The widest value the rule will treat as a thing the narrator says, in tokens. */
+const DEICTIC_CANDIDATE_MAX_TOKENS = 5;
+
+/**
+ * Every complete leaf string of an authored props object.
+ *
+ * Complete leaves rather than tokens, and that is the load-bearing choice. "Any token of
+ * the props appears in the beat" was tried and rejected on measurement: it fired twice on
+ * the shipped reference plan, matching stop-words out of headline and caption prose. A
+ * whole leaf value is what tells the two apart — a headline is three or more tokens that
+ * are not spoken verbatim, a chart label is a leaf that is.
+ */
+function* leafStrings(value: unknown): Generator<string> {
+  if (typeof value === 'string') {
+    yield value;
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) yield* leafStrings(item);
+    return;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const item of Object.values(value)) yield* leafStrings(item);
+  }
+}
+
+/**
+ * A pointing opportunity the author declined.
+ *
+ * `checkDeicticLanding` judges a pointing action the author *chose*. This judges the choice
+ * itself, and it exists because the measurement said the author never gets that far. Across
+ * the eight scenes of the Run that provoked it the author took the non-deictic sibling every
+ * time it had one — `annotate` over `highlightBar`, `annotatePoint` over `focusPoint`,
+ * `annotate` over `focusEvent` — so no deictic field was ever declared, the landing rule had
+ * nothing to fire on, and the plan was correct by the compiler's lights. The incentive was
+ * asymmetric: a word anchor risks two refusals, the non-deictic sibling at a boundary risks
+ * nothing, and nothing had ever cost the author anything for declining the gesture.
+ *
+ * A **warning**. Declining to point is a legitimate editorial choice and `compiler-checks`
+ * records why promoting this would be wrong.
+ *
+ * Three conditions, all of which must hold. The first two are cheap; the third is the rule.
+ * It asks whether the scene's own props name something the narration actually speaks, which
+ * is the difference between "this scene did not point" and "this scene had something to
+ * point at". A scene whose payload is authored copy rather than a reference into its own
+ * data — `image_context.emphasize` is the case — stays quiet, correctly: there is no sense
+ * in which it *missed* a gesture the material does not support.
+ *
+ * Matched case-insensitively and reported in the beat's own casing. The two halves are one
+ * decision. A beat saying "the harbour battery" and props saying "Harbour battery" is a
+ * scene that can point — the narrator says the value — so a case-sensitive match would miss
+ * it. But `checkWordAnchors` compares a named word to the tokenised text exactly, and
+ * `resolveAnchor` does the same against a take, so an anchor spelled the way the *payload*
+ * spells it would be a suggestion that refuses. Naming a repair the next check rejects is
+ * worse than naming none.
+ *
+ * A word the beat speaks twice yields no candidate, for the same reason: `AMBIGUOUS_ANCHOR`
+ * is waiting for it.
+ */
+const checkDeicticOpportunity = (
+  section: VideoPlanSection,
+  textOf: Map<string, string>,
+): CompilerWarning[] => {
+  const warnings: CompilerWarning[] = [];
+
+  for (const scene of section.scenes ?? []) {
+    const capability = findCapability(scene.component);
+    /** An unknown capability is already reported; its actions are unknowable from here. */
+    if (!capability) continue;
+
+    const pointing = Object.entries(capability.actions)
+      .filter(([, action]) => action.deicticFields?.length)
+      .map(([id]) => id);
+    if (pointing.length === 0) continue;
+
+    const events = scene.events ?? [];
+    if (events.length === 0) continue;
+    if (events.some((event) => pointing.includes(event.action))) continue;
+
+    const values = [...leafStrings(scene.props)];
+    const expected: string[] = [];
+    /**
+     * Counted separately from `expected`, which holds one entry per *token*: a scene whose
+     * only spoken value is "New York" offers two anchors and has found one thing to point at.
+     * Pluralising off the anchors would tell that scene its props name "values".
+     */
+    const spokenValues = new Set<string>();
+
+    for (const beatId of scene.spansBeats ?? []) {
+      const text = textOf.get(beatId);
+      if (text === undefined) continue;
+
+      const spoken = tokenise(text).map((word) => word.text);
+      const lowered = spoken.map((word) => word.toLowerCase());
+
+      for (const value of values) {
+        const tokens = tokenise(value).map((word) => word.text.toLowerCase());
+        if (tokens.length === 0 || tokens.length > DEICTIC_CANDIDATE_MAX_TOKENS) continue;
+
+        const found = tokens.map((token) => lowered.indexOf(token));
+        const once = tokens.every(
+          (token, position) =>
+            (found[position] as number) >= 0 &&
+            lowered.lastIndexOf(token) === (found[position] as number),
+        );
+        if (!once) continue;
+
+        spokenValues.add(value);
+        /** As the beat speaks it, so the anchor the author copies out is one that resolves. */
+        for (const position of found) expected.push(`${beatId}.word:${spoken[position]}`);
+      }
+    }
+
+    if (expected.length === 0) continue;
+
+    warnings.push({
+      code: 'DEICTIC_OPPORTUNITY_MISSED',
+      severity: 'quality',
+      sceneId: scene.id,
+      sectionId: section.id,
+      field: 'events',
+      message: `Scene "${scene.id}" uses none of ${capability.meta.id}'s pointing actions (${format(pointing)}), and its props name ${spokenValues.size === 1 ? 'a value' : `${spokenValues.size} values`} this scene's narration speaks. The picture never cuts on the word the narrator is saying.`,
+      suggestion:
+        'Point at one of them: replace an event with the pointing sibling of its action and ' +
+        'anchor it to one of the word anchors in expected. Keep the action you chose when the ' +
+        'note is deliberately timed to the sentence that justifies it rather than to the value.',
+      expected: [...new Set(expected)],
+    });
+  }
+
+  return warnings;
 };
 
 /**

@@ -154,6 +154,22 @@ instance with no take cannot carry a word anchor, and every catalog example is o
 multi-word value lands on any one of its tokens. Avoid: treating it as "the payload mentions
 a word", which is what `annotate` also does.
 
+**Declined gesture** — What `DEICTIC_OPPORTUNITY_MISSED` reports, and the two names are one
+term: a SceneInstance whose capability publishes at least one pointing Action, which used
+none of them, and whose own props name a value the Beats it spans actually speak. Such a
+scene compiles — the plan is legal and every event scores. What it does not do is cut the
+picture on the word the narrator is saying, and until this code nothing in the system cost
+an author anything for that: writing a Word anchor risked two refusals, writing the
+non-deictic sibling at a Boundary risked none, so a careful author took the safe verb.
+Reported as a `quality` warning and deliberately **not** an error, because an annotation's
+timing legitimately follows the sentence that *justifies* it, which may be a Beat away, and
+promoting the code would delete that editorial freedom. The finding names the Word anchors
+that were available, spelled as the Beat speaks them rather than as the payload spells them,
+so acting on it is a substitution and not a second refusal. Avoid: reading it as "this scene
+did not point" — the rule is about a scene that had something to point at, which is why an
+Action taking authored copy rather than a reference into the scene's own data, like
+`image_context.emphasize`, never raises it.
+
 **Teaching surface** — Everything an agent learns what to write from, taken together: the
 manifest it reads before writing — grammar forms and their examples, action descriptions,
 soft constraints, scene examples — and the compiler's refusals afterwards, each carrying

@@ -21,6 +21,16 @@ const withBarChartMeta = (meta: unknown): SceneCapability =>
   }) as SceneCapability;
 
 /**
+ * What it takes for a description to claim the pointing gesture.
+ *
+ * Narrower than the word "point", and it has to be: `bar_chart.showBaseline` reveals the
+ * first bar *"as a reference point"* and points at nothing. The gesture is the verb taking
+ * an object — pointing **at** or **to** something — so that is what is reserved. A
+ * capability is free to use the noun.
+ */
+const POINTING_CLAIM = /\bpoint(s|ing)?\s+(at|to)\b|\bpointing gesture\b/;
+
+/**
  * What the manifest must publish before any capability in it is usable.
  *
  * Rule 2 says the agent sees the manifest and never the code, which makes anything the
@@ -273,6 +283,51 @@ describe.each(registry.map((c) => [c.meta.id, c] as const))('capability %s', (_i
       for (const field of action.deicticFields) {
         expect(carried, `action "${action.id}"`).toContain(field);
       }
+    }
+  });
+
+  /**
+   * The obligation a deictic field creates, published on the action that creates it.
+   *
+   * `deicticFields` publishes *which* payload fields point. What it never published is what
+   * pointing costs the author: that the anchor to write is the word form, and that the event
+   * has to land while the narrator is saying the value. That reasoning existed — beautifully,
+   * at length — in the source docstrings on `ActionDef` and on `timelineActions`, which by
+   * rule 2 the agent never sees. An author choosing a verb reads the description and nothing
+   * else, so the description is where the obligation has to be.
+   *
+   * Asserted on the published entry rather than on the source object, because the manifest is
+   * what the agent reads. Deliberately not a spelling test: it holds the two words the author
+   * needs to connect — that this action points, and that the repair is a word anchor — and
+   * leaves the sentence around them to whoever writes the capability.
+   */
+  it('says on a pointing action that it points, and names the anchor form it obliges', () => {
+    for (const action of buildCatalogEntry(capability).actions) {
+      if (!action.deicticFields) continue;
+      const description = action.description.toLowerCase();
+
+      expect(description, `action "${action.id}"`).toMatch(POINTING_CLAIM);
+      expect(description, `action "${action.id}"`).toContain('word anchor');
+    }
+  });
+
+  /**
+   * The regression that provoked the pair. `bar_chart.annotate` declares no deictic field
+   * and was described as *"Show a short annotation pointing at one bar"*, while
+   * `highlightBar` — the actual pointing gesture — said only *"Bring one bar forward and
+   * recede all the others."* An author looking for a way to point at a bar was being sent to
+   * the wrong verb by the teaching surface itself, and then held to a landing rule it had
+   * never been told applied to the other one.
+   *
+   * So a non-deictic action may describe what it does with an annotation, a note or a label,
+   * and may not claim to point. The word is reserved for the actions that carry the
+   * obligation, which is what makes it readable as a signal at all.
+   */
+  it('does not let an action that declines to point describe itself as pointing', () => {
+    for (const action of buildCatalogEntry(capability).actions) {
+      if (action.deicticFields) continue;
+
+      expect(action.description.toLowerCase(), `action "${action.id}"`).not.toMatch(POINTING_CLAIM);
     }
   });
 

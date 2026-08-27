@@ -23,6 +23,7 @@ import json
 import re
 import sys
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -34,6 +35,7 @@ from vox_crew.planner import (
     AdkPlanAuthor,
     AuthoredRun,
     DraftReview,
+    Finding,
     HandedPlanAuthor,
     InstructionsLeaked,
     PlanAuthor,
@@ -52,6 +54,27 @@ from vox_crew.refusals import Refusal
 from vox_crew.teaching_surface import TeachingSurface
 
 CATEGORIES = ("language", "plan", "catalog", "checks", "protocol")
+
+# The two plans the deixis rule was measured on, read from where the compiler's own suite
+# reads them.
+#
+# **This is a deliberate exception to the boundary `pyproject.toml` states**, and it is
+# narrow enough to name exactly. That header says the two halves share only the vox.exe
+# boundary, and `vox_crew` still shares nothing: it imports no repository module, and
+# nothing under `src/` knows these paths exist. What crosses here is two JSON documents,
+# read by tests, in the one case where reading the same bytes is the property under test.
+#
+# The crew and the compiler each implement `DEICTIC_OPPORTUNITY_MISSED` — they must, since
+# `pyproject.toml` forbids shared code and the catalog publishes the check vocabulary but
+# not the rule. The only assertion worth making about two implementations of one rule is
+# that they agree *on the same input*. A copy in `fixtures/` would drift, and the agreement
+# test would quietly become two tests that each check an implementation against itself.
+# `fixtures/` is also not the place for it: that directory is what the interface records
+# into, and a hand-placed plan there would be the first thing in it the recorder does not
+# own.
+_REPO = Path(__file__).resolve().parents[3]
+VERTICAL_SLICE = _REPO / "packages/video/src/plans/vertical-slice.plan.json"
+DECLINED_GESTURES = _REPO / "packages/video/tests/fixtures/declined-gestures.plan.json"
 
 
 def a_refusal() -> Refusal:
@@ -1063,3 +1086,167 @@ def test_a_run_the_crew_authored_never_reaches_the_network(work_root, launcher) 
     run = plan_and_produce(client, REQUEST, ScriptedPlanAuthor(a_catalog_following_plan()))
 
     assert run.produced.artifact("preview").data == recorded_bytes("preview.mp4")
+
+
+# --- The gesture that was available and not taken -----------------------------------------
+
+
+def a_plan_that_declines_the_gesture() -> dict[str, Any]:
+    """The catalog-following plan, with its one pointing event traded for an annotation.
+
+    Derived from `a_catalog_following_plan` rather than written beside it, so the two differ in
+    exactly the thing under test. `annotate` names the same bar in the same payload and declares
+    no deictic field, which is the trade the measurement found the author making every time it
+    had the choice.
+
+    The beat is rewritten to *say* the town, and that is not incidental. The shared plan speaks
+    none of its own labels, so the rule is correctly silent on it whichever action it uses —
+    there is no gesture to decline when the narration never names the thing. Saying it is what
+    creates the opportunity this plan then declines.
+    """
+    plan = a_catalog_following_plan()
+    plan["beats"][1]["text"] = "Only Larkmouth was reading the gauge at high water."
+    plan["sections"][0]["scenes"][0]["events"][2] = {
+        "at": "b2.start",
+        "action": "annotate",
+        "payload": {"label": "Larkmouth", "text": "the only one at high water"},
+    }
+    return plan
+
+
+def declined(findings: tuple[Finding, ...]) -> tuple[Finding, ...]:
+    return tuple(f for f in findings if f.code == "DEICTIC_OPPORTUNITY_MISSED")
+
+
+def test_a_scene_that_could_have_pointed_and_did_not_is_a_finding() -> None:
+    """The reading the author can act on while it still costs a tool call rather than a Run.
+
+    Until this, the crew could tell an author that its plan was wrong and never that its plan
+    was *poorer than it needed to be*. Every event of the Run that provoked the rule was legal.
+    """
+    found = declined(review(a_plan_that_declines_the_gesture(), SURFACE))
+
+    assert len(found) == 1
+    assert "readings-compared" in found[0].where
+
+
+def test_a_declined_gesture_names_the_anchors_the_author_could_have_written() -> None:
+    """A finding that says "you could have pointed" and stops is a research task.
+
+    The anchors go in `detail` because `detail` is the crew's own field — `means` and `repair`
+    belong to the interface and are the same sentence for every plan, while which words *this*
+    beat speaks is the only part that makes the finding a substitution.
+    """
+    found = declined(review(a_plan_that_declines_the_gesture(), SURFACE))
+
+    assert "b2.word:Larkmouth" in found[0].detail
+
+
+def test_a_declined_gesture_carries_the_contract_the_registry_publishes_for_a_warning() -> None:
+    """The half that made this a change to `review` rather than a rule bolted beside it.
+
+    Every finding the crew reports carries the interface's own `means` and `repair`, read from
+    the published checks contract. This is the first one whose code lives in the registry's
+    **warnings** rather than its errors, and a lookup that only ever read `errors` would have
+    handed the author a code with its contract stripped off — the exact thing the crew refuses
+    to accept from the interface.
+    """
+    published = SURFACE.contract("checks")["warnings"]
+    found = declined(review(a_plan_that_declines_the_gesture(), SURFACE))
+
+    assert found[0].means == published["DEICTIC_OPPORTUNITY_MISSED"]["means"]
+    assert found[0].repair == published["DEICTIC_OPPORTUNITY_MISSED"]["repair"]
+
+
+def test_a_plan_that_points_once_is_not_pushed_to_point_again() -> None:
+    """`a_catalog_following_plan` highlights a bar, and its other two events reveal.
+
+    The rule is per SceneInstance and satisfied by one gesture, so a scene that points is done.
+    Judging per event would push the author to point at every label in a chart, which is a
+    different defect and a worse one.
+    """
+    assert declined(review(a_catalog_following_plan(), SURFACE)) == ()
+
+
+def test_a_scene_whose_props_name_nothing_spoken_is_not_asked_to_invent_a_gesture() -> None:
+    """The condition that keeps the rule off prose.
+
+    Nothing in these labels is a word either beat says, so there was no gesture to decline.
+    Reporting one would be asking the author to point at something the material does not carry.
+    """
+    plan = a_plan_that_declines_the_gesture()
+    plan["sections"][0]["scenes"][0]["props"]["data"] = [
+        {"label": "Ashford", "value": 4.1},
+        {"label": "Windermere", "value": 3.6},
+    ]
+    plan["sections"][0]["scenes"][0]["events"][2]["payload"]["label"] = "Ashford"
+    assert "Ashford" not in json.dumps(plan["beats"])
+
+    assert declined(review(plan, SURFACE)) == ()
+
+
+def test_the_crew_reads_the_same_plans_the_compiler_does_and_reaches_the_same_verdict() -> None:
+    """The assertion that keeps two implementations of one rule honest.
+
+    Not a second copy of the fixture: this is the same file `packages/video`'s validation suite
+    asserts against, which is what makes "the same plans" literally true. Two copies would let
+    the rules drift and leave this test asserting that each agrees with itself.
+
+    A pre-submission reading that disagreed with the compiler is worse than no reading at all —
+    the author would repair against one rule and be judged by the other.
+    """
+    plan = json.loads(DECLINED_GESTURES.read_text(encoding="utf-8"))
+
+    where = [finding.where for finding in declined(review(plan, SURFACE))]
+
+    assert len(where) == 3
+    for scene in ("scene-timeline", "scene-line", "scene-bar"):
+        assert any(scene in one for one in where), scene
+
+
+def test_the_shipped_reference_plan_is_as_quiet_for_the_crew_as_for_the_compiler() -> None:
+    """The falsification, on the other plan of the pair.
+
+    A rule that fires on the plan the repository ships is a rule whose findings nobody can read.
+    """
+    plan = json.loads(VERTICAL_SLICE.read_text(encoding="utf-8"))
+
+    assert declined(review(plan, SURFACE)) == ()
+
+
+def test_an_author_holding_the_tool_is_told_a_word_anchor_can_be_checked_first() -> None:
+    """The asymmetry closed from the other end.
+
+    Declining the gesture now costs the author a warning; this is what stops attempting it
+    being a gamble. A word anchor risks two refusals — the word must be in the Beat exactly
+    once, and it must land on the value the payload names — and both are readable from the
+    plan alone, so both are answerable before the plan is submitted.
+    """
+    text = instructions(SURFACE, drafts_reviewable=True)
+
+    assert "word anchor" in text
+
+
+def test_an_author_holding_no_tool_is_told_nothing_about_checking_one() -> None:
+    """The preamble sentence goes where the tool is, and nowhere else.
+
+    Stated narrowly on purpose, because the obvious wider claim is false. Ticket 17 asks that
+    "a scripted Run's instruction prefix is byte-identical to what it was", and after this
+    change it is not: the same ticket rewrites the action descriptions, and those *are* the
+    prefix — it grew by about 2.2 KB, which is why the contract fixtures had to be re-recorded.
+    What the ticket was protecting is the half it could protect, and that is what this asserts:
+    the scripted prefix is a byte-identical *prefix of* the tool-holding one, so the tool prose
+    is appended and never woven into the paragraphs a scripted author reads, and the contract
+    half is identical between the two. Prose woven in rather than appended would fail here and
+    pass the test next door.
+    """
+    without = instructions(SURFACE, drafts_reviewable=False)
+    with_tool = instructions(SURFACE, drafts_reviewable=True)
+
+    preamble_without, marker, contract_without = without.partition("\n## ")
+    preamble_with, _, contract_with = with_tool.partition("\n## ")
+
+    assert marker, "the instructions no longer separate the preamble from the categories"
+    assert contract_without == contract_with
+    assert preamble_with.startswith(preamble_without)
+    assert "word anchor" not in preamble_without

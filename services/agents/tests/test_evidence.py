@@ -215,6 +215,59 @@ def test_the_crews_own_findings_travel_with_the_version_they_are_about() -> None
     ]
 
 
+def test_whether_the_author_pointed_at_anything_is_a_number_in_the_bundle() -> None:
+    """"Did this Run's author reach for the word anchor" stops being a plan to open.
+
+    The whole deixis effort turns on that question, and until this it was answerable only by
+    reading every event of every scene — twice, for anyone comparing two Runs. The
+    before-and-after measurement the rule is closed by is a subtraction over these numbers.
+    """
+    run = a_rendered_run()
+
+    plans = [
+        record for record in lines(assemble(run).files, TRANSCRIPT) if record["kind"] == "plan"
+    ]
+    deixis = plans[0]["deixis"]
+
+    events = [
+        event
+        for section in run.versions[0].plan["sections"]
+        for scene in section["scenes"]
+        for event in scene.get("events", ())
+    ]
+
+    assert deixis["wordAnchors"] + deixis["boundaryAnchors"] == len(events)
+    assert deixis["scenes"] == sum(
+        len(section["scenes"]) for section in run.versions[0].plan["sections"]
+    )
+    assert deixis["scenesThatPointed"] <= deixis["scenes"]
+
+
+def test_a_word_anchor_is_counted_apart_from_the_gesture_it_is_not() -> None:
+    """The gap between the two counts is the finding, so they may never be the same number.
+
+    An author may anchor a non-deictic verb to a spoken word. That is legal, it is not a
+    pointing gesture, and a bundle that folded the two together would report a Run as having
+    pointed when it had only cut on a word. `pointingEvents` reads the catalog's own
+    `deicticFields`, so the distinction is the manifest's rather than this module's.
+    """
+    run = a_rendered_run()
+    plan = run.versions[0].plan
+    scene = plan["sections"][0]["scenes"][0]
+    scene["events"] = [
+        {"at": "b2.word:gauge", "action": "annotate", "payload": {"label": "Larkmouth", "text": "x"}}
+    ]
+
+    plans = [
+        record for record in lines(assemble(run).files, TRANSCRIPT) if record["kind"] == "plan"
+    ]
+    deixis = plans[0]["deixis"]
+
+    assert deixis["wordAnchors"] == 1
+    assert deixis["pointingEvents"] == 0
+    assert deixis["scenesThatPointed"] == 0
+
+
 def test_the_instructions_are_recorded_by_digest_and_not_a_second_time() -> None:
     """They are the contracts, and the contracts are already in the bundle verbatim.
 

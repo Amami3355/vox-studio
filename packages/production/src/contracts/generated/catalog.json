@@ -236,6 +236,15 @@
           "means": "Required media is represented by a placeholder because resolution is pending or failed.",
           "repair": "Resolve a pending requirement, or fix the reported failed asset before final delivery."
         },
+        "DEICTIC_OPPORTUNITY_MISSED": {
+          "code": "DEICTIC_OPPORTUNITY_MISSED",
+          "regime": "warning",
+          "severity": [
+            "quality"
+          ],
+          "means": "A scene could have pointed at something the narration says — its capability publishes a pointing action and its own props name a value the beats speak — and used no pointing action at all.",
+          "repair": "Replace one event with the pointing sibling of the action it uses and anchor it to one of the word anchors listed in expected, or keep the non-deictic action when the note is deliberately timed to the sentence that justifies it."
+        },
         "MOTION_PROFILE_REPETITION": {
           "code": "MOTION_PROFILE_REPETITION",
           "regime": "warning",
@@ -447,7 +456,7 @@
           },
           {
             "id": "highlightBar",
-            "description": "Bring one bar forward and recede all the others.",
+            "description": "Points at one bar, bringing it forward and receding all the others. It says \"this one\", so it must land while the narrator is saying that bar: anchor it with a word anchor onto the label, never a beat boundary.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -466,7 +475,7 @@
           },
           {
             "id": "annotate",
-            "description": "Show a short annotation pointing at one bar.",
+            "description": "Show a short annotation beside one bar. It makes no pointing claim, so its timing may follow the sentence that justifies it and a beat boundary is legitimate.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -1194,7 +1203,7 @@
           },
           {
             "id": "emphasize",
-            "description": "Stamp one spoken word or short phrase over the image, as the narrator says it. It holds until the scene ends, or until a later emphasis replaces it.",
+            "description": "Points at one spoken word or short phrase by stamping it over the image, as the narrator says it. Anchor it with a word anchor onto that word, never a beat boundary. It holds until the scene ends, or until a later emphasis replaces it.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -1490,7 +1499,7 @@
           },
           {
             "id": "focusSeries",
-            "description": "Bring one temporal series forward and clear any earlier point focus.",
+            "description": "Points at one temporal series, bringing it forward and clearing any earlier focus. It says \"this one\", so it must land while the narrator is saying that series: anchor it with a word anchor onto the series label, never a beat boundary.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -1512,7 +1521,7 @@
           },
           {
             "id": "focusPoint",
-            "description": "Focus one dated observation and show its exact date and formatted value.",
+            "description": "Points at one dated observation, showing its exact date and formatted value. It says \"this one\", so it must land while the narrator is saying that observation: anchor it with a word anchor onto the label, never a beat boundary.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -1541,7 +1550,7 @@
           },
           {
             "id": "annotatePoint",
-            "description": "Attach one concise explanatory note to a dated observation.",
+            "description": "Attach one concise explanatory note to a dated observation. It makes no pointing claim, so its timing may follow the sentence that justifies it and a beat boundary is legitimate.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -2450,7 +2459,7 @@
           },
           {
             "id": "focusEvent",
-            "description": "Bring one dated event forward and let the rest of the chronology recede.",
+            "description": "Points at one dated event, bringing it forward and letting the rest of the chronology recede. It says \"this one\", so it must land while the narrator is saying that event: anchor it with a word anchor onto the label, never a beat boundary.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -2472,7 +2481,7 @@
           },
           {
             "id": "annotate",
-            "description": "Attach one durable explanation to a dated event, and leave it up.",
+            "description": "Attach one durable explanation to a dated event, and leave it up. It makes no pointing claim, so its timing may follow the sentence that justifies it and a beat boundary is legitimate.",
             "payloadSchema": {
               "type": "object",
               "properties": {

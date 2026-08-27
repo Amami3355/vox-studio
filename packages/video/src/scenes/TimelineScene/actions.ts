@@ -29,12 +29,18 @@ export const timelineActions = {
     payload: null,
   },
   focusEvent: {
-    description: 'Bring one dated event forward and let the rest of the chronology recede.',
+    description:
+      'Points at one dated event, bringing it forward and letting the rest of the chronology ' +
+      'recede. It says "this one", so it must land while the narrator is saying that event: ' +
+      'anchor it with a word anchor onto the label, never a beat boundary.',
     deicticFields: ['label'],
     payload: z.object({ label: eventTarget }).strict(),
   },
   annotate: {
-    description: 'Attach one durable explanation to a dated event, and leave it up.',
+    description:
+      'Attach one durable explanation to a dated event, and leave it up. It makes no pointing ' +
+      'claim, so its timing may follow the sentence that justifies it and a beat boundary is ' +
+      'legitimate.',
     payload: z
       .object({
         label: eventTarget,

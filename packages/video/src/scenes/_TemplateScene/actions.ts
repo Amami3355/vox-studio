@@ -37,7 +37,9 @@ export const templateSceneActions = {
    */
   emphasizeWord: {
     description:
-      'Stamp one spoken word over the statement, as the narrator says it. It holds until the scene ends, or until a later emphasis replaces it.',
+      'Points at one spoken word by stamping it over the statement, as the narrator says it. ' +
+      'Anchor it with a word anchor onto that word, never a beat boundary. It holds until the ' +
+      'scene ends, or until a later emphasis replaces it.',
     deicticFields: ['word'],
     payload: z.object({
       word: z

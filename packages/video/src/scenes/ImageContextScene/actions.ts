@@ -44,7 +44,9 @@ export const imageContextActions = {
    */
   emphasize: {
     description:
-      'Stamp one spoken word or short phrase over the image, as the narrator says it. It holds until the scene ends, or until a later emphasis replaces it.',
+      'Points at one spoken word or short phrase by stamping it over the image, as the narrator ' +
+      'says it. Anchor it with a word anchor onto that word, never a beat boundary. It holds ' +
+      'until the scene ends, or until a later emphasis replaces it.',
     deicticFields: ['text'],
     payload: z.object({
       text: z

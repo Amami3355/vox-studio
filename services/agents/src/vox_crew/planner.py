@@ -159,6 +159,26 @@ RESOLVED_REFERENCE = re.compile(
 )
 
 
+# What counts as one word, for the rule that reads a Beat against a scene's own props.
+#
+# A word starts and ends on a letter or a digit and may carry apostrophes or hyphens inside it,
+# so "Europe's" is one word and the comma after "cities" belongs to none. This is the
+# interface's `WORD_PATTERN` restated in the one dialect Python's `re` can express: the catalog
+# publishes the anchor *grammar* but never the tokeniser, so there is nothing to read it from.
+#
+# It is not the only unpublished half of that rule, and saying so here is the point. The token
+# bound below, the choice to match whole leaf values rather than tokens, the case fold and the
+# spoken-exactly-once predicate are all hand-copied from the compiler too. The drift surface is
+# the whole rule rather than this pattern, and what guards it is the cross-implementation test
+# that runs both readers over the same two plan files.
+WORD = re.compile(r"[^\W_](?:(?:[^\W_]|['’-])*[^\W_])?")
+
+# The widest value the rule will treat as a thing the narrator says, in tokens. The compiler's
+# `DEICTIC_CANDIDATE_MAX_TOKENS`, which it takes in turn from the multi-word rule the landing
+# check already implements, so the two agree about what "New York" can be anchored to.
+DEICTIC_CANDIDATE_MAX_TOKENS = 5
+
+
 @dataclass(frozen=True, slots=True)
 class LeakScan:
     """What a scan over a prompt found. `ok` is the acceptance criterion."""
@@ -325,6 +345,11 @@ def _preamble(*, drafts_reviewable: bool = False) -> str:
             "nothing. Repair what it names and call it again. An empty report is not an "
             "acceptance — it is a reading that found nothing, and the production interface is "
             "the only authority on a plan.\n"
+            "\n"
+            "This is also how a word anchor stops being a gamble. Whether a Beat speaks a word "
+            "exactly once, and whether a pointing action lands on the value it names, are both "
+            "answerable from the plan alone — so reach for the pointing action when there is "
+            "something to point at, and check the anchor here before you commit to it.\n"
             if drafts_reviewable
             else ""
         )
@@ -478,6 +503,92 @@ def published_errors(surface: TeachingSurface) -> Mapping[str, Any]:
     return surface.contract("checks").get("errors", {})
 
 
+def published_warnings(surface: TeachingSurface) -> Mapping[str, Any]:
+    """The check registry's warning half, as the contract publishes it.
+
+    A second reader beside `published_errors` rather than one that merges the two, because the
+    regimes are distinct and the interface keeps them so: an error is a plan production will not
+    take and a warning is a plan it will take and think less of. Flattening them here would let
+    a finding built from a warning read as a refusal to whichever caller forgot to ask.
+    """
+    return surface.contract("checks").get("warnings", {})
+
+
+def _tokens(text: str) -> list[str]:
+    """A beat's words, split the way the interface splits them."""
+    return WORD.findall(text or "")
+
+
+def _leaf_strings(value: Any) -> Iterator[str]:
+    """Every complete leaf string of an authored props object.
+
+    Complete leaves rather than tokens: a headline is three or more tokens that are not spoken
+    verbatim, a chart label is a leaf that is, and matching tokens instead would report the
+    former on nothing but its stop-words.
+    """
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _leaf_strings(item)
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        for item in value:
+            yield from _leaf_strings(item)
+
+
+def _declined_gesture(
+    scene: Mapping[str, Any], capability: Mapping[str, Any], text_of: Mapping[str, str]
+) -> list[str]:
+    """The word anchors a scene could have pointed at, and did not. Empty when it did.
+
+    The compiler's rule, over the manifest the crew was taught from rather than over the
+    registry the compiler holds. `deicticFields` is published per action, which is what lets
+    this be one rule for every capability instead of a list of verbs kept in step by hand — a
+    capability that ships a new pointing action is covered by both readers on the day it lands.
+
+    The three conditions are the compiler's, in its order, and the third is the rule. It asks
+    whether the scene's own props name something the narration actually speaks, which is the
+    difference between "this scene did not point" and "this scene had something to point at".
+
+    Matched case-insensitively and reported in the beat's own casing, which is one decision and
+    not two. A beat saying "the harbour battery" over props saying "Harbour battery" is a scene
+    that can point, so a case-sensitive match would miss it; but a word anchor resolves exactly,
+    so an anchor spelled the way the payload spells it would be a suggestion that refuses. A
+    word the beat speaks twice yields nothing, for the same reason: `AMBIGUOUS_ANCHOR` is
+    waiting for it.
+    """
+    pointing = {
+        str(action["id"])
+        for action in capability.get("actions", ())
+        if isinstance(action, Mapping) and "id" in action and action.get("deicticFields")
+    }
+    if not pointing:
+        return []
+
+    events = [event for event in scene.get("events", ()) or () if isinstance(event, Mapping)]
+    if not events:
+        return []
+    if any(str(event.get("action", "")) in pointing for event in events):
+        return []
+
+    values = list(_leaf_strings(scene.get("props")))
+    offered: list[str] = []
+
+    for beat in scene.get("spansBeats", ()) or ():
+        spoken = _tokens(text_of.get(str(beat), ""))
+        lowered = [word.lower() for word in spoken]
+
+        for value in values:
+            tokens = [word.lower() for word in _tokens(value)]
+            if not tokens or len(tokens) > DEICTIC_CANDIDATE_MAX_TOKENS:
+                continue
+            if any(lowered.count(token) != 1 for token in tokens):
+                continue
+            offered += [f"{beat}.word:{spoken[lowered.index(token)]}" for token in tokens]
+
+    return list(dict.fromkeys(offered))
+
+
 def _published_finding(
     published: Mapping[str, Any], code: str, where: str, detail: str
 ) -> Finding:
@@ -508,6 +619,12 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
     """
     catalog = surface.contract("catalog")
     published = published_errors(surface)
+    warned = published_warnings(surface)
+    text_of = {
+        str(beat["id"]): str(beat.get("text", ""))
+        for beat in plan.get("beats", ()) or ()
+        if isinstance(beat, Mapping) and "id" in beat
+    }
     capabilities = {
         str(item["id"]): item
         for item in catalog.get("capabilities", ())
@@ -519,6 +636,16 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
 
     def report(code: str, where: str, detail: str) -> None:
         findings.append(_published_finding(published, code, where, detail))
+
+    def note(code: str, where: str, detail: str) -> None:
+        """A finding whose code the registry publishes as a warning rather than an error.
+
+        The same `Finding`, and deliberately so: what a code costs the plan is the interface's
+        to say and the crew has never sorted findings by regime. What moves is only where the
+        `means` and the `repair` are read from, and reading a warning out of `errors` would
+        hand the author a code with its contract stripped off.
+        """
+        findings.append(_published_finding(warned, code, where, detail))
 
     for where, key in _walk(plan, "plan"):
         lowered = key.lower()
@@ -580,6 +707,16 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
                 f"{here}.events",
                 report,
             )
+
+            offered = _declined_gesture(scene, capability, text_of)
+            if offered:
+                note(
+                    "DEICTIC_OPPORTUNITY_MISSED",
+                    f"{here}.events",
+                    f"This scene used none of {component}'s pointing actions, and its props "
+                    f"name values its beats speak. It could have pointed at: "
+                    f"{', '.join(offered)}.",
+                )
 
     return tuple(findings)
 

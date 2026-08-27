@@ -20,14 +20,19 @@ export const barChartActions = {
     payload: null,
   },
   highlightBar: {
-    description: 'Bring one bar forward and recede all the others.',
+    description:
+      'Points at one bar, bringing it forward and receding all the others. It says "this one", ' +
+      'so it must land while the narrator is saying that bar: anchor it with a word anchor onto ' +
+      'the label, never a beat boundary.',
     deicticFields: ['label'],
     payload: z.object({
       label: z.string().describe('Must match a `label` present in `data`.'),
     }),
   },
   annotate: {
-    description: 'Show a short annotation pointing at one bar.',
+    description:
+      'Show a short annotation beside one bar. It makes no pointing claim, so its timing may ' +
+      'follow the sentence that justifies it and a beat boundary is legitimate.',
     payload: z.object({
       label: z.string().describe('Must match a `label` present in `data`.'),
       text: z.string().max(50).describe('Annotation copy. Keep it under 50 characters.'),

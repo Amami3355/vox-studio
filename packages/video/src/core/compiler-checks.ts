@@ -260,6 +260,26 @@ export const COMPILER_CHECKS = {
       repair:
         'Resolve a pending requirement, or fix the reported failed asset before final delivery.',
     },
+    DEICTIC_OPPORTUNITY_MISSED: {
+      code: 'DEICTIC_OPPORTUNITY_MISSED',
+      regime: 'warning',
+      /**
+       * `quality` alone, and never promoted, which is a decision rather than a starting
+       * point. Declining to point is a legitimate editorial choice: an annotation's timing
+       * follows the sentence that *justifies* it, which may be a beat away, and the actions
+       * that decline to declare a deictic field already carry that reasoning. An error here
+       * would contradict a decision this codebase has taken and delete a real freedom.
+       */
+      severity: ['quality'],
+      means:
+        'A scene could have pointed at something the narration says — its capability ' +
+        'publishes a pointing action and its own props name a value the beats speak — and ' +
+        'used no pointing action at all.',
+      repair:
+        'Replace one event with the pointing sibling of the action it uses and anchor it to ' +
+        'one of the word anchors listed in expected, or keep the non-deictic action when the ' +
+        'note is deliberately timed to the sentence that justifies it.',
+    },
     MOTION_PROFILE_REPETITION: {
       code: 'MOTION_PROFILE_REPETITION',
       regime: 'warning',

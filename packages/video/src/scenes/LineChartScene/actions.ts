@@ -11,17 +11,25 @@ export const lineChartActions = {
     payload: null,
   },
   focusSeries: {
-    description: 'Bring one temporal series forward and clear any earlier point focus.',
+    description:
+      'Points at one temporal series, bringing it forward and clearing any earlier focus. It ' +
+      'says "this one", so it must land while the narrator is saying that series: anchor it ' +
+      'with a word anchor onto the series label, never a beat boundary.',
     deicticFields: ['series'],
     payload: z.object({ series: seriesTarget }).strict(),
   },
   focusPoint: {
-    description: 'Focus one dated observation and show its exact date and formatted value.',
+    description:
+      'Points at one dated observation, showing its exact date and formatted value. It says ' +
+      '"this one", so it must land while the narrator is saying that observation: anchor it ' +
+      'with a word anchor onto the label, never a beat boundary.',
     deicticFields: ['label'],
     payload: z.object({ series: seriesTarget, label: pointTarget }).strict(),
   },
   annotatePoint: {
-    description: 'Attach one concise explanatory note to a dated observation.',
+    description:
+      'Attach one concise explanatory note to a dated observation. It makes no pointing claim, ' +
+      'so its timing may follow the sentence that justifies it and a beat boundary is legitimate.',
     payload: z
       .object({
         series: seriesTarget,

@@ -206,6 +206,15 @@
         "means": "Required media is represented by a placeholder because resolution is pending or failed.",
         "repair": "Resolve a pending requirement, or fix the reported failed asset before final delivery."
       },
+      "DEICTIC_OPPORTUNITY_MISSED": {
+        "code": "DEICTIC_OPPORTUNITY_MISSED",
+        "regime": "warning",
+        "severity": [
+          "quality"
+        ],
+        "means": "A scene could have pointed at something the narration says — its capability publishes a pointing action and its own props name a value the beats speak — and used no pointing action at all.",
+        "repair": "Replace one event with the pointing sibling of the action it uses and anchor it to one of the word anchors listed in expected, or keep the non-deictic action when the note is deliberately timed to the sentence that justifies it."
+      },
       "MOTION_PROFILE_REPETITION": {
         "code": "MOTION_PROFILE_REPETITION",
         "regime": "warning",

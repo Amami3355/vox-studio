@@ -52,6 +52,7 @@ from typing import Any
 
 from .context import tokens
 from .converge import MARGIN_CLEAR, RENDERED, ConvergedRun
+from .teaching_surface import TeachingSurface
 from .planner import scan_for_leaks
 
 # The files a bundle carries, under the names the proof bundles carry them under.
@@ -247,6 +248,7 @@ def _commands(run: ConvergedRun) -> list[dict[str, Any]]:
 def _transcript(run: ConvergedRun) -> list[dict[str, Any]]:
     """The Brief, every plan version authored, every refusal gathered, and how it ended."""
     records: list[dict[str, Any]] = [{"actor": SYSTEM, "kind": "task", "brief": dict(run.brief)}]
+    pointing = _pointing_actions(run.surface)
     submitted = [(version, "submitted") for version in run.versions]
     withheld = [(version, "withheld") for version in run.withheld]
     for number, (version, disposition) in enumerate(submitted + withheld, start=1):
@@ -269,6 +271,7 @@ def _transcript(run: ConvergedRun) -> list[dict[str, Any]]:
                     }
                     for finding in version.findings
                 ],
+                "deixis": _deixis(version.plan, pointing),
                 "reviewCalls": version.review_calls,
                 "reviewedWhileDrafting": list(version.reviewed),
             }
@@ -300,6 +303,83 @@ def _transcript(run: ConvergedRun) -> list[dict[str, Any]]:
         }
     )
     return [{"ordinal": ordinal, **record} for ordinal, record in enumerate(records, start=1)]
+
+
+def _pointing_actions(surface: TeachingSurface) -> dict[str, set[str]]:
+    """Which actions each capability publishes as pointing gestures, read from the catalog.
+
+    Read rather than listed, for the reason the rule itself reads it: a capability that ships a
+    new deictic action is counted on the day it lands, and a hand-kept list here would be the
+    copy that goes stale while looking right.
+    """
+    catalog = surface.contract("catalog")
+    return {
+        str(capability["id"]): {
+            str(action["id"])
+            for action in capability.get("actions", ())
+            if isinstance(action, Mapping) and "id" in action and action.get("deicticFields")
+        }
+        for capability in catalog.get("capabilities", ())
+        if isinstance(capability, Mapping) and "id" in capability
+    }
+
+
+def _deixis(plan: Mapping[str, Any], pointing: Mapping[str, set[str]]) -> dict[str, int]:
+    """Whether the author pointed at anything, as numbers rather than as a plan to open.
+
+    "Did this Run's author reach for the word anchor" is the question the whole deixis effort
+    turns on, and before this it was answerable only by reading every event of every scene. A
+    reader comparing two Runs had to do it twice. These counts make the comparison a
+    subtraction, which is what a before-and-after measurement over fixture Runs needs.
+
+    `wordAnchors` counts events cut on a spoken word and `boundaryAnchors` those cut on a beat
+    edge, so the two sum to the events the plan placed. `pointingEvents` is the narrower count
+    that matters: events using an action the catalog declares deictic. It is deliberately not
+    the same number as `wordAnchors`, and the gap between them is itself a finding — an author
+    may write a word anchor on a verb that points at nothing, which is legal and is not the
+    gesture.
+
+    `scenesThatPointed` is counted per scene rather than per event because the rule that asks
+    for the gesture is satisfied by one: a scene that points once is done, and counting events
+    would make a chart with four highlights look four times better than one with a single
+    well-chosen one.
+    """
+    word = 0
+    boundary = 0
+    pointing_events = 0
+    scenes = 0
+    pointed = 0
+
+    for section in plan.get("sections", ()) or ():
+        if not isinstance(section, Mapping):
+            continue
+        for scene in section.get("scenes", ()) or ():
+            if not isinstance(scene, Mapping):
+                continue
+            scenes += 1
+            deictic = pointing.get(str(scene.get("component", "")), set())
+            here = 0
+            for event in scene.get("events", ()) or ():
+                if not isinstance(event, Mapping):
+                    continue
+                at = event.get("at")
+                if isinstance(at, str):
+                    if ".word:" in at:
+                        word += 1
+                    else:
+                        boundary += 1
+                if str(event.get("action", "")) in deictic:
+                    here += 1
+            pointing_events += here
+            pointed += 1 if here else 0
+
+    return {
+        "scenes": scenes,
+        "wordAnchors": word,
+        "boundaryAnchors": boundary,
+        "pointingEvents": pointing_events,
+        "scenesThatPointed": pointed,
+    }
 
 
 def _context(run: ConvergedRun) -> dict[str, Any]:

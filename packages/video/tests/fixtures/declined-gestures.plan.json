@@ -1,0 +1,412 @@
+{
+  "beats": [
+    {
+      "id": "b1",
+      "text": "Resilience is built one connection at a time."
+    },
+    {
+      "id": "b2",
+      "text": "In coastal communities where winter storms grow sharper, power is secured not by promises, but by infrastructure."
+    },
+    {
+      "id": "b3",
+      "text": "This is how Helios Bay transformed its grid from the coastline inward."
+    },
+    {
+      "id": "b4",
+      "text": "At dawn, Helios Bay reveals the machinery of its clean energy transition."
+    },
+    {
+      "id": "b5",
+      "text": "A working harbour stands beside offshore wind turbines and rooftop solar arrays."
+    },
+    {
+      "id": "b6",
+      "text": "For decades, the city relied on imported fossil fuels vulnerable to severe gales."
+    },
+    {
+      "id": "b7",
+      "text": "At the centre is Maya Sen, the fictional grid coordinator responsible for storm resilience."
+    },
+    {
+      "id": "b8",
+      "text": "Her role demands balancing variable renewable power with neighborhood demand during surges."
+    },
+    {
+      "id": "b9",
+      "text": "Under pressure, Maya made the decisive call to decentralise control and add local storage."
+    },
+    {
+      "id": "b10",
+      "text": "The programme moved through four structured milestones."
+    },
+    {
+      "id": "b11",
+      "text": "A grid audit on February 12th, 2027 was followed by the harbour battery opening on June 3rd, 2028."
+    },
+    {
+      "id": "b12",
+      "text": "Three microgrids connected on September 18th, 2029, and the diesel reserve retired on December 1st, 2030."
+    },
+    {
+      "id": "b13",
+      "text": "With every milestone, clean generation expanded across the network."
+    },
+    {
+      "id": "b14",
+      "text": "Renewable electricity rose from 24 percent in 2027 to 39 percent in 2028."
+    },
+    {
+      "id": "b15",
+      "text": "It reached 55 percent in 2029, before hitting 72 percent in 2030."
+    },
+    {
+      "id": "b16",
+      "text": "Reliability gains soon registered across every district."
+    },
+    {
+      "id": "b17",
+      "text": "Following the rollout, annual outage minutes fell steadily."
+    },
+    {
+      "id": "b18",
+      "text": "Harbour Ward recorded 42 outage minutes, East Bank reached 27, and Hillside dropped to 16."
+    },
+    {
+      "id": "b19",
+      "text": "By 2030, the transition reached its central milestone."
+    },
+    {
+      "id": "b20",
+      "text": "Seventy-two percent stands as the single headline statistic defining the clean energy share."
+    },
+    {
+      "id": "b21",
+      "text": "The human value proved clearest during severe weather."
+    },
+    {
+      "id": "b22",
+      "text": "Night-shift nurse Samira Vale recalled working through a major coastal storm."
+    },
+    {
+      "id": "b23",
+      "text": "She observed: The lights stayed on when the storm crossed the bay."
+    },
+    {
+      "id": "b24",
+      "text": "The programme did not eliminate risk; it shortened outages and gave essential workers a more dependable city."
+    }
+  ],
+  "sections": [
+    {
+      "id": "sec-statement",
+      "spansBeats": ["b1", "b2", "b3"],
+      "scenes": [
+        {
+          "id": "scene-statement",
+          "component": "typographic_statement",
+          "layout": "cut",
+          "motionProfile": "editorialStatic",
+          "spansBeats": ["b1", "b2", "b3"],
+          "props": {
+            "statement": "Resilience is built one connection at a time",
+            "eyebrow": "Helios Bay",
+            "ordinal": "01 / 08",
+            "emphasis": "neutral"
+          },
+          "events": [
+            {
+              "at": "b1.start",
+              "action": "revealStatement"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-context",
+      "spansBeats": ["b4", "b5", "b6"],
+      "scenes": [
+        {
+          "id": "scene-context",
+          "component": "image_context",
+          "layout": "splitLeft",
+          "motionProfile": "subtleDrift",
+          "spansBeats": ["b4", "b5", "b6"],
+          "props": {
+            "headline": "A coastal city powered by clean energy",
+            "caption": "Helios Bay at dawn, where offshore wind and rooftop solar meet a working harbour.",
+            "assetRequirement": {
+              "type": "image",
+              "subject": "Working harbour at dawn with wind turbines and rooftop solar",
+              "treatment": "photo",
+              "orientation": "landscape"
+            }
+          },
+          "events": [
+            {
+              "at": "b4.start",
+              "action": "revealImage"
+            },
+            {
+              "at": "b5.start",
+              "action": "revealCopy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-explainer",
+      "spansBeats": ["b7", "b8", "b9"],
+      "scenes": [
+        {
+          "id": "scene-explainer",
+          "component": "character_explainer",
+          "layout": "sideBySide",
+          "motionProfile": "subtleDrift",
+          "spansBeats": ["b7", "b8", "b9"],
+          "props": {
+            "label": "Maya Sen",
+            "headline": "Grid coordinator for Helios Bay",
+            "explanation": "Balancing variable solar and offshore wind to keep power available during major storms.",
+            "assetRequirement": {
+              "type": "character",
+              "subject": "Maya Sen grid coordinator holding a tablet",
+              "treatment": "illustration",
+              "orientation": "portrait"
+            }
+          },
+          "events": [
+            {
+              "at": "b7.start",
+              "action": "revealCopy"
+            },
+            {
+              "at": "b8.start",
+              "action": "revealCharacter"
+            },
+            {
+              "at": "b9.start",
+              "action": "accentCharacter"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-timeline",
+      "spansBeats": ["b10", "b11", "b12"],
+      "scenes": [
+        {
+          "id": "scene-timeline",
+          "component": "timeline",
+          "layout": "spine",
+          "motionProfile": "pushIn",
+          "spansBeats": ["b10", "b11", "b12"],
+          "props": {
+            "title": "Clean energy programme timeline",
+            "events": [
+              {
+                "date": "2027-02-12",
+                "label": "Grid audit"
+              },
+              {
+                "date": "2028-06-03",
+                "label": "Harbour battery opening"
+              },
+              {
+                "date": "2029-09-18",
+                "label": "Microgrids connected"
+              },
+              {
+                "date": "2030-12-01",
+                "label": "Diesel reserve retired"
+              }
+            ],
+            "periods": [
+              {
+                "label": "Programme rollout",
+                "from": "2027-02-12",
+                "to": "2030-12-01"
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b10.start",
+              "action": "revealTimeline"
+            },
+            {
+              "at": "b12.start",
+              "action": "annotate",
+              "payload": {
+                "label": "Diesel reserve retired",
+                "text": "Transition complete"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-line",
+      "spansBeats": ["b13", "b14", "b15"],
+      "scenes": [
+        {
+          "id": "scene-line",
+          "component": "line_chart",
+          "layout": "standard",
+          "motionProfile": "energetic",
+          "spansBeats": ["b13", "b14", "b15"],
+          "props": {
+            "title": "Renewable share of electricity generation",
+            "unit": "%",
+            "baseline": "zero",
+            "points": [
+              {
+                "date": "2027-01-01",
+                "label": "2027"
+              },
+              {
+                "date": "2028-01-01",
+                "label": "2028"
+              },
+              {
+                "date": "2029-01-01",
+                "label": "2029"
+              },
+              {
+                "date": "2030-01-01",
+                "label": "2030"
+              }
+            ],
+            "series": [
+              {
+                "label": "Renewable share",
+                "values": [24, 39, 55, 72]
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b13.start",
+              "action": "revealTrend"
+            },
+            {
+              "at": "b15.start",
+              "action": "annotatePoint",
+              "payload": {
+                "series": "Renewable share",
+                "label": "2030",
+                "text": "Target reached"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-bar",
+      "spansBeats": ["b16", "b17", "b18"],
+      "scenes": [
+        {
+          "id": "scene-bar",
+          "component": "bar_chart",
+          "layout": "standard",
+          "motionProfile": "impact",
+          "spansBeats": ["b16", "b17", "b18"],
+          "props": {
+            "title": "Annual outage minutes after rollout",
+            "unit": "m",
+            "valueKind": "amount",
+            "gridlines": true,
+            "data": [
+              {
+                "label": "Harbour Ward",
+                "value": 42
+              },
+              {
+                "label": "East Bank",
+                "value": 27
+              },
+              {
+                "label": "Hillside",
+                "value": 16
+              }
+            ]
+          },
+          "events": [
+            {
+              "at": "b16.start",
+              "action": "showBaseline"
+            },
+            {
+              "at": "b17.start",
+              "action": "revealAll"
+            },
+            {
+              "at": "b18.start",
+              "action": "annotate",
+              "payload": {
+                "label": "Hillside",
+                "text": "Lowest outage duration"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-stat",
+      "spansBeats": ["b19", "b20"],
+      "scenes": [
+        {
+          "id": "scene-stat",
+          "component": "stat_counter",
+          "layout": "centered",
+          "motionProfile": "editorialStatic",
+          "spansBeats": ["b19", "b20"],
+          "props": {
+            "value": 72,
+            "unit": "%",
+            "label": "Clean electricity share achieved by 2030",
+            "sublabel": "Single headline statistic for Helios Bay",
+            "emphasis": "positive"
+          },
+          "events": [
+            {
+              "at": "b19.start",
+              "action": "revealStat"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sec-quote",
+      "spansBeats": ["b21", "b22", "b23", "b24"],
+      "scenes": [
+        {
+          "id": "scene-quote",
+          "component": "quote",
+          "layout": "centered",
+          "motionProfile": "cinematic",
+          "spansBeats": ["b21", "b22", "b23", "b24"],
+          "props": {
+            "quote": "The lights stayed on when the storm crossed the bay.",
+            "attribution": "Samira Vale",
+            "role": "Night-shift nurse",
+            "eyebrow": "Bay Hospital"
+          },
+          "events": [
+            {
+              "at": "b21.start",
+              "action": "revealQuote"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

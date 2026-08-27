@@ -135,6 +135,18 @@ means regenerating and re-reading every diff that quotes them.
 5. **`actions.ts`** — write `{}` unless a beat has actually asked for a verb. A vocabulary the
    component does not read produces a plan that validates, renders, and animates nothing.
    If it is `{}`, set `supportsEvents: false` and skip steps 6 and 7.
+
+   **A gate applies to the descriptions here, and it is enforced.** An action that declares
+   `deicticFields` is a pointing gesture, and its `description` must say so — it must claim
+   the gesture ("points at…", or "a pointing gesture") and it must contain the words *word
+   anchor*, because the anchor form is the obligation the declaration creates and the
+   description is the only string the agent reads while choosing a verb. An action that
+   declares none may not claim to point: it may annotate, note or label, but "pointing at"
+   and "pointing to" are reserved. `bar_chart` shipped for months with the two the wrong way
+   round — `annotate` described as *"pointing at one bar"* while `highlightBar`, the actual
+   gesture, said nothing — and the agent picked the verb the description pointed it at.
+   `tests/catalog-contract.test.ts` holds both halves over every registered capability, and
+   `_TemplateScene/actions.ts` already carries the shape to copy.
 6. **`state.ts`** — store entrance frames inside the state, not off `resolveEvents`' `since`.
    `since` reports 0 for a field no event reached, which is indistinguishable from a reveal
    anchored at the top of the scene.
