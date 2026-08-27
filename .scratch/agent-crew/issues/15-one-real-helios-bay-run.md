@@ -120,9 +120,62 @@ measurement reason, a second condition the gate can never meet. Signing the bund
 running `verify:proof` still throws `PROOF_VERDICT_NOT_PASS`, and the verdict is not why. The gate
 is `verifyProofBundle` without `requirePass`, which the signing script runs on itself afterwards;
 on the signed bundle, re-run in a fresh process, it returns
-`{ machineVerdict: 'not-evidenced', humanVerdict: 'pass' }`. **There is no standing command that
-runs that check** — `verify:proof` is `requirePass`-only, so a crew bundle has no re-verification
-script of its own.
+`{ machineVerdict: 'not-evidenced', humanVerdict: 'pass' }`.
+
+**Amended 2026-08-27 — that check now has a standing command.** This paragraph used to end "there
+is no standing command that runs that check", and a criterion evidenced only by a call nobody can
+re-issue is not evidenced in a way a reader can use. `verify:proof <dir> --allow-pending` runs
+`verifyProofBundle` with no `requirePass`, which is the check a crew bundle can actually pass; the
+bare `verify:proof` keeps `requirePass: true` untouched, because production ticket 21 records that
+as the correct fail-closed result for the northbridge proof and this is not the place to soften it.
+`proof-verdict-scripts.test.ts` holds both halves: the same pending bundle is refused by the
+default and verified by the flag.
+
+## Review corrections, 2026-08-27
+
+A two-axis review over `db6956a..b0987b5` found four things about this ticket. Two were defects and
+are fixed; two are decisions that were taken without being written down, and are written down here.
+
+**Fixed — the ordering guard was opt-in.** `--template` is described above as the reason notes
+cannot be filed against the wrong rows, but `criterion` was an optional field checked only when
+present, so an input that simply omitted it got exactly the silent misfiling the field exists to
+prevent — and a hand-typed input, the one most likely to be mis-ordered, was the one that went
+unchecked. `criterion` is now required and always compared. A test confirms the old code signed six
+mis-filed notes and the new code refuses them.
+
+**Fixed — signing could leave a bundle signed and unverifiable.** `signedContents` checked the
+input against the *sealed* sheet's row count while `verifyProofBundle` checked a signed pass
+against a literal six. A sheet sealed with any other number was therefore accepted, both files were
+written and re-hashed, and only the re-verification afterwards refused the result. The count is now
+one exported constant read by both, the sheet is refused before the first write, and
+`proof-scenarios.test.ts` holds every scenario to it so the divergence cannot start again in the
+table where the criteria are actually written.
+
+**Decision, now recorded — the bundle stays out of version control.** Criterion 6 says the verdict
+is "recorded alongside the evidence bundle", and a reader may reasonably take that to mean
+committed. It does not. `.gitignore` ignores `.scratch/**` wholesale; what git carries is
+`SUMMARY.md`, force-added, and `human-verdict.json` and `hash-index.json` live on disk beside the
+bundle and nowhere else. That is deliberate rather than an oversight: a hash index whose hashed
+files are not themselves committed attests nothing, so committing it would publish the appearance
+of verifiability without the substance. "Alongside" means on disk, and the summary line is the
+committed record of the verdict.
+
+**Decision, now recorded — the notes are repetitive, and may not be rewritten to look less so.**
+Five of the six notes are the same sentence. They are not invented observations: each carries the
+evaluator's words verbatim, and each says outright that *"all six rows were passed together"*,
+which is the honest shape of one spoken verdict covering six criteria. A later session may be
+tempted to differentiate them so the sheet reads better. It must not. The notes would then be a
+record of what an agent thought the evaluator meant, which is the failure this ticket already
+refused once, and the file is signed and hashed — editing it breaks the bundle and falsifies a
+person's record in the same stroke. If per-row detail is wanted, it is wanted from the evaluator,
+on a second watch.
+
+**Noted, not changed — rewriting `SUMMARY.md` was not in this ticket's criteria.** The signing path
+also restates the verdict line in the summary, which no criterion asked for, and it couples signing
+to that line's exact wording (`VERDICT_SUMMARY_LINE_ABSENT`). It stays, because a bundle whose
+summary contradicted its own verdict file would be worse than the coupling, but it is scope that
+arrived without being requested and a reader comparing the diff to the criteria should not have to
+work that out.
 
 **Status:** done
 

@@ -86,7 +86,7 @@ export const buildContractProjections = (inputs: {
    * the video package's catalog moves. What a consumer reads is the decision: each document in
    * one place, so reading the whole contract does not mean reading the checks twice.
    */
-  const { checks: _publishedBesideIt, ...catalogWithoutChecks } = catalog;
+  const { checks: _checksHaveTheirOwnCategory, ...catalogWithoutChecks } = catalog;
 
   const protocol = {
     ...PRODUCTION_CONTRACT,

@@ -8,8 +8,11 @@ The contract publishes the compiler's check meanings twice, in two categories, b
 
 `buildContractProjections` takes the checks *out of* the catalog — `assertObject(catalog.checks,
 'checks')` — and publishes them as the `checks` category. It then publishes the catalog as its own
-category with `catalog.checks` still on it. The two documents are 9,367 characters each and hash
-identically.
+category with `catalog.checks` still on it. The two documents are 9,585 characters each and hash
+identically. *(Corrected 2026-08-27: this said 9,367, which was the figure the ticket was drafted
+against. The measurement recorded further down — 9,585 — is the one taken when the change was
+made, and it is the one every other number in this ticket is consistent with. The arithmetic below
+was corrected in place when it was found; this sentence was missed.)*
 
 Every consumer that reads the whole contract therefore reads the same document twice. The crew is
 the consumer that makes this expensive: it assembles one instructions prefix from every category

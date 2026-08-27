@@ -1,9 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { verifyProofBundle, writeHashIndex, writeJson } from '../src/proof/evidence';
+import { verifyProofBundle } from '../src/proof/evidence';
 import { type HumanVerdictInput, signHumanVerdict } from '../src/proof/sign-verdict';
+import {
+  CRITERIA,
+  PREVIEW_SHA256,
+  SUMMARY,
+  TAKE_ID,
+  verdictInput as input,
+  pendingBundle,
+  removeVerdictBundles,
+} from './verdict-fixture';
 
 /**
  * `human-verdict.json` is written `pending` at seal time and is meant to be filled in by a
@@ -21,93 +29,7 @@ import { type HumanVerdictInput, signHumanVerdict } from '../src/proof/sign-verd
  * pass that gate, and the verdict is not the reason.
  */
 
-const roots: string[] = [];
-afterAll(async () => {
-  await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
-});
-
-const CRITERIA = [
-  'narration is intelligible, complete, continuous and matches every fictional fact',
-  'all eight catalogue capabilities are perceptibly distinct and synchronized to the voice',
-  'character, chronology, trend, comparison, statistic and quote remain legible',
-  'the image placeholder is honest visible degradation',
-  'composition, typography, motion and pace remain coherent across the full film',
-  'the complete preview is watchable and listenable without explanation',
-] as const;
-
-const PREVIEW_SHA256 = 'a'.repeat(64);
-const TAKE_ID = '6a329bf5bc47';
-
-const SUMMARY = `# Fixture proof evidence
-
-- Proof id: fixture-proof-v1
-- Machine verdict: not-evidenced
-- Human verdict: pending
-- Code-blind end-to-end claim: no
-
-Pending human review is incomplete, never pass.
-`;
-
-/** A bundle with the smallest shape `verifyProofBundle` accepts, sealed and unsigned. */
-const pendingBundle = async (): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'vox-sign-verdict-'));
-  roots.push(root);
-  await mkdir(join(root, 'main-run'), { recursive: true });
-  await writeJson(join(root, 'main-run', 'run.json'), {
-    bindings: {
-      render: { preview: { sha256: PREVIEW_SHA256 } },
-      take: { takeId: TAKE_ID },
-    },
-  });
-  await writeJson(join(root, 'assertions.json'), {
-    machineVerdict: 'not-evidenced',
-    assertions: [
-      {
-        id: 'scenario.brief-compliance',
-        expected: [],
-        observed: [],
-        outcome: 'pass',
-        pass: true,
-        evidence: ['main-run/run.json'],
-      },
-      {
-        id: 'isolation.repository-denied',
-        expected: true,
-        observed: null,
-        outcome: 'not-evidenced',
-        pass: false,
-        evidence: ['main-run/run.json'],
-      },
-    ],
-  });
-  await writeJson(join(root, 'human-verdict.json'), {
-    humanVerdict: 'pending',
-    evaluator: null,
-    evaluatedAt: null,
-    displayAndAudioSetup: null,
-    previewSha256: PREVIEW_SHA256,
-    takeId: TAKE_ID,
-    verticalSliceReviewed: false,
-    rows: CRITERIA.map((criterion) => ({ criterion, verdict: 'pending', note: null })),
-    note: 'Pending is incomplete, never pass. This verdict does not close gap 8.',
-  });
-  await writeFile(join(root, 'SUMMARY.md'), SUMMARY, 'utf8');
-  await writeHashIndex(root);
-  return root;
-};
-
-const input = (overrides: Partial<HumanVerdictInput> = {}): HumanVerdictInput => ({
-  humanVerdict: 'pass',
-  evaluator: 'A Person',
-  evaluatedAt: '2026-08-27T20:00:00.000Z',
-  displayAndAudioSetup: '27-inch display at 100%, wired headphones',
-  rows: CRITERIA.map((criterion, position) => ({
-    criterion,
-    verdict: 'pass' as const,
-    note: `watched, row ${position + 1} holds`,
-  })),
-  ...overrides,
-});
+afterAll(removeVerdictBundles);
 
 const readJson = async (root: string, path: string): Promise<Record<string, unknown>> =>
   JSON.parse(await readFile(join(root, path), 'utf8')) as Record<string, unknown>;
@@ -277,5 +199,61 @@ describe('signHumanVerdict', () => {
       machineVerdict: 'not-evidenced',
       humanVerdict: 'pending',
     });
+  });
+
+  it('refuses a sheet whose row count a signed pass could never satisfy, before writing', async () => {
+    // The defect this closes: the input was checked against the *sealed* sheet and the sealed
+    // sheet against nothing, so five criteria accepted five notes. Both files were written and
+    // re-hashed, and only the re-verification afterwards refused the result — leaving a bundle
+    // signed `pass` that no longer verified. The refusal now happens before the first write.
+    const short = CRITERIA.slice(0, 5);
+    const root = await pendingBundle(short);
+    const before = await readJson(root, 'hash-index.json');
+    const rows = short.map((criterion, position) => ({
+      criterion,
+      verdict: 'pass' as const,
+      note: `watched, row ${position + 1} holds`,
+    }));
+    await expect(signHumanVerdict(root, input({ rows }))).rejects.toThrow(
+      'VERDICT_SHEET_ROW_COUNT:6:5',
+    );
+    expect(await readJson(root, 'hash-index.json')).toEqual(before);
+    expect((await readJson(root, 'human-verdict.json')).humanVerdict).toBe('pending');
+    await expect(verifyProofBundle(root)).resolves.toEqual({
+      machineVerdict: 'not-evidenced',
+      humanVerdict: 'pending',
+    });
+  });
+
+  it('still signs a fail against a sheet that could not carry a pass', async () => {
+    // The count gates a *pass*, which is the verdict `verifyProofBundle` holds to six complete
+    // rows. A fail is not held to it there, so refusing one here would be this module inventing
+    // a rule the verifier does not have.
+    const short = CRITERIA.slice(0, 5);
+    const root = await pendingBundle(short);
+    const rows = short.map((criterion, position) => ({
+      criterion,
+      verdict: (position === 0 ? 'fail' : 'pass') as 'pass' | 'fail',
+      note: `watched, row ${position + 1}`,
+    }));
+    await expect(signHumanVerdict(root, input({ humanVerdict: 'fail', rows }))).resolves.toEqual({
+      machineVerdict: 'not-evidenced',
+      humanVerdict: 'fail',
+    });
+  });
+
+  it('refuses a row that omits its criterion, rather than filing it wherever it landed', async () => {
+    // The guard used to be skipped when the field was absent, which made it opt-in: the input
+    // most likely to be mis-ordered — one typed by hand rather than from `--template` — was
+    // exactly the one that went unchecked.
+    const root = await pendingBundle();
+    const rows = CRITERIA.map((_criterion, position) => ({
+      verdict: 'pass' as const,
+      note: `watched, row ${position + 1} holds`,
+    })) as unknown as HumanVerdictInput['rows'];
+    await expect(signHumanVerdict(root, input({ rows }))).rejects.toThrow(
+      'VERDICT_ROW_CRITERION_MISMATCH:0',
+    );
+    expect((await readJson(root, 'human-verdict.json')).humanVerdict).toBe('pending');
   });
 });

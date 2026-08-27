@@ -9,10 +9,10 @@ which governs what the catalog demonstrates.
 ## Context
 
 The crew assembles one instructions prefix from the projections the contract index publishes, and
-every turn of a Run is authored against that same object. The catalog is 68,135 characters of it,
-roughly 52% of a ~125,000-character prefix, and it goes in whole: `instructions` puts each
-category's body in unsummarised, on the stated ground that *"a summary of a catalog is a
-description of capabilities the model then cannot name correctly."*
+every turn of a Run is authored against that same object. The catalog is 56,930 characters of it,
+48% of a 118,598-character prefix, and it goes in whole: `instructions` puts each category's body
+in unsummarised, on the stated ground that *"a summary of a catalog is a description of
+capabilities the model then cannot name correctly."*
 
 Two properties follow, and only one of them has ever been written down.
 
@@ -104,6 +104,40 @@ Every before-and-after measurement in this project — ticket 17's Word-anchor c
 side, the prefix census of ticket 23, the fixed byte count a scripted author's prefix is held to —
 is valid only within one prefix regime. A change to this decision invalidates the comparison, and
 any such change should say which measurements it is retiring.
+
+### Amended 2026-08-27: production ticket 28 moved the prefix, and this is the disclosure
+
+Ticket 28 stopped the catalog projection from republishing the checks document that the `checks`
+category already publishes. Nothing about the film, the capabilities, the anchor forms or the check
+meanings moved; what moved is how much of the contract the crew is handed. That makes it a new
+prefix regime under the rule directly above, and the rule says such a change must name the
+measurements it retires. Ticket 28 did not, and this paragraph is that omission being corrected
+rather than a second decision.
+
+**The figures in this ADR's Context were measured before the change and have been updated in
+place.** What they said — "68,135 characters… roughly 52% of a ~125,000-character prefix" — is
+retired. It was stale in two directions at once: the prefix had already moved, and the 52% counted
+the checks document inside the catalog, where ticket 28 established it never belonged.
+
+The current numbers, reproducible rather than asserted:
+
+```
+services/agents/.venv/Scripts/python.exe -c "import sys; sys.path[:0]=['src','.','tests'];   from tests.test_planner import SURFACE; from vox_crew.planner import cache_prefix;   print(cache_prefix(SURFACE).chars)"     # 118,598 — the assembled prefix
+```
+
+The catalog is 56,930 of that, or 48.0%. Ticket 28's commit reports 126,927 → 117,332 for the same
+change; that figure counts the five contract bodies as the `contract show` envelopes deliver them,
+where this one counts the prefix `cache_prefix` actually assembles, framing included. Both are
+post-ticket-28 measurements of slightly different objects and neither supersedes the other — but a
+later session comparing against either must say which, because the ~900-character gap between them
+is larger than some of the changes anyone would be measuring.
+
+**What is retired, explicitly.** Any prefix-size or catalog-share figure taken before `b0987b5`.
+That includes this ADR's own two numbers, `teaching_surface.py`'s module docstring, and ticket 17's
+"the catalog projection is 52% of the prefix". Ticket 17's *Word-anchor counts* are not retired:
+they count anchors in a plan, not characters in a prefix, and nothing about this change touches
+what an anchor is. Ticket 23's prefix census has not been taken yet and should be taken against the
+current regime, which is the reason it is worth taking at all.
 
 Binding the catalog search and scene-spec tools now has a place to be argued. The evidence that
 would justify it is a Run economics argument with numbers on both sides: what the repair turns

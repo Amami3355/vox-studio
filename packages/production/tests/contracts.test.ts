@@ -83,6 +83,11 @@ describe('production contract projections', () => {
   it('publishes the checks as an exact view of catalog v4, and the catalog without them', () => {
     const source = sourceCatalog();
 
+    // Two unrelated 4s sit near each other here and mean different things. This one is the
+    // *manifest* version — what the catalog describes. The `catalog` category's own
+    // `contractVersion` in `protocol.ts` is separately at 4 after ticket 28, and versions how the
+    // category is *published*. They moved to the same digit by coincidence and nothing keeps them
+    // in step; a reader who assumed one tracked the other would be wrong in both directions.
     expect(catalog.contract.manifestVersion).toBe(4);
     expect(checks.contract).toEqual(source.checks);
     expect(Object.hasOwn(catalog.contract, 'checks')).toBe(false);

@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { sha256, verifyProofBundle, writeJson } from './evidence';
+import { SIGNED_VERDICT_ROWS, sha256, verifyProofBundle, writeJson } from './evidence';
 
 /**
  * The one path by which a human verdict may enter a sealed bundle.
@@ -21,12 +21,27 @@ import { sha256, verifyProofBundle, writeJson } from './evidence';
  *
  * It signs the verdict and the SUMMARY line that states it. Everything else the sheet asserts —
  * the artifact bindings, the criteria, `verticalSliceReviewed` — is left exactly as sealed.
+ *
+ * **Why these codes are `VERDICT_*` and not `PROOF_*` like the rest of `src/proof`.** They answer
+ * different questions. A `PROOF_*` code says a bundle does not hold together and is what a reader
+ * of somebody else's evidence meets. A `VERDICT_*` code says *this signing input was refused and
+ * nothing was written*, which is a fact about the request rather than about the bundle — the
+ * bundle it names is still exactly as sealed. Keeping the namespaces apart is what lets a caller
+ * tell "your input was wrong" from "the evidence you were handed is broken"; folding them together
+ * would make a rejected paste look like a corrupted proof.
  */
 
 export type HumanVerdictRowInput = {
-  /** Checked when present, against the sealed criterion at the same position: six notes pasted
-   * in the wrong order are otherwise indistinguishable from six correct ones. */
-  criterion?: string;
+  /**
+   * Checked against the sealed criterion at the same position: six notes pasted in the wrong
+   * order are otherwise indistinguishable from six correct ones.
+   *
+   * Required, not optional. It was optional, and an optional guard against mis-ordering is not a
+   * guard — an input that simply omitted the field got the silent misfiling the field exists to
+   * prevent, which is the one failure `--template` is built around. The template emits it, so
+   * the path a person actually walks already satisfies this.
+   */
+  criterion: string;
   verdict: 'pass' | 'fail';
   note: string;
 };
@@ -52,7 +67,7 @@ const oneLine = (value: unknown): string =>
  * Validation is a single pass that returns the two files to write, so a refusal cannot leave a
  * half-signed bundle behind: nothing is written until every field has been accepted.
  */
-const signedFiles = (
+const signedContents = (
   sealed: SealedVerdict,
   summary: string,
   input: HumanVerdictInput,
@@ -68,6 +83,16 @@ const signedFiles = (
   if (typeof evaluatedAt !== 'string' || Number.isNaN(Date.parse(evaluatedAt))) {
     throw new Error(`VERDICT_EVALUATED_AT_INVALID:${String(input.evaluatedAt)}`);
   }
+  // The sealed sheet is checked against the count a signed pass has to have, before the input is
+  // checked against the sealed sheet. Only the second was here, which made this function agree
+  // with whatever the bundle happened to hold rather than with the verifier: a sheet sealed with
+  // five criteria accepted five notes, both files were written, and `verifyProofBundle` then
+  // refused the result with `PROOF_HUMAN_VERDICT_INCOMPLETE` — a bundle signed `pass` and no
+  // longer verifiable, which is the one outcome this module promises cannot happen. Refusing the
+  // sheet up front costs nothing and cannot leave anything behind.
+  if (input.humanVerdict === 'pass' && sealed.rows.length !== SIGNED_VERDICT_ROWS) {
+    throw new Error(`VERDICT_SHEET_ROW_COUNT:${SIGNED_VERDICT_ROWS}:${sealed.rows.length}`);
+  }
   const rows = Array.isArray(input.rows) ? input.rows : [];
   if (rows.length !== sealed.rows.length) {
     throw new Error(`VERDICT_ROW_COUNT:${sealed.rows.length}:${rows.length}`);
@@ -77,7 +102,7 @@ const signedFiles = (
     if (row === null || typeof row !== 'object') {
       throw new Error(`VERDICT_ROW_MALFORMED:${position}`);
     }
-    if (row.criterion !== undefined && row.criterion !== sealedRow.criterion) {
+    if (row.criterion !== sealedRow.criterion) {
       throw new Error(`VERDICT_ROW_CRITERION_MISMATCH:${position}`);
     }
     if (row.verdict !== 'pass' && row.verdict !== 'fail') {
@@ -109,7 +134,7 @@ const signedFiles = (
   };
 };
 
-/** Re-hashes one path from the bytes on disk, leaving every other entry in the index alone. */
+/** Re-hashes the named paths from the bytes on disk, leaving every other entry alone. */
 const reindex = async (root: string, paths: string[]): Promise<void> => {
   const indexPath = resolve(root, 'hash-index.json');
   const index = JSON.parse(await readFile(indexPath, 'utf8')) as Record<string, string>;
@@ -130,7 +155,7 @@ export const signHumanVerdict = async (
   }
   const verdictPath = resolve(absoluteRoot, 'human-verdict.json');
   const summaryPath = resolve(absoluteRoot, 'SUMMARY.md');
-  const signed = signedFiles(
+  const signed = signedContents(
     JSON.parse(await readFile(verdictPath, 'utf8')) as SealedVerdict,
     await readFile(summaryPath, 'utf8'),
     input,

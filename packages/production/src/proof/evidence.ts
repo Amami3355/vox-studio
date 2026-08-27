@@ -112,6 +112,22 @@ export const writeHashIndex = async (root: string): Promise<Record<string, strin
   return index;
 };
 
+/**
+ * How many criteria a signed human verdict answers.
+ *
+ * Exported because two modules have to agree on it and once did not. This file decides whether a
+ * signed pass is complete; `sign-verdict.ts` decides whether an input may be written at all. When
+ * the second checked the input against the *sealed* sheet's row count and the first checked it
+ * against a literal six, a sheet sealed with any other number could be signed and only then fail
+ * to verify — files written, bundle unreadable. One constant, read by both, is what stops that.
+ *
+ * It is a fixed number rather than the sealed sheet's own length because the six criteria are the
+ * watch-and-listen sheet, not a per-scenario detail: `proof-scenarios.test.ts` holds every
+ * scenario to it, so a scenario that grows a seventh criterion fails there — where the decision
+ * is — rather than here, on a bundle somebody was trying to sign.
+ */
+export const SIGNED_VERDICT_ROWS = 6;
+
 export const verifyProofBundle = async (
   root: string,
   options: { requirePass?: boolean } = {},
@@ -201,7 +217,7 @@ export const verifyProofBundle = async (
       !Number.isNaN(Date.parse(human.evaluatedAt)) &&
       typeof human.displayAndAudioSetup === 'string' &&
       human.displayAndAudioSetup.length > 0 &&
-      human.rows?.length === 6 &&
+      human.rows?.length === SIGNED_VERDICT_ROWS &&
       human.rows.every(
         (row) => row.verdict === 'pass' && typeof row.note === 'string' && row.note.length > 0,
       );

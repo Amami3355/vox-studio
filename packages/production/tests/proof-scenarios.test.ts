@@ -1,6 +1,7 @@
 import type { VideoPlan } from '@vox/video';
 import { describe, expect, it } from 'vitest';
 import { CATALOG_SHOWCASE_CAPABILITIES } from '../src/proof/catalog-showcase';
+import { SIGNED_VERDICT_ROWS } from '../src/proof/evidence';
 import {
   PROOF_SCENARIOS,
   PROOF_SCENARIO_KEYS,
@@ -93,5 +94,19 @@ describe('proof scenario table', () => {
     expect(isProofScenarioKey('showcase')).toBe(true);
     expect(isProofScenarioKey('helios-bay')).toBe(false);
     expect(isProofScenarioKey('toString')).toBe(false);
+  });
+
+  it('seals every scenario with the number of criteria a signed pass has to answer', () => {
+    // The watch-and-listen sheet is six criteria, and `verifyProofBundle` will only accept a
+    // signed pass that answers all six. Each scenario supplies its own wording, though, and
+    // nothing here held the *count* — so a scenario could have grown a seventh criterion and the
+    // only symptom would have been a bundle that could be sealed and then never signed. The
+    // decision belongs in this table, so the failure belongs here too.
+    for (const key of PROOF_SCENARIO_KEYS) {
+      expect(
+        PROOF_SCENARIOS[key].humanVerdictRows,
+        `scenario ${key} seals a sheet a signed pass could not answer`,
+      ).toHaveLength(SIGNED_VERDICT_ROWS);
+    }
   });
 });
