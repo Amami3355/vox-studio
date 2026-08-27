@@ -1,0 +1,124 @@
+# ADR-0017 — The prefix is identical and the catalog goes whole, and that is a trade
+
+**Status:** accepted · 2026-08-27
+**Scope:** what the crew sends a model on every turn of a Run, and why it is the same bytes each
+time. It changes no production command, no envelope and no schema. It says nothing about what the
+contract publishes — only about what the crew does with it — and it does not reopen ADR-0012,
+which governs what the catalog demonstrates.
+
+## Context
+
+The crew assembles one instructions prefix from the projections the contract index publishes, and
+every turn of a Run is authored against that same object. The catalog is 68,135 characters of it,
+roughly 52% of a ~125,000-character prefix, and it goes in whole: `instructions` puts each
+category's body in unsummarised, on the stated ground that *"a summary of a catalog is a
+description of capabilities the model then cannot name correctly."*
+
+Two properties follow, and only one of them has ever been written down.
+
+The recorded one is that the prefix is **identical across turns**. `cache_prefix` is the only
+place a prefix is built, and both the authoring turn and every repair turn read that same object,
+so two call sites cannot drift about what "identical" means. This is asserted in the tests: a
+scripted author's prefix is byte-identical at a fixed character count, which is what makes a
+measurement taken before a change comparable with one taken after. Ticket 17's entire before-and-
+after design rests on it.
+
+The unrecorded one is the cost. The resident prefix is priced per model call — `context.Ask`
+multiplies it by `model_calls` — so a Run that repairs twice sends the catalog three times. A
+repair provoked by one code about one scene re-sends every capability in the catalog to fix it.
+At three cycles that is upward of two hundred thousand characters of catalog, for a turn whose
+subject is a single duration.
+
+For a while the answer to that was caching. The prefix is identical, an identical prefix is what
+a provider serves from a cache, and the bundle reports `cacheableChars` against a `cacheServed:
+null`. That answer does not survive inspection: the live author opens a fresh runner and session
+per ask, the framework's caching begins on a session's second turn, and no session here ever has
+one. The saving is not unconfirmed, it is unreachable. Ticket 22 corrects the places that imply
+otherwise.
+
+So the identical prefix currently buys **comparability and nothing else**, and the whole catalog
+is paid for on every turn.
+
+The alternative has been named repeatedly and never argued. The contract publishes catalog search
+and scene-spec commands; binding them would let an author fetch the capability it is working on
+instead of reading all of them. Three consecutive handoffs record those tools as unbound and
+describe the reason as *"architectural, not wiring — it means replacing the flattened cached
+prefix with on-demand lookups."* That sentence is correct and it is not a decision. It has been
+carried as a deferral across enough sessions that each new one rediscovers the conflict from
+scratch, which is precisely the failure ADR-0012 was written to stop happening to the plan
+examples.
+
+## Decision
+
+**The prefix is identical across a Run's turns and the catalog goes into it whole. This is
+chosen, it is paid for per turn, and what it buys today is measurement comparability rather than
+a cache.**
+
+The two halves are one decision and not two. A prefix cannot be byte-identical across turns and
+also be narrowed to the capability a given turn is about; on-demand lookup and the identical
+prefix are alternatives, not stages. Anyone changing either is changing both.
+
+Three things follow that are binding rather than descriptive.
+
+**The prefix is not narrowed to save budget alone.** A cost argument by itself is not sufficient
+to break the identical prefix, because the property it would break is the one every before-and-
+after measurement in this project depends on. What was measured under one prefix regime cannot be
+compared with what is measured under another.
+
+**No part of the codebase may claim the cost is recovered by caching.** Not in a bundle field,
+not in a docstring, not in a commit message. The crew may report that its prefix is identical,
+because that is observed. It may not report a saving no provider has told it about. Ticket 22
+sweeps the existing claims; this ADR is why they do not come back.
+
+**The deferral of the catalog tools is a consequence of this decision, not an oversight.** They
+stay unbound because binding them means giving up the identical prefix, and that trade has not
+been made. A session may make it, and must do so here rather than in a wiring commit.
+
+## Considered and rejected
+
+**Narrow the repair prefix only.** Authoring reads the whole catalog; a repair reads only the
+capability it is fixing. This is the most tempting option and it is the one that breaks the
+property most quietly: a Run whose first turn and second turn have different prefixes cannot be
+compared with a Run of either shape, and the difference would not be visible in a bundle unless
+someone thought to look. If the trade is made it is made for the whole Run.
+
+**Summarise the catalog and keep the full body behind a lookup.** Rejected on the ground already
+recorded in `instructions`: a model that reads a summary of a catalog cannot name its capabilities
+correctly, and a wrong capability name is a refusal, which costs a repair cycle — the thing the
+budget exists to protect.
+
+**Wire the framework's context caching and keep everything else.** It does not engage: it starts
+on a session's second turn and the author opens one session per ask. Reaching it means reusing a
+session across a Run's turns, which `context.py` records as deliberate and costly to change, and
+which ticket 22 rejects again beside the field it would clear.
+
+**Keep deferring.** What this ADR replaces. The deferral is defensible; three sessions of it
+without a written trade is how a project loses the reasoning and re-derives it worse.
+
+## Consequences
+
+The catalog is re-sent on every turn of every Run, and the budget in `context.py` prices it
+honestly. That number is expected to be large and is not, by itself, a defect report.
+
+Every before-and-after measurement in this project — ticket 17's Word-anchor counts at n≥3 either
+side, the prefix census of ticket 23, the fixed byte count a scripted author's prefix is held to —
+is valid only within one prefix regime. A change to this decision invalidates the comparison, and
+any such change should say which measurements it is retiring.
+
+Binding the catalog search and scene-spec tools now has a place to be argued. The evidence that
+would justify it is a Run economics argument with numbers on both sides: what the repair turns
+actually cost against what a targeted lookup would cost, including the refusals a model makes when
+it cannot see a capability it did not think to ask for.
+
+The identical prefix remains eligible for provider-side caching if the session model ever changes.
+That is a reason not to abandon the property casually. It is not a reason to report a saving, and
+this ADR is the record that the two were once confused.
+
+## References
+
+- ADR-0012 — examples illustrate, refusals teach. Governs what the catalog demonstrates; this ADR
+  governs how much of it is sent and how often. Neither reopens the other.
+- ADR-0015 — the deployment seam is the crew client. The session model this decision depends on
+  sits below that seam.
+- Ticket 22 — removes the claims that the per-turn cost is recovered by caching.
+- Ticket 23 — the prefix census, which is one of the measurements this decision keeps comparable.
