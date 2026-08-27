@@ -740,7 +740,9 @@ def test_a_run_that_cannot_afford_its_next_repair_ends_before_asking_for_it() ->
         client,
         REQUEST,
         author,
-        context_budget=ContextBudget(resident_chars=10**9, fresh_chars=authoring.fresh),
+        context_budget=ContextBudget(
+            resident_chars=10**9, fresh_chars=authoring.fresh, model_calls=10**9
+        ),
     )
 
     assert run.outcome == BUDGET_EXHAUSTED
@@ -764,7 +766,9 @@ def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
             client,
             REQUEST,
             author,
-            context_budget=ContextBudget(resident_chars=10, fresh_chars=10**9),
+            context_budget=ContextBudget(
+                resident_chars=10, fresh_chars=10**9, model_calls=10**9
+            ),
         )
 
     assert author.asked == []

@@ -473,6 +473,32 @@ def _anchor_pattern(time: Mapping[str, Any]) -> re.Pattern[str]:
     return re.compile(r"^(?P<beat>[^.]+)\.(?:" + "|".join(alternatives) + r")$")
 
 
+def published_errors(surface: TeachingSurface) -> Mapping[str, Any]:
+    """The check registry's error half, as the contract publishes it."""
+    return surface.contract("checks").get("errors", {})
+
+
+def _published_finding(
+    published: Mapping[str, Any], code: str, where: str, detail: str
+) -> Finding:
+    """One finding, carrying the `means` and `repair` the registry publishes for its code.
+
+    The lookup lives here rather than at each caller because a `Finding` built without it is a
+    code with its contract stripped off. That is precisely what the crew refuses to accept from
+    the interface, and the draft-review tool was building `MALFORMED_PLAN` that way — telling an
+    author, in the one case where its draft would not even parse, a code and nothing to do about
+    it, while the tool's own docstring promised it the `means` and the `repair`.
+    """
+    meaning = published.get(code, {})
+    return Finding(
+        code=code,
+        where=where,
+        detail=detail,
+        means=str(meaning.get("means", "")),
+        repair=str(meaning.get("repair", "")),
+    )
+
+
 def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, ...]:
     """Reads an authored plan against the catalog it was supposed to be authored from.
 
@@ -481,7 +507,7 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
     discovering. Everything else is the compiler's to say.
     """
     catalog = surface.contract("catalog")
-    published = surface.contract("checks").get("errors", {})
+    published = published_errors(surface)
     capabilities = {
         str(item["id"]): item
         for item in catalog.get("capabilities", ())
@@ -492,16 +518,7 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
     findings: list[Finding] = []
 
     def report(code: str, where: str, detail: str) -> None:
-        meaning = published.get(code, {})
-        findings.append(
-            Finding(
-                code=code,
-                where=where,
-                detail=detail,
-                means=str(meaning.get("means", "")),
-                repair=str(meaning.get("repair", "")),
-            )
-        )
+        findings.append(_published_finding(published, code, where, detail))
 
     for where, key in _walk(plan, "plan"):
         lowered = key.lower()
@@ -585,20 +602,30 @@ class DraftReview:
 
     **It is also the meter, and that is not incidental.** Every call the author makes is a
     further model call that re-sends the whole prefix, so the object that provides the tool is
-    the only one positioned to count them honestly. `context.Ask` multiplies by `turns`, and a
-    turn that under-reported its own spend would put a wrong number in a bundle that is
+    the only one positioned to count them honestly. `context.Ask` multiplies by `model_calls`,
+    and a turn that under-reported its own spend would put a wrong number in a bundle that is
     evidence.
     """
 
     surface: TeachingSurface
+    offered: bool = True
     calls: int = 0
     returned_chars: int = 0
     codes: list[str] = field(default_factory=list)
 
     @property
-    def turns(self) -> int:
+    def model_calls(self) -> int:
         """Model calls this ask made: the first, plus one to read each tool answer."""
         return 1 + self.calls
+
+    def check(self) -> Callable[[str], Mapping[str, Any]] | None:
+        """The tool this author was offered, or `None` where it holds none.
+
+        A meter is built for every turn so that every turn's account has one shape. Whether the
+        author can *reach* the tool is this method's answer, and an author that cannot leaves
+        the meter reading zero rather than leaving it absent.
+        """
+        return self.tool() if self.offered else None
 
     def tool(self) -> Callable[[str], Mapping[str, Any]]:
         """The callable an author is given. Its docstring is what the model reads."""
@@ -616,7 +643,7 @@ class DraftReview:
             covers only what the contract above is responsible for teaching.
 
             Args:
-                plan: the draft VideoPlan, as a JSON object.
+                plan: the draft VideoPlan, as JSON text.
 
             Returns:
                 `findings`, and `clean` when there are none.
@@ -626,12 +653,8 @@ class DraftReview:
                 draft = _plan_from(plan)
             except PlanNotAuthored as error:
                 found = (
-                    Finding(
-                        code="MALFORMED_PLAN",
-                        where="plan",
-                        detail=str(error),
-                        means="",
-                        repair="",
+                    _published_finding(
+                        published_errors(self.surface), "MALFORMED_PLAN", "plan", str(error)
                     ),
                 )
             else:
@@ -734,40 +757,46 @@ def authoring_ask(prefix: CachedPrefix, brief: Mapping[str, Any]) -> Ask:
     return Ask(resident=prefix.chars, fresh=len(message_text(brief)))
 
 
-def _offered(prefix: CachedPrefix, author: PlanAuthor) -> DraftReview | None:
-    """A fresh meter for this turn, where the author can use one.
+def _offered(prefix: CachedPrefix, author: PlanAuthor) -> DraftReview:
+    """A fresh meter for this turn, whether or not the author can reach the tool.
 
     Fresh per turn rather than per Run, because an `Ask` is what one turn cost and a meter
     shared across the loop would charge the second turn for the first turn's tool calls.
+
+    Built for every author rather than only for one holding a tool. An author that cannot call
+    the tool leaves the meter reading zero, which is the same answer an author that could and
+    did not leaves — so no caller has to ask which kind it is holding, and the four places that
+    asked have one shape between them.
     """
-    return DraftReview(prefix.surface) if author.reviews_drafts else None
+    return DraftReview(prefix.surface, offered=author.reviews_drafts)
 
 
-def _tool(meter: DraftReview | None) -> Callable[[str], Mapping[str, Any]] | None:
-    return meter.tool() if meter is not None else None
-
-
-def _reviewed(meter: DraftReview | None) -> tuple[str, ...]:
+def _reviewed(meter: DraftReview) -> tuple[str, ...]:
     """Every code the author was shown while drafting, in the order it was shown them.
 
     Order is kept rather than a set taken: the same code twice means the author was told, wrote
     something else, and was told again, which reads very differently from being told once.
     """
-    return tuple(meter.codes) if meter is not None else ()
+    return tuple(meter.codes)
 
 
-def _spent(priced: Ask, meter: DraftReview | None) -> Ask:
+def _spent(priced: Ask, meter: DraftReview) -> Ask:
     """The ask as it actually happened: the price it was quoted, plus what the tool cost.
 
-    Every call the author made re-sent the prefix, and its answer arrived as fresh text on the
-    turn after it. Both are on the meter, so neither has to be estimated.
+    The two costs are carried apart because they behave differently. Every call re-sent the
+    prefix *and* the message beside it, so `Ask` multiplies both by `model_calls`; a tool's
+    answer appears only in the calls after the one that asked for it, so it is handed over as
+    `returned` and charged on its own line. Folding the answers into `fresh` — which this did
+    at first — charged them once and charged the Brief once, and the Brief is the larger of the
+    two.
     """
-    if meter is None or meter.calls == 0:
+    if meter.calls == 0:
         return priced
     return Ask(
         resident=priced.resident,
-        fresh=priced.fresh + meter.returned_chars,
-        turns=meter.turns,
+        fresh=priced.fresh,
+        model_calls=meter.model_calls,
+        returned=meter.returned_chars,
     )
 
 
@@ -799,14 +828,14 @@ def author_plan(
     _refuse_if_leaked(prefix.text, "instructions", brief)
 
     meter = _offered(prefix, author)
-    plan = _as_plan(author.author(prefix.text, brief, check=_tool(meter)), "answered")
+    plan = _as_plan(author.author(prefix.text, brief, check=meter.check()), "answered")
     return AuthoredPlan(
         plan=plan,
         instructions=prefix.text,
         findings=review(plan, prefix.surface),
         ask=_spent(authoring_ask(prefix, brief), meter),
         reviewed=_reviewed(meter),
-        review_calls=meter.calls if meter is not None else 0,
+        review_calls=meter.calls,
     )
 
 
@@ -835,7 +864,7 @@ def repair_plan(
 
     meter = _offered(prefix, author)
     repaired = _as_plan(
-        author.repair(text, brief, plan, refusal, check=_tool(meter)), "repaired"
+        author.repair(text, brief, plan, refusal, check=meter.check()), "repaired"
     )
     return AuthoredPlan(
         plan=repaired,
@@ -843,7 +872,7 @@ def repair_plan(
         findings=review(repaired, prefix.surface),
         ask=_spent(repair_ask(prefix, brief, plan, refusal), meter),
         reviewed=_reviewed(meter),
-        review_calls=meter.calls if meter is not None else 0,
+        review_calls=meter.calls,
     )
 
 

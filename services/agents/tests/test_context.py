@@ -29,6 +29,8 @@ from vox_crew.context import (
     CHARS_PER_TOKEN,
     FRESH_CHARS,
     FRESH_CHARS_PER_ASK,
+    MODEL_CALLS,
+    MODEL_CALLS_PER_ASK,
     RESIDENT_CHARS,
     RESIDENT_CHARS_ALLOWED,
     Ask,
@@ -161,21 +163,51 @@ def test_a_spend_whose_turns_read_different_prefixes_reports_more_than_one() -> 
 def test_the_budget_scales_its_turn_allowance_with_the_asks_the_repair_budget_allows() -> None:
     """One line is the catalog, which is sent once; the other grows with the loop."""
     assert context_budget(6) == ContextBudget(
-        resident_chars=RESIDENT_CHARS_ALLOWED, fresh_chars=FRESH_CHARS_PER_ASK * 6
+        resident_chars=RESIDENT_CHARS_ALLOWED,
+        fresh_chars=FRESH_CHARS_PER_ASK * 6,
+        model_calls=MODEL_CALLS_PER_ASK * 6,
     )
 
 
 def test_an_overrun_names_the_line_it_passed_rather_than_answering_yes_or_no() -> None:
-    budget = ContextBudget(resident_chars=100, fresh_chars=50)
+    budget = ContextBudget(resident_chars=100, fresh_chars=50, model_calls=4)
 
     assert ContextSpend((Ask(resident=100, fresh=50),)).overrun(budget) is None
     assert ContextSpend((Ask(resident=101, fresh=0),)).overrun(budget) == RESIDENT_CHARS
     assert ContextSpend((Ask(resident=100, fresh=51),)).overrun(budget) == FRESH_CHARS
 
 
+def test_an_author_looping_against_its_tool_passes_the_rate_line() -> None:
+    """The term the crew does not choose, held to a line rather than only reported.
+
+    `repair_budget` decides how many plan versions a Run may ask for. How many times an author
+    calls a tool inside one of them is the model's decision, and before this line existed it
+    was the one term in a Run's spend that nothing bounded.
+    """
+    budget = ContextBudget(resident_chars=10**9, fresh_chars=10**9, model_calls=4)
+
+    assert ContextSpend((Ask(resident=1, fresh=1, model_calls=4),)).overrun(budget) is None
+    assert (
+        ContextSpend((Ask(resident=1, fresh=1, model_calls=5),)).overrun(budget) == MODEL_CALLS
+    )
+
+
+def test_the_rate_line_is_read_before_the_character_line_it_would_also_blow() -> None:
+    """A Run that looped against a tool spent its budget on calls, not on plan versions.
+
+    Where the characters went is a symptom; the finding is the loop, so the loop is what the
+    overrun names.
+    """
+    budget = ContextBudget(resident_chars=10**9, fresh_chars=10, model_calls=2)
+
+    assert ContextSpend((Ask(resident=1, fresh=100, model_calls=9),)).overrun(budget) == (
+        MODEL_CALLS
+    )
+
+
 def test_the_resident_line_is_read_before_the_turn_line() -> None:
     """A prefix that does not fit is the finding; what a turn added on top of it is noise."""
-    budget = ContextBudget(resident_chars=100, fresh_chars=50)
+    budget = ContextBudget(resident_chars=100, fresh_chars=50, model_calls=4)
 
     assert ContextSpend((Ask(resident=200, fresh=200),)).overrun(budget) == RESIDENT_CHARS
 

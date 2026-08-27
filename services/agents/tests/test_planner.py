@@ -43,6 +43,7 @@ from vox_crew.planner import (
     cache_prefix,
     instructions,
     plan_and_produce,
+    published_errors,
     review,
     scan_for_leaks,
     scan_message_for_leaks,
@@ -550,27 +551,66 @@ def test_a_draft_arriving_in_a_fence_is_read_rather_than_refused() -> None:
     assert DraftReview(SURFACE).tool()(fenced) == {"findings": [], "clean": True}
 
 
+def test_a_draft_that_does_not_parse_is_refused_with_the_contract_the_registry_publishes(
+) -> None:
+    """The one case where the author most needs the repair, and it was the case it never got.
+
+    `MALFORMED_PLAN` is published with a `means` and a `repair` like every other code, and the
+    tool was building it by hand with both blank — while its own docstring, which the model
+    reads, promised them. A code with its contract stripped off is what the crew refuses to
+    accept from the interface; it must not hand one to an author either.
+    """
+    answer = DraftReview(SURFACE).tool()("this is not a plan")
+    finding = answer["findings"][0]
+    published = published_errors(SURFACE)["MALFORMED_PLAN"]
+
+    assert answer["clean"] is False
+    assert finding["code"] == "MALFORMED_PLAN"
+    assert finding["means"] == published["means"] != ""
+    assert finding["repair"] == published["repair"] != ""
+
+
+def test_an_author_offered_no_tool_is_handed_none_and_still_meters_zero() -> None:
+    """One meter shape for every turn: an author that cannot call the tool reads zero.
+
+    The alternative was an optional meter, and four call sites each asking whether they held
+    one. Zero is the same answer an author that could call the tool and did not gives, and no
+    caller has to tell those apart.
+    """
+    withheld = DraftReview(SURFACE, offered=False)
+
+    assert withheld.check() is None
+    assert withheld.model_calls == 1
+    assert withheld.calls == 0
+    assert DraftReview(SURFACE, offered=True).check() is not None
+
+
 def test_the_tool_meters_what_it_cost_because_nothing_else_can_see_it() -> None:
     """Every call is another model call re-sending the prefix, counted where it happens."""
     meter = DraftReview(SURFACE)
     tool = meter.tool()
 
-    assert meter.turns == 1
+    assert meter.model_calls == 1
     tool(json.dumps(a_catalog_following_plan()))
     tool(json.dumps(a_catalog_following_plan()))
 
     assert meter.calls == 2
-    assert meter.turns == 3
+    assert meter.model_calls == 3
     assert meter.returned_chars > 0
 
 
 def test_a_turn_that_used_a_tool_is_priced_over_every_call_it_made() -> None:
-    """The accounting a bundle reports. An ask is not a model call once a tool is held."""
+    """The accounting a bundle reports. An ask is not a model call once a tool is held.
+
+    The prefix and the message beside it are both re-sent on every call, so both multiply. A
+    tool's answer is not: it appears only in the calls after the one that asked for it, so it
+    is charged apart from the two that repeat.
+    """
     quiet = Ask(resident=1000, fresh=50)
-    talkative = Ask(resident=1000, fresh=50, turns=3)
+    talkative = Ask(resident=1000, fresh=50, model_calls=3, returned=200)
 
     assert quiet.chars == 1050
-    assert talkative.chars == 3050
+    assert talkative.chars == 3350
 
 
 def test_the_instructions_name_the_tool_only_to_an_author_that_holds_one() -> None:
@@ -618,8 +658,9 @@ def test_an_ask_records_the_tool_calls_the_author_actually_made() -> None:
 
     authored = author_plan(prefix, REQUEST["brief"], ReviewingAuthor(a_catalog_following_plan()))
 
-    assert authored.ask.turns == 3
-    assert authored.ask.fresh > quoted.fresh
+    assert authored.ask.model_calls == 3
+    assert authored.ask.fresh == quoted.fresh, "the message beside the prefix did not grow"
+    assert authored.ask.returned > 0, "what the tool handed back is charged on its own line"
     assert authored.ask.chars > quoted.chars
 
 
@@ -693,7 +734,7 @@ def test_an_author_that_called_no_tool_is_priced_exactly_as_it_always_was() -> N
     authored = author_plan(prefix, REQUEST["brief"], author)
 
     assert authored.ask == authoring_ask(prefix, REQUEST["brief"])
-    assert authored.ask.turns == 1
+    assert authored.ask.model_calls == 1
 
 
 # --- The seam --------------------------------------------------------------------------
@@ -702,13 +743,15 @@ def test_an_author_that_called_no_tool_is_priced_exactly_as_it_always_was() -> N
 def test_an_author_is_handed_instructions_a_brief_and_the_tools_it_was_offered() -> None:
     """The model's seam carries payloads and tools, and nothing that locates anything.
 
-    It was payloads only until a draft could be reviewed. A tool is a callable and therefore
-    not serialisable, which is a real widening of the seam and is written down as one rather
-    than waved through: offering an author a tool is the whole of what binding one means, and
-    an interface that could not express it would be an interface the capability had to go
-    around. What the rule was actually protecting is unchanged and asserted below — nothing
+    **ADR-0016 is where this rule lives.** It was payloads only until a draft could be
+    reviewed, and the widening to callables was recorded in this docstring — which a review
+    correctly called the wrong home, since a rule that has to be reconstructed from a test is
+    a rule that will be broken by someone who never found it.
+
+    What the rule was actually protecting is unchanged and is what this test asserts: nothing
     here names a path, a root, a directory, a file or a client, so an author still cannot tell
-    where it is running or reach the production sequence sideways.
+    where it is running or reach the production sequence sideways. A tool that wanted a work
+    root would fail this exactly as it always would have.
     """
     signature = inspect.signature(PlanAuthor.author)
 

@@ -672,7 +672,10 @@ def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
     assert context["budget"] == {
         "residentChars": run.context_budget.resident_chars,
         "freshChars": run.context_budget.fresh_chars,
+        "modelCalls": run.context_budget.model_calls,
     }
+    # The tool's answers, apart from the message beside the prefix: they are not re-sent.
+    assert context["returnedChars"] == run.spend.returned_chars
     # The figure the budget is stated in, beside the one a model is billed in.
     assert context["sentTokens"] == tokens(run.spend.sent_chars)
 

@@ -329,6 +329,7 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
         "onePrefix": spend.one_prefix,
         "residentChars": spend.resident_chars,
         "freshChars": spend.fresh_chars,
+        "returnedChars": spend.returned_chars,
         "distinctChars": spend.distinct_chars,
         "distinctTokens": tokens(spend.distinct_chars),
         "sentChars": spend.sent_chars,
@@ -338,6 +339,7 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
         "budget": {
             "residentChars": run.context_budget.resident_chars,
             "freshChars": run.context_budget.fresh_chars,
+            "modelCalls": run.context_budget.model_calls,
         },
         "overrun": spend.overrun(run.context_budget),
     }

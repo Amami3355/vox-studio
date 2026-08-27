@@ -79,11 +79,24 @@ RESIDENT_CHARS_ALLOWED = 150_000
 # authoring turn rather than ending a Run mid-repair.
 FRESH_CHARS_PER_ASK = 20_000
 
+# How many model calls one ask may take: the call that reads the prefix, plus three the author
+# spends reading a tool's answer and trying again. An author holding no tool uses exactly one
+# and cannot approach this.
+#
+# The line exists because a tool loop is the only term in a Run's spend that the crew does not
+# choose. `repair_budget` decides how many plan versions a Run may ask for; how many times an
+# author calls a tool inside one of them is the model's decision, and an unbounded term in an
+# account that is evidence is a number nobody can promise. Three is the smallest allowance that
+# lets an author read a finding, repair, and confirm the repair — the loop the tool exists for
+# — and it is a ceiling rather than a target: the one live Run measured so far used one call.
+MODEL_CALLS_PER_ASK = 4
+
 # The lines a Run can pass, named the way `converge` names its budget lines and for the same
 # reason: `limit` is read by whoever audits the Run, and a string literal at a return site is
 # a reason nothing else in the repo can recognise.
 RESIDENT_CHARS = "resident_chars"
 FRESH_CHARS = "fresh_chars"
+MODEL_CALLS = "model_calls"
 
 
 class ContextBudgetExceeded(RuntimeError):
@@ -115,22 +128,36 @@ class Ask:
     the refusal, where there was one, and the message carrying the Brief and the plan being
     repaired.
 
-    **`turns` is why an ask is not a model call.** An author holding a tool answers over several
-    model calls rather than one: it reads the prefix, calls the tool, and reads the prefix again
-    with the tool's answer appended. The prefix is re-sent every time. An `Ask` that assumed one
-    call would report a fraction of what a tool-using turn actually put in front of a model, and
-    a bundle is evidence — so the count is carried rather than assumed, and `chars` multiplies
-    by it. A turn that used no tool has `turns=1` and prices exactly as it always did.
+    **`model_calls` is why an ask is not a model call.** An author holding a tool answers over
+    several model calls rather than one: it reads the prefix, calls the tool, and reads the
+    prefix again with the tool's answer appended. An `Ask` that assumed one call would report a
+    fraction of what a tool-using turn actually put in front of a model, and a bundle is
+    evidence — so the count is carried rather than assumed. A turn that used no tool has
+    `model_calls=1` and prices exactly as it always did.
+
+    `returned` is what the tool handed back, and it is a field of its own rather than more
+    `fresh` for a reason the first version of this got wrong: **`resident` and `fresh` are both
+    re-sent on every call, and a tool's answer is not.** The prefix and the message carrying the
+    Brief sit in the conversation for the whole ask, so both multiply; an answer appears only in
+    the calls after the one that asked for it. Folding the answers into `fresh` charged them
+    once and charged the Brief once, which under-reported the larger of the two and misreported
+    both.
+
+    What `chars` does *not* do is charge each answer for every later call that carries it. That
+    would need each answer's size and the meter keeps only their total, so this is a floor on
+    the tool's tail rather than the exact figure — named here because a number in a bundle that
+    quietly rounds in its own favour is worse than one that says where it stops.
     """
 
     resident: int
     fresh: int
-    turns: int = 1
+    model_calls: int = 1
+    returned: int = 0
 
     @property
     def chars(self) -> int:
         """What this turn would cost with nothing cached, over every model call it made."""
-        return self.resident * self.turns + self.fresh
+        return (self.resident + self.fresh) * self.model_calls + self.returned
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +166,7 @@ class ContextBudget:
 
     resident_chars: int
     fresh_chars: int
+    model_calls: int
 
 
 def context_budget(asks: int) -> ContextBudget:
@@ -152,6 +180,7 @@ def context_budget(asks: int) -> ContextBudget:
     return ContextBudget(
         resident_chars=RESIDENT_CHARS_ALLOWED,
         fresh_chars=FRESH_CHARS_PER_ASK * asks,
+        model_calls=MODEL_CALLS_PER_ASK * asks,
     )
 
 
@@ -174,7 +203,7 @@ class ContextSpend:
         several calls. The two are equal for an author that holds none, which is every
         scripted Run and was every Run before a tool was bound.
         """
-        return sum(ask.turns for ask in self.asks)
+        return sum(ask.model_calls for ask in self.asks)
 
     @property
     def one_prefix(self) -> bool:
@@ -200,12 +229,18 @@ class ContextSpend:
 
     @property
     def fresh_chars(self) -> int:
-        return sum(ask.fresh for ask in self.asks)
+        """The message beside the prefix, charged once per call that carried it."""
+        return sum(ask.fresh * ask.model_calls for ask in self.asks)
+
+    @property
+    def returned_chars(self) -> int:
+        """What the draft-review tool handed back across the Run. Zero for an author with none."""
+        return sum(ask.returned for ask in self.asks)
 
     @property
     def sent_chars(self) -> int:
         """What the Run would cost with the prefix charged once, which is the point of caching."""
-        return self.resident_chars + self.fresh_chars
+        return self.resident_chars + self.fresh_chars + self.returned_chars
 
     @property
     def distinct_chars(self) -> int:
@@ -246,9 +281,18 @@ class ContextSpend:
         The resident line is read first. A prefix that does not fit is a fact about the crew's
         own prompt and is true of every turn; what one turn added on top of it is noise beside
         that, and reporting the turn line would send whoever reads it to the wrong place.
+
+        The rate line is read next, ahead of the character line it would also blow. A Run that
+        passed it spent its budget on an author looping against a tool rather than on plan
+        versions, and that is the finding — where the characters went is a symptom of it. It is
+        read here rather than reported because a term the crew does not choose is exactly the
+        term that has to be bounded: `model_calls` was published beside `asks_made` and enforced
+        by nothing, which left the Run budget carrying a number nobody could promise.
         """
         if self.resident_chars > budget.resident_chars:
             return RESIDENT_CHARS
+        if self.model_calls > budget.model_calls:
+            return MODEL_CALLS
         if self.fresh_chars > budget.fresh_chars:
             return FRESH_CHARS
         return None

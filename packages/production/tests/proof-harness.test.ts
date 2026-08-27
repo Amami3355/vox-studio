@@ -30,7 +30,7 @@ const probeFixture = async () => ({
   takeAudioNonSilent: true,
 });
 
-const execute = async (seededViolations: Array<'leak' | 'network'> = []) => {
+const execute = async (seededFaults: Array<'leak' | 'network'> = []) => {
   const parent = await mkdtemp(join(tmpdir(), 'vox-proof-test-'));
   roots.push(parent);
   const evidenceRoot = join(parent, 'evidence');
@@ -39,7 +39,7 @@ const execute = async (seededViolations: Array<'leak' | 'network'> = []) => {
     evidenceRoot,
     renderer: renderFixture,
     mediaProbe: probeFixture,
-    seededViolations,
+    seededFaults,
   });
 };
 
@@ -196,7 +196,7 @@ describe.sequential('Northbridge proof harness', () => {
         renderer: renderFixture,
         mediaProbe: probeFixture,
         keepWorkingRoots: true,
-        seededViolations: ['audit-crash'],
+        seededFaults: ['audit-crash'],
       }),
     ).rejects.toThrow('PROOF_FAILED_EVIDENCE_PRESERVED');
     const failure = JSON.parse(await readFile(join(evidenceRoot, 'failure.json'), 'utf8')) as {

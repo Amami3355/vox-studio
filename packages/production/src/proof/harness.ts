@@ -121,7 +121,16 @@ export type NorthbridgeProofOptions = {
   renderer?: RenderAdapter;
   mediaProbe?: MediaProbe;
   agentDriver?: AgentDriver;
-  seededViolations?: Array<'leak' | 'network' | 'audit-crash'>;
+  /**
+   * Faults to seed, so a proof can demonstrate that its own detectors fire.
+   *
+   * Not all three are violations, and the name said they were. `leak` and `network` are things
+   * an *agent* does that the proof must catch; `audit-crash` is the *harness* failing — the
+   * audit hook throwing mid-command — and a proof that cannot show what happens then is a
+   * proof trusting its own instrument. Grouping them under one honest word keeps the third
+   * from reading as agent misbehaviour in the evidence it produces.
+   */
+  seededFaults?: Array<'leak' | 'network' | 'audit-crash'>;
   keepWorkingRoots?: boolean;
 };
 
@@ -470,7 +479,7 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
   if (options.provider === 'elevenlabs' && !options.agentDriver) {
     throw new Error('PROOF_FRESH_GENERALIST_REQUIRED');
   }
-  const seeded = new Set(options.seededViolations ?? []);
+  const seeded = new Set(options.seededFaults ?? []);
   const scenario = proofScenario(options.length ?? 'short');
   const { proofId, slug: proofSlug, nonClaims, durationBounds, targetSeconds } = scenario;
   const proofRequest = scenario.request;
