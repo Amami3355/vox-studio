@@ -521,7 +521,11 @@ def converge(
     # Assembled once, here, and read by every turn below. This is the caching: not a store the
     # crew keeps, but the fact that there is one object to send and nothing downstream can
     # build a second.
-    prefix = cache_prefix(surface)
+    #
+    # The author is asked whether it can review a draft, because the answer belongs in the
+    # prefix: instructions that name a tool an author does not hold describe a capability that
+    # will never answer. Asked once, here, for the same reason the prefix is built once.
+    prefix = cache_prefix(surface, drafts_reviewable=author.reviews_drafts)
     # The first turn priced before it is asked for, through the same reader the loop uses
     # below. Written as a comparison here instead, it would be the budget rule stated twice —
     # and the gate that allowed a turn the finished bundle then reports as an overrun.

@@ -269,6 +269,8 @@ def _transcript(run: ConvergedRun) -> list[dict[str, Any]]:
                     }
                     for finding in version.findings
                 ],
+                "reviewCalls": version.review_calls,
+                "reviewedWhileDrafting": list(version.reviewed),
             }
         )
     for refusal in run.refusals:
@@ -314,10 +316,16 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
     crew has never been told by a provider that a prefix was served from cache, and the
     non-claim beside it says so. Reporting it as a saving is the one thing this block must not
     do — it would be the crew evidencing an outcome it has no instrument for.
+
+    `asks` and `modelCalls` differ when an author held a tool: one ask, answered over several
+    calls, each re-sending the prefix. Both are published because `distinctChars` is otherwise
+    unreadable — a reader seeing one ask against three prefixes would have no way to tell a
+    tool-using turn from an accounting fault, and would be right to suspect the second.
     """
     spend = run.spend
     return {
         "asks": spend.asks_made,
+        "modelCalls": spend.model_calls,
         "onePrefix": spend.one_prefix,
         "residentChars": spend.resident_chars,
         "freshChars": spend.fresh_chars,

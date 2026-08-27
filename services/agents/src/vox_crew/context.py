@@ -108,21 +108,29 @@ def tokens(chars: int) -> int:
 
 @dataclass(frozen=True, slots=True)
 class Ask:
-    """One thing the crew put in front of an author, in the two costs it has.
+    """One thing the crew put in front of an author, in the costs it has.
 
     `resident` is the instructions prefix the turn was authored against — the same object every
     turn, which is what makes it cacheable. `fresh` is everything else that reached the model:
     the refusal, where there was one, and the message carrying the Brief and the plan being
     repaired.
+
+    **`turns` is why an ask is not a model call.** An author holding a tool answers over several
+    model calls rather than one: it reads the prefix, calls the tool, and reads the prefix again
+    with the tool's answer appended. The prefix is re-sent every time. An `Ask` that assumed one
+    call would report a fraction of what a tool-using turn actually put in front of a model, and
+    a bundle is evidence — so the count is carried rather than assumed, and `chars` multiplies
+    by it. A turn that used no tool has `turns=1` and prices exactly as it always did.
     """
 
     resident: int
     fresh: int
+    turns: int = 1
 
     @property
     def chars(self) -> int:
-        """What this turn would cost with nothing cached."""
-        return self.resident + self.fresh
+        """What this turn would cost with nothing cached, over every model call it made."""
+        return self.resident * self.turns + self.fresh
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,8 +163,18 @@ class ContextSpend:
 
     @property
     def asks_made(self) -> int:
-        """How many times a model was asked. The Run's whole rate consumption."""
+        """How many plan versions were asked for. One per authoring or repair turn."""
         return len(self.asks)
+
+    @property
+    def model_calls(self) -> int:
+        """How many times a model was actually called. The Run's whole rate consumption.
+
+        Separate from `asks_made` because an author holding a tool answers one ask over
+        several calls. The two are equal for an author that holds none, which is every
+        scripted Run and was every Run before a tool was bound.
+        """
+        return sum(ask.turns for ask in self.asks)
 
     @property
     def one_prefix(self) -> bool:
@@ -213,6 +231,8 @@ class ContextSpend:
         read differently.
         """
         asks = f"{self.asks_made} model ask{'' if self.asks_made == 1 else 's'}"
+        if self.model_calls != self.asks_made:
+            asks += f" over {self.model_calls} model calls"
         return (
             f"{asks}, {self.distinct_chars:,} characters "
             f"(~{tokens(self.distinct_chars):,} tokens) put in front of a model, of which "

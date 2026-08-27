@@ -4,7 +4,7 @@ This is where a model enters the loop. Everything before it was the crew learnin
 interface publishes; this module turns that into a prompt, asks for a plan, reads what comes
 back, and hands it to the sequence `producer.py` already holds.
 
-Four properties in it are load-bearing.
+Five properties in it are load-bearing.
 
 **The instructions are assembled, not written.** They are built from the categories the
 contract index published and the bodies those categories carry, so a category the contract
@@ -25,6 +25,15 @@ same thing. The findings do not stop a plan being submitted: the compiler is the
 authority on a plan, and a crew that refused to submit on its own reading would put its
 opinion above the interface's. They travel with the Run instead, for the repair loop and the
 evidence bundle to read.
+
+**That reading is also offered to the author, as a tool, while it is still drafting.**
+`DraftReview` wraps `review` as a callable an author may ask, and `AdkPlanAuthor` binds it onto
+the agent it builds. Nothing about the authority moves and no second opinion is invented — it
+is the same reading, reached a turn earlier, so a defect the crew can already see costs a tool
+call to fix instead of a Run cycle. Two consequences are carried rather than assumed: an ask
+holding a tool is answered over several model calls and `context.Ask` counts them, and the
+codes an author was shown while drafting are kept on `AuthoredPlan.reviewed` beside the
+findings it settled on, which is the only place a reader can see the tool change an outcome.
 
 **A repair is authored, not composed.** `repair_plan` is `author_plan` with what production
 said placed after the same instructions, and it runs the same leak gate over the whole text.
@@ -52,7 +61,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from .client import ProductionClient
@@ -185,12 +194,26 @@ class AuthoredPlan:
     `ask` is an account and not a second copy of the prompt: two numbers, the resident prefix
     and what this turn added on top of it. `instructions` is already the text, and a Run
     carrying six of those in an evidence bundle would carry six copies of the catalog.
+
+    **`findings` and `reviewed` answer two different questions, and the pair is the point.**
+    `findings` is the reading of the plan the author *settled on* — what it still had wrong when
+    it stopped. `reviewed` is every code the author was shown while it drafted. A code in
+    `reviewed` and not in `findings` is one the author was told about and fixed before
+    answering, which is the only direct evidence there is that holding the tool changed what was
+    written rather than merely costing turns.
+
+    `review_calls` is beside them because `reviewed` alone cannot say whether the tool was used.
+    An author that called it once and was told nothing was wrong records no codes, which is the
+    same empty tuple as an author that never called it at all — two very different things, and
+    the first observed on the first run that held the tool. The count separates them.
     """
 
     plan: Mapping[str, Any]
     instructions: str
     findings: tuple[Finding, ...]
     ask: Ask
+    reviewed: tuple[str, ...] = ()
+    review_calls: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,11 +245,31 @@ class PlanAuthor(ABC):
     what it was given, and nothing above this interface can tell which it has. That is
     ADR-0015's rule about the deployment seam applied to the model seam, for the same reason —
     an interface that leaked the implementation would have to be unpicked to swap it.
+
+    **`reviews_drafts` is the one thing an author says about itself.** Not which model it is and
+    not where it runs — only whether it can call a tool while it drafts, which is the single fact
+    the prompt above it has to know: instructions telling an author to call a tool it does not
+    hold describe a capability that will never answer. It stays `False` here, so an author that
+    says nothing gets exactly the prompt and the accounting it got before any tool existed.
     """
 
+    reviews_drafts: bool = False
+
     @abstractmethod
-    def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
-        """Answers with a VideoPlan for the Brief, authored against the instructions."""
+    def author(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """Answers with a VideoPlan for the Brief, authored against the instructions.
+
+        `check` is `DraftReview.tool`'s callable, where the caller offered one. An author that
+        holds no tools ignores it; one that does hands it to the model to call before answering.
+        It is keyword-only and defaulted so that an author written before tools existed is still
+        a valid implementation of this interface.
+        """
 
     @abstractmethod
     def repair(
@@ -235,6 +278,8 @@ class PlanAuthor(ABC):
         brief: Mapping[str, Any],
         plan: Mapping[str, Any],
         refusal: Refusal,
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
     ) -> Mapping[str, Any]:
         """Answers with a repaired VideoPlan for the plan production would not take.
 
@@ -246,12 +291,17 @@ class PlanAuthor(ABC):
         """
 
 
-def _preamble() -> str:
+def _preamble(*, drafts_reviewable: bool = False) -> str:
     """The crew's only prose, in the vocabulary the `language` category publishes.
 
     It says what the model is for and what it may not write, and nothing about how the crew is
     built. Every noun in it — Brief, Beat, Section, SceneInstance, capability, anchor — is a
     term the contract defines, which is what keeps it scannable.
+
+    `drafts_reviewable` follows the author rather than the surface. An author that holds no tool
+    must not be told to call one — it would spend the instruction budget describing a capability
+    that does not answer, and a scripted Run's prefix would stop being the prefix it has always
+    been. So the paragraph is added where the tool is, and nowhere else.
     """
     return (
         "You are the producer on a video production. You are given a Brief and the contract "
@@ -268,10 +318,20 @@ def _preamble() -> str:
         "and anchor names come from the catalog below, never from memory — if the catalog "
         "does not publish it, it does not exist. Asset requirements are a subject in natural "
         "language with a treatment and an orientation, never a file, a URL or an image.\n"
+        + (
+            "\n"
+            "Before you answer, call `review_draft` with the plan you are about to give, and "
+            "read what it reports. It answers from this same contract and costs the production "
+            "nothing. Repair what it names and call it again. An empty report is not an "
+            "acceptance — it is a reading that found nothing, and the production interface is "
+            "the only authority on a plan.\n"
+            if drafts_reviewable
+            else ""
+        )
     )
 
 
-def instructions(surface: TeachingSurface) -> str:
+def instructions(surface: TeachingSurface, *, drafts_reviewable: bool = False) -> str:
     """Assembles the prompt from the categories the index published, in the index's order.
 
     The bodies go in whole. They are what the plan is authored against, and a summary of a
@@ -279,7 +339,7 @@ def instructions(surface: TeachingSurface) -> str:
     compact, the way the envelopes themselves are framed: the catalog is the largest thing in
     this prompt by a wide margin and indenting it buys a model nothing it cannot already read.
     """
-    parts = [_preamble()]
+    parts = [_preamble(drafts_reviewable=drafts_reviewable)]
     for category in surface.categories:
         parts.append(
             f"\n## {category}\n\n{surface.summary(category)}\n\n"
@@ -313,9 +373,17 @@ class CachedPrefix:
         return len(self.text)
 
 
-def cache_prefix(surface: TeachingSurface) -> CachedPrefix:
-    """Assembles the instructions, once. The only place a Run's prompt prefix is built."""
-    return CachedPrefix(surface=surface, text=instructions(surface))
+def cache_prefix(surface: TeachingSurface, *, drafts_reviewable: bool = False) -> CachedPrefix:
+    """Assembles the instructions, once. The only place a Run's prompt prefix is built.
+
+    `drafts_reviewable` is the author's answer, not the surface's — see `_preamble`. It is a
+    property of the prefix rather than of each turn because both turns of the repair loop are
+    authored against the same object, and a prefix that described the tool on one turn and not
+    the other would stop being one identical prefix.
+    """
+    return CachedPrefix(
+        surface=surface, text=instructions(surface, drafts_reviewable=drafts_reviewable)
+    )
 
 
 def _markers(lowered: str) -> list[str]:
@@ -499,6 +567,83 @@ def review(plan: Mapping[str, Any], surface: TeachingSurface) -> tuple[Finding, 
     return tuple(findings)
 
 
+@dataclass(slots=True)
+class DraftReview:
+    """`review`, offered to an author as a tool it may call before answering — and its meter.
+
+    The reading itself is unchanged and shared: this is the same `review` the crew has always
+    run over a finished plan, reached one turn earlier. What is new is *when* an author can see
+    it. Until now the findings were computed after the author had answered and travelled with
+    the Run for the repair loop and the bundle to read, which meant the one reader who could
+    still act on them cheaply — the author, still drafting — was the one reader who never saw
+    them. A plan reached the interface carrying defects the crew had already spotted.
+
+    Nothing about the authority moves. `review` is advisory here for exactly the reason it is
+    advisory everywhere else: the compiler is the only authority on a plan, and an empty report
+    is a reading that found nothing rather than an acceptance. What the tool changes is the cost
+    of acting on a finding, from a Run cycle to a tool call.
+
+    **It is also the meter, and that is not incidental.** Every call the author makes is a
+    further model call that re-sends the whole prefix, so the object that provides the tool is
+    the only one positioned to count them honestly. `context.Ask` multiplies by `turns`, and a
+    turn that under-reported its own spend would put a wrong number in a bundle that is
+    evidence.
+    """
+
+    surface: TeachingSurface
+    calls: int = 0
+    returned_chars: int = 0
+    codes: list[str] = field(default_factory=list)
+
+    @property
+    def turns(self) -> int:
+        """Model calls this ask made: the first, plus one to read each tool answer."""
+        return 1 + self.calls
+
+    def tool(self) -> Callable[[str], Mapping[str, Any]]:
+        """The callable an author is given. Its docstring is what the model reads."""
+
+        def review_draft(plan: str) -> Mapping[str, Any]:
+            """Reads a draft VideoPlan against the published contract and reports what it finds.
+
+            Call this before answering, with the plan you are about to give. Each finding names
+            a check `code` the contract publishes, what that code `means`, the `repair` the
+            contract states for it, and where in the plan it was found. Repair what it names
+            and call this again.
+
+            An empty `findings` list means this reading found nothing. It is not an acceptance:
+            the production interface remains the only authority on a plan, and this reading
+            covers only what the contract above is responsible for teaching.
+
+            Args:
+                plan: the draft VideoPlan, as a JSON object.
+
+            Returns:
+                `findings`, and `clean` when there are none.
+            """
+            self.calls += 1
+            try:
+                draft = _plan_from(plan)
+            except PlanNotAuthored as error:
+                found = (
+                    Finding(
+                        code="MALFORMED_PLAN",
+                        where="plan",
+                        detail=str(error),
+                        means="",
+                        repair="",
+                    ),
+                )
+            else:
+                found = review(draft, self.surface)
+            self.codes.extend(finding.code for finding in found)
+            answer = {"findings": [asdict(finding) for finding in found], "clean": not found}
+            self.returned_chars += len(json.dumps(answer, separators=(",", ":")))
+            return answer
+
+        return review_draft
+
+
 def _read_anchors(
     items: Any,
     anchor: re.Pattern[str],
@@ -579,8 +724,51 @@ def authoring_ask(prefix: CachedPrefix, brief: Mapping[str, Any]) -> Ask:
     spent rather than after. The alternative — the caller adding up the same two lengths — is
     the rule written twice, and the copy that could allow a turn the finished bundle then
     reports as an overrun.
+
+    **This is a floor where the author holds a tool**, and it cannot be anything else: how many
+    times an author will call one is not knowable before it is asked. `author_plan` records what
+    the turn actually cost by reading the meter afterwards. A budget consulted here is therefore
+    reading the cheapest the turn can be, which is the direction a budget wants to be wrong in —
+    the same choice `context.CHARS_PER_TOKEN` makes for the same reason.
     """
     return Ask(resident=prefix.chars, fresh=len(message_text(brief)))
+
+
+def _offered(prefix: CachedPrefix, author: PlanAuthor) -> DraftReview | None:
+    """A fresh meter for this turn, where the author can use one.
+
+    Fresh per turn rather than per Run, because an `Ask` is what one turn cost and a meter
+    shared across the loop would charge the second turn for the first turn's tool calls.
+    """
+    return DraftReview(prefix.surface) if author.reviews_drafts else None
+
+
+def _tool(meter: DraftReview | None) -> Callable[[str], Mapping[str, Any]] | None:
+    return meter.tool() if meter is not None else None
+
+
+def _reviewed(meter: DraftReview | None) -> tuple[str, ...]:
+    """Every code the author was shown while drafting, in the order it was shown them.
+
+    Order is kept rather than a set taken: the same code twice means the author was told, wrote
+    something else, and was told again, which reads very differently from being told once.
+    """
+    return tuple(meter.codes) if meter is not None else ()
+
+
+def _spent(priced: Ask, meter: DraftReview | None) -> Ask:
+    """The ask as it actually happened: the price it was quoted, plus what the tool cost.
+
+    Every call the author made re-sent the prefix, and its answer arrived as fresh text on the
+    turn after it. Both are on the meter, so neither has to be estimated.
+    """
+    if meter is None or meter.calls == 0:
+        return priced
+    return Ask(
+        resident=priced.resident,
+        fresh=priced.fresh + meter.returned_chars,
+        turns=meter.turns,
+    )
 
 
 def repair_ask(
@@ -610,12 +798,15 @@ def author_plan(
     """
     _refuse_if_leaked(prefix.text, "instructions", brief)
 
-    plan = _as_plan(author.author(prefix.text, brief), "answered")
+    meter = _offered(prefix, author)
+    plan = _as_plan(author.author(prefix.text, brief, check=_tool(meter)), "answered")
     return AuthoredPlan(
         plan=plan,
         instructions=prefix.text,
         findings=review(plan, prefix.surface),
-        ask=authoring_ask(prefix, brief),
+        ask=_spent(authoring_ask(prefix, brief), meter),
+        reviewed=_reviewed(meter),
+        review_calls=meter.calls if meter is not None else 0,
     )
 
 
@@ -642,12 +833,17 @@ def repair_plan(
     text = prefix.text + said
     _refuse_if_leaked(text, "repair instructions", brief, plan)
 
-    repaired = _as_plan(author.repair(text, brief, plan, refusal), "repaired")
+    meter = _offered(prefix, author)
+    repaired = _as_plan(
+        author.repair(text, brief, plan, refusal, check=_tool(meter)), "repaired"
+    )
     return AuthoredPlan(
         plan=repaired,
         instructions=text,
         findings=review(repaired, prefix.surface),
-        ask=repair_ask(prefix, brief, plan, refusal),
+        ask=_spent(repair_ask(prefix, brief, plan, refusal), meter),
+        reviewed=_reviewed(meter),
+        review_calls=meter.calls if meter is not None else 0,
     )
 
 
@@ -665,7 +861,8 @@ def plan_and_produce(
     report the repair loop is built from, and nothing raises.
     """
     surface = read_teaching_surface(client, on_envelope)
-    authored = author_plan(cache_prefix(surface), request.get("brief", {}), author)
+    prefix = cache_prefix(surface, drafts_reviewable=author.reviews_drafts)
+    authored = author_plan(prefix, request.get("brief", {}), author)
     produced = produce(
         client, request, authored.plan, on_envelope=on_envelope, read_back=read_back
     )
@@ -689,7 +886,19 @@ class HandedPlanAuthor(PlanAuthor):
 
     plan: Mapping[str, Any]
 
-    def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
+    def author(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """The handed plan, unread and unreviewed.
+
+        `check` is accepted and deliberately not called. A handed plan is an operator's, and a
+        tool call here would spend a turn arriving at findings `author_plan` computes over the
+        same plan a moment later anyway — the same findings, reported twice.
+        """
         return self.plan
 
     def repair(
@@ -698,6 +907,8 @@ class HandedPlanAuthor(PlanAuthor):
         brief: Mapping[str, Any],
         plan: Mapping[str, Any],
         refusal: Refusal,
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
     ) -> Mapping[str, Any]:
         """Refuses, because the one thing a handed plan cannot be is repaired.
 
@@ -733,6 +944,8 @@ class AdkPlanAuthor(PlanAuthor):
     authored the plan, and a floating name cannot.
     """
 
+    reviews_drafts = True
+
     def __init__(
         self,
         *,
@@ -747,22 +960,34 @@ class AdkPlanAuthor(PlanAuthor):
         self._name = name
         self._app_name = app_name
 
-    def agent(self, instructions: str) -> Any:
+    def agent(self, instructions: str, check: Callable[..., Any] | None = None) -> Any:
         """The agent that would be asked, built but not run.
 
         Exposed because building it is the furthest a machine with no model credential can
         follow this path, and a seam that can only be exercised with a key is one that is
-        never exercised.
+        never exercised. `check` is bound as the agent's one tool where it was given, which is
+        what makes that reachable too: a keyless machine can assert the tool is on the agent.
+
+        The framework takes a plain function and reads its name, signature and docstring to
+        build the declaration the model sees, so the tool's docstring is prompt text — which is
+        why it is written in the contract's vocabulary and scanned along with the rest.
         """
         return self._llm_agent(
             name=self._name,
             model=self._model,
             description="Authors a VideoPlan for a Brief from the published contract.",
             instruction=instructions,
+            tools=[check] if check is not None else [],
         )
 
-    def author(self, instructions: str, brief: Mapping[str, Any]) -> Mapping[str, Any]:
-        return self._ask(instructions, brief)
+    def author(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        return self._ask(instructions, brief, check)
 
     def repair(
         self,
@@ -770,6 +995,8 @@ class AdkPlanAuthor(PlanAuthor):
         brief: Mapping[str, Any],
         plan: Mapping[str, Any],
         refusal: Refusal,
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
     ) -> Mapping[str, Any]:
         """The same ask, with the refused plan beside the Brief in the message.
 
@@ -778,15 +1005,31 @@ class AdkPlanAuthor(PlanAuthor):
         authoring used. Nothing is composed here: the two keys below are the interface's own
         nouns, and the plan is the model's own previous answer handed back unedited.
         """
-        return self._ask(instructions, {"brief": brief, "plan": plan})
+        return self._ask(instructions, {"brief": brief, "plan": plan}, check)
 
-    def _ask(self, instructions: str, message: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _ask(
+        self,
+        instructions: str,
+        message: Mapping[str, Any],
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """One ask, which is one *turn* and not necessarily one model call.
+
+        Only the final response is read. With a tool bound the run yields the intermediate
+        turns too — the call the model made and the answer it got back — and joining every
+        text part the way this did before tools would splice the model's reasoning about a
+        finding into the JSON it eventually answered with, so `_plan_from` would be handed a
+        plan with prose in front of it. `is_final_response` is the framework's own answer to
+        which event is the reply, so the reply is read by asking rather than by concatenating.
+        """
         import asyncio  # noqa: PLC0415
 
         from google.adk.runners import InMemoryRunner  # noqa: PLC0415
         from google.genai import types  # noqa: PLC0415
 
-        runner = InMemoryRunner(agent=self.agent(instructions), app_name=self._app_name)
+        runner = InMemoryRunner(
+            agent=self.agent(instructions, check), app_name=self._app_name
+        )
         session = asyncio.run(
             runner.session_service.create_session(app_name=self._app_name, user_id=self._name)
         )
@@ -799,7 +1042,7 @@ class AdkPlanAuthor(PlanAuthor):
                     role="user", parts=[types.Part(text=message_text(message))]
                 ),
             )
-            if event.content
+            if event.is_final_response() and event.content
             for part in (event.content.parts or ())
             if part.text
         ]

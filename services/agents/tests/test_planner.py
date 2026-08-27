@@ -22,20 +22,24 @@ import inspect
 import json
 import re
 import sys
+from dataclasses import asdict
 from typing import Any
 
 import pytest
 from conftest import recorded, recorded_bytes
 from test_complete_run import REQUEST, a_complete_run, client_for, refused_at_validation, verbs
+from vox_crew.context import Ask
 from vox_crew.envelopes import parse_envelope
 from vox_crew.planner import (
     AdkPlanAuthor,
     AuthoredRun,
+    DraftReview,
     HandedPlanAuthor,
     InstructionsLeaked,
     PlanAuthor,
     PlanNotRepairable,
     author_plan,
+    authoring_ask,
     cache_prefix,
     instructions,
     plan_and_produce,
@@ -149,12 +153,16 @@ class ScriptedPlanAuthor(PlanAuthor):
     def __init__(self, plan: dict[str, Any]) -> None:
         self._plan = plan
         self.asked: list[tuple[str, Any]] = []
+        self.offered: list[Any] = []
 
-    def author(self, instructions: str, brief: Any) -> dict[str, Any]:
+    def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
         self.asked.append((instructions, brief))
+        self.offered.append(check)
         return self._plan
 
-    def repair(self, instructions: str, brief: Any, plan: Any, refusal: Any) -> dict[str, Any]:
+    def repair(
+        self, instructions: str, brief: Any, plan: Any, refusal: Any, *, check: Any = None
+    ) -> dict[str, Any]:
         """Nothing in this ticket repairs, and the assertions below say so by failing here.
 
         The seam has two methods because a repair is a function of four things; an author that
@@ -275,7 +283,8 @@ def test_a_brief_that_carries_a_secret_never_reaches_an_author() -> None:
 def test_instructions_that_leak_never_reach_an_author(monkeypatch) -> None:
     """A prompt is not reviewed on its way out, so the scan is a gate rather than a report."""
     monkeypatch.setattr(
-        "vox_crew.planner._preamble", lambda: "Author from C:/Users/x/vox-studio/packages/production."
+        "vox_crew.planner._preamble",
+        lambda **_: "Author from C:/Users/x/vox-studio/packages/production.",
     )
     author = ScriptedPlanAuthor(a_catalog_following_plan())
 
@@ -478,19 +487,252 @@ def test_a_semantic_asset_requirement_is_accepted() -> None:
     assert review(plan, SURFACE) == ()
 
 
+# --- The draft review, as a tool ---------------------------------------------------------
+
+
+def test_a_draft_is_read_in_the_same_words_a_finished_plan_is() -> None:
+    """The tool is the existing reading reached a turn earlier, not a second opinion.
+
+    Asserted as an equality rather than by matching codes, because the value of the tool is
+    precisely that an author sees what the crew sees. Two readings that agreed today and drifted
+    later would be the defect this shape exists to make impossible.
+    """
+    plan = a_catalog_following_plan()
+    plan["sections"][0]["scenes"][0]["durationInFrames"] = 210
+    meter = DraftReview(SURFACE)
+
+    answer = meter.tool()(json.dumps(plan))
+
+    assert answer["clean"] is False
+    assert [finding["code"] for finding in answer["findings"]] == [
+        finding.code for finding in review(plan, SURFACE)
+    ]
+    assert answer["findings"] == [asdict(finding) for finding in review(plan, SURFACE)]
+
+
+def test_a_finding_reaches_the_author_with_the_repair_the_contract_publishes() -> None:
+    """A code alone would tell an author it was wrong without telling it what to write."""
+    plan = a_catalog_following_plan()
+    plan["sections"][0]["scenes"][0]["component"] = "no_such_capability"
+
+    answer = DraftReview(SURFACE).tool()(json.dumps(plan))
+
+    (finding,) = answer["findings"]
+    assert finding["code"] == "UNKNOWN_CAPABILITY"
+    assert finding["means"] and finding["repair"]
+    assert finding["where"].startswith("plan.sections")
+
+
+def test_a_clean_draft_comes_back_clean_and_says_nothing_more() -> None:
+    """`clean` is a reading that found nothing. The wording of that is the contract's job."""
+    answer = DraftReview(SURFACE).tool()(json.dumps(a_catalog_following_plan()))
+
+    assert answer == {"findings": [], "clean": True}
+
+
+def test_a_draft_that_is_not_a_plan_is_a_finding_rather_than_a_crash() -> None:
+    """An author mid-draft is exactly who sends malformed JSON, and it must survive.
+
+    Raising inside a tool would end the turn — the author would lose the draft it was holding
+    over a defect it was one call away from being told about.
+    """
+    answer = DraftReview(SURFACE).tool()("{not json at all")
+
+    assert answer["clean"] is False
+    (finding,) = answer["findings"]
+    assert finding["code"] == "MALFORMED_PLAN"
+
+
+def test_a_draft_arriving_in_a_fence_is_read_rather_than_refused() -> None:
+    """Models fence JSON. `_plan_from` already knew that, and the tool reads through it too."""
+    fenced = "```json\n" + json.dumps(a_catalog_following_plan()) + "\n```"
+
+    assert DraftReview(SURFACE).tool()(fenced) == {"findings": [], "clean": True}
+
+
+def test_the_tool_meters_what_it_cost_because_nothing_else_can_see_it() -> None:
+    """Every call is another model call re-sending the prefix, counted where it happens."""
+    meter = DraftReview(SURFACE)
+    tool = meter.tool()
+
+    assert meter.turns == 1
+    tool(json.dumps(a_catalog_following_plan()))
+    tool(json.dumps(a_catalog_following_plan()))
+
+    assert meter.calls == 2
+    assert meter.turns == 3
+    assert meter.returned_chars > 0
+
+
+def test_a_turn_that_used_a_tool_is_priced_over_every_call_it_made() -> None:
+    """The accounting a bundle reports. An ask is not a model call once a tool is held."""
+    quiet = Ask(resident=1000, fresh=50)
+    talkative = Ask(resident=1000, fresh=50, turns=3)
+
+    assert quiet.chars == 1050
+    assert talkative.chars == 3050
+
+
+def test_the_instructions_name_the_tool_only_to_an_author_that_holds_one() -> None:
+    """Telling a scripted author to call a tool describes something that never answers.
+
+    It also keeps a scripted Run's prefix the prefix it has always been, which is what lets the
+    recorded context measurements stay comparable across a change that added a tool.
+    """
+    without = instructions(SURFACE)
+    with_tool = instructions(SURFACE, drafts_reviewable=True)
+
+    assert "review_draft" not in without
+    assert "review_draft" in with_tool
+    assert without in with_tool or len(with_tool) > len(without)
+
+
+def test_an_author_that_reviews_drafts_is_offered_the_tool_and_one_that_does_not_is_not() -> None:
+    """`author_plan` offers what the author said it could use, and nothing more."""
+    author = ScriptedPlanAuthor(a_catalog_following_plan())
+
+    author_plan(cache_prefix(SURFACE), REQUEST["brief"], author)
+
+    assert author.offered == [None]
+
+    author.reviews_drafts = True
+    author_plan(cache_prefix(SURFACE), REQUEST["brief"], author)
+
+    assert callable(author.offered[1])
+
+
+def test_an_ask_records_the_tool_calls_the_author_actually_made() -> None:
+    """What the turn cost, not what it was quoted. The quote is a floor once a tool is held."""
+
+    class ReviewingAuthor(ScriptedPlanAuthor):
+        reviews_drafts = True
+
+        def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
+            assert check is not None
+            check(json.dumps(self._plan))
+            check(json.dumps(self._plan))
+            return super().author(instructions, brief, check=check)
+
+    prefix = cache_prefix(SURFACE, drafts_reviewable=True)
+    quoted = authoring_ask(prefix, REQUEST["brief"])
+
+    authored = author_plan(prefix, REQUEST["brief"], ReviewingAuthor(a_catalog_following_plan()))
+
+    assert authored.ask.turns == 3
+    assert authored.ask.fresh > quoted.fresh
+    assert authored.ask.chars > quoted.chars
+
+
+def test_what_the_author_was_shown_while_drafting_is_kept_beside_what_it_settled_on() -> None:
+    """The pair that answers whether holding the tool changed the plan or only cost turns.
+
+    Driven with an author that is shown a defect and then answers with the plan repaired, which
+    is the case worth being able to see: the code is in `reviewed` and gone from `findings`, and
+    nothing else in the bundle could tell you that happened.
+    """
+
+    class RepairingWhileDrafting(ScriptedPlanAuthor):
+        reviews_drafts = True
+
+        def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
+            broken = a_catalog_following_plan()
+            broken["sections"][0]["scenes"][0]["component"] = "no_such_capability"
+            check(json.dumps(broken))
+            return self._plan
+
+    authored = author_plan(
+        cache_prefix(SURFACE, drafts_reviewable=True),
+        REQUEST["brief"],
+        RepairingWhileDrafting(a_catalog_following_plan()),
+    )
+
+    assert authored.reviewed == ("UNKNOWN_CAPABILITY",)
+    assert authored.findings == ()
+
+
+def test_an_author_holding_no_tool_was_shown_nothing_and_says_so() -> None:
+    """Empty rather than absent. Nothing was shown to anyone, which is a fact worth recording."""
+    author = ScriptedPlanAuthor(a_catalog_following_plan())
+
+    authored = author_plan(cache_prefix(SURFACE), REQUEST["brief"], author)
+
+    assert authored.reviewed == ()
+    assert authored.review_calls == 0
+
+
+def test_a_clean_tool_call_is_told_apart_from_never_having_called_it() -> None:
+    """Observed on the first run that held the tool: no codes, but the tool was used.
+
+    `reviewed` is empty in both cases, so the count is the only thing that separates an author
+    that asked and was told nothing was wrong from one that never asked at all. Those are
+    opposite readings of the same run.
+    """
+
+    class AsksAndIsToldNothing(ScriptedPlanAuthor):
+        reviews_drafts = True
+
+        def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
+            check(json.dumps(self._plan))
+            return self._plan
+
+    authored = author_plan(
+        cache_prefix(SURFACE, drafts_reviewable=True),
+        REQUEST["brief"],
+        AsksAndIsToldNothing(a_catalog_following_plan()),
+    )
+
+    assert authored.reviewed == ()
+    assert authored.review_calls == 1
+
+
+def test_an_author_that_called_no_tool_is_priced_exactly_as_it_always_was() -> None:
+    """The change costs a scripted Run nothing, which is what keeps old measurements readable."""
+    prefix = cache_prefix(SURFACE)
+    author = ScriptedPlanAuthor(a_catalog_following_plan())
+
+    authored = author_plan(prefix, REQUEST["brief"], author)
+
+    assert authored.ask == authoring_ask(prefix, REQUEST["brief"])
+    assert authored.ask.turns == 1
+
+
 # --- The seam --------------------------------------------------------------------------
 
 
-def test_an_author_is_handed_instructions_and_a_brief_and_nothing_else() -> None:
-    """The model's seam is payload-shaped like the client's, and for the same reason."""
+def test_an_author_is_handed_instructions_a_brief_and_the_tools_it_was_offered() -> None:
+    """The model's seam carries payloads and tools, and nothing that locates anything.
+
+    It was payloads only until a draft could be reviewed. A tool is a callable and therefore
+    not serialisable, which is a real widening of the seam and is written down as one rather
+    than waved through: offering an author a tool is the whole of what binding one means, and
+    an interface that could not express it would be an interface the capability had to go
+    around. What the rule was actually protecting is unchanged and asserted below — nothing
+    here names a path, a root, a directory, a file or a client, so an author still cannot tell
+    where it is running or reach the production sequence sideways.
+    """
     signature = inspect.signature(PlanAuthor.author)
 
-    assert list(signature.parameters) == ["self", "instructions", "brief"]
+    assert list(signature.parameters) == ["self", "instructions", "brief", "check"]
     for parameter in signature.parameters.values():
         assert not any(
             word in parameter.name.lower() for word in ("path", "root", "dir", "file", "client")
         )
         assert "Path" not in str(parameter.annotation)
+
+
+def test_a_tool_is_offered_to_an_author_and_never_required_of_one() -> None:
+    """An author written before tools existed is still an implementation of this seam.
+
+    Keyword-only with a default is what makes that true, and it is the reason `HandedPlanAuthor`
+    needs no opinion about tools to keep working. A positional `check` would make every existing
+    implementation invalid at once, which is the kind of break a defaulted keyword exists to
+    avoid.
+    """
+    for method in (PlanAuthor.author, PlanAuthor.repair):
+        check = inspect.signature(method).parameters["check"]
+
+        assert check.kind is inspect.Parameter.KEYWORD_ONLY
+        assert check.default is None
 
 
 def test_nothing_above_the_seam_knows_which_author_it_is_holding() -> None:
@@ -524,6 +766,62 @@ def test_the_live_author_builds_its_agent_from_the_instructions_it_was_given() -
     assert agent.instruction == text
     # Deliberately not the default, so this reads the model through rather than past it.
     assert agent.model == "gemini-3.1-flash-lite"
+
+
+def test_the_live_author_binds_the_draft_review_onto_the_agent_it_builds() -> None:
+    """The binding itself, as far as a keyless machine can follow it.
+
+    This is the assertion the whole change turns on: the tools existed and were reachable by
+    nothing. Building the agent is where that stops being true, and it is the last step before
+    a credential is needed — so it is the last thing that can be proved for free.
+    """
+    pytest.importorskip("google.adk")
+    from google.adk.tools import FunctionTool
+
+    tool = DraftReview(SURFACE).tool()
+
+    agent = AdkPlanAuthor(model="gemini-3.1-flash-lite").agent(instructions(SURFACE), tool)
+
+    (held,) = agent.tools
+    assert held is tool
+
+    # What the framework makes of it, which is what the model is actually shown. Built directly
+    # rather than through the agent's own `canonical_tools`, which is a coroutine: awaiting one
+    # needs an event loop, and an event loop on Windows opens a socket pair that this suite's
+    # network sentinel refuses — correctly, and for a reason worth more than this assertion.
+    declared = FunctionTool(func=held)
+
+    assert declared.name == "review_draft"
+    assert "draft VideoPlan" in (declared.description or "")
+
+
+def test_the_live_author_offered_no_tool_builds_an_agent_holding_none() -> None:
+    """A tool nobody offered is not a tool the agent invents."""
+    pytest.importorskip("google.adk")
+
+    agent = AdkPlanAuthor(model="gemini-3.1-flash-lite").agent(instructions(SURFACE))
+
+    assert list(agent.tools) == []
+
+
+def test_the_live_author_says_it_reviews_drafts_and_the_scripted_ones_do_not() -> None:
+    """What the prefix is built from. An author that cannot call a tool is not told to."""
+    assert AdkPlanAuthor.reviews_drafts is True
+    assert HandedPlanAuthor.reviews_drafts is False
+    assert PlanAuthor.reviews_drafts is False
+
+
+def test_the_tool_a_model_reads_carries_no_repository_vocabulary() -> None:
+    """The tool's docstring is prompt text, so it is held to the gate the instructions are.
+
+    The framework builds the declaration a model sees out of the function's name, signature and
+    docstring. That text reaches a model without passing through `instructions`, which is
+    exactly how a leak gets somewhere nothing scans it.
+    """
+    tool = DraftReview(SURFACE).tool()
+
+    assert scan_for_leaks(tool.__doc__ or "").ok
+    assert scan_for_leaks(tool.__name__).ok
 
 
 def test_the_live_author_pins_a_model_that_is_still_served() -> None:

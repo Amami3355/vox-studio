@@ -172,11 +172,13 @@ class RepairingAuthor(PlanAuthor):
     def _next(self) -> dict[str, Any]:
         return self._plans.pop(0) if len(self._plans) > 1 else self._plans[0]
 
-    def author(self, instructions: str, brief: Any) -> dict[str, Any]:
+    def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
         self.asked.append((instructions, brief))
         return self._next()
 
-    def repair(self, instructions: str, brief: Any, plan: Any, refusal: Refusal) -> dict[str, Any]:
+    def repair(
+        self, instructions: str, brief: Any, plan: Any, refusal: Refusal, *, check: Any = None
+    ) -> dict[str, Any]:
         self.repairs.append((instructions, brief, plan, refusal))
         return self._next()
 
@@ -291,7 +293,7 @@ def test_repair_instructions_that_leak_never_reach_an_author(monkeypatch) -> Non
     """
     monkeypatch.setattr(
         "vox_crew.planner._preamble",
-        lambda: "Author from C:/Users/x/vox-studio/packages/production.",
+        lambda **_: "Author from C:/Users/x/vox-studio/packages/production.",
     )
     client = a_client()
     refusal = read_refusal(
@@ -641,9 +643,9 @@ def test_a_whole_convergence_assembles_the_teaching_surface_exactly_once(monkeyp
     assembled: list[Any] = []
     real = planner.instructions
 
-    def counting(surface: Any) -> str:
+    def counting(surface: Any, **held: Any) -> str:
         assembled.append(surface)
-        return real(surface)
+        return real(surface, **held)
 
     monkeypatch.setattr(planner, "instructions", counting)
     client, author = a_run_that_repairs_once()
@@ -1166,10 +1168,22 @@ def test_the_preview_and_the_reports_come_back_by_descriptor_and_never_by_path()
 
 
 def test_a_repair_is_handed_the_plan_and_the_refusal_and_nothing_else() -> None:
-    """The model's second seam is payload-shaped like its first, and like the client's."""
+    """The model's second seam carries what its first does, and the same tools.
+
+    `check` is on both methods deliberately. A repair that could not review its own draft would
+    be the one turn in the loop authoring blind, and it is the turn with the most to go on —
+    it already holds a refusal naming what was wrong the first time.
+    """
     signature = inspect.signature(PlanAuthor.repair)
 
-    assert list(signature.parameters) == ["self", "instructions", "brief", "plan", "refusal"]
+    assert list(signature.parameters) == [
+        "self",
+        "instructions",
+        "brief",
+        "plan",
+        "refusal",
+        "check",
+    ]
     for parameter in signature.parameters.values():
         assert not any(
             word in parameter.name.lower() for word in ("path", "root", "dir", "file", "client")
