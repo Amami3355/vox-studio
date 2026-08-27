@@ -12,8 +12,10 @@ difference between a work root that is evidence and one that is just a directory
 
 The five projections are large — they assemble into ~125,000 characters of instructions, and
 the catalog alone is half of that. They are read once and kept, and `planner.cache_prefix`
-assembles them once, so the repair loop runs against a cached prefix rather than re-sending
-the catalog every turn. Nothing is dropped to save room: the catalog is the planner's primary
+assembles them into instructions once, so every turn of the repair loop is authored against
+that one prefix rather than against a fresh assembly of it. The catalog is re-sent every turn
+regardless: what happens once is the assembly, not the transmission, and `context.py` prices it
+that way. Nothing is dropped to save room: the catalog is the planner's primary
 authoring input, so the one item that dominates the budget is also the one that cannot be
 deferred. `context.py` holds what that costs and what a Run is allowed to spend.
 """

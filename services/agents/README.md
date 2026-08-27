@@ -188,12 +188,21 @@ is either a network call or a `sentencepiece` model this machine does not have, 
 number no test could check. `tokens` converts at three characters per token, chosen low so the
 figure is an upper bound.
 
-*The word "cached" is used carefully here.* `cache_prefix` makes every turn's prefix identical,
-which is the precondition for a provider serving it from a cache — not evidence that one did.
-The bundle reports `cacheableChars` as an eligibility, writes `cacheServed: null`, and carries
-an explicit non-claim. ADK's `ContextCacheConfig` cannot engage as the crew is built, because
-it starts caching on a session's second turn and `AdkPlanAuthor` opens a fresh session per ask;
-the module docstring says why that session model is deliberate and what changing it would cost.
+*The word "cached" is used carefully here.* `cache_prefix` caches inside this process: one
+assembly, held and re-read by every turn. That makes every turn's prefix identical, and the
+property it buys is **comparability** — a measurement taken either side of a change is a
+measurement of the change. It is not a saving. The prefix is transmitted in full every turn, and
+the bundle reports `repeatedPrefixChars` as exactly that: what the turns after the first spent
+re-sending it.
+
+A *provider* cache is not merely unobserved here, it is out of reach. ADK's `ContextCacheConfig`
+cannot engage as the crew is built, because caching begins on a session's second turn at the
+earliest and `AdkPlanAuthor` opens a fresh session per ask — so every session this crew opens is
+single-turn, the case ADK names as never cached, and `min_tokens` only raises that floor. The
+bundle says so under `prefixCache`, with the reason and with the deliberate rejection of session
+reuse beside it (ADR-0017), so that a reader does not take the number for a saving waiting to be
+confirmed. The module docstring says why that session model is deliberate and what changing it
+would cost.
 
 *A pause is a decision waiting on a human, and says so under its own name.* Production pauses
 before the network for two reasons — the budget is gone, or an identical input needs a grant —

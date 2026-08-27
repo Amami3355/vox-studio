@@ -622,11 +622,11 @@ def test_an_author_that_keeps_costing_the_take_exhausts_the_post_record_budget()
     assert client.calls.count("record") == 1
 
 
-# --- The teaching surface is cached, and what that cost is reported --------------------------
+# --- The teaching surface is assembled once, and what that cost is reported -------------------
 
 
 def a_run_that_repairs_once() -> tuple[ScriptedClient, RepairingAuthor]:
-    """The smallest convergence with two turns in it, which is what a cache is about."""
+    """The smallest convergence with two turns in it, which is what one prefix is about."""
     return (
         a_client(validate=["run-validate-needs-repair.stdout", "run-validate-succeeded.stdout"]),
         RepairingAuthor(a_catalog_following_plan(), a_repaired_plan()),
@@ -636,7 +636,7 @@ def a_run_that_repairs_once() -> tuple[ScriptedClient, RepairingAuthor]:
 def test_a_whole_convergence_assembles_the_teaching_surface_exactly_once(monkeypatch) -> None:
     """The first criterion, counted rather than argued.
 
-    Two turns, one assembly. Counting is the assertion that actually distinguishes a cached
+    Two turns, one assembly. Counting is the assertion that actually distinguishes one held
     prefix from two rebuilds that happen to agree — comparing the texts would pass either way,
     because assembling twice from one surface is deterministic.
     """
@@ -660,8 +660,8 @@ def test_a_whole_convergence_assembles_the_teaching_surface_exactly_once(monkeyp
 def test_every_turn_is_authored_against_that_one_prefix_byte_for_byte() -> None:
     """A repair adds the refusal after the prefix and changes nothing in front of it.
 
-    That ordering is the caching arrangement, not a tidiness preference: a provider serves the
-    longest matching prefix, so text placed before the catalog would evict it every cycle.
+    That ordering is what makes the prefix a prefix, not a tidiness preference: text placed
+    before the catalog would differ from turn to turn, and no two turns would share an opening.
     """
     client, author = a_run_that_repairs_once()
 
@@ -675,14 +675,14 @@ def test_every_turn_is_authored_against_that_one_prefix_byte_for_byte() -> None:
     assert run.spend.resident_chars == len(prefix)
 
 
-def test_caching_changes_what_is_sent_and_not_what_the_run_decides() -> None:
-    """The criterion that the outcomes are unchanged, at the one place caching could change one.
+def test_one_assembled_prefix_changes_what_is_sent_and_not_what_the_run_decides() -> None:
+    """The criterion that the outcomes are unchanged, at the one place assembling once could.
 
     Everything downstream of authoring reads `AuthoredPlan.instructions` and the surface, and
-    the cached prefix is byte-for-byte what assembling per turn produced — so there is nothing
+    the held prefix is byte-for-byte what assembling per turn produced — so there is nothing
     for a decision to differ on. The rest of this module is the characterisation: every ending
     the loop has is driven here, and they are asserted against the same expectations they were
-    before a prefix was cached.
+    before a prefix was assembled once and kept.
     """
     client, author = a_run_that_repairs_once()
 
@@ -696,7 +696,7 @@ def test_caching_changes_what_is_sent_and_not_what_the_run_decides() -> None:
     ]
 
 
-def test_a_run_reports_what_it_put_in_front_of_a_model_and_what_the_cache_saved() -> None:
+def test_a_run_reports_what_it_put_in_front_of_a_model_and_what_the_repeated_prefix_cost() -> None:
     """The second criterion: the consumption is on the Run, derived from what it authored."""
     client, author = a_run_that_repairs_once()
 
@@ -707,9 +707,9 @@ def test_a_run_reports_what_it_put_in_front_of_a_model_and_what_the_cache_saved(
     assert spend.resident_chars == len(run.versions[0].instructions)
     assert spend.fresh_chars == sum(version.ask.fresh for version in run.versions)
     assert spend.sent_chars == spend.resident_chars + spend.fresh_chars
-    # Two turns uncached is two prefixes. The saving is exactly the one that was not re-sent.
+    # Two turns is two prefixes transmitted. The repeated one is exactly the second of them.
     assert spend.distinct_chars == 2 * spend.resident_chars + spend.fresh_chars
-    assert spend.cacheable_chars == spend.resident_chars
+    assert spend.repeated_prefix_chars == spend.resident_chars
 
 
 def test_an_authoring_turn_is_charged_the_brief_and_a_repair_the_refusal_and_the_plan() -> None:

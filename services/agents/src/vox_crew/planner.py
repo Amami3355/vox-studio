@@ -44,9 +44,10 @@ the published `means` and `repair` for the codes in it, and the author reads tho
 and `repair_plan` take that object rather than the surface it was built from — so a turn cannot
 assemble a second one, and the catalog is one identical prefix across the whole loop by
 construction rather than by two call sites happening to agree. Only the refusal after it
-differs from cycle to cycle, which is what makes the prefix reusable at all. What that does and
-does not establish is set out in `context.py`: an identical prefix is the precondition for a
-provider serving it from a cache, and this crew has never observed one do so. `authoring_ask`
+differs from cycle to cycle, which is what makes the prefix one prefix at all. What that does
+and does not establish is set out in `context.py`: assembling once is not sending once, the
+prefix is transmitted whole on every turn, and what it buys is that measurements either side of
+a change are comparable. A provider cache is out of reach here. `authoring_ask`
 and `repair_ask` price a turn before it is asked for, so a budget can refuse one rather than
 report it.
 
@@ -380,9 +381,10 @@ class CachedPrefix:
     """The teaching surface assembled into instructions once, and kept for a whole Run.
 
     Every turn of the repair loop is authored against this same object, which is what makes the
-    catalog one identical prefix rather than five identical rebuilds — a provider serves an
-    identical prefix from its cache, and two call sites that each assembled their own would be
-    one edit away from disagreeing about what "identical" meant.
+    catalog one identical prefix rather than five identical rebuilds — and two call sites that
+    each assembled their own would be one edit away from disagreeing about what "identical"
+    meant. The cache is this process's own: one assembly, held. Nothing about it reaches a
+    provider, and `context.py` is where that is set out.
 
     It carries the surface it was built from because everything downstream of authoring needs
     both: `review` reads the catalog out of the surface, and `refusals.py` reads the checks and
@@ -990,10 +992,10 @@ def repair_plan(
     prompt is where code-blindness is lost quietly — that argument does not weaken because the
     new text came from the service.
 
-    The refusal goes *after* the cached prefix rather than in front of it. That ordering is the
-    whole caching arrangement: a provider serves the longest matching prefix, so text placed
-    before the catalog would push the catalog out of the cache on every cycle and turn one
-    resident 125 KB into six billed ones.
+    The refusal goes *after* the prefix rather than in front of it, and that ordering is what
+    makes the prefix a prefix. Text placed before the catalog would differ from cycle to cycle,
+    so no two turns would share an opening and there would be nothing identical left to compare
+    a measurement against — which is the whole property the assembled prefix earns its place on.
     """
     said = refusal.as_text()
     text = prefix.text + said

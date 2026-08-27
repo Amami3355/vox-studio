@@ -518,9 +518,10 @@ def converge(
         else default_context_budget(allowed.plan_versions)
     )
 
-    # Assembled once, here, and read by every turn below. This is the caching: not a store the
-    # crew keeps, but the fact that there is one object to send and nothing downstream can
-    # build a second.
+    # Assembled once, here, and read by every turn below. This is the whole of the caching, and
+    # it is this process's own: not a store the crew keeps and not a provider's, but the fact
+    # that there is one object to send and nothing downstream can build a second. It is still
+    # sent in full every turn.
     #
     # The author is asked whether it can review a draft, because the answer belongs in the
     # prefix: instructions that name a tool an author does not hold describe a capability that

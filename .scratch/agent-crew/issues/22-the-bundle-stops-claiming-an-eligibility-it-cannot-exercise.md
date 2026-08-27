@@ -1,6 +1,6 @@
 # 22: The bundle stops claiming an eligibility it cannot exercise
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -143,15 +143,42 @@ this. It documents the configuration surface and leaves the turn rule to the cla
 which is the same text as the installed source. The installed package is the better source here
 in any case, being the code that actually runs.
 
+**The sweep, and what it found (2026-08-27).** Fourteen prose sites across five files, not the
+two the Implementation Decisions knew about. The two sharpest were never named here:
+`context.py`'s own budget note stated the saving as fact — *"the catalog, sent once and served
+from a cache after that"* — forty lines below the module docstring that says the opposite. A
+reader arriving at the fields met the false version first. `spec.md` and `services/agents/README.md`
+carried it too, and both are amended rather than deleted, in their own idiom.
+
+**What the bundle publishes now.** `cacheableChars` is `repeatedPrefixChars`: the prefix the
+turns after the first re-sent, every character of it transmitted spend. `cacheServed: null` is
+gone, replaced by a `prefixCache` block — `reachable: false` with the reason beside it. False
+rather than null because this is structural: it follows from the session model, so the crew can
+assert it without an instrument, where a null invites a reader to go looking for a confirmation
+that cannot arrive. The rejection of session reuse travels in that reason, citing ADR-0017, so
+that a later reader does not read the false as a defect and clear it by changing the session
+model.
+
+**`cache_prefix` and `CachedPrefix` keep their names, deliberately, and the user was asked.**
+They are true in the sense that matters at the call site: the prefix *is* cached, in this
+process, assembled once and held. What was false was never the identifier but the benefit
+claimed around it, and the docstrings at both now say which cache they mean and that nothing
+about it reaches a provider. Renaming was the alternative considered; it would have touched
+~20 call sites and moved the diff off the claim.
+
+**Not changed:** the prefix machinery, the accounting, `RESIDENT_CHARS_ALLOWED`, and every
+number ADR-0017's amendment records. No behaviour moved; the whole change is one field, one
+block, and prose.
+
 **Blocked by:** None (can start immediately)
 
 - [x] The framework's context-caching behaviour is checked against current documentation and the finding recorded
-- [ ] The bundle publishes the identical-prefix property under a name that describes it
-- [ ] The wording beside it says caching is unreachable under the current session model, and why
-- [ ] The claim that the repair loop avoids re-sending the catalog is corrected where it is made
-- [ ] Every other site claiming a caching benefit is found and corrected in the same change
-- [ ] Everything that reads the bundle back moves in the same change and the verifier is green
-- [ ] The pinned bundle shape is updated deliberately, with the change visible in the diff
-- [ ] `cache_prefix` and the prefix accounting are unchanged in behaviour
-- [ ] The rejection of session reuse is recorded beside the field, not only in a module docstring
-- [ ] The leak scan passes over the new wording
+- [x] The bundle publishes the identical-prefix property under a name that describes it
+- [x] The wording beside it says caching is unreachable under the current session model, and why
+- [x] The claim that the repair loop avoids re-sending the catalog is corrected where it is made
+- [x] Every other site claiming a caching benefit is found and corrected in the same change
+- [x] Everything that reads the bundle back moves in the same change and the verifier is green
+- [x] The pinned bundle shape is updated deliberately, with the change visible in the diff
+- [x] `cache_prefix` and the prefix accounting are unchanged in behaviour
+- [x] The rejection of session reuse is recorded beside the field, not only in a module docstring
+- [x] The leak scan passes over the new wording

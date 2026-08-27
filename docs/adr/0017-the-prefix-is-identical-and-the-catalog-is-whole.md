@@ -30,11 +30,13 @@ At three cycles that is upward of two hundred thousand characters of catalog, fo
 subject is a single duration.
 
 For a while the answer to that was caching. The prefix is identical, an identical prefix is what
-a provider serves from a cache, and the bundle reports `cacheableChars` against a `cacheServed:
+a provider serves from a cache, and the bundle reported `cacheableChars` against a `cacheServed:
 null`. That answer does not survive inspection: the live author opens a fresh runner and session
 per ask, the framework's caching begins on a session's second turn, and no session here ever has
-one. The saving is not unconfirmed, it is unreachable. Ticket 22 corrects the places that imply
-otherwise.
+one. The saving is not unconfirmed, it is unreachable. Ticket 22 corrected the places that
+implied otherwise: the bundle now reports `repeatedPrefixChars` — the prefix the turns after the
+first re-sent, all of it transmitted — beside a `prefixCache` block whose `reachable` is `false`
+and whose reason names this decision.
 
 So the identical prefix currently buys **comparability and nothing else**, and the whole catalog
 is paid for on every turn.

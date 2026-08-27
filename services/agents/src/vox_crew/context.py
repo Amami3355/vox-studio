@@ -6,25 +6,34 @@ against the whole of it — so a Run answering one Brief puts six times the cata
 a model. `planner.cache_prefix` assembles it once and every turn reads that same object, which
 makes those six prefixes byte-identical.
 
-**What that does and does not establish.** An identical prefix, placed first, is the
-*precondition* for a provider serving it from a cache instead of reading it again. It is not
-the same as having observed one do so, and the crew must not report it as though it were.
-Two things are worth writing down because they are easy to assume the other way:
+**What that does and does not establish.** `cache_prefix` caches inside this process: one
+assembly, held and re-read by every turn. It is not a provider cache and it recovers no cost.
+What the identical prefix does buy is **comparability** — a measurement taken either side of a
+change is a measurement of the change, because everything in front of it was the same bytes.
+That is real, offline, and the property the arrangement earns its place on. Two things are
+worth writing down because they are easy to assume the other way:
 
-- Identical prefixes are still **transmitted** every turn. What a cache saves is the model's
-  work and the bill, not the bytes on the wire. `cacheable_chars` below is named for what it
-  is: the spend an identical prefix makes *eligible* for reuse.
-- The crew is not wired to ADK's own `ContextCacheConfig`, and wiring it as things stand would
-  be a switch that could never fire. ADK's cache "begins on the second turn of a session at
-  the earliest", and `AdkPlanAuthor` opens a fresh session per ask — deliberately, because the
-  repair loop rebuilds the whole prompt rather than growing a conversation, which is what keeps
-  the prefix identical in the first place. So what the arrangement can reach is Gemini's
-  *implicit* prefix caching, which is a provider default and not something this code turns on.
-  Making the crew hold one session across a Run would change what the model sees on every turn
-  after the first; it is a design decision of its own and not this module's to take.
+- Identical prefixes are **transmitted in full, every turn**. Assembling once is not sending
+  once. `repeated_prefix_chars` below is named for what it is: the prefix that went down the
+  wire again on the turns after the first.
+- **A provider cache is not merely unobserved here. It is out of reach.** The crew is not wired
+  to ADK's own `ContextCacheConfig`, and wiring it as things stand would be a switch that could
+  never fire. ADK's cache begins on the second turn of a session at the earliest — a first
+  request has no previous token count to match against, and the cache manager skips creation
+  when there is none — while `AdkPlanAuthor` opens a fresh session per ask. Every session this
+  crew opens is therefore single-turn, which is the case ADK names outright as never cached.
+  Nor is it configurable into reach: `min_tokens` raises that floor and cannot lower it.
 
-Nothing here claims a cache was served. `assemble` writes an explicit non-claim saying so, and
-the first live Run is where it becomes answerable.
+Reusing one session across a Run's turns is the change that would put a cache in reach, and it
+is rejected. The repair loop rebuilds the whole prompt rather than growing a conversation, which
+is what keeps the prefix identical and the measurements comparable in the first place; holding
+one session would change what the model sees on every turn after the first. ADR-0017 records
+that decision, and `evidence` publishes it beside the field, so that a reader meeting the number
+does not take it for a bug someone should clear.
+
+Nothing here claims a cache was served, and nothing here is waiting to be told one was. Whether
+a provider does something of its own with a prefix it has seen before is not visible from this
+side, and the crew says nothing about it in either direction.
 
 **This module's vocabulary does not belong in `CONTEXT.md`.** It was tried, and the build
 refused it correctly: the repository glossary is *generated into the `language` contract*, which
@@ -47,11 +56,12 @@ could check. Characters are checked on every run of the suite; `tokens` converts
 one audience that thinks in tokens, at a divisor chosen to over-estimate rather than to be
 right on average.
 
-**Two lines, because they are two different costs.** `resident_chars` is the catalog, sent
-once and served from a cache after that. `fresh_chars` is the refusals and the plans handed
-back, which are new text every turn and are billed at full rate every turn. A single total
-would hide the distinction the whole ticket is about, and it is the distinction that decides
-whether a longer repair loop is affordable.
+**Two lines, because they are two different costs.** `resident_chars` is the catalog: one
+prefix, the same on every turn, counted once because counting it per turn would report the
+repair budget rather than the prompt. `fresh_chars` is the refusals and the plans handed back,
+which are new text every turn and are billed at full rate every turn. A single total would hide
+the distinction the whole ticket is about, and it is the distinction that decides whether a
+longer repair loop is affordable.
 """
 
 from __future__ import annotations
@@ -124,7 +134,8 @@ class Ask:
     """One thing the crew put in front of an author, in the costs it has.
 
     `resident` is the instructions prefix the turn was authored against — the same object every
-    turn, which is what makes it cacheable. `fresh` is everything else that reached the model:
+    turn, which is what makes every turn's prompt comparable. `fresh` is everything else that
+    reached the model:
     the refusal, where there was one, and the message carrying the Brief and the plan being
     repaired.
 
@@ -156,7 +167,7 @@ class Ask:
 
     @property
     def chars(self) -> int:
-        """What this turn would cost with nothing cached, over every model call it made."""
+        """What this turn put in front of a model, over every model call it made."""
         return (self.resident + self.fresh) * self.model_calls + self.returned
 
 
@@ -207,14 +218,14 @@ class ContextSpend:
 
     @property
     def one_prefix(self) -> bool:
-        """Whether every turn read a prefix of one size — the cache precondition, not the cache.
+        """Whether every turn read a prefix of one size — the comparability property itself.
 
         Deliberately not called `cached`. In a Run driven by `converge` this is true by
         construction, because every `Ask` is priced against the same `CachedPrefix`, so as
         *evidence* it is a probe that cannot fail and the bundle must not present it as one. It
         is kept because it is a real invariant with a real way of breaking: a future caller that
         authored some turns against one prefix and some against another would show up here, and
-        the field is what a reader checks before believing `cacheable_chars`.
+        the field is what a reader checks before believing `repeated_prefix_chars`.
 
         Lengths rather than bytes: this is an account, not a second copy of the prompt. That the
         prefix is the same *object* across a convergence is asserted where it is built, by
@@ -239,7 +250,7 @@ class ContextSpend:
 
     @property
     def sent_chars(self) -> int:
-        """What the Run would cost with the prefix charged once, which is the point of caching."""
+        """What the Run would cost with the prefix charged once rather than per turn."""
         return self.resident_chars + self.fresh_chars + self.returned_chars
 
     @property
@@ -248,12 +259,14 @@ class ContextSpend:
         return sum(ask.chars for ask in self.asks)
 
     @property
-    def cacheable_chars(self) -> int:
-        """The spend an identical prefix makes eligible for reuse, not a saving observed.
+    def repeated_prefix_chars(self) -> int:
+        """The identical prefix, re-sent. What the turns after the first spent repeating it.
 
-        Every turn after the first re-sends the same prefix, so this is what a provider serving
-        it from cache would not have to read again. Whether one did is the provider's answer and
-        the crew has never had it — see this module's opening note.
+        Not an eligibility and not a saving. Every turn transmits the whole prefix, so this is
+        text that certainly reached a model, counted apart because it is the term that grows
+        with the repair budget while saying nothing about the Brief. A provider cache is what
+        would make it cheaper, and this crew's session model does not reach one — see this
+        module's opening note.
         """
         return self.distinct_chars - self.sent_chars
 
@@ -271,8 +284,8 @@ class ContextSpend:
         return (
             f"{asks}, {self.distinct_chars:,} characters "
             f"(~{tokens(self.distinct_chars):,} tokens) put in front of a model, of which "
-            f"{self.cacheable_chars:,} is the teaching surface re-sent unchanged and eligible "
-            "for a provider cache the crew does not measure"
+            f"{self.repeated_prefix_chars:,} is the teaching surface re-sent unchanged on the "
+            "turns after the first"
         )
 
     def overrun(self, budget: ContextBudget) -> str | None:

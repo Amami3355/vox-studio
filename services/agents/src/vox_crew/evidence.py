@@ -81,6 +81,24 @@ SYSTEM = "system"
 # an expectation.
 CATEGORIES = ("catalog", "checks", "language", "plan", "protocol")
 
+# Why a prefix cache is out of reach, published beside the number rather than only held in a
+# module docstring. An operator meets `repeatedPrefixChars` here and nowhere else, and a bundle
+# that left the reason at the code would leave them to infer one — the inference being "eligible,
+# not yet confirmed", which is the reading this whole field exists to stop. `reachable` is false
+# rather than null because this is structural: it follows from the session model, so the crew can
+# assert it without an instrument. The rejection of session reuse travels with it so that a later
+# reader does not read the false as a defect and clear it by changing the session model.
+PREFIX_CACHE = {
+    "reachable": False,
+    "reason": (
+        "A fresh session is opened for every ask, and a context cache begins on a session's "
+        "second turn at the earliest, so no turn of this Run could be served from one. Reusing "
+        "one session across a Run is what would put a cache in reach, and it is rejected: "
+        "rebuilding the whole prompt each turn is what keeps the prefix identical and successive "
+        "measurements comparable. Recorded as ADR-0017."
+    ),
+}
+
 # What a crew bundle does not evidence, in the sheet's own family names. Stated rather than
 # omitted: a reader who cannot tell "not claimed" from "not written down" has to assume the
 # generous reading, and review decision 1 exists to stop exactly that.
@@ -94,10 +112,13 @@ NON_CLAIMS = (
     "cannot read.",
     "There is no human verdict. A crew bundle is machine evidence and the watch-and-listen "
     "verdict is a person's, recorded where the proofs record it.",
-    "Prefix caching is not evidenced. Every turn was authored against one identical prefix, "
-    "which is what a provider needs in order to serve it from a cache — but no provider has "
-    "told this crew that one did, so `context.cacheableChars` is an eligibility and never a "
-    "saving, and `context.cacheServed` is null rather than false.",
+    "No prefix cache is claimed, and none is reachable. Every turn was authored against one "
+    "identical prefix, which is a comparability property and not a saving: the whole prefix is "
+    "transmitted every turn, and `context.repeatedPrefixChars` counts what the turns after the "
+    "first spent repeating it. A fresh session is opened per ask and a context cache begins on "
+    "a session's second turn, so no turn of this Run could have been served from one — "
+    "`context.prefixCache.reachable` is false for that reason and not for want of an "
+    "instrument.",
 )
 
 
@@ -391,11 +412,11 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
     as a count.
 
     `distinctChars` is what actually reached a model — every turn's prompt in full. `sentChars`
-    is what the same Run costs if the identical prefix is served from a cache, and
-    `cacheableChars` is the difference. That difference is an eligibility, not a saving: the
-    crew has never been told by a provider that a prefix was served from cache, and the
-    non-claim beside it says so. Reporting it as a saving is the one thing this block must not
-    do — it would be the crew evidencing an outcome it has no instrument for.
+    is the same Run with the identical prefix counted once, and `repeatedPrefixChars` is the
+    difference: the prefix the turns after the first re-sent. All three are transmitted spend.
+    None of them is a saving, and `prefixCache` says why one is not available to be had — a
+    reader who meets a null here reads "not confirmed yet" and goes looking for the confirmation,
+    which is a search with no end, so the block states the structural fact instead.
 
     `asks` and `modelCalls` differ when an author held a tool: one ask, answered over several
     calls, each re-sending the prefix. Both are published because `distinctChars` is otherwise
@@ -414,8 +435,8 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
         "distinctTokens": tokens(spend.distinct_chars),
         "sentChars": spend.sent_chars,
         "sentTokens": tokens(spend.sent_chars),
-        "cacheableChars": spend.cacheable_chars,
-        "cacheServed": None,
+        "repeatedPrefixChars": spend.repeated_prefix_chars,
+        "prefixCache": PREFIX_CACHE,
         "budget": {
             "residentChars": run.context_budget.resident_chars,
             "freshChars": run.context_budget.fresh_chars,

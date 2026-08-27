@@ -718,10 +718,11 @@ def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
     assert context["freshChars"] == run.spend.fresh_chars
     assert context["sentChars"] == run.spend.sent_chars
     assert context["distinctChars"] == run.spend.distinct_chars
-    assert context["cacheableChars"] == run.spend.cacheable_chars
+    assert context["repeatedPrefixChars"] == run.spend.repeated_prefix_chars
     assert context["onePrefix"] is True
-    # Null rather than false: the crew has no instrument for this, and false would be a claim.
-    assert context["cacheServed"] is None
+    # False rather than null: this is a structural fact about the session model, not a
+    # measurement the crew lacks an instrument for, so it is asserted rather than withheld.
+    assert context["prefixCache"]["reachable"] is False
     assert context["budget"] == {
         "residentChars": run.context_budget.resident_chars,
         "freshChars": run.context_budget.fresh_chars,
@@ -733,6 +734,27 @@ def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
     assert context["sentTokens"] == tokens(run.spend.sent_chars)
 
 
+def test_the_context_block_says_why_a_prefix_cache_is_out_of_reach_and_stays_that_way() -> None:
+    """Ticket 22's ninth criterion: the rejection is recorded beside the field, not only in code.
+
+    An operator meets this number in the bundle and nowhere else. A reason kept in a module
+    docstring is a reason that reader never sees, and the reading they are left with — "eligible,
+    not yet confirmed" — is the one thing this block must not invite. The two facts that make it
+    unreachable are asserted rather than the sentence carrying them, so the wording can be
+    rewritten without the criterion quietly going with it.
+    """
+    context = document(assemble(a_repaired_run()).files, ENVIRONMENT)["context"]
+
+    reason = context["prefixCache"]["reason"]
+
+    # A fresh session per ask, and a cache that begins on a session's second turn. Either
+    # alone would be a curiosity; together they are why the number can never be a saving.
+    assert "fresh session" in reason
+    assert "second turn" in reason
+    # And why it is not simply a bug someone should clear by reusing one.
+    assert "ADR-0017" in reason
+
+
 def test_the_summary_reports_the_spend_and_how_much_of_it_is_the_repeated_prefix() -> None:
     """The page a person opens first says what the Run cost, not only how it ended."""
     run = a_repaired_run()
@@ -740,7 +762,7 @@ def test_the_summary_reports_the_spend_and_how_much_of_it_is_the_repeated_prefix
     summary = assemble(run).files[SUMMARY].decode("utf-8")
 
     assert f"{run.spend.distinct_chars:,}" in summary
-    assert f"{run.spend.cacheable_chars:,}" in summary
+    assert f"{run.spend.repeated_prefix_chars:,}" in summary
     assert f"{run.spend.asks_made}" in summary
 
 

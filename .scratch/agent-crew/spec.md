@@ -287,11 +287,16 @@ ticket.
    capability names, actions and anchors all live there and nothing can be written
    before it is read — so the dominant term is the one item that cannot be
    deferred. Fetching `checks` only when a refusal names it, and `language` and
-   `plan` once, saves a fraction and leaves the problem. The lever is **context
-   caching**: the catalog is read once and kept in a cached prefix across the
-   repair loop rather than re-sent per turn. Prerequisite 2's "free tier is enough
-   for development" is struck; the crew names a rate-limit and token budget it
-   runs within.
+   `plan` once, saves a fraction and leaves the problem. The lever taken was an
+   assembled prefix: the catalog is read once and assembled once, and every turn is
+   authored against that same object. Prerequisite 2's "free tier is enough for
+   development" is struck; the crew names a rate-limit and token budget it runs
+   within.
+
+   **Amended, ticket 22.** That lever is not the saving this paragraph was written
+   expecting. Assembling once is not sending once — the catalog is transmitted in
+   full on every turn — so what the prefix buys is comparability, not a smaller
+   bill. The dominant term is unchanged and still paid per turn.
 
    **Measured, ticket 14.** The 220 KB is the generated files on disk, and it is
    not what a model receives. What the crew assembles and sends is each category's
@@ -345,29 +350,35 @@ ticket.
    the recorded projections on every run of the suite, so a catalog that outgrows
    the allowance fails the build rather than an invoice.
 
-   **What "cached" does and does not mean here, and what ticket 15 must settle.**
-   The crew's side of caching is an identical prefix, placed first, assembled once
-   — the *precondition* for a provider serving it from cache. That is as far as
-   this ticket can go, and the code, the bundle and the CLI are all worded to
-   claim no more: `cacheableChars` is an eligibility, `cacheServed` is `null`, and
-   the bundle carries an explicit non-claim. Two things are worth recording:
+   **What "cached" does and does not mean here.** The crew's side of it is an
+   identical prefix, placed first, assembled once. **Amended, ticket 22:** that was
+   written as the *precondition* for a provider serving it from cache, with the
+   code, the bundle and the CLI worded to claim no more than an eligibility. The
+   eligibility itself does not survive inspection, and the wording now says so.
+   Three things are worth recording:
 
-   - Identical prefixes are still **transmitted** every turn. A cache saves the
-     model's work and the bill, not the bytes on the wire.
-   - **ADK's own `ContextCacheConfig` cannot engage as the crew is built.** It
-     documents that caching "begins on the second turn of a session at the
-     earliest", and `AdkPlanAuthor` opens a fresh session per ask — deliberately,
-     because the repair loop rebuilds the whole prompt instead of growing a
-     conversation, which is what keeps the prefix identical. So the mechanism
-     actually available is Gemini's *implicit* prefix caching, a provider default
-     this code does not turn on. Wiring `ContextCacheConfig` as things stand would
-     be a switch that could never fire — the "probe that cannot fail" decision 2
-     already rejects. Holding one session across a Run would change what the model
-     sees on every turn after the first; that is a design decision of its own.
+   - Identical prefixes are still **transmitted** every turn. A cache would save
+     the model's work and the bill, not the bytes on the wire — and there is no
+     cache. The bundle reports `repeatedPrefixChars`: what the turns after the
+     first spent re-sending the prefix, every character of it spend that reached a
+     model.
+   - **ADK's own `ContextCacheConfig` cannot engage as the crew is built.** Checked
+     against the installed `google-adk 2.7.1` rather than inherited: caching begins
+     on a session's second turn at the earliest, a first request has no previous
+     token count to match on, and `AdkPlanAuthor` opens a fresh session per ask. So
+     every session this crew opens is single-turn, which that package names
+     outright as never cached, and `min_tokens` only raises the floor. Wiring
+     `ContextCacheConfig` as things stand would be a switch that could never fire —
+     the "probe that cannot fail" decision 2 already rejects.
+   - **Holding one session across a Run is the change that would put a cache in
+     reach, and it is rejected.** Rebuilding the whole prompt each turn is what
+     keeps the prefix identical and successive measurements comparable. ADR-0017
+     records that decision, and the bundle publishes it under `prefixCache` beside
+     the number, so that a reader does not read the rejection as a defect.
 
-   The first live Run is where a served cache becomes observable, in the SDK's
-   `usage_metadata.cached_content_token_count`. **That reading is ticket 15's**,
-   and it is the only thing that can turn the eligibility above into a measurement.
+   What the identical prefix buys is **comparability**: a measurement taken either
+   side of a change is a measurement of the change. That is the whole of it, and it
+   is what ticket 17's before-and-after design rests on.
 
 4. **A third scenario is added: an unservable Brief that must produce a Decline.**
    Story 8 wants a structured Decline naming the unmet editorial need, and neither

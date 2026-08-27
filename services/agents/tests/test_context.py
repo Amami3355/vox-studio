@@ -115,7 +115,7 @@ def test_an_ask_is_the_resident_prefix_plus_what_that_turn_added() -> None:
 
 
 def test_a_spend_charges_the_resident_prefix_once_however_many_turns_read_it() -> None:
-    """The whole point of the cache, in one assertion: six turns, one catalog."""
+    """One prefix charged once, in one assertion: six turns, one catalog counted."""
     spend = ContextSpend(tuple(Ask(resident=1000, fresh=10) for _ in range(6)))
 
     assert spend.asks_made == 6
@@ -125,11 +125,11 @@ def test_a_spend_charges_the_resident_prefix_once_however_many_turns_read_it() -
 
 
 def test_a_spend_says_what_reached_a_model_and_how_much_of_it_was_the_repeated_prefix() -> None:
-    """An eligibility, not a saving. Whether a provider served it is nobody here's to say."""
+    """Not a saving: every one of those characters was transmitted. Six turns re-sent five."""
     spend = ContextSpend(tuple(Ask(resident=1000, fresh=10) for _ in range(6)))
 
     assert spend.distinct_chars == 6060
-    assert spend.cacheable_chars == 5000
+    assert spend.repeated_prefix_chars == 5000
 
 
 def test_an_empty_spend_is_zero_rather_than_an_error() -> None:
@@ -140,7 +140,7 @@ def test_an_empty_spend_is_zero_rather_than_an_error() -> None:
     assert spend.resident_chars == 0
     assert spend.sent_chars == 0
     assert spend.distinct_chars == 0
-    assert spend.cacheable_chars == 0
+    assert spend.repeated_prefix_chars == 0
     assert spend.one_prefix
 
 
