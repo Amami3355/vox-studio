@@ -4,6 +4,11 @@
 the repair loop instead of re-sending it every turn, and the spec's placeholder budget is
 replaced by a figure measured against a real run.
 
+**Amended, ticket 22.** "Keeps it in a cached prefix … instead of re-sending it every turn" is
+not what was built, and not what was available to build. The catalog is assembled once and
+re-sent in full on every turn; what the identical prefix buys is comparability, not a smaller
+bill. The budget half of this ticket stands as measured. Recorded as ADR-0017.
+
 The five projections total roughly 220 KB of JSON. Selective fetching does not solve
 this, and the reason is worth stating in whatever this ticket leaves behind: the catalog
 is the planner's primary authoring input — capability names, actions and anchors all live
@@ -50,3 +55,10 @@ it as such (`cacheServed` is `null`, and the bundle carries a non-claim). ADK's
 turn and `AdkPlanAuthor` opens a fresh session per ask. So the mechanism available is Gemini's
 implicit prefix caching, and `usage_metadata.cached_content_token_count` on the first live Run is
 the only thing that can confirm it. Spec decision 3 records this in full.
+
+**Amended, ticket 22 — this paragraph is superseded and its reading is discharged.** There was no
+eligibility for a live Run to confirm: every session the crew opens is single-turn, which is
+never cached, so that count could only ever have come back zero. `cacheServed` no longer exists
+either — the bundle publishes `prefixCache.reachable: false` with the reason beside it, and
+`cacheableChars` is now `repeatedPrefixChars`, the prefix the turns after the first re-sent.
+Ticket 15 closed without this reading. Spec decision 3 records the amended account.

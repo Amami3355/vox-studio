@@ -182,3 +182,42 @@ block, and prose.
 - [x] `cache_prefix` and the prefix accounting are unchanged in behaviour
 - [x] The rejection of session reuse is recorded beside the field, not only in a module docstring
 - [x] The leak scan passes over the new wording
+
+## Reviewed, and what the review corrected
+
+A two-axis review of `48fb6a3..e099db2` ran after this ticket closed. It found the fifth
+criterion above ticked ahead of itself: the sweep reported 14 sites and had missed six. They are
+corrected in the follow-up commit, and the count in **Further Notes** should be read as 20.
+
+**Three said "sent once" outright** — `context.py`'s `context_budget` note, `test_context.py`'s
+budget test, and the spec's own resident-prefix budget line. Each is a budget statement, and the
+budget really does charge the prefix once; what was wrong was calling that *sent*. All three now
+say charged once and transmitted every turn, which is the distinction this ticket exists to hold.
+
+**`_context`'s own docstring gained a new false claim** in the same commit that removed the old
+ones: *"All three are transmitted spend"* is not true of `sentChars`, which is a counterfactual —
+nothing was ever sent that way. `sent_chars`'s docstring in `context.py` had the same defect
+already, describing a saving as a cost. Both now name it as the counterfactual it is, and say
+that it is published so `repeatedPrefixChars` has something to be the distance from.
+
+**Ticket 14 still published the retracted claim** and pointed at a spec decision that no longer
+recorded what it promised — the exact reader-goes-looking failure this ticket names. The spec
+paragraph assigning that reading to ticket 15 had been deleted rather than amended, against this
+ticket's own "rewritten, not deleted" decision. Both are amended in place now, and the reading is
+recorded as discharged rather than dropped: a single-turn session is never cached, so the count
+ticket 15 was to fetch could only ever have come back zero.
+
+**Two more, neither a caching claim.** The bundle's `prefixCache` was a module-level mutable dict
+inserted into the bundle by reference, against `assemble` being documented pure; it is built per
+call now. And its reason sentence was duplicated verbatim in the non-claim, two copies free to
+drift — both now read one `NO_CACHE_BECAUSE` constant.
+
+**One thing this ticket got right was undone and put back.** The testing decision above says the
+prose is not testable and should not be made so; the new test pinned three literal substrings of
+the reason string. It now pins the shape — a false and a non-empty reason, never a null — plus
+one identity assertion against `NO_CACHE_BECAUSE`, which is the anti-drift check rather than a
+check on wording. A rewrite of the sentence moves both publications or neither.
+
+Nothing in the correction moved behaviour either: the numbers are unchanged
+(`residentChars` 118,598, `repeatedPrefixChars` = `distinctChars` - `sentChars`), the published
+`prefixCache.reason` text is byte-identical, and the leak scan is clean over all of it.

@@ -184,8 +184,9 @@ def context_budget(asks: int) -> ContextBudget:
     """The budget for a Run allowed `asks` plan versions.
 
     Keyed on the same number `repair_budget` already derives from the Brief's length rather
-    than on the Brief again: the catalog is sent once whatever the Brief asks for, and the only
-    thing a longer Brief buys is more turns to send fresh text in. Two budgets reading the
+    than on the Brief again: the catalog is charged once whatever the Brief asks for — charged
+    once against this budget, not sent once, since it is transmitted on every turn — and the
+    only thing a longer Brief buys is more turns to send fresh text in. Two budgets reading the
     Brief separately would be two rules to keep in step.
     """
     return ContextBudget(
@@ -250,7 +251,12 @@ class ContextSpend:
 
     @property
     def sent_chars(self) -> int:
-        """What the Run would cost with the prefix charged once rather than per turn."""
+        """The counterfactual: what the Run would have cost had the prefix been charged once.
+
+        Not what it did cost. Every turn transmits the whole prefix, so this prices a Run that
+        did not happen. It is kept because `repeated_prefix_chars` is the distance between it
+        and `distinct_chars`, and that distance is the figure that does describe this Run.
+        """
         return self.resident_chars + self.fresh_chars + self.returned_chars
 
     @property

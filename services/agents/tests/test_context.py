@@ -161,7 +161,7 @@ def test_a_spend_whose_turns_read_different_prefixes_reports_more_than_one() -> 
 
 
 def test_the_budget_scales_its_turn_allowance_with_the_asks_the_repair_budget_allows() -> None:
-    """One line is the catalog, which is sent once; the other grows with the loop."""
+    """One line is the catalog, charged once however many asks; the other grows with the loop."""
     assert context_budget(6) == ContextBudget(
         resident_chars=RESIDENT_CHARS_ALLOWED,
         fresh_chars=FRESH_CHARS_PER_ASK * 6,

@@ -14,4 +14,12 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 Because this repo tracks issues as local markdown, the label is written as a `Status:` line near the top of the issue file.
 
+Two further status strings are in use and map to no skills role, because they record what became
+of a ticket rather than how it was triaged:
+
+| Status in our tracker  | Meaning                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| `done`                 | Implemented and landed; every acceptance criterion discharged       |
+| `claimed` / `resolved` | Wayfinding tickets only — see `issue-tracker.md`                    |
+
 Edit the right-hand column to match whatever vocabulary you actually use.

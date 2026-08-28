@@ -70,7 +70,7 @@ compared with what is measured under another.
 **No part of the codebase may claim the cost is recovered by caching.** Not in a bundle field,
 not in a docstring, not in a commit message. The crew may report that its prefix is identical,
 because that is observed. It may not report a saving no provider has told it about. Ticket 22
-sweeps the existing claims; this ADR is why they do not come back.
+swept the existing claims; this ADR is why they do not come back.
 
 **The deferral of the catalog tools is a consequence of this decision, not an oversight.** They
 stay unbound because binding them means giving up the identical prefix, and that trade has not

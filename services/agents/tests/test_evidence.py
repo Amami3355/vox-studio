@@ -36,6 +36,7 @@ from vox_crew.evidence import (
     FAIL,
     HASH_INDEX,
     NOT_EVIDENCED,
+    NO_CACHE_BECAUSE,
     PASS,
     SUMMARY,
     TRANSCRIPT,
@@ -739,20 +740,23 @@ def test_the_context_block_says_why_a_prefix_cache_is_out_of_reach_and_stays_tha
 
     An operator meets this number in the bundle and nowhere else. A reason kept in a module
     docstring is a reason that reader never sees, and the reading they are left with — "eligible,
-    not yet confirmed" — is the one thing this block must not invite. The two facts that make it
-    unreachable are asserted rather than the sentence carrying them, so the wording can be
-    rewritten without the criterion quietly going with it.
+    not yet confirmed" — is the one thing this block must not invite.
+
+    The shape is pinned and the wording is not: ticket 22's testing decision is that the prose is
+    not testable and should not be made so, and what protects it is that it sits beside the field
+    it describes. The one sentence named here is named by identity with the constant the
+    non-claim also reads, so a rewrite moves both publications or neither — which is the drift
+    this asserts against, not the phrasing.
     """
     context = document(assemble(a_repaired_run()).files, ENVIRONMENT)["context"]
 
-    reason = context["prefixCache"]["reason"]
+    prefix_cache_block = context["prefixCache"]
 
-    # A fresh session per ask, and a cache that begins on a session's second turn. Either
-    # alone would be a curiosity; together they are why the number can never be a saving.
-    assert "fresh session" in reason
-    assert "second turn" in reason
-    # And why it is not simply a bug someone should clear by reusing one.
-    assert "ADR-0017" in reason
+    # A reader meets a false and a reason, never a null. That is the whole of the criterion.
+    assert prefix_cache_block["reachable"] is False
+    assert prefix_cache_block["reason"].strip()
+    # And the reason beside the field is the reason in the non-claim: one source, not two.
+    assert NO_CACHE_BECAUSE in prefix_cache_block["reason"]
 
 
 def test_the_summary_reports_the_spend_and_how_much_of_it_is_the_repeated_prefix() -> None:

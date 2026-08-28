@@ -81,23 +81,38 @@ SYSTEM = "system"
 # an expectation.
 CATEGORIES = ("catalog", "checks", "language", "plan", "protocol")
 
-# Why a prefix cache is out of reach, published beside the number rather than only held in a
-# module docstring. An operator meets `repeatedPrefixChars` here and nowhere else, and a bundle
-# that left the reason at the code would leave them to infer one — the inference being "eligible,
-# not yet confirmed", which is the reading this whole field exists to stop. `reachable` is false
-# rather than null because this is structural: it follows from the session model, so the crew can
-# assert it without an instrument. The rejection of session reuse travels with it so that a later
-# reader does not read the false as a defect and clear it by changing the session model.
-PREFIX_CACHE = {
-    "reachable": False,
-    "reason": (
-        "A fresh session is opened for every ask, and a context cache begins on a session's "
-        "second turn at the earliest, so no turn of this Run could be served from one. Reusing "
-        "one session across a Run is what would put a cache in reach, and it is rejected: "
-        "rebuilding the whole prompt each turn is what keeps the prefix identical and successive "
-        "measurements comparable. Recorded as ADR-0017."
-    ),
-}
+# The two structural facts that put a prefix cache out of reach, held in one sentence because
+# the bundle publishes them twice — once as `prefixCache.reason` and once in the non-claims. Two
+# copies of a fact are two things to keep in step, and the drift would be silent: everything that
+# says why the number is not a saving reads this.
+NO_CACHE_BECAUSE = (
+    "A fresh session is opened for every ask, and a context cache begins on a session's "
+    "second turn at the earliest, so no turn of this Run could be served from one."
+)
+
+
+def prefix_cache() -> dict[str, Any]:
+    """Why a prefix cache is out of reach, published beside the number.
+
+    An operator meets `repeatedPrefixChars` in the bundle and nowhere else, and a bundle that
+    left the reason at the code would leave them to infer one — the inference being "eligible,
+    not yet confirmed", which is the reading this whole field exists to stop. `reachable` is
+    false rather than null because this is structural: it follows from the session model, so the
+    crew can assert it without an instrument. The rejection of session reuse travels with it so
+    that a later reader does not read the false as a defect and clear it by changing the session
+    model.
+
+    Built per call rather than held as a module constant: `assemble` is documented pure, and a
+    dict handed out by reference is process state that one caller could edit from under the next.
+    """
+    return {
+        "reachable": False,
+        "reason": (
+            f"{NO_CACHE_BECAUSE} Reusing one session across a Run is what would put a cache in "
+            "reach, and it is rejected: rebuilding the whole prompt each turn is what keeps the "
+            "prefix identical and successive measurements comparable. Recorded as ADR-0017."
+        ),
+    }
 
 # What a crew bundle does not evidence, in the sheet's own family names. Stated rather than
 # omitted: a reader who cannot tell "not claimed" from "not written down" has to assume the
@@ -115,10 +130,8 @@ NON_CLAIMS = (
     "No prefix cache is claimed, and none is reachable. Every turn was authored against one "
     "identical prefix, which is a comparability property and not a saving: the whole prefix is "
     "transmitted every turn, and `context.repeatedPrefixChars` counts what the turns after the "
-    "first spent repeating it. A fresh session is opened per ask and a context cache begins on "
-    "a session's second turn, so no turn of this Run could have been served from one — "
-    "`context.prefixCache.reachable` is false for that reason and not for want of an "
-    "instrument.",
+    f"first spent repeating it. {NO_CACHE_BECAUSE} `context.prefixCache.reachable` is false for "
+    "that reason and not for want of an instrument.",
 )
 
 
@@ -411,10 +424,12 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
     bundle carrying only one of them would either be unauditable or be an estimate presented
     as a count.
 
-    `distinctChars` is what actually reached a model — every turn's prompt in full. `sentChars`
-    is the same Run with the identical prefix counted once, and `repeatedPrefixChars` is the
-    difference: the prefix the turns after the first re-sent. All three are transmitted spend.
-    None of them is a saving, and `prefixCache` says why one is not available to be had — a
+    `distinctChars` is what actually reached a model — every turn's prompt in full, and the only
+    one of the three that totals what was transmitted. `sentChars` is the counterfactual beside
+    it: the same Run priced with the identical prefix charged once, which is not what happened.
+    It is published so that `repeatedPrefixChars` — the difference, and the prefix the turns
+    after the first really did re-send — can be read against something. None of them is a
+    saving, and `prefixCache` says why one is not available to be had — a
     reader who meets a null here reads "not confirmed yet" and goes looking for the confirmation,
     which is a search with no end, so the block states the structural fact instead.
 
@@ -436,7 +451,7 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
         "sentChars": spend.sent_chars,
         "sentTokens": tokens(spend.sent_chars),
         "repeatedPrefixChars": spend.repeated_prefix_chars,
-        "prefixCache": PREFIX_CACHE,
+        "prefixCache": prefix_cache(),
         "budget": {
             "residentChars": run.context_budget.resident_chars,
             "freshChars": run.context_budget.fresh_chars,

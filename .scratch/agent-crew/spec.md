@@ -314,7 +314,8 @@ ticket.
    in characters, which the crew can count exactly and offline on every Run, with
    tokens as a deliberately conservative conversion at 3 characters per token:
 
-   - **Resident prefix: 150,000 characters (~50k tokens)**, sent once per Run.
+   - **Resident prefix: 150,000 characters (~50k tokens)**, charged once per Run
+     and transmitted on every turn of it.
      About a fifth of headroom over the measured 125,039, which is room for the
      catalog to gain capabilities without a Run being refused for it.
    - **Fresh text: 20,000 characters per plan version.** The largest refusal the
@@ -379,6 +380,15 @@ ticket.
    What the identical prefix buys is **comparability**: a measurement taken either
    side of a change is a measurement of the change. That is the whole of it, and it
    is what ticket 17's before-and-after design rests on.
+
+   **Amended, ticket 22 — the reading this section assigned is discharged, not
+   dropped.** What stood here asked ticket 15 to read the SDK's
+   `usage_metadata.cached_content_token_count` on the first live Run, as the one
+   thing that could turn the eligibility into a measurement. There is no eligibility
+   to turn: every session the crew opens is single-turn, which is never cached, so
+   that count could only ever have come back zero. Ticket 15 closed without the
+   reading and nothing is now waiting on it. Recorded because ticket 14 points here
+   for it.
 
 4. **A third scenario is added: an unservable Brief that must produce a Decline.**
    Story 8 wants a structured Decline naming the unmet editorial need, and neither
