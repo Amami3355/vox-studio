@@ -366,14 +366,23 @@ def instructions(surface: TeachingSurface, *, drafts_reviewable: bool = False) -
     this prompt by a wide margin and indenting it buys a model nothing it cannot already read.
     """
     parts = [_preamble(drafts_reviewable=drafts_reviewable)]
-    for category in surface.categories:
-        parts.append(
-            f"\n## {category}\n\n{surface.summary(category)}\n\n"
-            "```json\n"
-            + json.dumps(surface.contract(category), separators=(",", ":"), ensure_ascii=False)
-            + "\n```\n"
-        )
+    parts.extend(category_part(surface, category) for category in surface.categories)
     return "".join(parts)
+
+
+def category_part(surface: TeachingSurface, category: str) -> str:
+    """One category's contribution to the prefix — its framing, summary and body, as placed.
+
+    Public because `census.py` divides the assembled prefix by exactly these parts, and a
+    second copy of this framing over there would be one edit away from disagreeing with this
+    one about where a category begins and how much of the prefix it is.
+    """
+    return (
+        f"\n## {category}\n\n{surface.summary(category)}\n\n"
+        "```json\n"
+        + json.dumps(surface.contract(category), separators=(",", ":"), ensure_ascii=False)
+        + "\n```\n"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -482,22 +491,44 @@ def _anchor_pattern(time: Mapping[str, Any]) -> re.Pattern[str]:
     the ones it described when this was written. A form this cannot parse is left out, which
     a test catches by holding every published example to the pattern.
     """
-    edges: set[str] = set()
-    words = False
-    for form in time.get("forms", ()):
-        tail = str(form.get("form", "")).split(".", 1)[-1] if isinstance(form, Mapping) else ""
-        if tail.startswith("word:"):
-            words = True
-        else:
-            edges.update(part for part in tail.split("|") if part.isalpha())
+    return _anchor_reader("|".join(tail for _, tail in _tails(time) if tail))
+
+
+def anchor_forms(time: Mapping[str, Any]) -> tuple[tuple[str, re.Pattern[str] | None], ...]:
+    """Every form the catalog publishes, in the order it publishes them, each with its reader.
+
+    One reader per form rather than the single combined one above, because `census.py` reports
+    anchors *by form* and a combined reader cannot say which form it matched. A form no reader
+    can be built from comes back as `None` rather than being left out of the list: a caller can
+    then report it as unread, and a form silently dropped is how a census starts lying.
+    """
+    return tuple(
+        (form, _anchor_reader(tail) if tail else None) for form, tail in _tails(time)
+    )
+
+
+def _anchor_reader(alternatives: str) -> re.Pattern[str]:
+    """One anchor grammar, whether it carries every published form or only one."""
+    return re.compile(r"^(?P<beat>[^.]+)\.(?:" + alternatives + r")$")
+
+
+def _tails(time: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Each published form string, with the pattern its tail becomes — empty if unreadable."""
     offsets = "|".join(re.escape(str(token)) for token in time.get("offsets", ()))
-    alternatives = []
-    if edges:
-        edge = "|".join(sorted(re.escape(name) for name in edges))
-        alternatives.append(f"(?:{edge})" + (f"(?:[+-](?:{offsets}))?" if offsets else ""))
-    if words:
-        alternatives.append(r"word:\S.*")
-    return re.compile(r"^(?P<beat>[^.]+)\.(?:" + "|".join(alternatives) + r")$")
+    published = []
+    for form in time.get("forms", ()):
+        name = str(form.get("form", "")) if isinstance(form, Mapping) else str(form)
+        tail = name.split(".", 1)[-1]
+        if tail.startswith("word:"):
+            published.append((name, r"word:\S.*"))
+            continue
+        edges = sorted(re.escape(part) for part in tail.split("|") if part.isalpha())
+        if not edges:
+            published.append((name, ""))
+            continue
+        edge = "(?:" + "|".join(edges) + ")"
+        published.append((name, edge + (f"(?:[+-](?:{offsets}))?" if offsets else "")))
+    return tuple(published)
 
 
 def published_errors(surface: TeachingSurface) -> Mapping[str, Any]:

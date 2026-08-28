@@ -1,6 +1,6 @@
 # 23: The prefix is measured rather than argued about
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -130,16 +130,73 @@ and it is not this.
   the other half of that comparison and a different number.
 - **Measuring tokens.** Characters, offline, for the reasons `context.py` records.
 
+## Further Notes
+
+**The boundary this measures at is the assembled prefix**, the one ADR-0017 and every bundle
+field are denominated at — `cache_prefix(SURFACE).text`, framing included, **118,598 characters**
+today. It is not the 117,332 that counts the five contract bodies as the `contract show`
+envelopes deliver them (ticket 28's boundary). Neither supersedes the other; this instrument
+stays at the first one, and any figure quoted from the record is a 118,598-boundary figure.
+
+**Ticket 17's four numbers, re-measured by the instrument** rather than re-reasoned about. They
+have all moved, which is the argument for having built it:
+
+| ticket 17, by hand | the census, today |
+|---|---|
+| 44 anchors, 35 Boundary and 9 Word | 53 anchors: 40 Boundary, 12 Word, 1 unparsed |
+| 7 of the 9 Word anchors are one idiom | 12 Word occurrences in **6 distinct statements** |
+| the catalog projection is 52% of the prefix | **47.6%** |
+| the catalog is 30 Boundary anchors and no Word | **33 Boundary and 1 Word** |
+
+The Word anchor now in the catalog arrived with ticket 17's own description fixes, and the
+Boundary count rose with them. The record is `services/agents/prefix-census.md`, rewritten on
+every `pytest` run; the comparison the ticket asks for is its diff.
+
+**The duplication this ticket was written about is already gone at the source.** The catalog
+projection no longer carries `contract.checks` — it publishes `manifestVersion`, `time` and
+`capabilities` and nothing else, so the 9,367 bytes the Solution names are now published once,
+by the `checks` category, at 9,585. Production issue 28 landed it. The census reports what is
+there now: the largest single repeat in the prefix is **5,146 characters inside `protocol`**,
+where `schemas.preflightReport.properties` and
+`schemas.commandData.run.preflight.properties.report.properties` are byte-identical — 4.3% of
+every turn's prefix. Repetition *within* one category is reported the same way repetition
+between two is, because it costs the prefix exactly as dearly and a census silent about it
+would be the naive count this ticket rejected wearing a different hat. In total 12,754
+characters, 10.8% of the prefix, are copies of content published elsewhere in it.
+
+**A statement is the JSON object or the sentence an anchor sits in, with the anchor elided.**
+That definition is the whole of the distinct count, and it is what makes the idiom visible: the
+seven `advanceWord` events that walk down one typographic statement normalise to one
+`{"at":"<anchor>","action":"advanceWord"}` and are counted once. Nothing else the census does
+would have found ticket 17's defect.
+
+**One number in the census is not read from the contract, and it is named where it lives.**
+`census.BEAT_ID` is the crew's own reading of the beat-id convention, because the published forms
+name their left side `<beatId>` and the plan schema asks only for a non-empty string. It is
+deliberately wider than the forms — that is what makes `b5.mid`, which the language projection
+carries as a retired form, reportable as unparsed instead of invisible. A convention that moved
+would make the scanner blind, so a form whose own published examples the scanner cannot find is
+reported `readable: false` rather than counted as zero.
+
+**The 100-character floor is on listing, never on counting.** Without one the record's table was
+54 rows led by `{"type":"string"}` twenty-one times, which buries the case the record exists to
+show. `PrefixCensus.repeats` and `repeated_chars` still carry every repeat; the record lists the
+ones that are documents and says how many smaller ones it did not list and what they come to.
+
+**Ticket 24's premise is now measurable.** The catalog is 47.6% of the prefix and eight
+capabilities, and this instrument is where "what did offering the catalog rather than showing it
+do to the prefix" gets answered with a before and an after rather than an argument.
+
 **Blocked by:** None (can start immediately)
 
-- [ ] A census of the assembled instructions is produced by the suite, with no service, key or network
-- [ ] It reports the prefix size and its division across the categories the index published
-- [ ] It reports anchors by the forms the contract publishes, read through the existing contract-derived reader
-- [ ] It reports distinct statements alongside raw occurrences
-- [ ] An anchor form the reader cannot parse is reported as unparsed, never silently dropped
-- [ ] The division accounts for the whole prefix, asserted rather than assumed
-- [ ] Content published in more than one category is reported, with how much of the prefix it is
-- [ ] The census reports duplication and never elides it
-- [ ] A repeated idiom reports a low distinct count against a high raw one, under a test
-- [ ] No threshold fails a build, and today's counts are not pinned as expected values
-- [ ] Two censuses taken either side of a contract change can be compared without re-deriving either
+- [x] A census of the assembled instructions is produced by the suite, with no service, key or network
+- [x] It reports the prefix size and its division across the categories the index published
+- [x] It reports anchors by the forms the contract publishes, read through the existing contract-derived reader
+- [x] It reports distinct statements alongside raw occurrences
+- [x] An anchor form the reader cannot parse is reported as unparsed, never silently dropped
+- [x] The division accounts for the whole prefix, asserted rather than assumed
+- [x] Content published in more than one category is reported, with how much of the prefix it is
+- [x] The census reports duplication and never elides it
+- [x] A repeated idiom reports a low distinct count against a high raw one, under a test
+- [x] No threshold fails a build, and today's counts are not pinned as expected values
+- [x] Two censuses taken either side of a contract change can be compared without re-deriving either

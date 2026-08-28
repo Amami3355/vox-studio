@@ -125,6 +125,35 @@ refused and what was said about it; an author asked to repair without those woul
 from scratch. Both are payload-shaped: no client, no path, and no opinion about the production
 sequence.
 
+**`census.py` measures the prefix rather than arguing about it.** Ticket 17 rested an argument,
+a severity decision and an ADR reading on four hand-counted numbers about the instructions the
+crew authors from, and nothing in the repository could re-take them. This is the instrument: how
+large the assembled prefix is, how it divides across the categories the index published, how many
+anchors it demonstrates and of which published forms, how many *distinct statements* those
+anchors are spread over, and what content it carries more than once. It runs on every `pytest`,
+over the recorded fixtures, and writes `prefix-census.md` — the record a later session diffs
+against after a contract has moved.
+
+Three things about it are worth knowing before changing it.
+
+*It is a record, not a gate.* No threshold fails a build and no count is pinned as an expected
+value. What a balanced prefix looks like has never been argued, and a suite that went red because
+another team added a capability would be this crew holding their contract hostage to a ratio
+nobody granted authority to. The fixtures already have a staleness guard and it is not this.
+
+*The distinct-statement count is the one that matters.* Nine word anchors that are one idiom
+repeated seven times teach what two teach, and a census reporting nine would have hidden the
+defect it was built to expose. So an anchor's statement — the JSON object or the sentence it sits
+in, with the anchor elided — is counted beside the raw occurrences, and the record publishes both.
+
+*Everything it reads, it reads from the contract, except one thing.* The anchor forms come
+through `planner.anchor_forms`, so a form the contract adds is a form the census counts with no
+edit here. What no contract publishes is the shape of a beat id, and without one an anchor cannot
+be told from `contract.show`; `BEAT_ID` is the crew's own reading of that convention, deliberately
+wider than the published forms so an anchor no form can read is reported as unparsed rather than
+missed. A convention that moved would leave it blind, so `readable` is false for any form whose
+own published examples the scanner cannot find, and a test asserts every one of them is read.
+
 **`refusals.py` gathers what production said, and never restates it.** A refusal already
 carries a report, published codes and a suggested next command, and the checks contract carries
 a `means` and a `repair` for every code in it. So this module composes nothing: it fetches the
@@ -260,6 +289,12 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
 .venv/Scripts/python -m pytest
 ```
+
+One file in the project is generated rather than written: `prefix-census.md` is rewritten on
+every `pytest` run from the recorded fixtures. It is committed on purpose — the point of it is
+that two censuses taken either side of a contract change can be read against each other — so a
+diff in it after re-recording the fixtures is the answer to what that contract change did to the
+prefix, and a diff in it at any other time means the instrument moved.
 
 The tests are held to the same bar as the proofs: no production service, no Gemini key, no
 ElevenLabs quota, no network. Tool tests replay recorded envelopes — see
