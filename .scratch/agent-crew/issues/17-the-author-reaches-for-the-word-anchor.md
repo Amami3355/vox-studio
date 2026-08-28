@@ -1,6 +1,6 @@
 # 17: The author reaches for the word anchor
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
