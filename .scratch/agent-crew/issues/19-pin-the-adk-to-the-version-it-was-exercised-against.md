@@ -1,6 +1,6 @@
 # 19: Pin the ADK to the version it was exercised against
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -73,9 +73,55 @@ this reason.
 
 **Blocked by:** None (can start immediately)
 
-- [ ] The declared constraint requires the major version the crew is written against and excludes the next
-- [ ] The floor is the version the crew has actually been exercised on
-- [ ] The README, the pyproject comment and the constraint agree on one number
-- [ ] The extra is still optional and the framework is still imported when an author is built, not when the module loads
-- [ ] The full suite passes with the extra absent
-- [ ] With the extra installed, a keyless machine can still build an agent through the public seam
+- [x] The declared constraint requires the major version the crew is written against and excludes the next
+- [x] The floor is the version the crew has actually been exercised on
+- [x] The README, the pyproject comment and the constraint agree on one number
+- [x] The extra is still optional and the framework is still imported when an author is built, not when the module loads
+- [x] The full suite passes with the extra absent
+- [x] With the extra installed, a keyless machine can still build an agent through the public seam
+
+## Further Notes
+
+**What the constraint became (2026-08-28).** `agents = ["google-adk>=2.7.1,<3"]`. The floor is
+the version installed in `services/agents/.venv` and the one every claim in this repo about the
+framework was checked against — `ContextCacheConfig`'s caching gate for ticket 22, and the
+`LlmAgent` and `InMemoryRunner` surfaces `AdkPlanAuthor` builds. There is evidence for that
+version and none for any older one.
+
+**The number now has one home.** It was written in three places and is written in one: the
+constraint. The pyproject comment above it and the README's install paragraph both point at the
+constraint rather than restating a digit that can drift away from it. The spec's ticket-22
+finding still names `google-adk 2.7.1` and is left alone deliberately — it is a past-tense record
+of what was checked on a day, not a claim about what the project requires.
+
+**The ceiling is prospective, and that is the point.** `pip index versions google-adk` on
+2026-08-28 lists 2.8.0 as the latest and no 3.x at all, so the ceiling excludes nothing that
+exists. It is written so that the day a 3.x lands, a routine `pip install -e ".[agents,dev]"`
+fails loudly rather than quietly reshaping `LlmAgent` under the one class that reaches for it —
+the same argument the model pin already makes one level up, where a stale pin is a dead run
+rather than a slow one.
+
+**Why the floor is not 2.8.0.** Because 2.8.0 is the latest and not the exercised. The floor
+states what the crew has evidence for, and the evidence is a suite run and a keyless agent build
+against 2.7.1; the constraint admits 2.8.0 without claiming it. Adopting it is the change this
+ticket puts out of scope, where the installed version and the floor move together.
+
+**Verified by install, not by argument.** `.venv/Scripts/python -m pip install -e
+".[agents,dev]"` resolved against the installed 2.7.1 and exited 0, recording
+`google-adk<3,>=2.7.1` in the distribution metadata, and `pip check` reports no broken
+requirements. On a process with `GOOGLE_API_KEY`, `GEMINI_API_KEY` and
+`GOOGLE_APPLICATION_CREDENTIALS` all absent, `AdkPlanAuthor(model=...).agent(instructions(...))`
+returned an `LlmAgent` holding the 118,598-character prefix and no tools — the furthest a keyless
+machine follows the live path, and the ticket's stated verification.
+
+**The suite with the extra absent.** Simulated rather than uninstalled: a `meta_path` finder that
+raises `ModuleNotFoundError` for `google.adk`, which is what a truly missing package raises, run
+as a `-p` plugin. Exit 0, with five `importorskip` skips (`test_cli.py` twice, `test_planner.py`
+three times) and the pre-existing symlink skip. That measurement corrected a claim in the two
+paragraphs this ticket was editing anyway: both said *"every test but one runs without it"*, and
+five tests need it. Neither says a number now — they say which tests, which cannot drift.
+
+**Nothing else moved.** The extra is still optional, and `planner.py` still imports the framework
+inside `agent()` rather than at module load, which
+`test_the_live_author_is_not_imported_until_one_is_built` asserts and which passed in both runs.
+No test was added, removed or changed.

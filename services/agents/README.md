@@ -268,9 +268,12 @@ sentinel in `conftest.py` fails any test that reaches for egress.
 
 The ADK framework is declared as an optional dependency rather than a required one. Only
 `AdkPlanAuthor` needs it, and it imports the framework when one is built rather than when
-`planner.py` is loaded, so a bare `pytest` still needs no network install and every test but
-one runs without it. Install it with `.venv/Scripts/python -m pip install -e ".[agents,dev]"`;
-`google-adk` 2.7.1 is what has been exercised here, on Python 3.14.4.
+`planner.py` is loaded, so a bare `pytest` still needs no network install and every test that
+does not exercise the live author runs without it. Install it with
+`.venv/Scripts/python -m pip install -e ".[agents,dev]"`. The version exercised here is the floor
+of the `agents` constraint in `pyproject.toml`, which is where that number lives rather than
+being restated in prose that can drift away from it; the ceiling stops short of the next major.
+The Python exercised here is 3.14.4.
 
 Driving the live author additionally needs a model credential in the runtime's environment. The
 crew never holds one, so nothing in the test suite can reach a model: the furthest a keyless
