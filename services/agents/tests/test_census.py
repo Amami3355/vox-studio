@@ -20,6 +20,7 @@ from conftest import recorded
 from test_planner import SURFACE
 from test_teaching_surface import projection
 from vox_crew.census import CensusIncomplete, take_census
+from vox_crew.census_record import render_prefix_census
 from vox_crew.envelopes import parse_envelope
 from vox_crew.planner import CachedPrefix, cache_prefix
 from vox_crew.teaching_surface import TeachingSurface
@@ -282,7 +283,7 @@ def test_the_record_names_every_part_and_form_it_found() -> None:
     """What a session reads. Every part of the division and every published form appears."""
     prefix = a_prefix_carrying(("b2.word:London", "highlightBar"))
 
-    rendered = take_census(prefix).render()
+    rendered = render_prefix_census(take_census(prefix))
 
     assert "| preamble |" in rendered
     assert "| catalog |" in rendered
@@ -301,9 +302,9 @@ def test_the_record_is_deterministic_and_is_rewritten_on_every_run() -> None:
     """
     census = take_census(cache_prefix(SURFACE))
 
-    assert census.render() == take_census(cache_prefix(SURFACE)).render()
+    assert render_prefix_census(census) == render_prefix_census(take_census(cache_prefix(SURFACE)))
 
-    RECORD.write_text(census.render(), encoding="utf-8", newline="\n")
+    RECORD.write_text(render_prefix_census(census), encoding="utf-8", newline="\n")
 
 
 def test_the_record_lists_the_repeats_that_are_documents_and_totals_the_rest() -> None:
@@ -318,7 +319,7 @@ def test_the_record_lists_the_repeats_that_are_documents_and_totals_the_rest() -
             catalog={"b": SHARED, "small": {"type": "string"}},
         )
     )
-    rendered = census.render()
+    rendered = render_prefix_census(census)
 
     assert len(census.repeats) == 2
     assert "`catalog.b`" in rendered

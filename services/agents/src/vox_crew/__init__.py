@@ -20,6 +20,7 @@ from .census import (
     Unparsed,
     take_census,
 )
+from .census_record import render_prefix_census
 from .client import (
     Artifact,
     ArtifactCorrupted,
@@ -106,6 +107,7 @@ from .planner import (
     PlanAuthor,
     PlanNotAuthored,
     PlanNotRepairable,
+    PublishedForm,
     anchor_forms,
     author_plan,
     authoring_ask,
@@ -178,6 +180,7 @@ __all__ = [
     "ProductionClient",
     "ProductionClientError",
     "ProductionUnavailable",
+    "PublishedForm",
     "READ_BACK",
     "RENDERED",
     "RESIDENT_CHARS",
@@ -216,6 +219,7 @@ __all__ = [
     "read_bundle",
     "read_refusal",
     "read_teaching_surface",
+    "render_prefix_census",
     "repair_ask",
     "repair_budget",
     "repair_plan",

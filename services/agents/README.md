@@ -134,7 +134,12 @@ anchors are spread over, and what content it carries more than once. It runs on 
 over the recorded fixtures, and writes `prefix-census.md` — the record a later session diffs
 against after a contract has moved.
 
-Three things about it are worth knowing before changing it.
+The measuring lives in `census.py` and the record it writes in `census_record.py`, because the
+two change for different reasons: what is counted moves when the contract does, and how it is
+laid out moves when a session finds the record hard to read. Nothing in `census_record.py` can
+change a number, which is what makes it safe to reword.
+
+Four things about it are worth knowing before changing it.
 
 *It is a record, not a gate.* No threshold fails a build and no count is pinned as an expected
 value. What a balanced prefix looks like has never been argued, and a suite that went red because
@@ -148,11 +153,22 @@ in, with the anchor elided — is counted beside the raw occurrences, and the re
 
 *Everything it reads, it reads from the contract, except one thing.* The anchor forms come
 through `planner.anchor_forms`, so a form the contract adds is a form the census counts with no
-edit here. What no contract publishes is the shape of a beat id, and without one an anchor cannot
+edit here — and each form arrives carrying its own published examples, so the census never goes
+back to the contract for the shape of a form entry and there is only ever one reader of it. What
+no contract publishes is the shape of a beat id, and without one an anchor cannot
 be told from `contract.show`; `BEAT_ID` is the crew's own reading of that convention, deliberately
 wider than the published forms so an anchor no form can read is reported as unparsed rather than
 missed. A convention that moved would leave it blind, so `readable` is false for any form whose
 own published examples the scanner cannot find, and a test asserts every one of them is read.
+
+*Repeats are found in the bodies and confirmed in the prefix.* What repeats is a JSON object or
+an array, and the assembled prefix is flat text with no structure to search; so the walk is over
+the published bodies, and every blob it finds is then checked against the assembled text before
+it is reported — `category_part` embeds each body with the same compact serialisation the walk
+uses, so a repeat that is not carried as many times as claimed refuses the census rather than
+being reported. The denominator stays the whole prefix. Its one blind spot, named rather than
+implied: duplication between a body and the crew's preamble or the per-category framing is prose
+that no JSON walk reaches, and nothing has been measured about it either way.
 
 **`refusals.py` gathers what production said, and never restates it.** A refusal already
 carries a report, published codes and a suggested next command, and the checks contract carries

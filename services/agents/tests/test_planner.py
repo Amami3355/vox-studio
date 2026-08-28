@@ -40,6 +40,8 @@ from vox_crew.planner import (
     InstructionsLeaked,
     PlanAuthor,
     PlanNotRepairable,
+    _anchor_pattern,
+    anchor_forms,
     author_plan,
     authoring_ask,
     cache_prefix,
@@ -417,6 +419,24 @@ def test_every_anchor_the_catalog_gives_as_an_example_is_one_the_crew_accepts() 
             scene["spansBeats"] = ["b1", "b2"] if beat == "scene" else [beat]
             plan["beats"] = [{"id": beat, "text": "A beat that speaks a word."}] if beat != "scene" else plan["beats"]
             assert review(plan, SURFACE) == (), f"{example} was refused"
+
+
+def test_a_form_entry_that_is_not_an_object_widens_no_grammar() -> None:
+    """ADR-0009: the reader takes its edge names from what the contract publishes as a form.
+
+    A form entry published as a bare string rather than an object is one the crew cannot read.
+    Taking its tail as an edge name anyway would let a contract widen the accepted grammar by
+    malforming an entry, which is the one way the anchor reader is not allowed to grow. It is
+    reported as unread instead — a hole the census names, not a licence.
+    """
+    published = {**CATALOG["time"], "forms": [*CATALOG["time"]["forms"], "<beatId>.middle"]}
+
+    assert _anchor_pattern(published).pattern == _anchor_pattern(CATALOG["time"]).pattern
+    assert _anchor_pattern(published).match("b1.middle") is None
+    assert [(form.form, form.reader is None) for form in anchor_forms(published)][-1] == (
+        "<beatId>.middle",
+        True,
+    )
 
 
 def test_an_asset_requirement_that_names_a_resolved_reference_is_a_finding() -> None:

@@ -305,18 +305,27 @@ ticket.
    crew's preamble and headings). The placeholder estimate of 55–70k tokens was
    over the wrong artifact and by roughly a third.
 
-   **Re-measured once the author was given a tool.** 124,690 is the scripted
-   prefix and is unchanged — that is the point of adding the tool paragraph only
+   **Re-measured once the author was given a tool.** The scripted prefix is
+   unchanged by the tool — that is the point of adding the tool paragraph only
    for an author that holds one, and it is what keeps every measurement taken
-   before the tool comparable. A live author's prefix is **125,039**: the same
-   text plus 349 characters describing the tool it may call. Both sit far inside
-   the resident line. The budget is therefore stated
+   before the tool comparable. A live author's prefix is the same text plus a
+   paragraph describing the tool it may call. Both sit far inside the resident
+   line.
+
+   **Both figures are now taken by the suite, not by hand.** At ADR-0017's
+   boundary — the prefix `cache_prefix` assembles, framing included — the
+   scripted prefix is **118,598** and the tool-holding one **119,266**, a
+   668-character paragraph apart. The 124,690 and 125,039 this bullet carried
+   until crew 23 were taken before production issue 28 moved the checks document
+   out of the catalog projection, and were stale by roughly 6,000 characters. The
+   record is `services/agents/prefix-census.md`, rewritten on every `pytest` run.
+   The budget is therefore stated
    in characters, which the crew can count exactly and offline on every Run, with
    tokens as a deliberately conservative conversion at 3 characters per token:
 
    - **Resident prefix: 150,000 characters (~50k tokens)**, charged once per Run
      and transmitted on every turn of it.
-     About a fifth of headroom over the measured 125,039, which is room for the
+     A quarter of headroom over the measured 119,266, which is room for the
      catalog to gain capabilities without a Run being refused for it.
    - **Fresh text: 20,000 characters per plan version.** The largest refusal the
      fixtures record is 5,248 characters and a showcase Brief handed back with an

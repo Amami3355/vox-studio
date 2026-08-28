@@ -34,6 +34,9 @@ Anchor-shaped, and read by no published form: `b5.mid` ×1.
 ## What it carries more than once
 
 Content the prefix carries in more than one place, byte for byte, outermost repeats only.
+Found in the published bodies, where the structure is, and confirmed against the assembled
+text before it is reported. Duplication between a body and the crew's preamble or the
+per-category framing is not searched for and is not counted here.
 The crew does not act on this: dropping a repeat would be a consumer editing a published
 projection, which its own assembly rule forbids. Noticing is the whole of its part.
 

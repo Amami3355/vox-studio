@@ -9,8 +9,8 @@ which governs what the catalog demonstrates.
 ## Context
 
 The crew assembles one instructions prefix from the projections the contract index publishes, and
-every turn of a Run is authored against that same object. The catalog is 56,930 characters of it,
-48% of a 118,598-character prefix, and it goes in whole: `instructions` puts each category's body
+every turn of a Run is authored against that same object. The catalog is 56,486 characters of it,
+47.6% of a 118,598-character prefix, and it goes in whole: `instructions` puts each category's body
 in unsummarised, on the stated ground that *"a summary of a catalog is a description of
 capabilities the model then cannot name correctly."*
 
@@ -127,12 +127,18 @@ The current numbers, reproducible rather than asserted:
 services/agents/.venv/Scripts/python.exe -c "import sys; sys.path[:0]=['src','.','tests'];   from tests.test_planner import SURFACE; from vox_crew.planner import cache_prefix;   print(cache_prefix(SURFACE).chars)"     # 118,598 — the assembled prefix
 ```
 
-The catalog is 56,930 of that, or 48.0%. Ticket 28's commit reports 126,927 → 117,332 for the same
+The catalog is 56,486 of that, or 47.6%. Ticket 28's commit reports 126,927 → 117,332 for the same
 change; that figure counts the five contract bodies as the `contract show` envelopes deliver them,
 where this one counts the prefix `cache_prefix` actually assembles, framing included. Both are
 post-ticket-28 measurements of slightly different objects and neither supersedes the other — but a
-later session comparing against either must say which, because the ~900-character gap between them
+later session comparing against either must say which, because the 1,266-character gap between them
 is larger than some of the changes anyone would be measuring.
+
+These two numbers are no longer taken by hand. Crew ticket 23 built the instrument, and
+`services/agents/prefix-census.md` — rewritten on every `pytest` run — is where they are read
+from now, at this ADR's boundary. The 56,930 and 48.0% this paragraph carried until then were
+themselves stale, by 444 characters: they predated ticket 17's description fixes, and no one
+would have known. That is the argument for the census, made against this ADR's own text.
 
 **What is retired, explicitly.** Any prefix-size or catalog-share figure taken before `b0987b5`.
 That includes this ADR's own two numbers, `teaching_surface.py`'s module docstring, and ticket 17's

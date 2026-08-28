@@ -66,7 +66,14 @@ something else.
 
 - **It measures the assembled instructions, not the projections separately.** The prefix is what
   reaches a model, including the preamble and the per-category framing. Measuring the bodies alone
-  would answer a question nobody asked.
+  would answer a question nobody asked. The size, the division and the anchor tally all read the
+  assembled text. **The repeat search is the one exception, and it is a search rather than a
+  measurement**: what repeats is a JSON object or array and the assembled prefix is flat text, so
+  the walk is over the bodies — but every blob it finds is confirmed against the assembled text
+  before it is reported, and the denominator is the whole prefix. `category_part` embeds each body
+  with the same compact serialisation the walk uses, so the two are the same characters. What this
+  cannot see is duplication between a body and the preamble or the framing, which is prose no JSON
+  walk reaches; nothing has been measured about it either way.
 - **The anchor vocabulary comes from the contract, through the existing reader.** A form the
   contract adds is a form the census counts, with no edit — the same rule the rest of the crew is
   held to. A form the reader cannot parse is reported as unparsed rather than dropped, because a
@@ -155,7 +162,10 @@ every `pytest` run; the comparison the ticket asks for is its diff.
 **The duplication this ticket was written about is already gone at the source.** The catalog
 projection no longer carries `contract.checks` — it publishes `manifestVersion`, `time` and
 `capabilities` and nothing else, so the 9,367 bytes the Solution names are now published once,
-by the `checks` category, at 9,585. Production issue 28 landed it. The census reports what is
+by the `checks` category, at 9,585 — the body alone, which is the one figure in this ticket not
+taken at the 118,598 boundary, because it is being compared with 9,367, another body figure. The
+prefix carries that body at 9,660; the 75-character difference is the category's framing, and the
+census reports the 9,660. Production issue 28 landed it. The census reports what is
 there now: the largest single repeat in the prefix is **5,146 characters inside `protocol`**,
 where `schemas.preflightReport.properties` and
 `schemas.commandData.run.preflight.properties.report.properties` are byte-identical — 4.3% of

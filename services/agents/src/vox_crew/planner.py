@@ -491,19 +491,47 @@ def _anchor_pattern(time: Mapping[str, Any]) -> re.Pattern[str]:
     the ones it described when this was written. A form this cannot parse is left out, which
     a test catches by holding every published example to the pattern.
     """
-    return _anchor_reader("|".join(tail for _, tail in _tails(time) if tail))
+    return _anchor_reader("|".join(tail for _, tail, _ in _tails(time) if tail))
 
 
-def anchor_forms(time: Mapping[str, Any]) -> tuple[tuple[str, re.Pattern[str] | None], ...]:
+@dataclass(frozen=True, slots=True)
+class PublishedForm:
+    """One anchor form as the catalog publishes it, with the reader built from its tail.
+
+    The three travel together because every caller needs all three: the form string to report
+    by, the reader to count with, and the examples to check the reader against. A caller given
+    only the first two has to go back to the contract for the third, and then there are two
+    readers of the form entry's shape, one edit away from disagreeing.
+
+    `reader` is `None` for a form no grammar could be built from — reported as unread rather
+    than counted as zero.
+    """
+
+    form: str
+    reader: re.Pattern[str] | None
+    examples: tuple[str, ...]
+
+
+def anchor_forms(time: Mapping[str, Any]) -> tuple[PublishedForm, ...]:
     """Every form the catalog publishes, in the order it publishes them, each with its reader.
 
     One reader per form rather than the single combined one above, because `census.py` reports
     anchors *by form* and a combined reader cannot say which form it matched. A form no reader
-    can be built from comes back as `None` rather than being left out of the list: a caller can
-    then report it as unread, and a form silently dropped is how a census starts lying.
+    can be built from comes back with `reader=None` rather than being left out of the list: a
+    caller can then report it as unread, and a form silently dropped is how a census starts
+    lying.
+
+    The published `examples` travel with the reader built from them. A caller that had to fetch
+    them itself would be a second reader of the form entry's shape — which is the disagreement
+    this function was extracted to prevent, re-created one level up.
     """
     return tuple(
-        (form, _anchor_reader(tail) if tail else None) for form, tail in _tails(time)
+        PublishedForm(
+            form=form,
+            reader=_anchor_reader(tail) if tail else None,
+            examples=examples,
+        )
+        for form, tail, examples in _tails(time)
     )
 
 
@@ -512,22 +540,36 @@ def _anchor_reader(alternatives: str) -> re.Pattern[str]:
     return re.compile(r"^(?P<beat>[^.]+)\.(?:" + alternatives + r")$")
 
 
-def _tails(time: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
-    """Each published form string, with the pattern its tail becomes — empty if unreadable."""
+def _tails(time: Mapping[str, Any]) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    """Each published form string, the pattern its tail becomes, and its published examples.
+
+    An empty tail means unreadable, and an unreadable form reaches no reader: `_anchor_pattern`
+    drops it from the combined grammar and `anchor_forms` hands it back with `reader=None`.
+    """
     offsets = "|".join(re.escape(str(token)) for token in time.get("offsets", ()))
     published = []
     for form in time.get("forms", ()):
-        name = str(form.get("form", "")) if isinstance(form, Mapping) else str(form)
+        if not isinstance(form, Mapping):
+            # A form entry that is not an object is one this cannot read. Named, so a census
+            # can report it as unread, but with an empty tail so it widens no grammar:
+            # ADR-0009 binds the reader to what the contract publishes as a form, and a bare
+            # string here would otherwise have its tail taken as an edge name.
+            published.append((str(form), "", ()))
+            continue
+        name = str(form.get("form", ""))
+        examples = tuple(str(example) for example in form.get("examples", ()))
         tail = name.split(".", 1)[-1]
         if tail.startswith("word:"):
-            published.append((name, r"word:\S.*"))
+            published.append((name, r"word:\S.*", examples))
             continue
         edges = sorted(re.escape(part) for part in tail.split("|") if part.isalpha())
         if not edges:
-            published.append((name, ""))
+            published.append((name, "", examples))
             continue
         edge = "(?:" + "|".join(edges) + ")"
-        published.append((name, edge + (f"(?:[+-](?:{offsets}))?" if offsets else "")))
+        published.append(
+            (name, edge + (f"(?:[+-](?:{offsets}))?" if offsets else ""), examples)
+        )
     return tuple(published)
 
 

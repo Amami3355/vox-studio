@@ -22,4 +22,7 @@ of a ticket rather than how it was triaged:
 | `done`                 | Implemented and landed; every acceptance criterion discharged       |
 | `claimed` / `resolved` | Wayfinding tickets only — see `issue-tracker.md`                    |
 
-Edit the right-hand column to match whatever vocabulary you actually use.
+Edit the `Label in our tracker` column of the first table to match whatever vocabulary you
+actually use. The second table is a record of what this repo already does, not a template: its
+two entries are read by `issue-tracker.md` and by the wayfinding operations, so renaming them is
+a change to those and not only to this file.
