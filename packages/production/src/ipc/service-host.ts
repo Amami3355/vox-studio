@@ -33,6 +33,18 @@ const runKeyId = required('VOX_RUN_KEY_ID');
 const calibrationPath = resolve(required('VOX_CALIBRATION_PATH'));
 const remotionEntryPoint = resolve(required('VOX_REMOTION_ENTRY'));
 
+/**
+ * A two-minute, eight-scene Remotion render exceeds the generic 120 s IPC idle timeout in
+ * `host.ts`, and the proof harness already allows for it (`proof/harness.ts`). A hand-started
+ * service needs the same allowance: without it `run render` is cut off mid-render and the
+ * launcher reports `vox: Production service is unavailable.` against a service that is healthy,
+ * which is the one message that also means a real outage.
+ */
+const socketTimeoutMs = Number(process.env.VOX_IPC_SOCKET_TIMEOUT_MS ?? 15 * 60_000);
+if (!Number.isFinite(socketTimeoutMs) || socketTimeoutMs <= 0) {
+  throw new TypeError('VOX_IPC_SOCKET_TIMEOUT_MS must be a positive number of milliseconds.');
+}
+
 const verifyReplacementGrant = (grant: ReplacementGrant): boolean => {
   const unsigned = {
     protocolVersion: grant.protocolVersion,
@@ -65,6 +77,7 @@ const host = createProductionIpcHost({
   pipePath: `\\\\.\\pipe\\${privatePipeName}`,
   secret: ipcSecret,
   service,
+  socketTimeoutMs,
 });
 await host.listen();
 const pipeBridge = await startProductionPipeBridge({

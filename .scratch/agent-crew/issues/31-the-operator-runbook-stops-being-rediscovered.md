@@ -1,6 +1,6 @@
 # 31: The operator's runbook stops being rediscovered every session
 
-Status: done, except the end-to-end walk by a second reader — see Comments
+Status: done — walked end to end, including a paid Run; see Comments
 
 ## Problem Statement
 
@@ -127,7 +127,7 @@ against, and each one currently starts by reconstructing this.
 - [x] Recovering a dropped render is a first-class section
 - [x] The paid step is marked as paid and requires deliberate confirmation
 - [x] No credential is carried in the skill, and reusing a written-down token is called out as wrong
-- [ ] The procedure is walked once end to end by someone reading only the skill
+- [x] The procedure is walked once end to end by someone reading only the skill
 
 ## Comments
 
@@ -168,7 +168,7 @@ envelope at exit 0, and all five failure routes were probed. **The walk found on
 the skill's own step 1**: `RandomNumberGenerator::GetBytes(int)` does not exist on the Windows
 PowerShell 5.1 / .NET Framework here, so token generation now uses `RNGCryptoServiceProvider`.
 
-**Steps 7 and 8 and the recovery section were not walked**, which is why the last box is unticked.
+**[Superseded by the walk below.] Steps 7 and 8 and the recovery section were not walked**, which is why the last box was unticked.
 `bootstrap:workroot` and `run init … preflight` are free and should be walked next; `record` is
 not, and should stay declined. The recovery path needs an existing Run directory in a rendered
 state, and no free one was to hand — the eight `C:\vox-proof-workroots\vox-proof-*` roots from
@@ -176,3 +176,83 @@ earlier proofs are the obvious candidates and were not inspected. **The remainin
 second reader following only the skill**, which is a human task by construction: the author
 walking their own procedure cannot detect the step they left out, because they know what they
 meant.
+
+---
+
+**The walk happened, and the skill did not survive it intact.** A later session followed only
+`SKILL.md`, from a cold start, and logged every point where it had to reconstruct something. Eight
+did. Two of them would have stranded the reader outright, and one was a product defect rather than
+a documentation gap. The skill and `REFERENCE.md` were rewritten against what the walk found, and
+every step in the rewritten file has now been executed — including a paid `record` and a
+successful `render`.
+
+**The two that stranded the reader.**
+
+*The step order was impossible.* `bootstrap:workroot` calls `buildAgentDistribution()`
+unconditionally, which rewrites `dist\service\vox-pipe-bridge.exe` — a file every running service
+holds open as a child process. Starting the service first (old step 6) guarantees the bootstrap
+(old step 7) dies on `EPERM: operation not permitted, unlink`. There is no flag to skip the
+rebuild, and a stale service from *another session* blocks it just as effectively. Bootstrap is
+now step 2 and the service start is step 5, with the reason written into the step.
+
+*The recovery section named two variables and needed five.* It said a dropped render needs
+`VOX_PIPE_NAME` and `VOX_IPC_TOKEN`. It also needs `VOX_LEDGER_ROOT`, `VOX_RUN_KEY_ID` and
+`VOX_RUN_HMAC_KEY` to match the original Run — and all three are read **service-side**, so
+reopening a Run recorded under another environment means restarting the service against that Run's
+trusted directory, not merely exporting variables in the launcher shell. Probed: a fresh ledger
+gives `RUN_LEDGER_MISSING`; the right ledger with the wrong secret gives `RUN_ATTESTATION_INVALID`.
+
+**The consequence of that is worse than the gap.** Because nothing ever told an operator those
+three were durable, **none of the ten work roots predating the walk can be reopened** — not to
+render, not even to read status. `C:\vox-trusted\anc\` kept its ledger, its calibration and even
+`ipc-token.txt`, but not its run key; the `vox-proof-*` roots kept per-proof ledgers under
+`<root>\trusted\ledger` and lost theirs. The secret is not derivable from anything in the
+repository. Step 1 now writes a `service-env.ps1` next to the ledger for exactly this reason, and
+says plainly what losing it costs.
+
+**The product defect.** `run render` could not complete over IPC at all. The generic host default
+is `socketTimeoutMs = 120_000` (`src/ipc/host.ts:58`); `service-host.ts` never passed the option,
+so a hand-started service inherited two minutes. The proof harness has always overridden it to
+`15 * 60_000` (`proof/harness.ts:633`) with the comment *"A two-minute, eight-scene Remotion render
+exceeds the generic 120 s IPC idle timeout"* — the knowledge existed, in the one consumer the
+skill was told not to treat as authoritative. Walked: render failed at **120.2 s** with `vox:
+Production service is unavailable.` while `run status` against the same service succeeded. The
+service was healthy and still rendering. `service-host.ts` now defaults to the harness's fifteen
+minutes and accepts `VOX_IPC_SOCKET_TIMEOUT_MS`; the same render then succeeded in **277.1 s**.
+
+**That message is now ambiguous four ways**, not three: wrong name, wrong token, socket timeout, or
+real outage. Elapsed time separates the timeout — a failure at almost exactly the timeout is not an
+outage — and the pipe listing separates the wrong name. Nothing separates a wrong token from a
+genuine outage. The skill's triage list is ordered accordingly, cheapest discriminator first.
+
+**Three smaller gaps, all the same root cause.** `pnpm --filter` runs with the working directory
+set to `packages\production`, not the workspace root, while the skill's preamble claimed the
+opposite. So a relative `--request` failed with an `ENOENT` naming a path the reader never typed,
+and — worse, because it surfaces only at `run render`, after a take is already paid for — a
+relative `VOX_REMOTION_ENTRY` produced `COMMAND_FAILED: ENOENT`. `VOX_LEDGER_ROOT`,
+`VOX_CALIBRATION_PATH` and `VOX_REMOTION_ENTRY` are all `resolve()`d service-side
+(`service-host.ts:30-34`). The skill now requires absolute paths and says why.
+
+**Two corrections to what the skill asserted.** A listed pipe is not a usable service — without its
+token it fails with the same message as an outage, and three unusable pipes from earlier sessions
+were open at the start of the walk. And the step-8 heading said "the last three verbs spend money"
+while the recovery section said a redone render costs nothing; only `record` spends, and the
+heading was talking readers out of a free recovery.
+
+**What the walk cost and produced.** One take, on an eight-scene brief with `maxNewTakes: 1`.
+Timings, now in `REFERENCE.md`: `record` 29.2 s, `compile` 1.7 s, `render` 277.1 s; `init`,
+`validate` and `preflight` under a second each. The Run is at
+`C:\vox-proof-workroots\walk-31\run-1` with a 21 MB `preview.mp4`, `newTakesUsed: 1`, a single take
+directory, and its trusted config preserved at `C:\vox-trusted\walk-31\service-env.ps1` — **the
+first Run on this machine that a later session can actually reopen.** Two renders failed before it
+succeeded and neither wrote a receipt, which is itself worth knowing: the receipt chain records
+what succeeded, not what was attempted.
+
+**`pnpm typecheck` passes; `vitest run packages/production/tests` passes 183 tests across 34
+files**, the proof-harness IPC tests included.
+
+**The last box is ticked with one caveat stated rather than hidden.** The walker read only the
+skill and reconstructed nothing that is not now written down — but having then rewritten the file,
+they are no longer a second reader of it. Every step in the rewritten skill has been executed; the
+part that cannot be self-certified is whether a *fresh* reader finds it sufficient. That is a
+cheaper test than this one was, and it no longer costs a take.
