@@ -101,3 +101,42 @@ ticket changes no behaviour a Run would show.
 - [ ] A fresh session per ask is unchanged
 - [ ] The framework's ephemeral-session entry point is adopted if the Python surface publishes one, and the ticket records the answer either way
 - [ ] The keyless assertions still hold and no test reaches the network
+
+## Comments
+
+**2026-08-28 — This ticket's session decision now has a ticket on the other side of it.**
+
+Two of this ticket's commitments are in direct conflict with ticket 30, which was written after
+it:
+
+- Implementation Decisions: *"The session model does not change. A fresh session per ask stays,
+  deliberately, for the reasons `context.py` records."*
+- Out of Scope: *"Reusing a session across a Run's turns. Considered in ticket 22 and rejected
+  there."*
+- Acceptance: *"A fresh session per ask is unchanged."*
+
+Ticket 30 proposes a session that spans a Run's turns, on a mechanism neither ticket 22 nor
+ADR-0017 considered: `LlmAgent.static_instruction`, present in the pinned `google-adk 2.7.1`,
+which carries the assembled surface as a literal system instruction while the per-turn material
+moves to turn content. The relevance is that ticket 22's rejection rests on the trade being
+*prefix identity versus a reachable cache* — and under `static_instruction` that trade dissolves,
+because the static half cannot drift and the half that grows was never the thing being held
+identical. Worth noting that `repair_plan` at `planner.py:1074` already does
+`text = prefix.text + said`, so a repair turn today sends a different instruction string anyway;
+what the crew holds is a shared opening, not an identical instruction.
+
+**Nothing here says this ticket is wrong.** Its scoping was correct when written and its
+reasoning about *how a turn is driven* is untouched. The point is only that "a fresh session per
+ask is unchanged" is now a contested acceptance criterion rather than a settled one, and that
+whichever of 20 and 30 lands second inherits the combination. Both touch the same eight lines at
+`planner.py:1251-1290`.
+
+**Suggested order, and why:** this ticket first. An async path is a prerequisite for a session
+that outlives a call, not an alternative to it, and ticket 30 records the same preference in its
+`Blocked by`. If it lands first, ticket 30 should amend the three lines quoted above rather than
+leave them standing — a criterion ticked under one design and contradicted by the next is how a
+ticket stops being readable as a record.
+
+Also relevant: `.scratch/cloud-phase/issues/01-the-crew-is-hostable-and-adk-is-not-the-mechanism.md`
+depends on this ticket and makes the session service *configurable* rather than replaced, which is
+deliberately compatible with either answer here.
