@@ -1,6 +1,8 @@
 # 31: The operator's runbook stops being rediscovered every session
 
-Status: done — walked end to end, including a paid Run; see Comments
+Status: ready-for-agent — the skill is built and walked, including a paid Run, but a code review
+reopened two acceptance boxes. What remains is a cold read of the current text by someone who has
+not seen it, which is free if it stops before `record`. See Comments.
 
 ## Problem Statement
 
@@ -120,14 +122,18 @@ against, and each one currently starts by reconstructing this.
 **Blocked by:** None (can start immediately)
 
 - [x] A skill exists that stands the production service up by hand, from nothing
-- [x] It is authored with the skill tooling rather than hand-rolled
+- [ ] It is authored with the skill tooling rather than hand-rolled — **unevidenced.** The
+      artifact carries no trace either way and the walk record does not say; a later review could
+      not tell. Ticked in error; the honest state is unknown, not met.
 - [x] It names where each fact lives in the source rather than only asserting it
 - [x] `VOX_PIPE_PATH` versus `VOX_PIPE_NAME` is its own step and carries the misleading error text
 - [x] Calibration seeding and the request's matching voice block are one step, not two unrelated ones
 - [x] Recovering a dropped render is a first-class section
 - [x] The paid step is marked as paid and requires deliberate confirmation
 - [x] No credential is carried in the skill, and reusing a written-down token is called out as wrong
-- [x] The procedure is walked once end to end by someone reading only the skill
+- [ ] The procedure is walked once end to end by someone reading only the skill — **not met.**
+      A walk happened and paid for a take, but the walker then rewrote the file, so no one has
+      read the current text cold. This is the one box the walk could not tick for itself.
 
 ## Comments
 
@@ -256,3 +262,54 @@ skill and reconstructed nothing that is not now written down — but having then
 they are no longer a second reader of it. Every step in the rewritten skill has been executed; the
 part that cannot be self-certified is whether a *fresh* reader finds it sufficient. That is a
 cheaper test than this one was, and it no longer costs a take.
+
+**2026-08-29 — A two-axis code review over `d2a6418..HEAD` reopened two boxes and found a defect
+the walk was structurally unable to find.**
+
+The Spec axis was told that a ticked checkbox is a claim to verify. Three of the nine did not
+survive that:
+
+- **`ELEVENLABS_API_KEY` was never exported by step 1.** The step wrote nine lines but substituted
+  the launcher-side `VOX_PIPE_NAME` for the key, and the name appeared nowhere in `SKILL.md`. The
+  first review reading concluded a reader would hit `Missing trusted service configuration:
+  ELEVENLABS_API_KEY` at step 5; on *this* machine they would not, because the key is set at User
+  scope and inherits into every shell. **That is why the walk passed without noticing, and it is
+  the interesting part** — a walk performed in an environment that already satisfies a
+  prerequisite cannot detect that the procedure never establishes it. Step 1 now carries an
+  explicit guard and says why the key is deliberately not written into `service-env.ps1`.
+- **"Authored with the skill tooling rather than hand-rolled" is unevidenced**, not met. The
+  artifact carries no trace either way. Unticked and marked unknown rather than quietly dropped.
+- **"Walked by someone reading only the skill" is not met**, as the note above this one already
+  conceded in prose. The prose was honest and the box was not; the box now matches the prose.
+
+Everything else held: all nine variables correct, the pipe-name step carries the verbatim error,
+recovery is first-class with its five-variable table, `record` is marked as spending, no
+credential appears in any of the four files, and every other `file:line` citation sampled across
+`REFERENCE.md` resolves.
+
+**The Standards axis found the branch failing `pnpm check`** — three biome errors, all in
+`check-environment.mts`, on a tree that was clean at `d2a6418`. Fixed.
+
+**The socket-timeout fix has been reshaped rather than kept as walked.** The review's objection
+was that fifteen minutes was set on `service-host.ts` while the generic `host.ts` default stayed
+at 120 s, and that no production caller inherited that default any more — only two test files
+did. A default nothing real uses is dead, and the next consumer added would have re-acquired
+exactly the defect this ticket found. So the constant moved: `DEFAULT_IPC_SOCKET_TIMEOUT_MS` now
+lives in `src/ipc/socket-timeout.ts`, `host.ts` takes it as its default, the proof harness drops
+its literal override and inherits it, and `service-host.ts` reads the operator override through
+`resolveSocketTimeoutMs`.
+
+That resolver also closes a bug the walk shipped: `Number(process.env.X ?? 15 * 60_000)` turned an
+exported-but-empty variable into `0`, which is the shape a half-written environment file produces
+and would have closed every socket the instant it opened. Unset and empty are now both
+"unspecified". `tests/socket-timeout.test.ts` covers the default, the empty-string case, valid
+overrides and the rejection cases — the env-var path the previous session recorded as untested.
+
+**`check-environment.mts` was blind to all of this.** It derived its list by regexing
+`required('...')`, so an optional variable that is nonetheless a hard start failure never
+appeared. It now derives the optional names the same way — from `process.env.<NAME>` reads in the
+host source — and validates them with the host's own resolver. Running it immediately surfaced a
+second optional variable, `VOX_PIPE_BRIDGE_HELPER`, that no document had mentioned.
+
+**What remains:** one cold read of the current text by someone who has not seen it. Stopping
+before `record` makes it free. Status is `ready-for-agent` for that reason.

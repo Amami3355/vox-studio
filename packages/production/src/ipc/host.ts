@@ -11,6 +11,7 @@ import {
 } from './authentication';
 import { encodeFrame, readFrame } from './framing';
 import { sanitizeBoundaryText } from './sanitize';
+import { DEFAULT_IPC_SOCKET_TIMEOUT_MS } from './socket-timeout';
 
 export type ProductionIpcHost = {
   listen: () => Promise<void>;
@@ -55,7 +56,7 @@ export const createProductionIpcHost = ({
   service,
   now = () => Date.now(),
   maxClockSkewMs = 30_000,
-  socketTimeoutMs = 120_000,
+  socketTimeoutMs = DEFAULT_IPC_SOCKET_TIMEOUT_MS,
   audit,
 }: {
   pipePath: string;

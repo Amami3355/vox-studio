@@ -116,9 +116,10 @@ it:
 - Acceptance: *"A fresh session per ask is unchanged."*
 
 Ticket 30 proposes a session that spans a Run's turns, on a mechanism neither ticket 22 nor
-ADR-0017 considered: `LlmAgent.static_instruction`, present in the pinned `google-adk 2.7.1`,
-which carries the assembled surface as a literal system instruction while the per-turn material
-moves to turn content. The relevance is that ticket 22's rejection rests on the trade being
+ADR-0017 considered: `LlmAgent.static_instruction`, which carries the assembled surface as a
+literal system instruction while the per-turn material moves to turn content. It is present in
+`google-adk 2.7.1` — the exercised version, and the floor of the `>=2.7.1,<3` constraint ticket
+19 chose in preference to an exact pin. The relevance is that ticket 22's rejection rests on the trade being
 *prefix identity versus a reachable cache* — and under `static_instruction` that trade dissolves,
 because the static half cannot drift and the half that grows was never the thing being held
 identical. Worth noting that `repair_plan` at `planner.py:1074` already does
@@ -128,8 +129,8 @@ what the crew holds is a shared opening, not an identical instruction.
 **Nothing here says this ticket is wrong.** Its scoping was correct when written and its
 reasoning about *how a turn is driven* is untouched. The point is only that "a fresh session per
 ask is unchanged" is now a contested acceptance criterion rather than a settled one, and that
-whichever of 20 and 30 lands second inherits the combination. Both touch the same eight lines at
-`planner.py:1251-1290`.
+whichever of 20 and 30 lands second inherits the combination. Both touch the same method, `_ask`
+at `planner.py:1251-1291` — forty lines, not the eight an earlier draft of this note claimed.
 
 **Suggested order, and why:** this ticket first. An async path is a prerequisite for a session
 that outlives a call, not an alternative to it, and ticket 30 records the same preference in its

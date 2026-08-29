@@ -27,7 +27,7 @@ cache floor being newly discovered, because it was not.
 reason from one shared premise: that reaching a cache means reusing a session, that reusing a
 session means the prompt grows across turns, and that a growing prompt costs the identical prefix
 every measurement in this project depends on. The rest of this statement is about that premise —
-first that the crew already holds it less tightly than it believes, and then that the pinned
+first that the crew already holds it less tightly than it believes, and then that the exercised
 version publishes a field which takes it apart.
 
 **The reason the crew opens a session per ask is to keep the prefix identical.** And here the
@@ -44,7 +44,7 @@ rest on — but it is not that the instruction is identical, and `repair_plan`'s
 as much when it explains that the refusal goes after the prefix *"rather than in front of it, and
 that ordering is what makes the prefix a prefix."*
 
-**There is a field in the pinned version built for exactly this separation, and the crew does not
+**There is a field in the exercised version built for exactly this separation, and the crew does not
 use it.** `LlmAgent.static_instruction`, present in 2.7.1:
 
 > Static instruction content sent literally as system instruction at the beginning. This field is
@@ -66,7 +66,7 @@ Put the assembled surface in `static_instruction`, move the refusal out of the i
 and into the turn, and let one session span a Run's turns. Then measure whether a cache is served,
 and write down the answer either way.
 
-The pieces are all present in the pinned dependency: `static_instruction` on `LlmAgent`,
+The pieces are all present in the exercised dependency: `static_instruction` on `LlmAgent`,
 `ContextCacheConfig` on `App` with `cache_intervals`, `ttl_seconds` and `min_tokens`, and a
 `CacheMetadata` the framework populates on a response. The last of those is what makes this
 reportable rather than assumed.
@@ -101,7 +101,7 @@ reportable rather than assumed.
   Ticket 20 rewrites the same `_ask` — `asyncio.run` around the session service, then the runner's
   synchronous generator — because neither works from inside a running event loop. This ticket
   changes what a session *is* for a Run. Whichever lands second inherits the combination, and both
-  touch `planner.py:1251-1290`. Landing 20 first is the cheaper order: an async path is a
+  touch `_ask` at `planner.py:1251-1291`. Landing 20 first is the cheaper order: an async path is a
   prerequisite for a session that outlives a call, not an alternative to it.
 - **If a cache is not served, the ticket still lands its half.** The `static_instruction`
   separation is worth having on its own: it makes the invariant literal, moves the refusal to where
@@ -204,8 +204,8 @@ and it should be the first commit rather than the last.
 
 **The conflict with ticket 20.** That ticket commits to the opposite in three places — an
 Implementation Decision, an Out of Scope entry, and an acceptance criterion reading *"A fresh
-session per ask is unchanged."* Both touch `planner.py:1251-1290`. The `Blocked by` line already
-prefers 20 first, and that preference should be kept: an async path is a prerequisite for a session
+session per ask is unchanged."* Both touch `_ask` at `planner.py:1251-1291`. The `Blocked by` line
+already prefers 20 first, and that preference should be kept: an async path is a prerequisite for a session
 that outlives a call. If 20 lands first, this ticket amends those three lines rather than leaving
 them standing. A matching comment has been added to ticket 20.
 

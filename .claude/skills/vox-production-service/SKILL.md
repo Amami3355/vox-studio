@@ -5,13 +5,18 @@ description: Stand the Vox production service up by hand, run a Run against a br
 
 # Running the Vox production service by hand
 
-The service is nine environment variables, a named pipe addressed by two different variable
+The service is nine required environment variables — one of which is your ElevenLabs key, not
+something this procedure can generate — plus a named pipe addressed by two different variable
 names, a calibration store that fails quietly when unseeded, and three secrets that decide
 whether a Run can ever be reopened. Every fact below is checked against source by the scripts;
 where a number or a name appears, [REFERENCE.md](REFERENCE.md) says which file it lives in.
 
 Every step in this file has been run end to end, including a paid `record` and a 277-second
 `render`. Where a step failed the first time, the reason is written into the step.
+
+**The walk that produced this file was done on a machine that already had `ELEVENLABS_API_KEY`
+in its environment, so step 1 never had to supply it and the omission went unnoticed.** If your
+shell does not already carry that key, step 3 is what will tell you.
 
 Paths are from the workspace root. `tsx` is **not on PATH** — invoke it at
 `.\packages\production\node_modules\.bin\tsx.CMD`.
@@ -64,7 +69,20 @@ $lines = @(
 )
 Set-Content -Path "$trusted\service-env.ps1" -Value $lines -Encoding utf8
 . "$trusted\service-env.ps1"
+
+if (-not $env:ELEVENLABS_API_KEY) {
+  throw "ELEVENLABS_API_KEY is not set. It is the ninth required variable and the service will not start without it."
+}
 ```
+
+**`ELEVENLABS_API_KEY` is required and is deliberately not in that file.** It is a long-lived
+credential you already hold, not a per-service secret this procedure can generate, and writing it
+beside the ledger would spread it further for no gain. It is often already set at User scope, in
+which case it inherits into every shell and you will never notice it — the guard above is there
+because that is exactly how it came to be missing from this step in the first place. If the guard
+fires, set it for your user (`setx ELEVENLABS_API_KEY "…"`, then open a new shell) or export it in
+the service shell only. Note that `[Environment]::GetEnvironmentVariable('ELEVENLABS_API_KEY',
+'Machine')` returns nothing for a User-scope key, so that is not the way to check.
 
 `RNGCryptoServiceProvider` rather than `RandomNumberGenerator::GetBytes(int)`, which does not
 exist on the Windows PowerShell 5.1 / .NET Framework here. 32 bytes base64 to 44 characters,
@@ -154,9 +172,11 @@ Prints `Vox Production service ready.` on stderr and holds the shell. If the pip
 missing (`dist\` is gitignored, so a clean checkout has none), build it first with
 `pnpm --filter @vox/production build:agent-distribution`.
 
-The host keeps an authenticated request open for 15 minutes, because a render takes minutes and
-the generic IPC idle timeout is two. Override with `VOX_IPC_SOCKET_TIMEOUT_MS` if a render is
-slower than that; a value that is too low cuts the render off and reports it as an outage.
+The host keeps an authenticated request open for 15 minutes, because a render takes minutes; the
+measured eight-scene render was 277 s. That is now the default for every caller, not something
+this service sets for itself. Override with `VOX_IPC_SOCKET_TIMEOUT_MS` if a render is slower
+than that; a value that is too low cuts the render off and reports it as an outage, and a value
+that is not a positive number of milliseconds refuses the start rather than silently reverting.
 
 ## The launcher's failure messages, and what they actually mean
 
@@ -171,9 +191,9 @@ All were probed against a live, healthy service.
 The last row is the trap: four unrelated causes, and a typo'd name reads exactly like an outage.
 Take them in this order:
 
-1. **How long did it take to fail?** A failure at almost exactly the socket timeout — 120 s on an
-   unconfigured host, 15 min by default here — is a timeout, not an outage. The service is fine
-   and is very likely still rendering. Raise `VOX_IPC_SOCKET_TIMEOUT_MS` and re-issue.
+1. **How long did it take to fail?** A failure at almost exactly the socket timeout — 15 min by
+   default, or whatever you set `VOX_IPC_SOCKET_TIMEOUT_MS` to — is a timeout, not an outage. The
+   service is fine and is very likely still rendering. Raise the variable and re-issue.
 2. **List the pipes.** If the name you are using is not there, it is the name — or a real outage.
 3. **If the pipe is there, suspect the token.** The service closes the connection on a bad MAC
    rather than answering, so a wrong token surfaces as this same message.

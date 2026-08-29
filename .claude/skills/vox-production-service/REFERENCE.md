@@ -8,31 +8,40 @@ whole file was walked once end to end, including a paid `record` and a successfu
 
 ## The nine variables
 
-All nine are `required(...)` calls in `packages/production/src/ipc/service-host.ts:24-34`, which
+All nine are `required(...)` calls in `packages/production/src/ipc/service-host.ts:25-35`, which
 throws `Missing trusted service configuration: <NAME>` for any that is unset
-(`service-host.ts:12-16`).
+(`service-host.ts:13-17`).
 
 | Variable | Read at | Notes |
 |---|---|---|
-| `VOX_PIPE_PATH` | `service-host.ts:24` | Host side only. Must start with `\\.\pipe\` |
-| `VOX_IPC_TOKEN` | `service-host.ts:27` | Also read by the launcher; ≥ 32 UTF-8 bytes |
-| `VOX_GRANT_KEY` | `service-host.ts:28` | HMAC key for replacement grants (`:39-46`) |
-| `ELEVENLABS_API_KEY` | `service-host.ts:29` | Passed to `createElevenLabsAdapter` |
-| `VOX_LEDGER_ROOT` | `service-host.ts:30` | `resolve()`d — **against the service's cwd** |
-| `VOX_RUN_HMAC_KEY` | `service-host.ts:31` | Run checkpoint signing |
-| `VOX_RUN_KEY_ID` | `service-host.ts:32` | Key id recorded alongside the signature |
-| `VOX_CALIBRATION_PATH` | `service-host.ts:33` | `resolve()`d; backs `DurationCalibrationStore` |
-| `VOX_REMOTION_ENTRY` | `service-host.ts:34` | `resolve()`d; `packages/video/src/remotion-entry.ts` |
+| `VOX_PIPE_PATH` | `service-host.ts:25` | Host side only. Must start with `\\.\pipe\` |
+| `VOX_IPC_TOKEN` | `service-host.ts:28` | Also read by the launcher; ≥ 32 UTF-8 bytes |
+| `VOX_GRANT_KEY` | `service-host.ts:29` | HMAC key for replacement grants (`:39-52`) |
+| `ELEVENLABS_API_KEY` | `service-host.ts:30` | Passed to `createElevenLabsAdapter` |
+| `VOX_LEDGER_ROOT` | `service-host.ts:31` | `resolve()`d — **against the service's cwd** |
+| `VOX_RUN_HMAC_KEY` | `service-host.ts:32` | Run checkpoint signing |
+| `VOX_RUN_KEY_ID` | `service-host.ts:33` | Key id recorded alongside the signature |
+| `VOX_CALIBRATION_PATH` | `service-host.ts:34` | `resolve()`d; backs `DurationCalibrationStore` |
+| `VOX_REMOTION_ENTRY` | `service-host.ts:35` | `resolve()`d; `packages/video/src/remotion-entry.ts` |
 
 `check-environment.mts` re-reads this list out of the host source at run time rather than
 hardcoding it, so a tenth variable is caught without editing this file.
 
+The `file:line` citations throughout this document are hand-written and the line halves do drift.
+`packages/production/tests/skill-citations.test.ts` holds the file halves to the tree — a cited
+file that moves or disappears fails the suite, as does a line past the end of one. It found a
+wrong path the first time it ran.
+
 Optional, not required to start:
 
-- `VOX_PIPE_BRIDGE_HELPER` (`service-host.ts:85`) overrides the bridge executable, which otherwise
+- `VOX_PIPE_BRIDGE_HELPER` (`service-host.ts:76`) overrides the bridge executable, which otherwise
   defaults to `dist/service/vox-pipe-bridge.exe`.
-- `VOX_IPC_SOCKET_TIMEOUT_MS` (`service-host.ts:43-46`) overrides the per-request socket timeout.
+- `VOX_IPC_SOCKET_TIMEOUT_MS` (`service-host.ts:37`) overrides the per-request socket timeout.
   See *The socket timeout* below.
+
+`check-environment.mts` validates these too, and derives their names the same way — by reading
+the `process.env.<NAME>` reads out of the host source. A malformed optional value is a start-up
+failure, not a default, so it belongs in a pre-start check.
 
 ### The three `resolve()` calls are relative to `packages\production`
 
@@ -53,15 +62,24 @@ three as absolute paths. The same trap applies to `--request` in `bootstrap:work
 
 ## The socket timeout
 
-- The generic host default is `socketTimeoutMs = 120_000` (`src/ipc/host.ts:58`), applied as
-  `socket.setTimeout(socketTimeoutMs, () => socket.destroy())` (`host.ts:91`).
-- The proof harness overrides it to `15 * 60_000` (`src/proof/harness.ts:633`), with the comment:
-  *"A two-minute, eight-scene Remotion render exceeds the generic 120 s IPC idle timeout."*
-- `service-host.ts` did not pass the option at all until this walk, so the hand-started service
-  inherited 120 s and **could not complete a render**. It now defaults to the harness's 15 minutes
-  and accepts `VOX_IPC_SOCKET_TIMEOUT_MS` (`service-host.ts:43-46, 80`).
+- One default serves every caller: `DEFAULT_IPC_SOCKET_TIMEOUT_MS = 15 * 60_000`
+  (`src/ipc/socket-timeout.ts:10`), taken by `createProductionIpcHost` (`src/ipc/host.ts:59`) and
+  applied as `socket.setTimeout(socketTimeoutMs, () => socket.destroy())` (`host.ts:92`).
+- `service-host.ts` reads the operator override through `resolveSocketTimeoutMs`
+  (`service-host.ts:37`), which treats unset **and empty** as unspecified and rejects anything
+  that is not a positive number of milliseconds (`socket-timeout.ts:17-24`).
+- The proof harness no longer overrides anything (`src/proof/harness.ts:627`); it inherits the
+  same default it used to carry as a literal.
 
-**Walked.** With the 120 s default, `run render` failed after **120.2 s** with
+**How it got here.** The generic default was `120_000` and `service-host.ts` passed no option at
+all, so a hand-started service inherited two minutes while the harness had always overridden to
+fifteen. Only the harness's literal encoded the real requirement, in the one consumer this skill
+is told not to treat as authoritative. Raising the shared default retires that split: no caller
+inherits a timeout shorter than the slowest command, and the next consumer added cannot
+re-acquire the defect by forgetting an option. `tests/socket-timeout.test.ts` holds the default
+above the measured render time and covers the override's rejection cases.
+
+**Walked.** With the old 120 s default, `run render` failed after **120.2 s** with
 `vox: Production service is unavailable.` while `run status` against the same service succeeded —
 the service was healthy and still rendering. With the 15-minute allowance the same command
 succeeded in **277.1 s**. A destroyed socket is indistinguishable, at the launcher, from a service
@@ -121,7 +139,7 @@ Run checkpoints are signed and the signature is verified on load.
 | Correct ledger, correct `VOX_RUN_KEY_ID`, fresh `VOX_RUN_HMAC_KEY` | `RUN_ATTESTATION_INVALID` |
 | All three matching (a Run this session recorded) | `succeeded`, stage returned |
 
-All three are read **service-side** (`service-host.ts:30-32`), so reopening a Run recorded under a
+All three are read **service-side** (`service-host.ts:31-33`), so reopening a Run recorded under a
 different environment requires restarting the service against that Run's trusted directory. A
 launcher shell with the right variables is not enough.
 
@@ -139,7 +157,7 @@ ephemeral. The secret is not derivable from anything in the repository.
   `JBFqnCBsd6RMkjVDRZzb`, model `eleven_v3`, seed `7`, language `en`.
 - Unseeded, the store loads `{ status: 'missing' }` (`calibration.ts:79` treats it as
   `CALIBRATION_MISSING`), and the service falls back to `activeInitialCalibration()` only when no
-  store is configured at all — `commands/service.ts:1311`.
+  store is configured at all — `src/commands/service.ts:1311`.
 - A request whose key differs is scored `different_key` and the calibration does not apply:
   `sameKey` / `auditVerifiedTake`, `calibration.ts:71-82`.
 - The request's voice block is `production.voice` in `productionRequestSchema`,
@@ -221,8 +239,8 @@ chain still ran `…04-run-record`, `…05-run-compile`, `…06-run-render`, and
 
 - `pnpm --filter @vox/production service` → `tsx src/ipc/service-host.ts`,
   `packages/production/package.json:14`.
-- Readiness line, on **stderr**: `Vox Production service ready.` — `service-host.ts:90`.
-- `SIGINT`/`SIGTERM` close the bridge and host — `service-host.ts:92-98`.
+- Readiness line, on **stderr**: `Vox Production service ready.` — `service-host.ts:81`.
+- `SIGINT`/`SIGTERM` close the bridge and host — `service-host.ts:83-89`.
 - `dist/` is gitignored (`.gitignore:2`), so `dist/service/vox-pipe-bridge.exe` is absent from a
   clean checkout until `build:agent-distribution` runs; it is compiled at
   `scripts/build-agent-distribution.ts:56`.

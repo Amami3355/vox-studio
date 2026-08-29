@@ -628,9 +628,6 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
       pipePath: `\\\\.\\pipe\\${trustedPipeName}`,
       secret: ipcSecret,
       service,
-      // A two-minute, eight-scene Remotion render exceeds the generic 120 s IPC idle timeout.
-      // Keep the authenticated request open long enough for the renderer to return its receipt.
-      socketTimeoutMs: 15 * 60_000,
       audit: {
         before: async (request) => {
           activeCommand = request.argv.slice(0, 3).join(' ');

@@ -8,7 +8,7 @@
  * The calibration and its key are imported from the source of truth, never restated here.
  */
 
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DurationCalibrationStore,
@@ -39,12 +39,14 @@ if (existing.status === 'active' && !process.argv.includes('--force')) {
 const seeded = activeInitialCalibration();
 if (seeded.status !== 'active') throw new Error('activeInitialCalibration is no longer active.');
 const { provider, voiceId, modelId, seed } = seeded.calibration.key;
+const sourcePath = relative(
+  repositoryRoot,
+  resolve(repositoryRoot, 'packages/production/src/preflight/preflight.ts'),
+);
 process.stdout.write(
   `\nThe request's production.voice block must match this key exactly:\n\n${JSON.stringify(
     { provider, voiceId, modelId, seed },
     null,
     2,
-  )}\n\nSource: ${resolve(repositoryRoot, 'packages/production/src/preflight/preflight.ts').slice(
-    repositoryRoot.length + 1,
-  )} (INITIAL_DURATION_CALIBRATION)\n`,
+  )}\n\nSource: ${sourcePath} (INITIAL_DURATION_CALIBRATION)\n`,
 );
