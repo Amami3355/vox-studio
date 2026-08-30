@@ -1,6 +1,11 @@
 # 24: The author is offered the catalog, not only shown it
 
-Status: ready-for-agent
+Status: frozen for the cloud phase — see `.scratch/cloud-phase/DELIVERY.md`
+
+> **Frozen 2026-08-30, not cancelled.** This ticket's deliverable is a measurement feeding
+> ADR-0017's argument, and nothing on the path to a hosted deployment depends on it. It was the top
+> build item before the freeze and is the first thing to unfreeze after ticket 09 lands. Its
+> `## Amendment` below is current and was rewritten the day the freeze was decided.
 
 ## Problem Statement
 

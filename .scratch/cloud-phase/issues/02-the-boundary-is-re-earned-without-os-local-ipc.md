@@ -1,0 +1,105 @@
+# 02: The boundary is re-earned without OS-local IPC
+
+Status: ready-for-agent
+
+## Problem Statement
+
+ADR-0007 contains one sentence that forbids this entire spec:
+
+> A native, thin `vox` launcher communicates with it through authenticated OS-local
+> IPC, **never TCP or HTTP**.
+
+That is not a stylistic preference and it must not be edited away as one. It is the load-bearing
+clause of the code-blindness argument, and three of the four isolation properties the proof sheet
+scores hang off it: the pipe ACL answers *who may connect*, the restricted Windows account answers
+*what the caller may read*, and the absence of a socket answers *who may reach the service at all*.
+In a cloud topology none of those three exist. There is no pipe, no Windows principal, and the
+service is reachable by anything the network permits.
+
+The spec's prerequisite 1 says nothing in the cloud phase may be built before this is settled, and
+that ordering is correct rather than ceremonial. Every other ticket in this phase is downstream of
+the answer: ticket 06 cannot choose an authentication mechanism before the guarantee it must deliver
+is stated, ticket 07 cannot argue its container's ingress posture, and ticket 09's proof sheet has
+nothing to score itself against.
+
+**The tempting move is to amend the sentence and leave the rest of ADR-0007 standing.** That is
+wrong, and cheaply so: the sentence is a consequence of the threat model rather than an axiom of it,
+and the surrounding paragraphs — what the service alone owns, what the agent receives, what `record`
+alone may do — remain true in both topologies. An amendment that changes one clause leaves a reader
+unable to tell which of the isolation *evidence* still applies. The honest shape is a new ADR that
+supersedes ADR-0007's transport clause specifically, states what replaces each of the three lost
+properties, and says which recorded probes stop being meaningful.
+
+## Solution
+
+Write the ADR. It answers four questions and nothing else.
+
+**What the guarantee actually is, stated independently of its mechanism.** ADR-0007's guarantee is
+that the agent cannot read production's implementation, cannot reach its credentials, and cannot
+issue a command production did not publish. The named pipe was one way to deliver that. The ADR
+restates the guarantee in terms that survive a transport change, so that a future topology can be
+judged against it rather than against a socket type.
+
+**What replaces the pipe ACL.** No public ingress, and a caller bearing an authorised workload
+identity — the platform answers *who is calling* where the ACL used to. The per-request HMAC stays,
+unchanged, because it authenticates the request body rather than the channel and the Run ledger's
+integrity story already rests on it. Two independent answers to two different questions, which is
+the property the local topology has and which is easy to lose by assuming TLS covers both.
+
+**What replaces the restricted OS account.** The container is the isolation unit. The agent has no
+filesystem in common with the service, which is a *stronger* separation than the local topology
+achieves and should be claimed as such rather than apologised for — locally the crew and the service
+share a disk and the boundary is an ACL over it.
+
+**Which recorded evidence stops meaning anything.** The isolated-OS-principal probes and the
+pipe-path assertions score a mechanism that will not be present. The ADR names them, says what is
+offered instead, and does not pretend the substitute is the same measurement. The distribution leak
+scan is unaffected and continues to apply to both topologies.
+
+## Implementation Decisions
+
+- **A new ADR supersedes the transport clause; ADR-0007 is not rewritten.** Its status line gains a
+  superseded-in-part note pointing at the new number, and its body stays legible as the record of
+  why the local design is what it is. Rewriting an accepted ADR destroys the reasoning a later
+  reader needs in order to evaluate the replacement.
+- **The scope is the transport clause and the isolation evidence, nothing else.** Not the contract
+  categories, not `record`'s network exception, not the code-blindness threat model. A wide ADR here
+  invites a wide argument and this phase cannot afford one.
+- **No local HTTP listener is authorised by this ADR.** ADR-0015 decision 3 rejected it and the
+  cloud spec's decision 3 declines to reopen it. The named pipe stays the local transport; the ADR
+  permits an authenticated network transport for the *remote* topology and says so in those words,
+  so that a future session cannot cite it to add a convenience listener on a developer's laptop.
+- **The ADR states the evidence a cloud deployment must produce**, in enough detail that ticket 09's
+  proof sheet can be written from it. An ADR that permits the topology without saying what would
+  demonstrate the guarantee has moved the decision rather than made it.
+
+## Testing Decisions
+
+An ADR is not tested; it is cited. What this ticket owes instead:
+
+**Every ADR that references ADR-0007's transport clause is found and updated.** `grep` for `0007`
+across `docs/`, `packages/`, `services/` and `.scratch/`, and each hit is either still correct or
+amended. The proof sheet and the release gate are the two most likely to be stale.
+
+**The superseded-in-part note is present on ADR-0007 itself**, so that a reader who arrives at the
+old ADR first is not misled by it.
+
+## Out of Scope
+
+- **Choosing the authentication implementation.** Ticket 06. This ADR says what property must hold;
+  that ticket picks the mechanism and proves it.
+- **Provisioning anything.** Ticket 03.
+- **Re-running or re-scoring the existing local proof.** The local topology is unchanged and its
+  evidence stands for it.
+- **The crew's own hosting posture.** Cloud-phase ticket 01 and crew ticket 20.
+
+**Blocked by:** None — and nothing else in this phase may start before it lands.
+
+- [ ] A new ADR states ADR-0007's isolation guarantee independently of the transport that delivered it
+- [ ] It names what replaces the pipe ACL, the restricted OS account, and the absence of a socket
+- [ ] It states that the per-request HMAC survives unchanged, and why channel and body authentication are two answers
+- [ ] It names which recorded isolation probes stop being meaningful, without claiming the substitute is the same measurement
+- [ ] It states the evidence a cloud deployment must produce, in terms ticket 09 can write a proof sheet from
+- [ ] It permits an authenticated network transport for the remote topology only, and does not authorise a local HTTP listener
+- [ ] ADR-0007 carries a superseded-in-part note pointing at it, and its body is otherwise unchanged
+- [ ] Every reference to ADR-0007's transport clause across the repository is found and is either still correct or amended
