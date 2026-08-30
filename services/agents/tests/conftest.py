@@ -15,9 +15,36 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
+from vox_crew.context import ContextBudget
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAKE_LAUNCHER = Path(__file__).parent / "fake_launcher.py"
+
+UNLIMITED = 10**9
+"""A budget line placed out of reach, so a test can name only the line it is about."""
+
+
+def a_budget(
+    *,
+    resident_chars: int = UNLIMITED,
+    fresh_chars: int = UNLIMITED,
+    model_calls: int = UNLIMITED,
+    returned_chars: int = UNLIMITED,
+) -> ContextBudget:
+    """A context budget with every line unreachable but the ones a test names.
+
+    Four lines is where restating the whole constructor at each site stops being readable: a
+    test about the returned line had three numbers in it that existed only to say "not this
+    one", and the line it was actually about was the hardest of the four to find. Here rather
+    than in one test module because three of them construct these, and a fifth line would
+    otherwise be a fourth place to remember.
+    """
+    return ContextBudget(
+        resident_chars=resident_chars,
+        fresh_chars=fresh_chars,
+        model_calls=model_calls,
+        returned_chars=returned_chars,
+    )
 
 
 class NetworkEgressAttempted(RuntimeError):

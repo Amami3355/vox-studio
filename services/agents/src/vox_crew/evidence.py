@@ -441,6 +441,13 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
     calls, each re-sending the prefix. Both are published because `distinctChars` is otherwise
     unreadable — a reader seeing one ask against three prefixes would have no way to tell a
     tool-using turn from an accounting fault, and would be right to suspect the second.
+
+    `returnedChars` has a line in `budget` beside it and `overrun` names it where a Run stopped
+    on it, which is the whole of what changed for a reader: the field was published and
+    enforced by nothing, so a Run could hand back any quantity at all and the bundle would
+    report it without a figure to read it against. Every line the budget holds is published
+    here, so a reader meeting a number has the allowance it was measured against on the same
+    screen rather than in `context.py`.
     """
     spend = run.spend
     return {
@@ -460,6 +467,7 @@ def _context(run: ConvergedRun) -> dict[str, Any]:
             "residentChars": run.context_budget.resident_chars,
             "freshChars": run.context_budget.fresh_chars,
             "modelCalls": run.context_budget.model_calls,
+            "returnedChars": run.context_budget.returned_chars,
         },
         "overrun": spend.overrun(run.context_budget),
     }

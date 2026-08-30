@@ -22,17 +22,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from conftest import recorded, recorded_bytes
-from test_planner import CATEGORIES, SURFACE
+from conftest import a_budget, recorded, recorded_bytes
+from test_planner import CATALOG, CATEGORIES, SURFACE
 from vox_crew.client import Artifact
 from vox_crew.context import (
     CHARS_PER_TOKEN,
     FRESH_CHARS,
     FRESH_CHARS_PER_ASK,
+    LARGEST_PUBLISHED_SPEC_CHARS,
     MODEL_CALLS,
     MODEL_CALLS_PER_ASK,
     RESIDENT_CHARS,
     RESIDENT_CHARS_ALLOWED,
+    RETURNED_CHARS,
+    RETURNED_CHARS_PER_ASK,
     Ask,
     ContextBudget,
     ContextSpend,
@@ -166,11 +169,12 @@ def test_the_budget_scales_its_turn_allowance_with_the_asks_the_repair_budget_al
         resident_chars=RESIDENT_CHARS_ALLOWED,
         fresh_chars=FRESH_CHARS_PER_ASK * 6,
         model_calls=MODEL_CALLS_PER_ASK * 6,
+        returned_chars=RETURNED_CHARS_PER_ASK * 6,
     )
 
 
 def test_an_overrun_names_the_line_it_passed_rather_than_answering_yes_or_no() -> None:
-    budget = ContextBudget(resident_chars=100, fresh_chars=50, model_calls=4)
+    budget = a_budget(resident_chars=100, fresh_chars=50, model_calls=4)
 
     assert ContextSpend((Ask(resident=100, fresh=50),)).overrun(budget) is None
     assert ContextSpend((Ask(resident=101, fresh=0),)).overrun(budget) == RESIDENT_CHARS
@@ -184,7 +188,7 @@ def test_an_author_looping_against_its_tool_passes_the_rate_line() -> None:
     calls a tool inside one of them is the model's decision, and before this line existed it
     was the one term in a Run's spend that nothing bounded.
     """
-    budget = ContextBudget(resident_chars=10**9, fresh_chars=10**9, model_calls=4)
+    budget = a_budget(model_calls=4)
 
     assert ContextSpend((Ask(resident=1, fresh=1, model_calls=4),)).overrun(budget) is None
     assert (
@@ -192,22 +196,70 @@ def test_an_author_looping_against_its_tool_passes_the_rate_line() -> None:
     )
 
 
-def test_the_rate_line_is_read_before_the_character_line_it_would_also_blow() -> None:
-    """A Run that looped against a tool spent its budget on calls, not on plan versions.
+def test_an_author_pulling_back_more_than_its_tools_may_hand_it_passes_the_returned_line() -> (
+    None
+):
+    """The other half of the same unchosen term: how much a tool hands back, not how often.
 
-    Where the characters went is a symptom; the finding is the loop, so the loop is what the
-    overrun names.
+    The rate line bounds the number of answers and nothing bounded their size. A search that
+    matched everything and a specification the catalog publishes at ten thousand characters
+    both arrive in one call, so a Run could stay inside the rate line and still pull back more
+    than the catalog it was already holding.
     """
-    budget = ContextBudget(resident_chars=10**9, fresh_chars=10, model_calls=2)
+    budget = a_budget(returned_chars=100)
 
-    assert ContextSpend((Ask(resident=1, fresh=100, model_calls=9),)).overrun(budget) == (
-        MODEL_CALLS
+    assert ContextSpend((Ask(resident=1, fresh=1, returned=100),)).overrun(budget) is None
+    assert (
+        ContextSpend((Ask(resident=1, fresh=1, returned=101),)).overrun(budget)
+        == RETURNED_CHARS
     )
+
+
+def test_the_returned_line_is_read_against_the_run_total_rather_than_one_ask() -> None:
+    """Per ask, checked against the whole Run — the shape `FRESH_CHARS_PER_ASK` already has.
+
+    A turn that needed three specifications where the previous turn needed none is paid for
+    out of the turn that fetched nothing, rather than ending a Run mid-repair.
+    """
+    budget = a_budget(returned_chars=100)
+
+    within = ContextSpend((Ask(resident=1, fresh=1, returned=90), Ask(resident=1, fresh=1)))
+    past = ContextSpend(
+        (Ask(resident=1, fresh=1, returned=90), Ask(resident=1, fresh=1, returned=11))
+    )
+
+    assert within.overrun(budget) is None
+    assert past.overrun(budget) == RETURNED_CHARS
+
+
+def test_the_lines_are_read_resident_then_rate_then_returned_then_turn() -> None:
+    """The whole order, over one spend that passes every one of them.
+
+    Each line is dropped in turn from a spend that fails all four, so the answer walks down the
+    order rather than being asserted a pair at a time. What the order encodes: a prefix that
+    does not fit is true before a Run exists, a Run that looped against a tool spent its budget
+    on calls rather than plan versions, and the characters either of those moved are a symptom
+    of the finding rather than the finding.
+    """
+    budget = a_budget(resident_chars=100, fresh_chars=10, model_calls=2, returned_chars=10)
+
+    assert ContextSpend(
+        (Ask(resident=1000, fresh=100, model_calls=9, returned=100),)
+    ).overrun(budget) == RESIDENT_CHARS
+    assert ContextSpend(
+        (Ask(resident=1, fresh=100, model_calls=9, returned=100),)
+    ).overrun(budget) == MODEL_CALLS
+    assert ContextSpend(
+        (Ask(resident=1, fresh=100, model_calls=1, returned=100),)
+    ).overrun(budget) == RETURNED_CHARS
+    assert ContextSpend(
+        (Ask(resident=1, fresh=100, model_calls=1, returned=1),)
+    ).overrun(budget) == FRESH_CHARS
 
 
 def test_the_resident_line_is_read_before_the_turn_line() -> None:
     """A prefix that does not fit is the finding; what a turn added on top of it is noise."""
-    budget = ContextBudget(resident_chars=100, fresh_chars=50, model_calls=4)
+    budget = a_budget(resident_chars=100, fresh_chars=50, model_calls=4)
 
     assert ContextSpend((Ask(resident=200, fresh=200),)).overrun(budget) == RESIDENT_CHARS
 
@@ -243,6 +295,65 @@ def test_the_resident_teaching_surface_fits_the_allowance_it_was_measured_agains
     )
     assert set(SURFACE.categories) == set(CATEGORIES)
     assert "catalog" in taught_categories(SURFACE)
+
+
+def test_the_largest_specification_the_catalog_publishes_fits_the_answer_ceiling() -> None:
+    """The measured input the returned line is derived from, held to the line it was set at.
+
+    `RETURNED_CHARS_PER_ASK` is three answers at the size the catalog publishes its largest
+    specification at. That size is a fact about another team's contract, so it is measured here
+    rather than remembered: a capability whose specification outgrows the ceiling moves the
+    derivation, and the constant has to move with it or stop being derived from anything.
+
+    Sized through `message_text` rather than a `json.dumps` of this test's own, for the reason
+    `message_chars` is: a second serialisation would drift from the one a tool would answer
+    through, and this guard would go on passing against text nobody hands back.
+    """
+    published = [len(message_text(capability)) for capability in CATALOG["capabilities"]]
+
+    assert max(published) <= LARGEST_PUBLISHED_SPEC_CHARS, (
+        f"the catalog's largest specification is now {max(published)} characters, past the "
+        f"{LARGEST_PUBLISHED_SPEC_CHARS} the returned line was derived from"
+    )
+
+
+def test_one_turn_may_fetch_the_whole_catalog_and_a_run_that_keeps_doing_it_may_not() -> None:
+    """What the returned line actually refuses, priced against a budget a Run is issued.
+
+    The line is per ask and read against the Run's total — the shape the fresh line already has
+    and the shape this ticket asked for. That shape has a consequence worth asserting rather
+    than discovering: a single turn *may* pull back more than one ask's allowance, paid for out
+    of the turns that fetched nothing. So an author that fetches all eight specifications once
+    is inside its budget, and what the line refuses is an author that keeps doing it.
+
+    Against `repair_budget`'s own smallest Run rather than against the bare constant. A guard
+    that priced the catalog against `RETURNED_CHARS_PER_ASK` alone would report a refusal that
+    no Run ever issues — the smallest returned budget any Brief is given is five asks' worth,
+    which is three times the catalog. That reading made it into a first draft of this ticket and
+    is the reason this test names a budget.
+
+    It is also the evidence that the returned line is not a restatement of the rate line: every
+    spend here stays well inside the calls it was budgeted, and the Run is still refused.
+    """
+    catalog = sum(len(message_text(item)) for item in CATALOG["capabilities"])
+    asks = repair_budget(target_seconds({"text": A_SHOWCASE_LENGTH_BRIEF})).plan_versions
+    budget = context_budget(asks)
+
+    def fetching(turns: int) -> ContextSpend:
+        """A Run whose every turn pulled the whole catalog back over two model calls."""
+        return ContextSpend(
+            tuple(Ask(resident=1, fresh=1, model_calls=2, returned=catalog) for _ in range(turns))
+        )
+
+    affordable = budget.returned_chars // catalog
+
+    assert fetching(1).overrun(budget) is None
+    assert fetching(affordable).overrun(budget) is None
+    assert fetching(affordable + 1).overrun(budget) == RETURNED_CHARS
+    # Inside its calls and refused anyway, which is the term the rate line does not bound.
+    assert fetching(affordable + 1).model_calls <= budget.model_calls
+    # And the reach is not the whole Run: a Brief cannot fetch the catalog on every turn.
+    assert affordable < asks
 
 
 def test_a_showcase_run_at_its_worst_stays_inside_the_budget() -> None:

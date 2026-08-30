@@ -1000,6 +1000,19 @@ def _offered(prefix: CachedPrefix, author: PlanAuthor) -> DraftReview:
     the tool leaves the meter reading zero, which is the same answer an author that could and
     did not leaves — so no caller has to ask which kind it is holding, and the four places that
     asked have one shape between them.
+
+    **The meter keeps that single shape, and does not distinguish "asked nothing" from "could
+    not ask".** Crew ticket 24 wants the bundle to tell those apart and this was the obvious
+    place to put it; it is the wrong place. A meter answers what a turn spent, and both of those
+    turns spent nothing — the difference between them is a fact about the *author*, which the
+    author already states as `reviews_drafts` and which `cache_prefix` already reads to decide
+    what the prompt says. Teaching the meter a second question would put that fact in two places
+    and make one of them derived, and the derived one is where they would disagree.
+
+    So the bundle carries it from the author's own answer rather than from the meter, and ticket
+    24's criterion is amended to say so. Settled here, in the module the meter lives in, because
+    the alternative was two tickets landing with opposite assumptions and a reader discovering it
+    in a bundle.
     """
     return DraftReview(prefix.surface, offered=author.reviews_drafts)
 

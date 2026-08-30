@@ -221,11 +221,38 @@ large for the context budget is refused before `run.init`, because it is true of
 no Run can be spent discovering it.
 
 **`context.py` is what a Run puts in front of a model, and the budget it works within.** An
-`Ask` is two numbers — the resident instructions prefix and what that turn added on top of it —
-and a `ContextSpend` is derived from the versions a Run authored, the way `quota_readings` is
-derived from its envelopes rather than counted beside them. `authoring_ask` and `repair_ask`
-price a turn *before* it is asked for, which is what lets a budget refuse one instead of
-reporting it afterwards.
+`Ask` is four numbers — the resident instructions prefix, what that turn added on top of it, how
+many model calls it took, and what its tools handed back — and a `ContextSpend` is derived from
+the versions a Run authored, the way `quota_readings` is derived from its envelopes rather than
+counted beside them. `authoring_ask` and `repair_ask` price a turn *before* it is asked for,
+which is what lets a budget refuse one instead of reporting it afterwards.
+
+*Four lines, read in one order.* `overrun` reads the resident line, then the rate line, then the
+returned line, then the turn line, and the order is the argument. A prefix that does not fit is
+true of every turn before any Run exists, so it is read first and refused before `run.init`
+rather than ended as a Run. A Run that spent its budget looping against a tool *is* the finding,
+and the characters that loop moved are a symptom of it — so the rate line is read ahead of the
+character lines it would also blow. The returned line sits with the rate line because it is the
+other half of the same term the crew does not choose: the rate line bounds how many answers an
+author fetches and the returned line bounds how large they are. What a turn added on top of a
+prefix that fits, without looping and without fetching, is the one term of the four the crew
+does choose, so it is read last.
+
+*The returned line is derived, not chosen.* `LARGEST_PUBLISHED_SPEC_CHARS` is a ceiling over one
+capability's published specification — the catalog's eight run 4,192 to 9,909 characters, mean
+6,813, measured over the recorded contract by a test that fails if the largest passes it.
+`TOOL_CALLS_PER_ASK` is six: the draft-review loop's three, plus the three the search-and-two-
+specifications sequence needs. `MODEL_CALLS_PER_ASK` is one more than that, so the count of calls
+and the count of answers cannot be moved apart. `RETURNED_CHARS_PER_ASK` is three answers at the
+ceiling, and three rather than eight is the whole of the line: eight specifications is the
+catalog, every author already holds the catalog resident, and a turn that pulls all of it back
+has re-fetched what it was given for free.
+
+One asymmetry, and it cannot be closed. Every term of a repair is known before it is asked for,
+so the turn line refuses the turn that would cross it. What a tool will hand back is not knowable
+until the author has called it, so the returned line is read against a turn that has already
+happened and the turn it refuses is the next one. The rate line has had this shape since it
+landed.
 
 It measures characters, not tokens. Characters are what a Python process can count exactly and
 offline, so the guard runs on every `pytest`; a token budget would need a Gemma tokenizer that

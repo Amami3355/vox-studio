@@ -146,7 +146,60 @@ same to obtain.
 - [ ] A scripted author's prefix is byte-identical to what it was
 - [ ] A tool-holding author's preamble names the tools, and no other author's does
 - [ ] What an author holds is one answer about itself, and a pre-existing author is still a valid implementation
-- [ ] `MODEL_CALLS_PER_ASK` moves with its reasoning recorded, and the line stays enforced
+- [x] `MODEL_CALLS_PER_ASK` moves with its reasoning recorded, and the line stays enforced — **done by ticket 26**, see the amendment below
 - [ ] The leak scan passes over the preamble sentence and every tool docstring
-- [ ] The bundle records which tools were called, with what, and how often, and distinguishes "asked nothing" from "could not ask"
+- [ ] The bundle records which tools were called, with what, and how often, and distinguishes "asked nothing" from "could not ask" **from the author's own answer rather than from the meter** — see the amendment below
 - [ ] Fixture Runs at n≥3 are recorded, counting tool calls and comparing which capabilities and actions the plans reach for
+
+---
+
+## Amendment — ticket 26, 2026-08-30
+
+Ticket 26 landed the returned line and settled two things this ticket had left open. Both are
+recorded here so that whoever picks 24 up does not re-decide them.
+
+**`MODEL_CALLS_PER_ASK` has already moved, from 4 to 7, and its derivation is written down.** It
+is now `1 + TOOL_CALLS_PER_ASK`, and `TOOL_CALLS_PER_ASK` is six: the draft-review loop's three,
+unchanged, plus the three this ticket names as the deepest an authoring turn reaches — a search,
+and two specifications. The number is therefore derived from this ticket's own sentence rather
+than chosen, which is what 26 required of it. Nothing here is left to move: if the tools this
+ticket binds turn out to need a different sequence, the sequence is what changes and the constant
+follows it.
+
+**The meter does not distinguish "asked nothing" from "could not ask", and the bundle carries the
+distinction from the author instead.** `planner._offered` builds a meter for every author,
+tool-holding or not, so both cases leave it reading zero; that shape is kept, and the argument is
+in `_offered`'s docstring. A meter answers what a turn *spent*, and both of those turns spent
+nothing. Which kind of author it was is a fact the author already states as `reviews_drafts`, and
+which `cache_prefix` already reads to decide what the prompt says — so the bundle reads it from
+there. Teaching the meter a second question would have put one fact in two places and made the
+derived one the place they disagree.
+
+What that leaves this ticket to do: carry `reviews_drafts` — or whatever it generalises into, per
+this ticket's own decision that what an author holds should be one answer — as far as the bundle,
+which nothing does today. `AuthoredPlan` already carries `review_calls` and `reviewed` beside each
+version and is the obvious place for it.
+
+**Also worth knowing before starting, and read this part carefully — a first draft of it was
+wrong.** The returned line is 30,000 characters per ask, derived from three answers at the size
+the catalog publishes its largest specification at. But it is *checked against the Run's total*,
+which is the shape ticket 26's third criterion required of it and the shape the fresh line
+already had. So the line an author actually meets is `30,000 × plan_versions`, and
+`repair_budget` never issues fewer than five plan versions — the smallest returned budget any
+Brief gets is 150,000, against a catalog of 54,504.
+
+What that means for the tools this ticket binds:
+
+- **One turn may fetch all eight specifications and is not refused.** It is paid for out of the
+  turns that fetched nothing, exactly as an expensive repair turn is. Three such turns fit a
+  six-ask Run; the fourth ends it.
+- So the line refuses a *habit*, not a single reach. An author that fetches the catalog once
+  because it needed to is affordable; an author that re-fetches it every turn is the loop the
+  line was written to name.
+- The constraint on the search tool is therefore softer than it first looked, but it is real: a
+  search that answers with full specifications rather than a narrowed result spends the Run's
+  whole returned budget in three turns.
+
+`test_one_turn_may_fetch_the_whole_catalog_and_a_run_that_keeps_doing_it_may_not` in
+`tests/test_context.py` asserts all of this against a budget `repair_budget` actually issues,
+rather than against the bare constant — which is what the first draft got wrong.

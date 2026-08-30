@@ -56,12 +56,20 @@ could check. Characters are checked on every run of the suite; `tokens` converts
 one audience that thinks in tokens, at a divisor chosen to over-estimate rather than to be
 right on average.
 
-**Two lines, because they are two different costs.** `resident_chars` is the catalog: one
-prefix, the same on every turn, counted once because counting it per turn would report the
-repair budget rather than the prompt. `fresh_chars` is the refusals and the plans handed back,
-which are new text every turn and are billed at full rate every turn. A single total would hide
-the distinction the whole ticket is about, and it is the distinction that decides whether a
-longer repair loop is affordable.
+**Three character lines, because they are three different costs.** `resident_chars` is the
+catalog: one prefix, the same on every turn, counted once because counting it per turn would
+report the repair budget rather than the prompt. `fresh_chars` is the refusals and the plans
+handed back, which are new text every turn and are billed at full rate every turn.
+`returned_chars` is what a tool handed an author mid-turn, which appears only in the calls
+after the one that asked for it. A single total would hide the distinction the whole ticket is
+about, and it is the distinction that decides whether a longer repair loop is affordable.
+
+**The resident line is the one everybody watches and the returned line is the one that will
+break.** The catalog is the same material either way — the difference is only whether it
+reaches a model resident or fetched. The resident path has an allowance, a census and a growth
+table behind it; the fetched path had a bundle field and nothing else, and every direction this
+crew is heading multiplies what comes back through it. Both are lines now, and `overrun` reads
+all four.
 """
 
 from __future__ import annotations
@@ -93,17 +101,73 @@ RESIDENT_CHARS_ALLOWED = 150_000
 # authoring turn rather than ending a Run mid-repair.
 FRESH_CHARS_PER_ASK = 20_000
 
-# How many model calls one ask may take: the call that reads the prefix, plus three the author
-# spends reading a tool's answer and trying again. An author holding no tool uses exactly one
-# and cannot approach this.
+# How many tool calls one ask may make, summed from the two sequences that are written down
+# rather than chosen here.
+#
+# Three are the draft-review loop's, and that allowance is unchanged: the smallest that lets an
+# author read a finding, repair, and confirm the repair — the loop the tool exists for. Three
+# more are the deepest an authoring turn reaches under crew ticket 24, which names the sequence
+# outright: an author that searches the catalog, fetches two specifications, reviews a draft and
+# answers. Six is therefore a ceiling over both, and both halves can be pointed at.
+#
+# It is a ceiling rather than a target. The one live Run measured so far used one call, and an
+# author holding no tool uses none.
+TOOL_CALLS_PER_ASK = 6
+
+# How many model calls one ask may take: the call that reads the prefix, plus one for each tool
+# answer the author reads back. Derived rather than stated, so that the count of calls and the
+# count of tool answers cannot be moved apart — a rate line and a returned line that disagreed
+# about how many answers a turn may fetch would be two budgets for one term.
 #
 # The line exists because a tool loop is the only term in a Run's spend that the crew does not
 # choose. `repair_budget` decides how many plan versions a Run may ask for; how many times an
 # author calls a tool inside one of them is the model's decision, and an unbounded term in an
-# account that is evidence is a number nobody can promise. Three is the smallest allowance that
-# lets an author read a finding, repair, and confirm the repair — the loop the tool exists for
-# — and it is a ceiling rather than a target: the one live Run measured so far used one call.
-MODEL_CALLS_PER_ASK = 4
+# account that is evidence is a number nobody can promise.
+MODEL_CALLS_PER_ASK = 1 + TOOL_CALLS_PER_ASK
+
+# The largest single thing a tool can hand an author: one capability's published specification.
+# The eight the catalog publishes run 4,192 to 9,909 characters, mean 6,813, measured over the
+# recorded contract by `tests/test_context.py` — which fails if the largest passes this line,
+# because the size of another team's contract is a fact to re-measure rather than remember.
+LARGEST_PUBLISHED_SPEC_CHARS = 10_000
+
+# What one ask may pull back from its tools, over every call it makes.
+#
+# Three answers at the ceiling above: the search and the two specifications ticket 24 names as
+# the deepest sequence an authoring turn has a reason to make. The draft-review loop's own
+# answers sit inside that rather than beside it — measured over the recorded contract they are
+# 28 characters for a clean draft and 386 for a malformed one, three orders below a
+# specification, and a line that itemised them would be pricing rounding error.
+#
+# Three rather than eight, and that is the whole of the line. Eight specifications is the
+# catalog, and every author already holds the catalog resident — a turn that pulls all of it
+# back has re-fetched what it was given for free, which is the loop this line exists to name.
+# The catalog is checked against this in `tests/test_context.py`, so the case the line was
+# written for is asserted rather than described.
+#
+# Below `TOOL_CALLS_PER_ASK * LARGEST_PUBLISHED_SPEC_CHARS`, deliberately. A returned line set
+# at or above that product could not fire without the rate line firing first, which would make
+# it a restatement of a line that already exists rather than a line.
+#
+# Checked against the one live Run that used a tool: the showcase Run of 2026-08-27 pulled back
+# 3,281 characters over three model calls, an order under one ask's allowance. So the line is a
+# ceiling over what has actually happened rather than a line drawn under it.
+#
+# The allowance is per ask and the line is checked against the Run's total, the way
+# `FRESH_CHARS_PER_ASK` is and for the same reason: a turn that needed three specifications
+# where the last needed none is paid for out of the cheaper turn rather than ending a Run
+# mid-repair.
+#
+# That it lands on the same figure as the fresh line is arithmetic, not a tie. The two are
+# derived from different measurements — the largest refusal production publishes, and the
+# largest specification the catalog does — and each moves when its own does.
+#
+# One asymmetry with the fresh line, and it cannot be closed. Every term of a repair is known
+# before it is asked for, so the fresh line refuses the turn that would cross it. What a tool
+# will hand back is not knowable until the author has called it — `planner.authoring_ask` says
+# the same thing about the rate line for the same reason — so this line is read against a turn
+# that has already happened, and the turn it refuses is the next one.
+RETURNED_CHARS_PER_ASK = 3 * LARGEST_PUBLISHED_SPEC_CHARS
 
 # The lines a Run can pass, named the way `converge` names its budget lines and for the same
 # reason: `limit` is read by whoever audits the Run, and a string literal at a return site is
@@ -111,6 +175,7 @@ MODEL_CALLS_PER_ASK = 4
 RESIDENT_CHARS = "resident_chars"
 FRESH_CHARS = "fresh_chars"
 MODEL_CALLS = "model_calls"
+RETURNED_CHARS = "returned_chars"
 
 
 class ContextBudgetExceeded(RuntimeError):
@@ -182,6 +247,7 @@ class ContextBudget:
     resident_chars: int
     fresh_chars: int
     model_calls: int
+    returned_chars: int
 
 
 def context_budget(asks: int) -> ContextBudget:
@@ -197,6 +263,7 @@ def context_budget(asks: int) -> ContextBudget:
         resident_chars=RESIDENT_CHARS_ALLOWED,
         fresh_chars=FRESH_CHARS_PER_ASK * asks,
         model_calls=MODEL_CALLS_PER_ASK * asks,
+        returned_chars=RETURNED_CHARS_PER_ASK * asks,
     )
 
 
@@ -250,7 +317,12 @@ class ContextSpend:
 
     @property
     def returned_chars(self) -> int:
-        """What the draft-review tool handed back across the Run. Zero for an author with none."""
+        """What an author's tools handed back across the Run. Zero for an author holding none.
+
+        Charged once rather than per call, because an answer appears only in the calls after
+        the one that asked for it — see `Ask.chars`, which says where that floor stops being
+        exact. `RETURNED_CHARS_PER_ASK` is the line it is read against.
+        """
         return sum(ask.returned for ask in self.asks)
 
     @property
@@ -311,11 +383,22 @@ class ContextSpend:
         read here rather than reported because a term the crew does not choose is exactly the
         term that has to be bounded: `model_calls` was published beside `asks_made` and enforced
         by nothing, which left the Run budget carrying a number nobody could promise.
+
+        The returned line is read with the rate line rather than with the character lines,
+        because it is the other half of the same unchosen term: the rate line bounds how many
+        answers an author fetches and this one bounds how large they are. A Run can stay inside
+        its calls and still pull back more than the catalog it was already holding, and where
+        both were passed the loop is the finding for the same reason it is above.
+
+        The turn line is read last, unchanged. What a turn added on top of a prefix that fits,
+        without looping and without fetching, is the one term of the four the crew does choose.
         """
         if self.resident_chars > budget.resident_chars:
             return RESIDENT_CHARS
         if self.model_calls > budget.model_calls:
             return MODEL_CALLS
+        if self.returned_chars > budget.returned_chars:
+            return RETURNED_CHARS
         if self.fresh_chars > budget.fresh_chars:
             return FRESH_CHARS
         return None

@@ -795,6 +795,30 @@ def test_an_author_offered_no_tool_is_handed_none_and_still_meters_zero() -> Non
     assert DraftReview(SURFACE, offered=True).check() is not None
 
 
+def test_the_author_that_could_not_ask_and_the_one_that_did_not_read_the_same() -> None:
+    """The decision crew ticket 26 settled, asserted over the two authors it is about.
+
+    An author that was offered no tool and an author that was offered one and never called it
+    leave meters that are equal in every term. That is the whole of the single shape: the meter
+    answers what a turn *spent*, both of those turns spent nothing, and no caller downstream has
+    to ask which kind of author it is holding.
+
+    Which kind it was is still a fact somebody needs, and it is a fact about the author rather
+    than about the turn — `reviews_drafts`, which `cache_prefix` already reads. Named here so
+    that a later change teaching the meter to tell them apart fails this test and has to argue
+    with `_offered`'s docstring first.
+    """
+    could_not_ask = DraftReview(SURFACE, offered=False)
+    did_not_ask = DraftReview(SURFACE, offered=True)
+
+    assert could_not_ask.calls == did_not_ask.calls == 0
+    assert could_not_ask.returned_chars == did_not_ask.returned_chars == 0
+    assert could_not_ask.model_calls == did_not_ask.model_calls == 1
+    assert could_not_ask.codes == did_not_ask.codes == []
+    # The one term that does differ, and it is the author's answer rather than the meter's.
+    assert could_not_ask.check() is None and did_not_ask.check() is not None
+
+
 def test_the_tool_meters_what_it_cost_because_nothing_else_can_see_it() -> None:
     """Every call is another model call re-sending the prefix, counted where it happens."""
     meter = DraftReview(SURFACE)

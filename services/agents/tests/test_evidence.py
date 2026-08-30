@@ -18,8 +18,15 @@ from typing import Any
 import pytest
 from conftest import recorded, recorded_bytes
 from test_complete_run import REQUEST, RUN_ID
-from test_converge import RepairingAuthor, a_client, a_catalog_following_plan, a_repaired_plan
-from vox_crew.context import tokens
+from test_converge import (
+    RETURNS_MORE_THAN_ALLOWED,
+    RepairingAuthor,
+    a_catalog_following_plan,
+    a_client,
+    a_repaired_plan,
+    a_run_that_consults_its_tool,
+)
+from vox_crew.context import RETURNED_CHARS, tokens
 from vox_crew.converge import (
     BUDGET_EXHAUSTED,
     PAUSED,
@@ -73,6 +80,19 @@ def an_exhausted_run() -> ConvergedRun:
         a_client(validate=["run-validate-needs-repair.stdout"]),
         REQUEST,
         RepairingAuthor(a_catalog_following_plan()),
+    )
+
+
+def a_run_stopped_on_its_returned_line() -> ConvergedRun:
+    """A Run whose author called its tool, against a returned line it cannot stay inside.
+
+    The Run and the budget are `test_converge`'s, imported rather than rebuilt: what this
+    module asserts is what the bundle made of an ending that module already drives, and two
+    builders would be one edit away from being two different endings.
+    """
+    client, author = a_run_that_consults_its_tool()
+    return converge(
+        client, REQUEST, author, context_budget=RETURNS_MORE_THAN_ALLOWED
     )
 
 
@@ -728,11 +748,36 @@ def test_the_environment_records_what_the_run_put_in_front_of_a_model() -> None:
         "residentChars": run.context_budget.resident_chars,
         "freshChars": run.context_budget.fresh_chars,
         "modelCalls": run.context_budget.model_calls,
+        "returnedChars": run.context_budget.returned_chars,
     }
     # The tool's answers, apart from the message beside the prefix: they are not re-sent.
     assert context["returnedChars"] == run.spend.returned_chars
     # The figure the budget is stated in, beside the one a model is billed in.
     assert context["sentTokens"] == tokens(run.spend.sent_chars)
+
+
+def test_the_bundle_names_which_line_a_run_stopped_on_beside_the_number_that_moved_it() -> None:
+    """A reader tells which line ended a Run without inferring it from the figures.
+
+    `returnedChars` was published from the day the meter existed and was read against nothing,
+    so a reader meeting a large one had no allowance to compare it to and no way to know
+    whether the Run had been stopped for it. The line, the figure and the name of the line the
+    Run passed are now in one block.
+
+    Asserted against a Run driven to that ending rather than against a constructed spend: what
+    is being checked is that the ending `converge` reached reaches the bundle intact, and a
+    hand-built `ConvergedRun` would assert this module against itself.
+    """
+    run = a_run_stopped_on_its_returned_line()
+
+    environment = document(assemble(run).files, ENVIRONMENT)
+    context = environment["context"]
+
+    assert environment["limit"] == RETURNED_CHARS
+    assert environment["outcome"] == BUDGET_EXHAUSTED
+    # The line it passed, the figure that passed it, and the allowance, in one block.
+    assert context["overrun"] == RETURNED_CHARS
+    assert context["returnedChars"] > context["budget"]["returnedChars"]
 
 
 def test_the_context_block_says_why_a_prefix_cache_is_out_of_reach_and_stays_that_way() -> None:

@@ -21,14 +21,14 @@ from hashlib import sha256
 from typing import Any
 
 import pytest
-from conftest import recorded, recorded_bytes
+from conftest import a_budget, recorded, recorded_bytes
 from test_complete_run import REQUEST, RUN_ID
 from test_planner import CATEGORIES, SURFACE, a_catalog_following_plan
 from vox_crew import planner
 from vox_crew.client import Artifact, ProductionClient
 from vox_crew.context import (
     FRESH_CHARS,
-    ContextBudget,
+    RETURNED_CHARS,
     ContextBudgetExceeded,
     context_budget,
 )
@@ -181,6 +181,36 @@ class RepairingAuthor(PlanAuthor):
     ) -> dict[str, Any]:
         self.repairs.append((instructions, brief, plan, refusal))
         return self._next()
+
+
+class ReviewingAuthor(RepairingAuthor):
+    """The same scripted author, holding the draft-review tool and calling it once per turn.
+
+    The tool is the crew's own rather than a stub, so what the meter records is what the review
+    actually hands back — a stub would let a test about the returned line pass against a number
+    no author could ever be given.
+    """
+
+    reviews_drafts = True
+
+    def __init__(self, *plans: dict[str, Any]) -> None:
+        super().__init__(*plans)
+        self.reviews: list[Any] = []
+
+    def _consult(self, check: Any, plan: dict[str, Any]) -> dict[str, Any]:
+        if check is not None:
+            self.reviews.append(check(json.dumps(plan)))
+        return plan
+
+    def author(self, instructions: str, brief: Any, *, check: Any = None) -> dict[str, Any]:
+        return self._consult(check, super().author(instructions, brief, check=check))
+
+    def repair(
+        self, instructions: str, brief: Any, plan: Any, refusal: Refusal, *, check: Any = None
+    ) -> dict[str, Any]:
+        return self._consult(
+            check, super().repair(instructions, brief, plan, refusal, check=check)
+        )
 
 
 def a_repaired_plan() -> dict[str, Any]:
@@ -633,6 +663,24 @@ def a_run_that_repairs_once() -> tuple[ScriptedClient, RepairingAuthor]:
     )
 
 
+def a_run_that_consults_its_tool() -> tuple[ScriptedClient, ReviewingAuthor]:
+    """The same two turns, with an author that calls the draft-review tool on each of them.
+
+    Here rather than in whichever module needed it first, because `test_evidence` drives the
+    same Run to read what the bundle made of it — and two builders would be two Runs one edit
+    away from stopping being the same Run.
+    """
+    return (
+        a_client(validate=["run-validate-needs-repair.stdout", "run-validate-succeeded.stdout"]),
+        ReviewingAuthor(a_catalog_following_plan(), a_repaired_plan()),
+    )
+
+
+# One character, so the smallest answer the review can give passes it. What a test built on this
+# asserts is which line was read and how the Run ended, not how large a finding happens to be.
+RETURNS_MORE_THAN_ALLOWED = a_budget(returned_chars=1)
+
+
 def test_a_whole_convergence_assembles_the_teaching_surface_exactly_once(monkeypatch) -> None:
     """The first criterion, counted rather than argued.
 
@@ -740,9 +788,7 @@ def test_a_run_that_cannot_afford_its_next_repair_ends_before_asking_for_it() ->
         client,
         REQUEST,
         author,
-        context_budget=ContextBudget(
-            resident_chars=10**9, fresh_chars=authoring.fresh, model_calls=10**9
-        ),
+        context_budget=a_budget(fresh_chars=authoring.fresh),
     )
 
     assert run.outcome == BUDGET_EXHAUSTED
@@ -750,6 +796,51 @@ def test_a_run_that_cannot_afford_its_next_repair_ends_before_asking_for_it() ->
     assert author.repairs == []
     # The Run stayed inside what it was budgeted. It ended because the *next* turn would not.
     assert run.spend.overrun(run.context_budget) is None
+
+
+def test_a_run_that_pulled_back_more_than_its_tools_may_hand_it_ends_rather_than_raises() -> None:
+    """The returned line, through a whole convergence and against the real review tool.
+
+    `ContextBudgetExceeded` is reserved for the resident line, on the recorded ground that a
+    prefix too large is a fact about the crew's own prompt and true before any Run exists. What
+    a tool handed back is the Run's own spending, so it ends a Run with the limit named — which
+    is what an operator reads and what the bundle carries.
+
+    The line is one character, so the smallest answer the review can give passes it. That keeps
+    the assertion about which line was read and how the Run ended, rather than about how large
+    a finding happens to be.
+    """
+    client, author = a_run_that_consults_its_tool()
+
+    run = converge(client, REQUEST, author, context_budget=RETURNS_MORE_THAN_ALLOWED)
+
+    assert run.outcome == BUDGET_EXHAUSTED
+    assert run.limit == RETURNED_CHARS
+    # The authoring turn happened and did pull something back; the repair after it did not.
+    assert len(author.reviews) == 1
+    assert run.spend.returned_chars > 1
+    assert author.repairs == []
+
+
+def test_a_run_whose_author_holds_no_tool_pulls_nothing_back_and_is_priced_as_it_always_was() -> (
+    None
+):
+    """The assertion that keeps the returned line invisible everywhere it should be.
+
+    Every scripted Run in this suite has an author holding no tool, so the line added here must
+    not be readable in any of their accounts. Zero returned, no overrun against the Run's own
+    budget, and the sent total is still the two terms it was made of before a tool existed.
+    """
+    client, author = a_run_that_repairs_once()
+
+    run = converge(client, REQUEST, author)
+    spend = run.spend
+
+    assert spend.returned_chars == 0
+    assert spend.model_calls == spend.asks_made
+    assert spend.sent_chars == spend.resident_chars + spend.fresh_chars
+    assert spend.overrun(run.context_budget) is None
+    assert run.limit is None
 
 
 def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
@@ -766,9 +857,7 @@ def test_a_prefix_that_does_not_fit_is_refused_before_a_run_is_opened() -> None:
             client,
             REQUEST,
             author,
-            context_budget=ContextBudget(
-                resident_chars=10, fresh_chars=10**9, model_calls=10**9
-            ),
+            context_budget=a_budget(resident_chars=10),
         )
 
     assert author.asked == []
