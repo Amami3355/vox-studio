@@ -13,7 +13,29 @@ const runRelativePath = nonEmpty.refine(
   'Artifact path must be a normalized Run-relative path.',
 );
 
-export const contractCategorySchema = z.enum(['language', 'plan', 'catalog', 'checks', 'protocol']);
+export const contractCategorySchema = z.enum([
+  'language',
+  'plan',
+  'catalog',
+  'checks',
+  'operating',
+  'protocol',
+]);
+
+/**
+ * Who a published category is for.
+ *
+ * `author` is whatever reads the contract as a prompt and answers with a plan; `client` is
+ * whatever drives production over the command line. The distinction is ADR-0016's: the author
+ * seam carries payloads and tools and nothing that locates anything, so an author cannot issue
+ * a command, read an exit code, resume a Run or write inside a boundary, and a category about
+ * those things is one it can read but never act on.
+ *
+ * Published rather than inferred. A consumer that pattern-matched category ids, or kept a list
+ * of the ones it wanted, would be holding an opinion about the contract in a place the contract
+ * cannot see — and the next category added here would find it silently teaching a stale subset.
+ */
+export const contractAudienceSchema = z.enum(['author', 'client']);
 
 export const commandIdSchema = z.enum([
   'contract.index',
@@ -219,7 +241,15 @@ export const preflightReportSchema = z
 export const commandDataSchemas = {
   'contract.index': z
     .object({
-      categories: z.array(z.object({ id: contractCategorySchema, summary: nonEmpty }).strict()),
+      categories: z.array(
+        z
+          .object({
+            id: contractCategorySchema,
+            summary: nonEmpty,
+            audience: z.array(contractAudienceSchema).min(1),
+          })
+          .strict(),
+      ),
     })
     .strict(),
   'contract.show': z
@@ -271,6 +301,7 @@ export const resultEnvelopeSchema = z
   .strict();
 
 export type ContractCategory = z.infer<typeof contractCategorySchema>;
+export type ContractAudience = z.infer<typeof contractAudienceSchema>;
 export type CommandId = z.infer<typeof commandIdSchema>;
 export type RunStage = z.infer<typeof runStageSchema>;
 export type CommandOutcome = z.infer<typeof commandOutcomeSchema>;

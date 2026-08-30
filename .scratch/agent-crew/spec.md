@@ -314,19 +314,24 @@ ticket.
 
    **Both figures are now taken by the suite, not by hand.** At ADR-0017's
    boundary — the prefix `cache_prefix` assembles, framing included — the
-   scripted prefix is **118,598** and the tool-holding one **119,266**, a
-   668-character paragraph apart. The 124,690 and 125,039 this bullet carried
-   until crew 23 were taken before production issue 28 moved the checks document
-   out of the catalog projection, and were stale by roughly 6,000 characters. The
-   record is `services/agents/prefix-census.md`, rewritten on every `pytest` run.
+   scripted prefix is **95,503** and the tool-holding one **96,171**, a
+   668-character paragraph apart. The 118,598 and 119,266 this bullet carried
+   until crew 25 were taken before the contract index published an audience per
+   category and the crew stopped sending the author the command surface it
+   cannot operate; they are retired by that ticket's amendment to ADR-0017, along
+   with every other figure at the 118,598 boundary. The 124,690 and 125,039
+   before them were pre-production-28 and were stale by roughly 6,000 characters.
+   The record is `services/agents/prefix-census.md`, rewritten on every `pytest`
+   run.
    The budget is therefore stated
    in characters, which the crew can count exactly and offline on every Run, with
    tokens as a deliberately conservative conversion at 3 characters per token:
 
    - **Resident prefix: 150,000 characters (~50k tokens)**, charged once per Run
      and transmitted on every turn of it.
-     A quarter of headroom over the measured 119,266, which is room for the
-     catalog to gain capabilities without a Run being refused for it.
+     A third of headroom over the measured 96,171 — room for four more
+     capabilities before a Run is refused for it, measured by crew 25 rather
+     than argued.
    - **Fresh text: 20,000 characters per plan version.** The largest refusal the
      fixtures record is 5,248 characters and a showcase Brief handed back with an
      eight-scene plan is ~10,000 more.

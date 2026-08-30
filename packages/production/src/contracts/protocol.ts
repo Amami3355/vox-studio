@@ -1,15 +1,32 @@
-import type { CommandId, ContractCategory } from './schemas';
+import type { CommandId, ContractAudience, ContractCategory } from './schemas';
 
+/**
+ * Every category the contract publishes, in the order the index publishes them, with the
+ * audience each is addressed to.
+ *
+ * The audience is the contract's own statement of its readership, added by ticket 25. Before it,
+ * a consumer assembling a prompt had to read everything or invent a rule about what to skip, and
+ * the first was costing an author 20.4% of every turn on a machine it is structurally forbidden
+ * from operating. Naming the readership here puts the decision with the document rather than
+ * with whoever reads it.
+ */
 export const CONTRACT_CATEGORIES: readonly {
   id: ContractCategory;
   summary: string;
   contractVersion: number;
+  audience: readonly ContractAudience[];
 }[] = [
-  { id: 'language', summary: 'Vox Studio domain terms and avoided synonyms.', contractVersion: 1 },
+  {
+    id: 'language',
+    summary: 'Vox Studio domain terms and avoided synonyms.',
+    contractVersion: 1,
+    audience: ['author'],
+  },
   {
     id: 'plan',
     summary: 'VideoPlan JSON Schema and validated full-plan examples.',
     contractVersion: 1,
+    audience: ['author'],
   },
   {
     /**
@@ -21,12 +38,34 @@ export const CONTRACT_CATEGORIES: readonly {
     id: 'catalog',
     summary: 'Scene capabilities and semantic time.',
     contractVersion: 4,
+    audience: ['author', 'client'],
   },
-  { id: 'checks', summary: 'Compiler error and warning meanings and repairs.', contractVersion: 1 },
   {
-    id: 'protocol',
-    summary: 'Production commands, stages, outcomes and operating rules.',
+    id: 'checks',
+    summary: 'Compiler error and warning meanings and repairs.',
     contractVersion: 1,
+    audience: ['author', 'client'],
+  },
+  {
+    /**
+     * Version 1, and new: the operating rules a plan is authored and repaired against, which
+     * were published inside `protocol` until ticket 25 separated them from the command surface
+     * they sat beside. What moved is where they are published, not what they say.
+     */
+    id: 'operating',
+    summary: 'Preflight authority, recording quota and repair rules.',
+    contractVersion: 1,
+    audience: ['author', 'client'],
+  },
+  {
+    /**
+     * Version 2 lifted the operating rules into the `operating` category, and the summary
+     * followed the document — it claimed "operating rules" while publishing them elsewhere.
+     */
+    id: 'protocol',
+    summary: 'Production commands, stages, outcomes and transport.',
+    contractVersion: 2,
+    audience: ['client'],
   },
 ];
 
@@ -52,7 +91,7 @@ const commands: readonly CommandContract[] = [
   },
   {
     id: 'contract.show',
-    syntax: 'vox production contract show <language|plan|catalog|checks|protocol>',
+    syntax: 'vox production contract show <language|plan|catalog|checks|operating|protocol>',
     prerequisite: 'one published category id',
     effect: 'Return one generated versioned contract projection.',
     readOnly: true,
@@ -133,6 +172,50 @@ const commands: readonly CommandContract[] = [
   },
 ];
 
+/**
+ * The rules a plan is authored and repaired against — the half of what `protocol` used to
+ * publish that a reader holding no client can still act on.
+ *
+ * All three are about the plan rather than about the machine. `preflight` is the assessment
+ * vocabulary and the authority behind it, which an author reads in an advisory refusal;
+ * `recording` is what a Take costs and when a matching one is reused for nothing, which is why
+ * `repair` prefers reassigning Beats to rewriting narration. A repair authored after a Take
+ * exists is authored against all three at once, which is the argument for publishing them
+ * together and separately from the transport they sat beside.
+ */
+export const OPERATING_CONTRACT = {
+  preflight: {
+    authority: 'advisory',
+    requiredBeforeRecord: true,
+    risksBlockRecord: false,
+    fabricatesTimings: false,
+    pointMsPerAuthoredUtf16Unit: 66.25,
+    uncertaintyMargin: 0.2,
+    policyIntervalMsPerUnit: [53, 79.5],
+    assessments: ['point_below', 'margin_crosses', 'margin_clear'],
+    authoritativeStage: 'run.compile with a verified Take',
+  },
+  recording: {
+    onlyNetworkCommand: 'run.record',
+    recordingInput: 'ordered Beat text plus provider, voiceId, modelId and seed',
+    verifiedMatchingTake: 'reuse without quota',
+    firstDispatch: 'autonomous while maxNewTakes budget remains',
+    identicalInputRedispatch: 'replacement grant required',
+    exhaustedBudget: 'paused before network',
+    uncertainDispatch: 'never retried automatically',
+  },
+  repair: {
+    planChangeStales: ['validation', 'preflight', 'compilation', 'render'],
+    takeRemainsReusableWhen: 'ordered Beat texts, segmentation and voice settings are unchanged',
+    preferredDurationRepair: 'reassign or merge existing Beats before changing narration text',
+    planIsNeverMutatedByProduction: true,
+  },
+} as const;
+
+/**
+ * How production is driven: the commands, the stages they move through, what they write to and
+ * what they exit with. `OPERATING_CONTRACT` holds what a plan is authored against.
+ */
 export const PRODUCTION_CONTRACT = {
   protocolVersion: 1,
   commands,
@@ -167,32 +250,6 @@ export const PRODUCTION_CONTRACT = {
     inputsAreNeverMutated: true,
     visibleWritesRemainBelowCanonicalRoot: true,
     symlinkAndReparseEscapesForbidden: true,
-  },
-  preflight: {
-    authority: 'advisory',
-    requiredBeforeRecord: true,
-    risksBlockRecord: false,
-    fabricatesTimings: false,
-    pointMsPerAuthoredUtf16Unit: 66.25,
-    uncertaintyMargin: 0.2,
-    policyIntervalMsPerUnit: [53, 79.5],
-    assessments: ['point_below', 'margin_crosses', 'margin_clear'],
-    authoritativeStage: 'run.compile with a verified Take',
-  },
-  recording: {
-    onlyNetworkCommand: 'run.record',
-    recordingInput: 'ordered Beat text plus provider, voiceId, modelId and seed',
-    verifiedMatchingTake: 'reuse without quota',
-    firstDispatch: 'autonomous while maxNewTakes budget remains',
-    identicalInputRedispatch: 'replacement grant required',
-    exhaustedBudget: 'paused before network',
-    uncertainDispatch: 'never retried automatically',
-  },
-  repair: {
-    planChangeStales: ['validation', 'preflight', 'compilation', 'render'],
-    takeRemainsReusableWhen: 'ordered Beat texts, segmentation and voice settings are unchanged',
-    preferredDurationRepair: 'reassign or merge existing Beats before changing narration text',
-    planIsNeverMutatedByProduction: true,
   },
   resume: {
     immutableResultsAreContentAddressed: true,

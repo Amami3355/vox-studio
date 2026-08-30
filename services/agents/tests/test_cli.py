@@ -34,7 +34,7 @@ EXPECTED = recorded("contract-index.stdout") + "".join(projection(name) for name
 
 
 def discovery() -> dict:
-    """The six commands every convergence opens with, as the launcher answers them."""
+    """The seven commands every convergence opens with, as the launcher answers them."""
     return {
         "production contract index": {"stdout": recorded("contract-index.stdout")},
         **{
@@ -104,10 +104,14 @@ def test_the_run_leaves_a_bundle_that_reads_back_and_verifies(work_root, launche
 
 
 def test_the_bundles_commands_start_at_discovery_and_not_at_the_run(work_root, launcher) -> None:
-    """The contract index and the five projections are commands the Run was authored against.
+    """The contract index and the six projections are commands the Run was authored against.
 
     They arrive on the surface rather than on the Run, and a bundle that started at `run.init`
-    would be six commands short of what the crew actually asked production for.
+    would be seven commands short of what the crew actually asked production for.
+
+    Every projection, not only the ones the prompt carries. A category addressed to the client
+    is one the crew read and acted on, and a trail that dropped it would understate what the
+    Run asked production for.
     """
     a_converging_work_root(work_root)
 
@@ -116,7 +120,7 @@ def test_the_bundles_commands_start_at_discovery_and_not_at_the_run(work_root, l
     written = read_bundle(work_root / "evidence")
     logged = [json.loads(line) for line in written[COMMANDS].decode("utf-8").splitlines()]
     assert [entry["command"] for entry in logged][:2] == ["contract.index", "contract.show"]
-    assert len(logged) == 12
+    assert len(logged) == 13
 
 
 def test_stdout_is_every_envelope_the_convergence_saw_and_nothing_else(

@@ -264,7 +264,7 @@ def test_the_refusal_carries_what_the_contract_says_about_repair_itself() -> Non
     converge(client, REQUEST, author)
 
     text, _, _, refusal = author.repairs[0]
-    published = SURFACE.contract("protocol")["repair"]
+    published = SURFACE.contract("operating")["repair"]
     assert refusal.guidance["repair"] == published
     assert published["takeRemainsReusableWhen"] in refusal.as_text()
     assert published["preferredDurationRepair"] in refusal.as_text()
@@ -352,7 +352,7 @@ def test_a_duration_risk_is_repaired_from_preflights_own_report() -> None:
     assert refusal.advisory
     assert refusal.outcome == "succeeded"
     assert refusal.report == json.loads(recorded_bytes("preflight-report-duration-risk.json"))
-    assert refusal.guidance["preflight"] == SURFACE.contract("protocol")["preflight"]
+    assert refusal.guidance["preflight"] == SURFACE.contract("operating")["preflight"]
     assert "advisory" in said and "did not stop the Run" in said
     assert recorded("run-preflight-duration-risk.stdout").strip() in said
     assert said in text and scan_for_leaks(text).ok
@@ -387,7 +387,7 @@ def test_only_the_minimum_threshold_is_worth_a_repair_cycle() -> None:
 
 def test_the_assessment_the_crew_reads_for_is_one_the_contract_publishes() -> None:
     """The guard on the duration reader: a renamed assessment shows up here, not in a paid Run."""
-    assert MARGIN_CLEAR in SURFACE.contract("protocol")["preflight"]["assessments"]
+    assert MARGIN_CLEAR in SURFACE.contract("operating")["preflight"]["assessments"]
 
 
 def test_a_run_with_no_calibration_has_nothing_to_consult_about_duration() -> None:
@@ -947,7 +947,7 @@ def test_the_quota_rules_the_crew_obeys_are_the_ones_the_protocol_publishes() ->
     interface rather than against this file: a rule reworded on the other side fails here
     instead of quietly meaning something else in the loop.
     """
-    rules = SURFACE.contract("protocol")["recording"]
+    rules = SURFACE.contract("operating")["recording"]
 
     assert rules["onlyNetworkCommand"] == "run.record"
     assert rules["verifiedMatchingTake"] == "reuse without quota"

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CONTRACT_CATEGORIES, PRODUCTION_CONTRACT } from './protocol';
+import { CONTRACT_CATEGORIES, OPERATING_CONTRACT, PRODUCTION_CONTRACT } from './protocol';
 import {
   artifactDescriptorSchema,
   commandDataSchemas,
@@ -108,6 +108,7 @@ export const buildContractProjections = (inputs: {
     plan,
     catalog: catalogWithoutChecks,
     checks,
+    operating: OPERATING_CONTRACT as unknown as JsonObject,
     protocol,
   };
 
@@ -121,7 +122,11 @@ export const buildContractProjections = (inputs: {
   return {
     index: {
       contractVersion: 1,
-      categories: CONTRACT_CATEGORIES.map(({ id, summary }) => ({ id, summary })),
+      categories: CONTRACT_CATEGORIES.map(({ id, summary, audience }) => ({
+        id,
+        summary,
+        audience,
+      })),
     },
     categories,
   };

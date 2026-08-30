@@ -15,7 +15,7 @@ from vox_crew.client import ProductionClient
 from vox_crew.envelopes import parse_envelope
 from vox_crew.teaching_surface import DiscoveryRefused, read_teaching_surface
 
-CATEGORIES = ("language", "plan", "catalog", "checks", "protocol")
+CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "protocol")
 
 
 def projection(category: str, contract: dict | None = None) -> str:

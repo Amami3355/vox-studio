@@ -271,7 +271,9 @@ export const evaluateNorthbridgeAssertions = (
     item('leaks.agent-readable-files', true, observed.leakScan.pass, ['leak-scan.json']),
     item(
       'contracts.all-categories',
-      ['catalog', 'checks', 'language', 'plan', 'protocol'],
+      // Restated rather than derived: an expectation taken from the table the harness drives
+      // from would be the observation agreeing with itself.
+      ['catalog', 'checks', 'language', 'operating', 'plan', 'protocol'],
       [...observed.contracts.categories].sort(),
       ['commands.jsonl'],
     ),

@@ -70,7 +70,7 @@ from .context import Ask
 from .envelopes import ResultEnvelope
 from .producer import READ_BACK, ProducedRun, produce
 from .refusals import Refusal
-from .teaching_surface import TeachingSurface, read_teaching_surface
+from .teaching_surface import AUTHOR, TeachingSurface, read_teaching_surface
 
 
 class InstructionsLeaked(RuntimeError):
@@ -357,16 +357,37 @@ def _preamble(*, drafts_reviewable: bool = False) -> str:
     )
 
 
+def taught_categories(surface: TeachingSurface) -> tuple[str, ...]:
+    """The categories the prefix is assembled from: the ones addressed to an author.
+
+    Public, and the single answer to that question. `instructions` builds the prefix out of
+    these and `census.py` divides the prefix by exactly these, and two call sites that each
+    decided for themselves would be one edit away from disagreeing about what the prefix is.
+
+    The crew adds nothing to the contract's answer. It does not know that `protocol` is the
+    category an author cannot act on; it knows that it is an author, and the index says which
+    categories are published to one. Everything discovery fetched is still held — `refusals.py`
+    and `converge.py` read categories no prompt carries — so what narrows here is the prompt,
+    not the surface.
+    """
+    return surface.addressed_to(AUTHOR)
+
+
 def instructions(surface: TeachingSurface, *, drafts_reviewable: bool = False) -> str:
-    """Assembles the prompt from the categories the index published, in the index's order.
+    """Assembles the prompt from the categories addressed to an author, in the index's order.
 
     The bodies go in whole. They are what the plan is authored against, and a summary of a
     catalog is a description of capabilities the model then cannot name correctly. They go in
     compact, the way the envelopes themselves are framed: the catalog is the largest thing in
     this prompt by a wide margin and indenting it buys a model nothing it cannot already read.
+
+    Whole, and every one of them: the rule that a category the contract adds is a category the
+    crew teaches with no edit here is unchanged, and it is now the contract that says which
+    categories those are. A crew that kept its own list of what to send would be the thing that
+    rule exists to prevent, arrived at from the other direction.
     """
     parts = [_preamble(drafts_reviewable=drafts_reviewable)]
-    parts.extend(category_part(surface, category) for category in surface.categories)
+    parts.extend(category_part(surface, category) for category in taught_categories(surface))
     return "".join(parts)
 
 

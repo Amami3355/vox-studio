@@ -6,6 +6,7 @@ import catalog from '../src/contracts/generated/catalog.json';
 import checks from '../src/contracts/generated/checks.json';
 import index from '../src/contracts/generated/index.json';
 import language from '../src/contracts/generated/language.json';
+import operating from '../src/contracts/generated/operating.json';
 import plan from '../src/contracts/generated/plan.json';
 import protocol from '../src/contracts/generated/protocol.json';
 import { handleContractIndex, handleContractShow } from '../src/contracts/handlers';
@@ -35,9 +36,9 @@ const fresh = () =>
   });
 
 describe('production contract projections', () => {
-  it('generates all five versioned categories and the compact index', () => {
+  it('generates all six versioned categories and the compact index', () => {
     const projections = fresh();
-    const committed = { language, plan, catalog, checks, protocol };
+    const committed = { language, plan, catalog, checks, operating, protocol };
 
     expect(Object.keys(projections.categories)).toEqual(Object.keys(committed));
     expect(projections.index).toEqual(index);
@@ -46,14 +47,58 @@ describe('production contract projections', () => {
     }
   });
 
-  it('publishes the same five categories, in the same order, under the same ids', () => {
+  it('publishes the same six categories, in the same order, under the same ids', () => {
     expect(index.categories.map(({ id }) => id)).toEqual([
       'language',
       'plan',
       'catalog',
       'checks',
+      'operating',
       'protocol',
     ]);
+  });
+
+  /**
+   * Ticket 25. The index says who each category is published *to*, so a consumer assembling a
+   * prompt reads what it was addressed rather than deciding for itself what it needs.
+   *
+   * Asserted as the whole partition rather than category by category: the failure this guards
+   * is a category added without an audience, or added to the author's set without the argument
+   * that it is something an author can act on, and either would slip past a per-category check
+   * that only knew about today's six.
+   */
+  it('addresses every category to an audience, and the author only to what it can act on', () => {
+    const addressed = (who: string): string[] =>
+      index.categories.filter(({ audience }) => audience.includes(who)).map(({ id }) => id);
+
+    for (const category of index.categories) expect(category.audience.length).toBeGreaterThan(0);
+    expect(addressed('author')).toEqual(['language', 'plan', 'catalog', 'checks', 'operating']);
+    expect(addressed('client')).toEqual(['catalog', 'checks', 'operating', 'protocol']);
+  });
+
+  /**
+   * ADR-0016 is the argument. An author holds payloads and tools and nothing that locates
+   * anything, so it cannot issue a command, read an exit code, resume a Run, observe a transport
+   * or write inside a boundary — and every one of those was a fifth of its prompt.
+   *
+   * The split is asserted as a partition of the document that was there before, so a key cannot
+   * be dropped on the way through or land in both halves.
+   */
+  it('splits the operating rules the author acts on out of the protocol it cannot operate', () => {
+    expect(Object.keys(operating.contract)).toEqual(['preflight', 'recording', 'repair']);
+    expect(Object.keys(protocol.contract)).toEqual([
+      'protocolVersion',
+      'commands',
+      'lifecycle',
+      'transport',
+      'exitCodes',
+      'writeBoundary',
+      'resume',
+      'schemas',
+    ]);
+    expect(
+      Object.keys(operating.contract).filter((key) => Object.hasOwn(protocol.contract, key)),
+    ).toEqual([]);
   });
 
   /**

@@ -21,6 +21,7 @@ const RECORDED = [
   'contract-show-catalog.stdout',
   'contract-show-checks.stdout',
   'contract-show-language.stdout',
+  'contract-show-operating.stdout',
   'contract-show-plan.stdout',
   'contract-show-protocol.stdout',
 ];

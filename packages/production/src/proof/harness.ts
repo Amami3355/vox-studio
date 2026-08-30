@@ -16,6 +16,7 @@ import {
   verifyTimedBeatFold,
 } from '@vox/voice';
 import { ProductionCommandService } from '../commands/service';
+import { CONTRACT_CATEGORIES } from '../contracts/protocol';
 import { resultEnvelopeSchema } from '../contracts/schemas';
 import { createProductionIpcHost } from '../ipc/host';
 import { type ProductionPipeBridge, startProductionPipeBridge } from '../ipc/pipe-bridge';
@@ -742,7 +743,10 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         .filter((envelope) => envelope.command === 'contract.show')
         .map((envelope) => String((envelope.data as { category?: unknown } | null)?.category)),
     );
-    for (const category of ['language', 'plan', 'catalog', 'checks', 'protocol']) {
+    // Read from the published table rather than restated here. This loop is an action, not an
+    // expectation — it fills in whatever the agent did not ask for — and a hand-kept list left
+    // a category unvisited on the day one was added, which the sheet then scored as a miss.
+    for (const { id: category } of CONTRACT_CATEGORIES) {
       if (!categoriesSeenByAgent.has(category)) {
         await invoke(['production', 'contract', 'show', category]);
       }

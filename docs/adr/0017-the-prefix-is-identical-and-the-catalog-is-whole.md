@@ -156,6 +156,49 @@ The identical prefix remains eligible for provider-side caching if the session m
 That is a reason not to abandon the property casually. It is not a reason to report a saving, and
 this ADR is the record that the two were once confused.
 
+### Amended 2026-08-30: crew ticket 25 moved the prefix again, and this is that disclosure
+
+Ticket 25 gave the contract index an `audience` field per category and split `protocol` into the
+command surface an author cannot operate and the `operating` rules it authors against. The crew
+assembles the categories addressed to an author, which is every category it was assembling before
+except `protocol`. **This decision is not reopened and the catalog did not move**: it goes in
+whole, resident, identical across turns, and its 56,486 characters are byte-identical either side,
+asserted directly rather than inferred from a total. What changed is what sits beside it.
+
+It is nonetheless a new prefix regime under the rule above, so the measurements it retires are
+named here rather than left to be discovered.
+
+**Retired: every prefix-size and category-share figure taken before this change** — which is to
+say every figure denominated at the 118,598-character boundary, including this ADR's own Context
+and Amendment text above, ticket 23's census record, ticket 22's `residentChars`, ticket 19's
+"118,598-character prefix", and the spec's 118,598 / 119,266 pair. The character counts of
+individual *bodies* are not retired: the catalog is still 56,486 and the checks still 9,660,
+because nothing about those documents moved. What is retired is every *share*, since the
+denominator changed.
+
+**Not retired:** ticket 17's Word-anchor counts, for the reason the amendment above gives, and
+because the census confirms the anchor tallies are unchanged — 40 boundary anchors over 19
+statements and 12 word anchors over 6, either side. A category that had no anchors in it left.
+
+The numbers, from the instrument rather than by hand — `services/agents/prefix-census.md`,
+rewritten on every `pytest` run:
+
+| | before | after |
+|---|---|---|
+| the assembled prefix | 118,598 | **95,503** |
+| the catalog | 56,486 (47.6%) | 56,486 (**59.1%**) |
+| `protocol` | 24,195 (20.4%) | not sent |
+| `operating` | — | 1,100 (1.2%) |
+| content carried more than once | 12,754 (10.8%), 54 repeats | 5,056 (5.3%), 41 repeats |
+
+**What it buys, as a capability count rather than as a character saving.** The resident line is
+150,000 and the catalog is what walks a prefix into it, so the honest unit is how many
+capabilities fit. Measured by cloning capabilities into the recorded catalog and asking
+`cache_prefix`: **the wall moves from eleven capabilities to fifteen.** Eleven fit before at
+141,537 and twelve did not at 151,456; fifteen fit now at 144,335 and sixteen does not at 150,085.
+That is four capabilities of runway, and it is runway rather than a fix — tickets 27 and 28 are
+the fix, and this is what buys them time to be built properly.
+
 ## References
 
 - ADR-0012 — examples illustrate, refusals teach. Governs what the catalog demonstrates; this ADR
@@ -164,3 +207,8 @@ this ADR is the record that the two were once confused.
   sits below that seam.
 - Ticket 22 — removes the claims that the per-turn cost is recovered by caching.
 - Ticket 23 — the prefix census, which is one of the measurements this decision keeps comparable.
+- Ticket 25 — the audience field, and the disclosure amendment above. It narrows what sits beside
+  the catalog and leaves the catalog itself untouched, which is why it amends this decision rather
+  than reopening it.
+- ADR-0016 — the author seam carries payloads and tools and nothing that locates anything. It is
+  the argument for which categories an author can act on at all.

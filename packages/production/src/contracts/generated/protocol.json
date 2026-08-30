@@ -1,6 +1,6 @@
 {
   "category": "protocol",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "contract": {
     "protocolVersion": 1,
     "commands": [
@@ -15,7 +15,7 @@
       },
       {
         "id": "contract.show",
-        "syntax": "vox production contract show <language|plan|catalog|checks|protocol>",
+        "syntax": "vox production contract show <language|plan|catalog|checks|operating|protocol>",
         "prerequisite": "one published category id",
         "effect": "Return one generated versioned contract projection.",
         "readOnly": true,
@@ -144,44 +144,6 @@
       "inputsAreNeverMutated": true,
       "visibleWritesRemainBelowCanonicalRoot": true,
       "symlinkAndReparseEscapesForbidden": true
-    },
-    "preflight": {
-      "authority": "advisory",
-      "requiredBeforeRecord": true,
-      "risksBlockRecord": false,
-      "fabricatesTimings": false,
-      "pointMsPerAuthoredUtf16Unit": 66.25,
-      "uncertaintyMargin": 0.2,
-      "policyIntervalMsPerUnit": [
-        53,
-        79.5
-      ],
-      "assessments": [
-        "point_below",
-        "margin_crosses",
-        "margin_clear"
-      ],
-      "authoritativeStage": "run.compile with a verified Take"
-    },
-    "recording": {
-      "onlyNetworkCommand": "run.record",
-      "recordingInput": "ordered Beat text plus provider, voiceId, modelId and seed",
-      "verifiedMatchingTake": "reuse without quota",
-      "firstDispatch": "autonomous while maxNewTakes budget remains",
-      "identicalInputRedispatch": "replacement grant required",
-      "exhaustedBudget": "paused before network",
-      "uncertainDispatch": "never retried automatically"
-    },
-    "repair": {
-      "planChangeStales": [
-        "validation",
-        "preflight",
-        "compilation",
-        "render"
-      ],
-      "takeRemainsReusableWhen": "ordered Beat texts, segmentation and voice settings are unchanged",
-      "preferredDurationRepair": "reassign or merge existing Beats before changing narration text",
-      "planIsNeverMutatedByProduction": true
     },
     "resume": {
       "immutableResultsAreContentAddressed": true,
@@ -1075,17 +1037,30 @@
                       "plan",
                       "catalog",
                       "checks",
+                      "operating",
                       "protocol"
                     ]
                   },
                   "summary": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "audience": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "author",
+                        "client"
+                      ]
+                    }
                   }
                 },
                 "required": [
                   "id",
-                  "summary"
+                  "summary",
+                  "audience"
                 ],
                 "additionalProperties": false
               }
@@ -1107,6 +1082,7 @@
                 "plan",
                 "catalog",
                 "checks",
+                "operating",
                 "protocol"
               ]
             },

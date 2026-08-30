@@ -13,8 +13,8 @@ So nothing here explains a refusal. It gathers one:
 - the report the envelope published, fetched by its descriptor through the client, never by
   joining a Run root to a path;
 - the published `means` and `repair` for exactly the codes that report named, and no others;
-- what the protocol category publishes about repair and about Preflight, which is where the
-  rule that a Take survives a repair is written down.
+- what the contract publishes about repair, Preflight and the recording quota, which is where
+  the rule that a Take survives a repair is written down.
 
 The crew's only prose is the four headings that separate them.
 
@@ -40,12 +40,17 @@ from .teaching_surface import TeachingSurface
 # them, and it is the body the codes live in — an envelope's `data.report` is only the summary.
 REPORT_KINDS = ("validation_report", "compile_report", "preflight_report")
 
-# What the protocol category publishes that a repair is authored against. All three are read
-# whole: `repair` is where `takeRemainsReusableWhen` and `preferredDurationRepair` are written,
+# What the contract publishes that a repair is authored against. All three are read whole:
+# `repair` is where `takeRemainsReusableWhen` and `preferredDurationRepair` are written,
 # `preflight` is where the assessment vocabulary and its authority are, and `recording` is
 # where the quota rules a repair has to survive are — that a matching Take is reuse without
 # quota, and that redispatching an identical input needs a grant the crew does not hold. A
 # repair authored after a Take exists is authored against all three at once.
+#
+# Named as keys and looked for wherever the contract publishes them, rather than read out of a
+# category by name. They sat inside `protocol` until it was split, and a reader that had been
+# told which category to open would have gone quietly empty on the day they moved — which is a
+# failure a refusal cannot report, because a repair with no guidance still looks like a repair.
 GUIDANCE = ("repair", "preflight", "recording")
 
 
@@ -159,6 +164,27 @@ def _report(
     return body if isinstance(body, Mapping) else None
 
 
+def _guidance(surface: TeachingSurface) -> dict[str, Any]:
+    """The `GUIDANCE` documents, from whichever categories publish them.
+
+    Searched rather than addressed. The three moved category once already, and a lookup that
+    named the category they used to live in would have kept working — returning nothing, on
+    every repair, with no error anywhere to say so.
+
+    First publisher wins, in the index's order, and a second copy of a key is left where it is.
+    Two categories publishing one document is a defect in the contract rather than a choice for
+    a consumer to make, and production's own projection test refuses it; picking a winner here
+    quietly would hide from the crew the one thing it could report.
+    """
+    found: dict[str, Any] = {}
+    for category in surface.categories:
+        published = surface.contract(category)
+        for key in GUIDANCE:
+            if key in published and key not in found:
+                found[key] = published[key]
+    return {key: found[key] for key in GUIDANCE if key in found}
+
+
 def read_refusal(
     client: ProductionClient,
     run_id: str | None,
@@ -171,7 +197,8 @@ def read_refusal(
 
     The checks entries are narrowed to the codes the report actually named. Handing an author
     the whole checks contract again would be handing it something it already has — the
-    instructions carry every category — where the useful thing is which of them applies here.
+    instructions carry every category addressed to an author — where the useful thing is which
+    of them applies here.
     """
     report = _report(client, run_id, envelope)
     published = surface.contract("checks") if "checks" in surface.categories else {}
@@ -179,12 +206,11 @@ def read_refusal(
     for regime in ("errors", "warnings"):
         for code, meaning in (published.get(regime) or {}).items():
             entries[str(code)] = meaning
-    protocol = surface.contract("protocol") if "protocol" in surface.categories else {}
     named = _codes_named(report)
     return Refusal(
         envelope=envelope,
         report=report,
         checks={code: entries[code] for code in named if code in entries},
-        guidance={key: protocol[key] for key in GUIDANCE if key in protocol},
+        guidance=_guidance(surface),
         advisory=advisory,
     )

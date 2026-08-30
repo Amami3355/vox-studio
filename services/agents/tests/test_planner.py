@@ -49,13 +49,15 @@ from vox_crew.planner import (
     plan_and_produce,
     published_errors,
     review,
+    category_part,
     scan_for_leaks,
     scan_message_for_leaks,
+    taught_categories,
 )
 from vox_crew.refusals import Refusal
-from vox_crew.teaching_surface import TeachingSurface
+from vox_crew.teaching_surface import AUTHOR, TeachingSurface
 
-CATEGORIES = ("language", "plan", "catalog", "checks", "protocol")
+CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "protocol")
 
 # The two plans the deixis rule was measured on, read from where the compiler's own suite
 # reads them.
@@ -97,23 +99,34 @@ def a_refusal() -> Refusal:
 def stdout_for(category: str) -> str:
     """The projection as the service wrote it.
 
-    All five are recorded for the planner, where discovery needed only one. Discovery was
+    All six are recorded for the planner, where discovery needed only one. Discovery was
     indifferent to what a projection carried; the prompt is made of it, and the leak scan over
     that prompt only means something against the bodies the build actually publishes.
     """
     return recorded(f"contract-show-{category}.stdout")
 
 
-def a_teaching_surface(categories: tuple[str, ...] = CATEGORIES) -> TeachingSurface:
-    """The surface as discovery would have assembled it, without driving a client for it."""
+def a_teaching_surface(
+    categories: tuple[str, ...] = CATEGORIES, *, audiences: bool = True
+) -> TeachingSurface:
+    """The surface as discovery would have assembled it, without driving a client for it.
+
+    `audiences=False` is the older contract: an index that publishes categories and says
+    nothing about who they are for. It is a parameter here rather than a fixture of its own
+    because the property that matters is a comparison between the two readings of the same
+    recorded bytes, and two builders would let them drift apart.
+    """
     index = parse_envelope(recorded("contract-index.stdout"))
+    published = [
+        entry for entry in (index.data or {})["categories"] if str(entry["id"]) in categories
+    ]
     return TeachingSurface(
         index=index,
         projections={name: parse_envelope(stdout_for(name)) for name in categories},
-        summaries={
-            str(entry["id"]): str(entry["summary"])
-            for entry in (index.data or {})["categories"]
-            if str(entry["id"]) in categories
+        summaries={str(entry["id"]): str(entry["summary"]) for entry in published},
+        audiences={
+            str(entry["id"]): (tuple(entry["audience"]) if audiences else None)
+            for entry in published
         },
     )
 
@@ -201,12 +214,105 @@ class ScriptedPlanAuthor(PlanAuthor):
 # --- The instructions ------------------------------------------------------------------
 
 
-def test_the_instructions_teach_every_category_the_index_published() -> None:
+AUTHORED = ("language", "plan", "catalog", "checks", "operating")
+"""What the recorded index addresses to an author. Read from the fixture, not decided here."""
+
+
+def test_the_instructions_teach_every_category_addressed_to_an_author() -> None:
     text = instructions(SURFACE)
 
-    for category in CATEGORIES:
+    assert taught_categories(SURFACE) == AUTHORED
+    for category in AUTHORED:
         assert category in text
         assert SURFACE.summary(category) in text
+
+
+def test_the_instructions_leave_out_what_the_contract_addresses_elsewhere() -> None:
+    """Ticket 25. A fifth of every turn taught a machine ADR-0016 forbids the author to operate.
+
+    The whole part goes, framing and summary with it — a category half-dropped would be a body
+    with no heading, which is worse than either. What proves it left is the body: `protocol` as
+    a word survives in `protocolVersion` and in the plan schema, and a substring check alone
+    would have gone on passing while the document was still being sent.
+    """
+    text = instructions(SURFACE)
+
+    assert "protocol" not in taught_categories(SURFACE)
+    assert category_part(SURFACE, "protocol") not in text
+    assert SURFACE.summary("protocol") not in text
+    # The largest single thing that leaves, and the reason the ticket exists.
+    assert json.dumps(
+        SURFACE.contract("protocol")["schemas"], separators=(",", ":"), ensure_ascii=False
+    ) not in text
+
+
+def test_a_contract_that_publishes_no_audience_is_taught_whole() -> None:
+    """The assertion that keeps this from being a flag day.
+
+    An index with no audience field is an older contract, not a contract addressed to nobody,
+    and it yields the prefix it yielded before any of this — byte for byte, preamble included.
+    The expected text is built by concatenation, which is not what is under test; the filter is.
+    """
+    older = a_teaching_surface(audiences=False)
+    reduced = instructions(SURFACE)
+    preamble = reduced[: reduced.index(category_part(SURFACE, "language"))]
+
+    text = instructions(older)
+
+    assert taught_categories(older) == SURFACE.categories
+    assert text == preamble + "".join(
+        category_part(older, category) for category in SURFACE.categories
+    )
+
+
+def test_a_new_category_addressed_to_the_author_is_taught_with_no_edit() -> None:
+    """The risk of this change is that filtering hardens into a list. This is the guard.
+
+    The crew has never heard of `invented`, and it holds no rule that would let it in — only
+    the audience the index published beside it.
+    """
+    surface = a_teaching_surface()
+    invented = TeachingSurface(
+        index=surface.index,
+        projections={**surface.projections, "invented": parse_envelope(stdout_for("checks"))},
+        summaries={**surface.summaries, "invented": "Something the crew has never heard of."},
+        audiences={**surface.audiences, "invented": (AUTHOR,)},
+    )
+
+    text = instructions(invented)
+
+    assert taught_categories(invented) == (*AUTHORED, "invented")
+    assert "Something the crew has never heard of." in text
+
+
+def test_a_category_addressed_to_nobody_is_not_the_same_as_one_that_said_nothing() -> None:
+    """`None` and `()` are different answers, and reading them alike would be a guess.
+
+    An index that published an empty audience has spoken; one that published no field has not.
+    """
+    surface = a_teaching_surface()
+    silent = TeachingSurface(
+        index=surface.index,
+        projections=surface.projections,
+        summaries=surface.summaries,
+        audiences={**surface.audiences, "catalog": ()},
+    )
+
+    assert surface.audience("catalog") == ("author", "client")
+    assert "catalog" not in taught_categories(silent)
+    assert "catalog" in taught_categories(a_teaching_surface(audiences=False))
+
+
+def test_the_catalog_reaches_the_author_unchanged_by_the_filter() -> None:
+    """ADR-0017 governs the catalog, and nothing here narrows, tiers or defers it.
+
+    Asserted against the same catalog assembled with no filtering at all, so what is compared
+    is the part itself rather than a total that could net out.
+    """
+    older = a_teaching_surface(audiences=False)
+
+    assert category_part(SURFACE, "catalog") in instructions(SURFACE)
+    assert category_part(SURFACE, "catalog") == category_part(older, "catalog")
 
 
 def test_a_category_the_contract_adds_is_a_category_the_instructions_teach() -> None:
@@ -239,6 +345,23 @@ def test_the_instructions_pass_a_leak_scan() -> None:
 
     assert scan.violations == ()
     assert scan.ok
+
+
+def test_the_reduced_prefix_still_carries_every_published_anchor_form() -> None:
+    """A category dropped is not allowed to take the anchor grammar with it.
+
+    The forms are read out of the catalog's own time vocabulary and looked for in the text a
+    model is sent. Nothing about them lived in `protocol`, which is the point: the assertion is
+    cheap and it is the one that would have caught a filter cutting deeper than it meant to.
+    """
+    text = instructions(SURFACE)
+    published = anchor_forms(SURFACE.contract("catalog")["time"])
+
+    assert published
+    for form in published:
+        assert form.form in text, f"the {form.form} form is not in the prefix"
+        for example in form.examples:
+            assert example in text, f"{example} is not in the prefix"
 
 
 @pytest.mark.parametrize("category", CATEGORIES)

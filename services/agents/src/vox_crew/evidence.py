@@ -79,7 +79,7 @@ SYSTEM = "system"
 # What the assertion sheet expects a Run to have discovered. Restated here rather than derived
 # from what this Run happened to read, because an expectation taken from the observation is not
 # an expectation.
-CATEGORIES = ("catalog", "checks", "language", "plan", "protocol")
+CATEGORIES = ("catalog", "checks", "language", "operating", "plan", "protocol")
 
 # The two structural facts that put a prefix cache out of reach, held in one sentence because
 # the bundle publishes them twice — once as `prefixCache.reason` and once in the non-claims. Two
@@ -253,11 +253,15 @@ def verify(files: Mapping[str, bytes]) -> str:
 def _commands(run: ConvergedRun) -> list[dict[str, Any]]:
     """Every envelope the crew received, in arrival order, with the bytes production wrote.
 
-    Discovery first. A crew Run begins before its Run does — the contract index and the five
-    projections are commands production answered, and they are the ones that decide what the
-    plan was authored against. `ConvergedRun.envelopes` starts at `run.init` because that is
-    where the loop starts; the surface kept the rest, so the two together are the whole trail
-    and neither is a copy of the other.
+    Discovery first. A crew Run begins before its Run does — the contract index and every
+    projection are commands production answered, and they are the ones that decide what the
+    plan was authored against. Every projection, including the ones no prompt carries: what
+    discovery read is the fact this file records, and narrowing it to what reached a model
+    would put the trail and the prompt in one column and lose the difference.
+
+    `ConvergedRun.envelopes` starts at `run.init` because that is where the loop starts; the
+    surface kept the rest, so the two together are the whole trail and neither is a copy of
+    the other.
 
     The command and the outcome are lifted out beside the envelope the way the proof bundles
     lift `argv` and `exitCode` out beside the stdout they came from — the file reads as a

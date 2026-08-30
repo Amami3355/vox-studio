@@ -1,6 +1,6 @@
 # 25: The author is taught only what it can act on
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -145,12 +145,64 @@ property standing, and is reversible by publishing a wider audience.
 
 **Blocked by:** None (can start immediately; needs its production sibling to land with it)
 
-- [ ] The contract index publishes an audience per category, and the crew reads it
-- [ ] The crew assembles the categories addressed to it and adds no list, guess or pattern of its own
-- [ ] A contract publishing no audience field yields today's prefix byte for byte
-- [ ] A new category addressed to the author is taught with no edit to the crew
-- [ ] The catalog's contribution to the prefix is byte-identical before and after, asserted
-- [ ] The census accounts for the whole reduced prefix, and records are committed either side
-- [ ] The commit names which measurements the new prefix regime retires, per ADR-0017
-- [ ] The leak scan passes and every published anchor form still appears in the prefix
-- [ ] The headroom gained is stated as a measured capability count, not as a character saving
+- [x] The contract index publishes an audience per category, and the crew reads it
+- [x] The crew assembles the categories addressed to it and adds no list, guess or pattern of its own
+- [x] A contract publishing no audience field yields today's prefix byte for byte
+- [x] A new category addressed to the author is taught with no edit to the crew
+- [x] The catalog's contribution to the prefix is byte-identical before and after, asserted
+- [x] The census accounts for the whole reduced prefix, and records are committed either side
+- [x] The commit names which measurements the new prefix regime retires, per ADR-0017
+- [x] The leak scan passes and every published anchor form still appears in the prefix
+- [x] The headroom gained is stated as a measured capability count, not as a character saving
+
+## Comments
+
+### 2026-08-30 — landed, with the split falling inside `protocol` as the ticket expected
+
+**The design question the ticket left open is answered by a split, not by a finer field.**
+`protocol` became two categories: `operating` (`preflight`, `recording`, `repair`) addressed to
+`['author', 'client']`, and `protocol` (`protocolVersion`, `commands`, `lifecycle`, `transport`,
+`exitCodes`, `writeBoundary`, `resume`, `schemas`) addressed to `['client']`. The audience is a
+list rather than a single value because four categories have two readers — the crew's own code
+reads `catalog`, `checks` and `operating`, and the prompt reads `language`, `plan`, `catalog`,
+`checks` and `operating`.
+
+A per-key audience *inside* a category was considered and rejected. It would have made the crew
+assemble a subset of a published body, which is the consumer holding an opinion about the
+contract that the ticket forbids in the other direction. A category is the unit the contract
+publishes, so it is the unit an audience can be attached to. The cost of the split is 218
+characters of second heading, summary and framing — the reason a same-shape measurement of the
+post-split contract taught whole reads 118,816 rather than 118,598.
+
+**Measured, at the new boundary.** The prefix is 118,598 → **95,503**, and the catalog is
+byte-identical either side — the `catalog`, `checks`, `language` and `plan` fixtures are
+untouched in this commit, which is stronger evidence than the assertion the ticket asked for and
+is committed beside it. Content the prefix carries more than once falls from 12,754 (10.8%,
+54 repeats) to 5,056 (5.3%, 41). The 5,146-character `protocol.schemas` repeat the ticket named
+is simply not sent any more; it is still published, and still production's to deduplicate.
+
+**The headroom, as a capability count.** The wall moves from **eleven capabilities to fifteen** —
+eleven fit at 141,537 and twelve did not at 151,456; fifteen fit at 144,335 and sixteen does not
+at 150,085, measured by cloning capabilities into the recorded catalog and asking `cache_prefix`,
+the ticket's own method. That is four capabilities of runway rather than the two or three the
+ticket estimated. `RESIDENT_CHARS_ALLOWED` was deliberately left at 150,000: raising the line in
+the same commit that bought distance from it would have spent the gain immediately.
+
+**ADR-0017 is amended, not reopened.** The catalog still goes in whole, resident and identical
+across turns. The amendment names what the new regime retires: every share and every prefix-size
+figure denominated at 118,598, this ticket's own 20.4% included. Body character counts are not
+retired, because no body moved. Ticket 17's Word-anchor counts are not retired, and the census
+confirms it — 40 boundary anchors over 19 statements and 12 word anchors over 6, unchanged.
+
+**Two things moved that the ticket did not anticipate, both for the same reason.**
+`refusals.py` read its three guidance documents out of `protocol` by name, and would have gone
+silently empty on the day they moved — a repair with no guidance still looks like a repair. It
+now searches for the keys wherever the contract publishes them. `proof/harness.ts` walked a
+hardcoded list of categories to backfill what an agent did not ask for; that is an action rather
+than an expectation, so it now reads `CONTRACT_CATEGORIES`. The assertion sheet beside it keeps
+its restated list, deliberately.
+
+**What is not done here.** Nothing narrows, tiers or defers a capability; `protocol.schemas` is
+not deduplicated; and no ratio is encoded anywhere. Tickets 27 and 28 are still the fix. Suites:
+crew `pytest` 324 passed 1 skipped (was 316/1), workspace `vitest` 910 passed across 63 files,
+`pnpm check` and `tsc --noEmit` clean.

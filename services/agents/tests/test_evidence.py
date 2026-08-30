@@ -124,7 +124,7 @@ def test_every_envelope_reaches_the_command_transcript_in_the_order_it_arrived()
     assert [record["ordinal"] for record in records] == list(range(1, len(trail) + 1))
     assert records[0]["command"] == "contract.index"
     assert records[1]["command"] == "contract.show"
-    assert records[6]["command"] == "run.init"
+    assert records[len(run.surface.envelopes)]["command"] == "run.init"
 
 
 def test_the_command_transcript_carries_the_bytes_production_wrote() -> None:

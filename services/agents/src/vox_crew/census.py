@@ -28,7 +28,13 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .planner import CachedPrefix, PublishedForm, anchor_forms, category_part
+from .planner import (
+    CachedPrefix,
+    PublishedForm,
+    anchor_forms,
+    category_part,
+    taught_categories,
+)
 from .teaching_surface import TeachingSurface
 
 PREAMBLE = "preamble"
@@ -253,11 +259,16 @@ def _repeats(prefix: CachedPrefix) -> tuple[Repeat, ...]:
     """Content the assembled prefix carries in more than one place.
 
     Found in the published bodies, structurally: what repeats is a JSON object or array, and
-    the flat prefix has no structure to find one in. That is a search over the projections, so
-    what it finds is confirmed against the assembled text before it is reported — every blob
-    here is a substring the prefix really carries, as many times as it is said to, because
-    `category_part` embeds each body with the same compact serialisation this walks. The
-    denominator stays the prefix, so a share is a share of what a model is sent.
+    the flat prefix has no structure to find one in. So it is a search over the projections the
+    prefix is assembled from, and what it finds is confirmed against the assembled text before
+    it is reported: every blob here is a substring the prefix really carries, as many times as
+    it is said to, because `category_part` embeds each body with the same compact serialisation
+    this walks. The denominator stays the prefix, so a share is a share of what a model is sent.
+
+    The projections the prefix is assembled from, and not every one the surface holds. A body
+    the contract publishes to some other audience is not a repeat a model is sent, and counting
+    it would report a cost nobody pays — and the confirmation step above would refuse the whole
+    census rather than report it, since that blob is in no prefix to be found in.
 
     Its one blind spot, named rather than implied: duplication *between* a body and the crew's
     preamble or the per-category framing is invisible to this, because the framing is prose
@@ -271,7 +282,7 @@ def _repeats(prefix: CachedPrefix) -> tuple[Repeat, ...]:
     fails a build. Reporting only outermost repeats is what keeps the list short without one.
     """
     found: dict[str, list[tuple[str, ...]]] = {}
-    for category in prefix.surface.categories:
+    for category in taught_categories(prefix.surface):
         for where, blob in _nodes(prefix.surface.contract(category), (category,)):
             found.setdefault(blob, []).append(where)
     repeated = {where for places in found.values() if len(places) > 1 for where in places}
@@ -305,7 +316,7 @@ def _divided(prefix: CachedPrefix) -> tuple[tuple[str, str], ...]:
     text = prefix.text
     parts: list[tuple[str, str]] = []
     at = 0
-    for category in prefix.surface.categories:
+    for category in taught_categories(prefix.surface):
         part = category_part(prefix.surface, category)
         found = text.find(part, at)
         if found < 0:

@@ -91,19 +91,26 @@ envelope that was already here could produce.
 Its report body uses the same canonical serialisation as the rest, so the digest in the
 envelope that publishes it is the digest of those exact bytes.
 
-## Why all five projections are recorded
+## Why every projection is recorded
 
 `checks` was recorded alone at first. The client was the thing under test and was indifferent
 to what a projection carried, so committing ~125 KB of generated contract data that drifts the
 moment the catalog is rebuilt bought nothing.
 
 The planner is not indifferent to any of them. Its instructions *are* these bodies — it
-assembles the prompt from every category the index publishes — and two of the acceptance
-criteria are about that text: the leak scan over it, and the capability, action and anchor
-names an authored plan is read back against. Both are assertions about the contract the build
-publishes, and neither means anything against a stand-in. The protocol category is the sharpest
-case: it tells an agent a plan is submitted as `plan.json`, which is why the crew's leak-marker
-list may not contain that string, and only the recorded body proves it.
+assembles the prompt from every category the index addresses to an author — and two of the
+acceptance criteria are about that text: the leak scan over it, and the capability, action and
+anchor names an authored plan is read back against. Both are assertions about the contract the
+build publishes, and neither means anything against a stand-in. The protocol category is the
+sharpest case: it tells an agent a plan is submitted as `plan.json`, which is why the crew's
+leak-marker list may not contain that string, and only the recorded body proves it.
+
+**Including the ones the prompt does not carry.** Since crew ticket 25 the index publishes an
+audience per category, and `protocol` is addressed to the client rather than to an author — so
+it is fetched, held and read by `refusals.py` and `converge.py`, and never assembled into a
+prompt. It is recorded for the same reason the others are: the tests that read it read the body
+the build publishes. A fixture set narrowed to what a model is sent would leave the half of the
+crew that drives production testing against nothing.
 
 Re-record when the contracts are rebuilt. The bare command writes the index and every
 category the index publishes, which is the whole recorded set:

@@ -41,7 +41,7 @@ from vox_crew.context import (
 )
 from vox_crew.converge import repair_budget, target_seconds
 from vox_crew.envelopes import ArtifactDescriptor, parse_envelope
-from vox_crew.planner import instructions, message_text
+from vox_crew.planner import instructions, message_text, taught_categories
 from vox_crew.refusals import read_refusal
 
 # What a showcase Brief asks for, in the words a Brief asks in. Only the duration matters
@@ -222,11 +222,16 @@ def test_tokens_are_an_upper_bound_over_an_exact_character_count() -> None:
 
 
 def test_the_resident_teaching_surface_fits_the_allowance_it_was_measured_against() -> None:
-    """The dominant term, over every projection the contract publishes today.
+    """The dominant term, over the projections a model is actually sent.
 
     This is the guard that keeps the number in `context.py` a measurement rather than a
     memory. A catalog that grows past the allowance fails here, with both figures beside each
     other, instead of on a billed Run.
+
+    Two sets, deliberately: the surface holds every category the contract publishes, and the
+    prefix carries the ones addressed to an author. Asserting the first against `CATEGORIES`
+    is what stops the second quietly shrinking to nothing — a filter that dropped everything
+    would fit the allowance beautifully.
     """
     resident = len(instructions(SURFACE))
 
@@ -235,6 +240,8 @@ def test_the_resident_teaching_surface_fits_the_allowance_it_was_measured_agains
         f"{RESIDENT_CHARS_ALLOWED} the budget allows"
     )
     assert set(SURFACE.categories) == set(CATEGORIES)
+    assert set(taught_categories(SURFACE)) < set(CATEGORIES)
+    assert resident > RESIDENT_CHARS_ALLOWED // 2
 
 
 def test_a_showcase_run_at_its_worst_stays_inside_the_budget() -> None:

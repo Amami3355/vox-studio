@@ -17,12 +17,12 @@ import pathlib
 
 import pytest
 from conftest import recorded
-from test_planner import SURFACE
+from test_planner import SURFACE, a_teaching_surface
 from test_teaching_surface import projection
 from vox_crew.census import CensusIncomplete, take_census
 from vox_crew.census_record import render_prefix_census
 from vox_crew.envelopes import parse_envelope
-from vox_crew.planner import CachedPrefix, cache_prefix
+from vox_crew.planner import CachedPrefix, cache_prefix, taught_categories
 from vox_crew.teaching_surface import TeachingSurface
 
 
@@ -31,12 +31,34 @@ def test_the_division_accounts_for_every_character_of_the_prefix() -> None:
 
     A census that silently skipped a category would report a balance over material it had not
     seen, which is worse than not measuring.
+
+    The whole thing is the prefix, which since ticket 25 is the categories the contract
+    addresses to an author rather than every category it publishes. Both halves of that are
+    asserted: the parts are the taught ones, and a category published to somebody else is
+    absent — a census that divided by `surface.categories` would have refused every real prefix
+    rather than mismeasuring one, but it would have refused it for the wrong reason.
     """
     prefix = cache_prefix(SURFACE)
 
     census = take_census(prefix)
 
-    assert [part.name for part in census.parts] == ["preamble", *SURFACE.categories]
+    assert [part.name for part in census.parts] == ["preamble", *taught_categories(SURFACE)]
+    assert "protocol" not in [part.name for part in census.parts]
+    assert sum(part.chars for part in census.parts) == census.chars == prefix.chars
+
+
+def test_the_division_accounts_for_a_prefix_carrying_every_category() -> None:
+    """The older contract measures too, and the instrument reads whichever it is handed.
+
+    The census asks the prefix which categories it is made of rather than assuming an answer,
+    so a contract that publishes no audience is divided into all six and still adds up.
+    """
+    older = a_teaching_surface(audiences=False)
+    prefix = cache_prefix(older)
+
+    census = take_census(prefix)
+
+    assert [part.name for part in census.parts] == ["preamble", *older.categories]
     assert sum(part.chars for part in census.parts) == census.chars == prefix.chars
 
 

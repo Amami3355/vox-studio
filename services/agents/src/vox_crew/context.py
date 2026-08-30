@@ -1,9 +1,9 @@
 """What one Run sends a model, and the budget it works within.
 
-The crew's prompt is dominated by one thing. The five projections assemble into roughly 125 KB
-of instructions, the catalog is half of that, and every turn of the repair loop is authored
-against the whole of it — so a Run answering one Brief puts six times the catalog in front of
-a model. `planner.cache_prefix` assembles it once and every turn reads that same object, which
+The crew's prompt is dominated by one thing. The projections addressed to an author assemble
+into roughly 95 KB of instructions, the catalog is nearly 60% of that, and every turn of the
+repair loop is authored against the whole of it — so a Run answering one Brief puts six times
+the catalog in front of a model. `planner.cache_prefix` assembles it once and every turn reads that same object, which
 makes those six prefixes byte-identical.
 
 **What that does and does not establish.** `cache_prefix` caches inside this process: one
@@ -37,7 +37,7 @@ side, and the crew says nothing about it in either direction.
 
 **This module's vocabulary does not belong in `CONTEXT.md`.** It was tried, and the build
 refused it correctly: the repository glossary is *generated into the `language` contract*, which
-is one of the five projections published to an agent. So a "resident prefix" entry there would
+is one of the projections published to an agent. So a "resident prefix" entry there would
 teach a model about the crew's own budget accounting — implementation detail reaching a prompt,
 which is the thing the leak scan exists to stop — and would grow the very prefix it describes.
 The terms are defined here and in `services/agents/README.md`, which agents never read.
@@ -74,11 +74,15 @@ from dataclasses import dataclass
 # prompt has been observed at, which is the direction a budget wants to be wrong in.
 CHARS_PER_TOKEN = 3
 
-# What the resident prefix may grow to. The teaching surface assembles to ~125,000 characters
-# today, measured over the recorded projections by `tests/test_context.py`, which fails if it
-# passes this line. The headroom is about a fifth, which is room for the catalog to gain
-# capabilities without a Run being refused for it — and small enough that a projection arriving
-# whole is a failure rather than a shrug.
+# What the resident prefix may grow to. The prefix assembles to ~95,500 characters today,
+# measured over the recorded projections by `tests/test_context.py`, which fails if it passes
+# this line. The headroom is about a third — room for the catalog to gain four more
+# capabilities before a Run is refused for it, measured by crew ticket 25 rather than argued —
+# and small enough that a projection arriving whole is a failure rather than a shrug.
+#
+# The line itself did not move for ticket 25, and deliberately: what that ticket bought is
+# distance from a fixed line, and raising the line at the same time would have spent the gain
+# in the same commit that made it.
 RESIDENT_CHARS_ALLOWED = 150_000
 
 # What one turn may add on top of the prefix, averaged over the turns a Run is allowed: a
