@@ -86,6 +86,13 @@ class TeachingSurface:
         alternative is a crew that goes silent against a contract it can still understand. An
         index that published an empty audience has said something, and what it said is that
         this category is addressed to nobody.
+
+        **The contract as published today cannot say that**: its index schema requires at
+        least one audience per category, which is the producer's own guard against a category
+        added with the field left blank. The distinction is kept anyway, because this reads
+        what arrives across a process boundary rather than what a schema on the other side of
+        it promises — and because collapsing the two would make an empty list mean "teach this
+        to everyone", which is the one reading of it nobody could have intended.
         """
         return self.audiences.get(category)
 

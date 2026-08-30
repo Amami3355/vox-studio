@@ -229,9 +229,11 @@ def test_the_resident_teaching_surface_fits_the_allowance_it_was_measured_agains
     other, instead of on a billed Run.
 
     Two sets, deliberately: the surface holds every category the contract publishes, and the
-    prefix carries the ones addressed to an author. Asserting the first against `CATEGORIES`
-    is what stops the second quietly shrinking to nothing — a filter that dropped everything
-    would fit the allowance beautifully.
+    prefix carries the ones addressed to an author. Both are named, because a filter that
+    dropped everything would fit this allowance beautifully — and the guard against that is
+    the catalog being *in* the prefix, not a ratio. What a prefix ought to weigh relative to
+    its budget has never been argued, and ticket 23's refusal to encode an unargued number
+    stands here as much as it does in the census.
     """
     resident = len(instructions(SURFACE))
 
@@ -240,8 +242,7 @@ def test_the_resident_teaching_surface_fits_the_allowance_it_was_measured_agains
         f"{RESIDENT_CHARS_ALLOWED} the budget allows"
     )
     assert set(SURFACE.categories) == set(CATEGORIES)
-    assert set(taught_categories(SURFACE)) < set(CATEGORIES)
-    assert resident > RESIDENT_CHARS_ALLOWED // 2
+    assert "catalog" in taught_categories(SURFACE)
 
 
 def test_a_showcase_run_at_its_worst_stays_inside_the_budget() -> None:

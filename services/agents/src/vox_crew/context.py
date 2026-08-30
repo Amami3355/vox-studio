@@ -3,8 +3,8 @@
 The crew's prompt is dominated by one thing. The projections addressed to an author assemble
 into roughly 95 KB of instructions, the catalog is nearly 60% of that, and every turn of the
 repair loop is authored against the whole of it — so a Run answering one Brief puts six times
-the catalog in front of a model. `planner.cache_prefix` assembles it once and every turn reads that same object, which
-makes those six prefixes byte-identical.
+the catalog in front of a model. `planner.cache_prefix` assembles it once and every turn
+reads that same object, which makes those six prefixes byte-identical.
 
 **What that does and does not establish.** `cache_prefix` caches inside this process: one
 assembly, held and re-read by every turn. It is not a provider cache and it recovers no cost.

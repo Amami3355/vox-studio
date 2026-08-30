@@ -206,3 +206,74 @@ its restated list, deliberately.
 not deduplicated; and no ratio is encoded anywhere. Tickets 27 and 28 are still the fix. Suites:
 crew `pytest` 324 passed 1 skipped (was 316/1), workspace `vitest` 910 passed across 63 files,
 `pnpm check` and `tsc --noEmit` clean.
+
+### 2026-08-30 — the two-axis review, and the three ticks that were not yet earned
+
+`mattpocock-skills:code-review` over `2224069..af2f39d`. The Spec axis found that **three of the
+nine boxes were ticked over assertions that could not fail**, which is the same defect ticket 31
+was reopened for a session ago and is worth naming as a pattern rather than as an incident.
+
+- *"A contract publishing no audience field yields today's prefix byte for byte."* The test built
+  an audience-less surface out of **today's** fixtures and compared it against today's assembly.
+  Both halves move together, so it could not fail — and "today's prefix" was not today's: the
+  split adds 218 characters of second heading, which the entry above concedes and the tick hid.
+  Fixed by freezing the contract as it stood at `2224069` under
+  `tests/fixtures/older-contract/`, six files, never re-recorded. The prefix it assembles is
+  pinned at **118,598** exactly. That pin is not the kind ticket 23 refused: nothing under that
+  directory is ever rebuilt, so it goes red only if the crew changes what it does with a contract
+  it has already seen, which is the flag day the criterion is about.
+- *"The catalog's contribution is byte-identical before and after, asserted."* The test compared
+  `category_part` of one fixture with itself, through a function that never consults an audience.
+  Now compared across the frozen older contract and the current one — two different indexes and
+  two different `protocol` bodies — for all four untouched categories, with the total reconciled
+  as `118,598 − protocol + operating`.
+- *"The contract index publishes an audience per category, **and the crew reads it**."* Every
+  audience test built a `TeachingSurface` by hand. Deleting `audiences=audiences` from
+  `read_teaching_surface`'s return left the whole suite green. Two tests now drive discovery
+  through the client, one for the published field and one for an index that omits it.
+
+**And one implementation decision was quietly dropped.** *"The census keeps reporting it either
+way."* `_repeats` and `_divided` were pointed at the taught categories, which is right for the
+accounting — the parts must sum to the prefix — but it took `protocol` out of the instrument
+entirely and the 5,146-character `protocol.schemas` row off the record. The census now has a
+`withheld` section: every category the contract publishes that the prefix does not carry, what it
+would have cost, and the repeats inside it, reported below the accounting and counted in no total
+above it. The repeat ticket 23 found is back on the record, marked as duplication nobody is
+charged for.
+
+**Two assertions were removed for breaching this ticket's own Out of Scope.** `test_context.py`
+had grown `assert resident > RESIDENT_CHARS_ALLOWED // 2` — an unargued ratio, which is exactly
+what ticket 23 refused and this ticket said still stands — and `assert set(taught_categories(...))
+< set(CATEGORIES)`, which hardcodes that something must always be withheld and would fail a
+budget test for an unrelated reason if a contract ever addressed everything to the author. The
+guard against a filter that drops everything is now that the catalog is *in* the prefix.
+
+The Standards axis found no ADR contradiction and no documented-standard breach in the code. Its
+findings were prose: `record-crew-fixtures.ts` still said "all five", the fixtures README carried
+a retired ~125 KB figure inside a rewritten paragraph, ticket 27's three 118,598 figures were
+covered by the amendment's blanket clause but not named in its explicit list, and one docstring
+line ran to 118 characters. All fixed. It also caught a real contradiction: `teaching_surface.py`
+documented `()` as a meaningful published answer while `schemas.ts` requires `.min(1)`, so no
+real index can emit it. The schema keeps its guard and the docstring now says why a consumer
+reads a state its producer forbids.
+
+**Deliberately not taken, and why.**
+
+- **No `CONTEXT.md` entry for `audience`.** `domain.md` treats a missing concept as a signal, and
+  this one is load-bearing. But `CONTEXT.md` is generated into the `language` projection, so
+  defining `audience` there would teach a model about the crew's own plumbing and grow the prefix
+  this ticket shrank — the precedent `context.py` already set for "resident prefix", for the same
+  reason and in the same words.
+- **`TeachingSurface`'s three parallel category-keyed maps** (`projections`, `summaries`,
+  `audiences`) want to be one per-category record. Correct, and a refactor touching every consumer
+  and every test — its own ticket, not a rider on this one. Two of the three maps pre-date it.
+- **`taught_categories` staying in `planner.py`** rather than becoming a property of the surface.
+  It reads as a Middle Man over `addressed_to(AUTHOR)`, but the step it takes is real: the surface
+  should not know it is being read for a prompt, and "which categories is the prefix made of" is
+  the planner's question. `census.py` importing it from there is the point.
+- **`refusals._guidance` walking the surface** rather than becoming `surface.publishing(key)`, and
+  **`addressed_to` being parameterised** when only `AUTHOR` is passed. Both are judgement calls
+  the reviewer marked as such; adding surface API for one caller trades one smell for another.
+
+Suites after the round: crew `pytest` **330 passed, 1 skipped**; workspace `vitest` 910 across 63
+files; `pnpm check`, `tsc --noEmit` and `contracts:check` clean.

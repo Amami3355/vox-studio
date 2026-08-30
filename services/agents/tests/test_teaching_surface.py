@@ -75,6 +75,56 @@ def test_asks_for_the_index_and_then_every_category_it_published() -> None:
     assert surface.categories == CATEGORIES
 
 
+def test_reads_the_audience_the_index_published_beside_each_category() -> None:
+    """The one parsing path the audience field has, driven the way discovery drives it.
+
+    Every other test about audiences builds a `TeachingSurface` by hand, which tests the
+    reading and not the parsing — dropping `audiences` from what `read_teaching_surface`
+    returns would leave all of them green. This one goes through the client.
+    """
+    surface = read_teaching_surface(StubClient(recorded("contract-index.stdout")))
+
+    assert surface.audience("catalog") == ("author", "client")
+    assert surface.audience("protocol") == ("client",)
+    assert surface.addressed_to("author") == (
+        "language",
+        "plan",
+        "catalog",
+        "checks",
+        "operating",
+    )
+    assert surface.addressed_to("client") == ("catalog", "checks", "operating", "protocol")
+
+
+def test_an_index_that_names_no_audience_leaves_every_category_readable() -> None:
+    """An older contract is not a contract addressed to nobody.
+
+    `None` is what discovery records for a category the index said nothing about, and it is
+    what `addressed_to` reads as "this one is for whoever is asking". The frozen contract at
+    `fixtures/older-contract/` is the real one; this asserts the parsing, over an index that
+    publishes categories and no audience field at all.
+    """
+    older = json.dumps(
+        {
+            "protocolVersion": 1,
+            "command": "contract.index",
+            "outcome": "succeeded",
+            "run": None,
+            "data": {"categories": [{"id": name, "summary": name} for name in CATEGORIES]},
+            "artifacts": [],
+            "error": None,
+            "next": [],
+        },
+        separators=(",", ":"),
+    ) + "\n"
+
+    surface = read_teaching_surface(StubClient(older))
+
+    assert all(surface.audience(name) is None for name in CATEGORIES)
+    assert surface.addressed_to("author") == CATEGORIES
+    assert surface.addressed_to("nobody-has-ever-asked-for-this") == CATEGORIES
+
+
 def test_holds_every_projection_in_context() -> None:
     surface = read_teaching_surface(StubClient(recorded("contract-index.stdout")))
 

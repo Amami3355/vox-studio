@@ -171,7 +171,9 @@ named here rather than left to be discovered.
 **Retired: every prefix-size and category-share figure taken before this change** — which is to
 say every figure denominated at the 118,598-character boundary, including this ADR's own Context
 and Amendment text above, ticket 23's census record, ticket 22's `residentChars`, ticket 19's
-"118,598-character prefix", and the spec's 118,598 / 119,266 pair. The character counts of
+"118,598-character prefix", the three figures in ticket 27 — which is open and unlanded, so it is
+the one a reader will take as current — and the spec's 118,598 / 119,266 pair, which is updated in
+place rather than left to be caught by this clause. The character counts of
 individual *bodies* are not retired: the catalog is still 56,486 and the checks still 9,660,
 because nothing about those documents moved. What is retired is every *share*, since the
 denominator changed.

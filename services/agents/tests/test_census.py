@@ -22,7 +22,7 @@ from test_teaching_surface import projection
 from vox_crew.census import CensusIncomplete, take_census
 from vox_crew.census_record import render_prefix_census
 from vox_crew.envelopes import parse_envelope
-from vox_crew.planner import CachedPrefix, cache_prefix, taught_categories
+from vox_crew.planner import CachedPrefix, cache_prefix, category_part, taught_categories
 from vox_crew.teaching_surface import TeachingSurface
 
 
@@ -292,6 +292,51 @@ def test_a_prefix_that_repeats_nothing_reports_nothing() -> None:
     assert census.repeated_chars == 0
 
 
+def test_the_census_still_names_what_the_contract_publishes_elsewhere() -> None:
+    """Ticket 25 stopped the crew paying for `protocol.schemas`; it did not stop it looking.
+
+    The category the contract addresses to a client is not a part and is in no total — nothing
+    of it is sent — but the largest duplication anyone has found in this contract lives in it,
+    and a census that simply went quiet would leave the next session unable to tell a category
+    withheld from one never published.
+    """
+    census = take_census(cache_prefix(SURFACE))
+
+    withheld = {item.name: item for item in census.withheld}
+    assert set(withheld) == set(SURFACE.categories) - set(taught_categories(SURFACE))
+    assert withheld["protocol"].chars == len(category_part(SURFACE, "protocol"))
+    # The repeat ticket 23 found and ticket 25 stopped sending, still on the record.
+    largest = max(withheld["protocol"].repeats, key=lambda repeat: repeat.chars)
+    assert largest.chars == 5146
+    assert largest.where == (
+        "protocol.schemas.commandData.run.preflight.properties.report.properties",
+        "protocol.schemas.preflightReport.properties",
+    )
+
+
+def test_nothing_withheld_is_counted_in_anything_the_prefix_is_measured_by() -> None:
+    """The accounting above stays an accounting of the prefix, and only of the prefix."""
+    census = take_census(cache_prefix(SURFACE))
+
+    assert census.withheld_chars > 0
+    assert [part.name for part in census.parts] == ["preamble", *taught_categories(SURFACE)]
+    assert sum(part.chars for part in census.parts) == census.chars
+    assert all(
+        not where.startswith("protocol.")
+        for repeat in census.repeats
+        for where in repeat.where
+    )
+
+
+def test_a_contract_that_withholds_nothing_reports_nothing_withheld() -> None:
+    """An older contract addresses nothing elsewhere, so the section has nothing to say."""
+    census = take_census(cache_prefix(a_teaching_surface(audiences=False)))
+
+    assert census.withheld == ()
+    assert census.withheld_chars == 0
+    assert "## What the contract publishes elsewhere" not in render_prefix_census(census)
+
+
 RECORD = pathlib.Path(__file__).resolve().parent.parent / "prefix-census.md"
 """Where the durable record lives: beside the project, not inside the suite's temp directory.
 
@@ -299,6 +344,16 @@ The ticket asks that two censuses taken either side of a contract change be comp
 re-deriving either. This is that record, and the comparison is the diff: the fixtures move only
 when the contract moves, so a change here is a change in what the crew is taught.
 """
+
+
+def test_the_record_names_the_withheld_category_and_the_repeat_inside_it() -> None:
+    """What a session reads about what it stopped sending."""
+    rendered = render_prefix_census(take_census(cache_prefix(SURFACE)))
+
+    assert "## What the contract publishes elsewhere" in rendered
+    assert "| protocol | 23,313 |" in rendered
+    assert "`protocol.schemas.preflightReport.properties`" in rendered
+    assert "5,146" in rendered
 
 
 def test_the_record_names_every_part_and_form_it_found() -> None:

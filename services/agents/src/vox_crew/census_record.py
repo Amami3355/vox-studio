@@ -90,8 +90,72 @@ def render_prefix_census(census: PrefixCensus) -> str:
             ),
             "",
             *_unlisted(census),
+            *_withheld(census),
         ]
     )
+
+
+def _withheld(census: PrefixCensus) -> list[str]:
+    """What the contract publishes to somebody else, and what it would have cost to teach.
+
+    Its own section, below the accounting and outside every total above it, because none of it
+    is sent. It is here so that a document the crew stopped paying for stops being paid for
+    visibly: a record that simply went quiet about a category would leave the next session
+    unable to tell one that was withheld from one that was never published, and the largest
+    duplication anyone has found in this contract lives in the category that left.
+    """
+    if not census.withheld:
+        return []
+    lines = [
+        "## What the contract publishes elsewhere",
+        "",
+        *_WITHHELD_NOTE,
+        f"**{census.withheld_chars:,} characters** the contract publishes to another audience "
+        f"are not assembled into this prefix, across "
+        f"{len(census.withheld)} categor{'y' if len(census.withheld) == 1 else 'ies'}. "
+        "None of it is counted anywhere above.",
+        "",
+        *_table(
+            ["category", "characters", "would have been", "repeated inside it"],
+            [
+                [
+                    item.name,
+                    f"{item.chars:,}",
+                    _share(item.chars, census.chars + census.withheld_chars),
+                    f"{item.repeated_chars:,}" if item.repeats else "—",
+                ]
+                for item in census.withheld
+            ],
+        ),
+        "",
+    ]
+    listed = [
+        (item, repeat)
+        for item in census.withheld
+        for repeat in item.repeats
+        if repeat.chars >= LISTED_CHARS
+    ]
+    if listed:
+        lines += [
+            "The repeats inside them, on the same outermost-only rule and the same listing "
+            "floor. No share, because there is no denominator: this is duplication in a "
+            "published contract that no model is charged for.",
+            "",
+            *_table(
+                ["characters", "copies", "repeated", "where"],
+                [
+                    [
+                        f"{repeat.chars:,}",
+                        str(repeat.copies),
+                        f"{repeat.repeated_chars:,}",
+                        ", ".join(f"`{where}`" for where in repeat.where),
+                    ]
+                    for _, repeat in listed
+                ],
+            ),
+            "",
+        ]
+    return lines
 
 
 _HEADER = (
@@ -124,6 +188,15 @@ _REPEAT_NOTE = (
     "per-category framing is not searched for and is not counted here.",
     "The crew does not act on this: dropping a repeat would be a consumer editing a published",
     "projection, which its own assembly rule forbids. Noticing is the whole of its part.",
+    "",
+)
+
+
+_WITHHELD_NOTE = (
+    "Categories the contract index addresses to an audience the crew is not. They are fetched,",
+    "held and read — `refusals.py` and `converge.py` read rules that live here — and they are",
+    "never assembled into a prompt. The `would have been` column is the share this category",
+    "would have held had it been taught, which is what the crew stopped spending.",
     "",
 )
 

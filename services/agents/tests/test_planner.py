@@ -45,11 +45,11 @@ from vox_crew.planner import (
     author_plan,
     authoring_ask,
     cache_prefix,
+    category_part,
     instructions,
     plan_and_produce,
     published_errors,
     review,
-    category_part,
     scan_for_leaks,
     scan_message_for_leaks,
     taught_categories,
@@ -246,22 +246,76 @@ def test_the_instructions_leave_out_what_the_contract_addresses_elsewhere() -> N
     ) not in text
 
 
+OLDER = Path(__file__).parent / "fixtures" / "older-contract"
+"""The contract as it stood at `2224069`, frozen. See that directory's README."""
+
+OLDER_CATEGORIES = ("language", "plan", "catalog", "checks", "protocol")
+OLDER_PREFIX_CHARS = 118_598
+"""What the crew assembled from that contract, before any of this. The number to beat.
+
+Not the kind of pin ticket 23 refused. That refusal is about numbers taken from material another
+team can rebuild — a suite that went red because a capability was added. Nothing under
+`older-contract/` is ever rebuilt, so this goes red only if the crew changes what it does with a
+contract it has already seen, which is the flag day the criterion is about.
+"""
+
+
+def an_older_teaching_surface() -> TeachingSurface:
+    """Discovery's own reading of the frozen contract, audience field and all — there isn't one."""
+    index = parse_envelope((OLDER / "contract-index.stdout").read_text(encoding="utf-8"))
+    published = (index.data or {})["categories"]
+    return TeachingSurface(
+        index=index,
+        projections={
+            str(entry["id"]): parse_envelope(
+                (OLDER / f"contract-show-{entry['id']}.stdout").read_text(encoding="utf-8")
+            )
+            for entry in published
+        },
+        summaries={str(entry["id"]): str(entry["summary"]) for entry in published},
+        audiences={str(entry["id"]): None for entry in published},
+    )
+
+
 def test_a_contract_that_publishes_no_audience_is_taught_whole() -> None:
-    """The assertion that keeps this from being a flag day.
+    """The assertion that keeps this from being a flag day, against history rather than itself.
 
     An index with no audience field is an older contract, not a contract addressed to nobody,
     and it yields the prefix it yielded before any of this — byte for byte, preamble included.
-    The expected text is built by concatenation, which is not what is under test; the filter is.
+
+    Measured against the frozen `older-contract/` set, because history is the one thing a live
+    fixture cannot be: an audience-less surface built out of *today's* fixtures and compared
+    with today's assembly is a comparison whose two halves move together, and it cannot fail.
     """
-    older = a_teaching_surface(audiences=False)
-    reduced = instructions(SURFACE)
-    preamble = reduced[: reduced.index(category_part(SURFACE, "language"))]
+    older = an_older_teaching_surface()
 
     text = instructions(older)
 
-    assert taught_categories(older) == SURFACE.categories
-    assert text == preamble + "".join(
-        category_part(older, category) for category in SURFACE.categories
+    assert older.categories == OLDER_CATEGORIES
+    assert older.audience("protocol") is None
+    assert taught_categories(older) == OLDER_CATEGORIES
+    assert len(text) == OLDER_PREFIX_CHARS
+    for category in OLDER_CATEGORIES:
+        assert category_part(older, category) in text
+
+
+def test_the_split_moved_nothing_inside_a_category_the_author_still_reads() -> None:
+    """The catalog is byte-identical before and after, asserted across the change itself.
+
+    `older` is built from a different index and a different `protocol` body than `SURFACE` is,
+    so this compares two contracts rather than one fixture with itself. ADR-0017 governs the
+    catalog and nothing here narrows, tiers or defers it.
+    """
+    older = an_older_teaching_surface()
+    text = instructions(SURFACE)
+
+    for untouched in ("language", "plan", "catalog", "checks"):
+        assert category_part(older, untouched) == category_part(SURFACE, untouched)
+        assert category_part(SURFACE, untouched) in text
+    # And the one that did move is gone from the prefix rather than reworded inside it.
+    assert category_part(older, "protocol") not in text
+    assert len(text) == OLDER_PREFIX_CHARS - len(category_part(older, "protocol")) + len(
+        category_part(SURFACE, "operating")
     )
 
 
@@ -303,16 +357,6 @@ def test_a_category_addressed_to_nobody_is_not_the_same_as_one_that_said_nothing
     assert "catalog" in taught_categories(a_teaching_surface(audiences=False))
 
 
-def test_the_catalog_reaches_the_author_unchanged_by_the_filter() -> None:
-    """ADR-0017 governs the catalog, and nothing here narrows, tiers or defers it.
-
-    Asserted against the same catalog assembled with no filtering at all, so what is compared
-    is the part itself rather than a total that could net out.
-    """
-    older = a_teaching_surface(audiences=False)
-
-    assert category_part(SURFACE, "catalog") in instructions(SURFACE)
-    assert category_part(SURFACE, "catalog") == category_part(older, "catalog")
 
 
 def test_a_category_the_contract_adds_is_a_category_the_instructions_teach() -> None:

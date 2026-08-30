@@ -147,17 +147,49 @@ class Repeat:
 
 
 @dataclass(frozen=True, slots=True)
-class PrefixCensus:
-    """What one assembled prefix is made of."""
+class Withheld:
+    """A category the contract publishes that the prefix does not carry.
 
+    Not a part, and deliberately not counted in any total the census reports: nothing here is
+    sent, so a share of it would be a share of a denominator it is not in. It is reported
+    because a document that stops being paid for should stop being paid for *visibly* — a
+    census that simply went quiet about `protocol` would leave a later session unable to tell
+    a category that was withheld from one that was never published.
+
+    `chars` is what it would have cost, framing included: the size of the part `instructions`
+    would have assembled had the contract addressed it here. `repeats` is duplication inside
+    this category's own body, which is still duplication in a published contract even when no
+    model pays for it — crew ticket 25 stopped the crew paying for the largest one and left it
+    published, and this is where that stays legible.
+    """
+
+    name: str
     chars: int
-    parts: tuple[Part, ...]
-    anchors: AnchorTally
     repeats: tuple[Repeat, ...]
 
     @property
     def repeated_chars(self) -> int:
         return sum(repeat.repeated_chars for repeat in self.repeats)
+
+
+@dataclass(frozen=True, slots=True)
+class PrefixCensus:
+    """What one assembled prefix is made of, and what the contract published beside it."""
+
+    chars: int
+    parts: tuple[Part, ...]
+    anchors: AnchorTally
+    repeats: tuple[Repeat, ...]
+    withheld: tuple[Withheld, ...] = ()
+
+    @property
+    def repeated_chars(self) -> int:
+        return sum(repeat.repeated_chars for repeat in self.repeats)
+
+    @property
+    def withheld_chars(self) -> int:
+        """What the categories addressed elsewhere would have added to every turn."""
+        return sum(item.chars for item in self.withheld)
 
 
 def _time(surface: TeachingSurface) -> Mapping[str, Any]:
@@ -281,9 +313,25 @@ def _repeats(prefix: CachedPrefix) -> tuple[Repeat, ...]:
     ticket's own rule against unargued numbers applies to this one as much as to a ratio that
     fails a build. Reporting only outermost repeats is what keeps the list short without one.
     """
+    return _repeats_across(
+        prefix.surface, taught_categories(prefix.surface), carried_by=prefix.text
+    )
+
+
+def _repeats_across(
+    surface: TeachingSurface, categories: Sequence[str], *, carried_by: str | None
+) -> tuple[Repeat, ...]:
+    """The outermost repeats across some categories, optionally confirmed against a text.
+
+    `carried_by` is the assembled prefix where there is one. Confirming against it is what
+    makes a repeat a cost rather than a curiosity, and a blob the text carries fewer times
+    than the walk says refuses the whole census. Withheld categories pass `None`: they are in
+    no prefix, so there is nothing to confirm them against and their duplication is a fact
+    about the published contract rather than about anything a model is sent.
+    """
     found: dict[str, list[tuple[str, ...]]] = {}
-    for category in taught_categories(prefix.surface):
-        for where, blob in _nodes(prefix.surface.contract(category), (category,)):
+    for category in categories:
+        for where, blob in _nodes(surface.contract(category), (category,)):
             found.setdefault(blob, []).append(where)
     repeated = {where for places in found.values() if len(places) > 1 for where in places}
 
@@ -295,14 +343,36 @@ def _repeats(prefix: CachedPrefix) -> tuple[Repeat, ...]:
         kept = tuple(sorted(".".join(where) for where in places if not inside_a_repeat(where)))
         if len(kept) <= 1:
             continue
-        carried = prefix.text.count(blob)
-        if carried < len(kept):
-            raise CensusIncomplete(
-                f"{' and '.join(kept)} repeat content the assembled prefix carries "
-                f"{carried} time(s), not {len(kept)}."
-            )
+        if carried_by is not None:
+            carried = carried_by.count(blob)
+            if carried < len(kept):
+                raise CensusIncomplete(
+                    f"{' and '.join(kept)} repeat content the assembled prefix carries "
+                    f"{carried} time(s), not {len(kept)}."
+                )
         outermost.append(Repeat(chars=len(blob), where=kept))
     return tuple(sorted(outermost, key=lambda repeat: (-repeat.repeated_chars, repeat.where)))
+
+
+def _withheld(prefix: CachedPrefix) -> tuple[Withheld, ...]:
+    """Every category the contract published that this prefix does not carry.
+
+    In the index's order, and each measured on its own: the repeats reported for one are the
+    ones inside its own body. A repeat spanning a withheld category and a taught one is not
+    reported here, and saying so is cheaper than a number nobody could act on — the taught
+    half of such a pair is already carried once in the prefix, at full price, and the withheld
+    half costs nothing.
+    """
+    taught = set(taught_categories(prefix.surface))
+    return tuple(
+        Withheld(
+            name=category,
+            chars=len(category_part(prefix.surface, category)),
+            repeats=_repeats_across(prefix.surface, (category,), carried_by=None),
+        )
+        for category in prefix.surface.categories
+        if category not in taught
+    )
 
 
 def _divided(prefix: CachedPrefix) -> tuple[tuple[str, str], ...]:
@@ -349,4 +419,5 @@ def take_census(prefix: CachedPrefix) -> PrefixCensus:
         ),
         anchors=_tally(prefix.text, time),
         repeats=_repeats(prefix),
+        withheld=_withheld(prefix),
     )

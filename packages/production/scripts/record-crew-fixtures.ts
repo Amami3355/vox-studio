@@ -8,8 +8,11 @@
  *
  * Every projection the contract index publishes is recorded, not the smallest one. That was
  * the policy while the fixtures were a convenience for the client, which was indifferent to
- * what a projection carried; the planner assembles its instructions from all five, so a
- * stand-in for any of them is a suite green against a catalog that does not exist.
+ * what a projection carried; the planner assembles its instructions from every category the
+ * index addresses to an author, so a stand-in for any of them is a suite green against a
+ * catalog that does not exist. The ones addressed elsewhere are recorded too — the crew reads
+ * them, it just does not teach them — so this writes what the index publishes, not what a
+ * prompt carries.
  *
  * What to write is not decided here. `crew-fixture-recording.ts` holds the names and the
  * bytes, and the guard that fails a stale recording reads the same module, so re-recording

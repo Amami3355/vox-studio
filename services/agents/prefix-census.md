@@ -55,3 +55,27 @@ projection, which its own assembly rule forbids. Noticing is the whole of its pa
 | 122 | 2 | 122 | 0.1% | `catalog.capabilities.5.examples.0.props`, `catalog.capabilities.5.examples.2.props` |
 
 32 smaller repeats, together 2,010 characters, 2.1% of the prefix, are counted in the total above and not listed: under 100 characters a repeat is a JSON declaration rather than a document.
+
+## What the contract publishes elsewhere
+
+Categories the contract index addresses to an audience the crew is not. They are fetched,
+held and read — `refusals.py` and `converge.py` read rules that live here — and they are
+never assembled into a prompt. The `would have been` column is the share this category
+would have held had it been taught, which is what the crew stopped spending.
+
+**23,313 characters** the contract publishes to another audience are not assembled into this prefix, across 1 category. None of it is counted anywhere above.
+
+| category | characters | would have been | repeated inside it |
+|---|---|---|---|
+| protocol | 23,313 | 19.6% | 7,564 |
+
+The repeats inside them, on the same outermost-only rule and the same listing floor. No share, because there is no denominator: this is duplication in a published contract that no model is charged for.
+
+| characters | copies | repeated | where |
+|---|---|---|---|
+| 5,146 | 2 | 5,146 | `protocol.schemas.commandData.run.preflight.properties.report.properties`, `protocol.schemas.preflightReport.properties` |
+| 549 | 2 | 549 | `protocol.schemas.commandData.run.decline`, `protocol.schemas.decline` |
+| 425 | 2 | 425 | `protocol.schemas.commandData.run.compile`, `protocol.schemas.commandData.run.validate` |
+| 254 | 2 | 254 | `protocol.schemas.commandData.run.status.properties.artifacts`, `protocol.schemas.resultEnvelope.properties.artifacts` |
+| 168 | 2 | 168 | `protocol.schemas.resultEnvelope.properties.command.anyOf.0`, `protocol.schemas.resultEnvelope.properties.next.items.properties.command` |
+| 110 | 2 | 110 | `protocol.schemas.commandData.run.status.properties.staleStages.items`, `protocol.schemas.resultEnvelope.properties.run.anyOf.0.properties.stage` |
