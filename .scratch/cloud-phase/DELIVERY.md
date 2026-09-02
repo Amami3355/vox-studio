@@ -1,6 +1,6 @@
 # Delivery plan — a Brief at a URL by 9 September 2026
 
-**Written:** 2026-08-30. **Target:** ticket 09's criteria, all of them. **Definition of delivered:**
+**Written:** 2026-09-02. **Target:** ticket 09's criteria, all of them. **Definition of delivered:**
 an operator submits a Brief to a hosted crew and watches a preview, with no local checkout, launcher
 or operator disk in the path.
 
@@ -59,20 +59,37 @@ credential.
 
 ## Suggested schedule
 
-Two days of slack are built in on purpose. First integrations do not go well.
+**Seven working days, and no slack.** This is the honest arithmetic and it should be read before it
+is agreed to, not after.
 
 | Day | Date | Service track | Crew track | Human track |
 |---|---|---|---|---|
-| 1 | Aug 30 | 02 ADR | — | 03 project |
-| 2 | Aug 31 | 05 surface | — | 04 volume |
-| 3 | Sep 1 | 05 lands | crew-20 | — |
-| 4 | Sep 2 | 06 transport | cloud-01 | — |
-| 5 | Sep 3 | 06 lands | 08 client | — |
-| 6 | Sep 4 | 07 container | 08 lands | — |
-| 7 | Sep 5 | 07 lands | cloud-01 lands | — |
-| 8 | Sep 6 | first end-to-end attempt | | |
-| 9 | Sep 7 | 09 proof run | | |
-| 10–11 | Sep 8–9 | slack | | |
+| 1 | Sep 2 (Wed) | 02 ADR | — | 03 project |
+| 2 | Sep 3 (Thu) | 05 surface | — | 04 volume |
+| 3 | Sep 4 (Fri) | 05 lands | crew-20 | — |
+| 4 | Sep 5 (Sat) | 06 transport | cloud-01 | — |
+| 5 | Sep 6 (Sun) | 06 lands, 07 begins | 08 client | — |
+| 6 | Sep 7 (Mon) | 07 lands | 08 lands, cloud-01 lands | — |
+| 7 | Sep 8 (Tue) | first end-to-end attempt | | |
+| 8 | Sep 9 (Wed) | 09 proof run — deadline | | |
+
+A first integration of nine parts on the day before the deadline, with the proof run on the deadline
+itself, is a plan with no room in it. Two things can be traded and they should be traded
+deliberately rather than discovered on day six.
+
+**The cut that buys back two days: drop crew-20 and cloud-01, and keep the crew local.** That is the
+spec's own decision 5 — *"the first cloud milestone is the local crew driving the cloud production
+service"* — and it is a milestone this spec already endorses rather than a retreat. The operator runs
+the crew from a checkout; the service, the run store and the render are all in the cloud. What is
+lost is the "no local checkout in the path" half of ticket 09's first criterion. What is kept is
+every other criterion, including the render, the bundle, the isolation checks and the preview.
+
+**The cut that buys back one more day: defer ticket 04's negative control.** Proving the conformance
+check can fail costs one extra run against a FUSE mount. It is the right discipline and it is the
+cheapest thing on this list to postpone to the week after.
+
+**Nothing else on the list is safe to cut**, and in particular ticket 02 is not — it is half a day
+and everything downstream cites it.
 
 ---
 
