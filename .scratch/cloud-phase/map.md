@@ -54,6 +54,11 @@ them contradict tickets as written; those tickets were edited the same day rathe
   being used; a real ext4 disk makes `RunStore`'s POSIX requirements a property rather than a
   hypothesis, and deletes the phase's largest unknown instead of testing it.
 - **Cost is held to a demo envelope**, which is what rules out a managed filesystem's monthly floor.
+- **The machine type is `e2-standard-2` — 2 vCPU, 8 GB — measured rather than chosen.** Ticket 11
+  built the real image and rendered in it: 2.08 GB peak and 178 s under a two-vCPU cap, against a
+  cap that was pessimistic in the direction that matters. Four times the memory headroom, three
+  minutes a render, and the cheaper answer. The request timeout and the platform's ceiling both have
+  to admit three minutes.
 - **Region is `europe-west1`, chosen once.** The disk, the VM and the proof run all agree on it.
 - **The preview is a time-limited signed link**, with the thinnest possible page around it. Streaming
   bytes back through a synchronous render response is the version that fails on the day.
@@ -65,9 +70,10 @@ them contradict tickets as written; those tickets were edited the same day rathe
   untouched by this, because the service, the store and the render are all remote.
 - **The image is pulled from Artifact Registry onto Container-Optimized OS**, with the platform
   owning restart — [07](issues/07-the-trusted-service-is-a-container-without-a-launcher.md). A plain
-  Debian VM with Docker is the named escape hatch if Remotion turns out to need something from the
-  host. Building from source on the box is ruled out: the source on the box is the code-blindness
-  argument leaking.
+  Debian VM with Docker was the named escape hatch if Remotion turned out to need something from the
+  host; **ticket 11 built the image and rendered in it, so the escape hatch is not taken** and the
+  decision is evidenced rather than assumed. Building from source on the box is ruled out: the
+  source on the box is the code-blindness argument leaking.
 - **The crew holding `VOX_IPC_TOKEN` is not a violation of decision 8, and never was.** Verified in
   `proof/codex-agent.ts:415`, which scrubs the environment and then re-applies the token by name as
   *the launcher capability*. It authorises calling the service; it reveals none of the four
@@ -81,9 +87,16 @@ In scope, real, and not yet sharp enough to ticket.
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
   what they see while a synchronous render runs for minutes. Graduates once 03 lands and there is a
   box to tunnel to.
-- **Whether the image can carry all of Remotion's dependencies.** Sharpens into a real question only
-  after the spike in [11](issues/11-remotion-renders-in-the-image-or-the-image-is-wrong.md) reports;
-  if it can't, the COS decision reopens and the Debian escape hatch is taken.
+- **Where the four faces come from.** New on 2026-09-02, and now the largest open question in the
+  phase. `packages/video/src/design/fonts.ts` loads Archivo, Instrument Serif, Inter and JetBrains
+  Mono through `@remotion/google-fonts`, which fetches `woff2` files from `fonts.gstatic.com`
+  *inside the headless browser* — below `service-host.ts:59`, where the denying adapter cannot see
+  them. Ticket 11 measured it: with no network the render fails outright. Ticket 07's egress
+  restriction and this image are contradictory as they stand. Self-hosting the faces in the image is
+  the obvious repair and it moves every accepted still hash, which is ticket 09's problem as well.
+- **What the Windows-recorded still hashes mean on Linux.** Fourteen of them differ in the container
+  and pass on the host. Sharpens once the font question above is answered, because answering it
+  moves them again.
 - **The Linux-path corpus for the widened sanitiser expression.** `internalPath` needs a container
   path to redact; what the corpus must contain is a ticket 06 question and is not answerable before
   the container path shape is known.

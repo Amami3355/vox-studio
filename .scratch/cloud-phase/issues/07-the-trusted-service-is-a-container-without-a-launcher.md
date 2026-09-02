@@ -23,6 +23,29 @@ otherwise intact:
   container that starts without its disk and writes a Run to its own ephemeral filesystem produces a
   Run that vanishes on the next restart, and the platform restarts it for you.
 
+**Amended again 2026-09-02, after ticket 11 reported.** It ran, the render survives the container,
+and it hands this ticket three things — see [`../spike-11/FINDINGS.md`](../spike-11/FINDINGS.md),
+which reproduces the working image in full for this ticket to promote rather than rewrite.
+
+- **The number.** `e2-standard-2` — 2 vCPU, 8 GB, `europe-west1`. A render peaks at **2.08 GB** and
+  takes **178 s** under a two-vCPU cap, 2.51 GB and 127 s unconstrained. The request timeout, on the
+  platform as well as in the host, has to admit three minutes.
+- **The browser is pinned, not discovered.** Remotion resolves Chrome Headless Shell from
+  `node_modules/.remotion/` relative to the *working directory*, and only `@remotion/cli` — which
+  lives in `@vox/video` — installs it. The service renders from the repo root, finds nothing, and
+  downloads 92 MB from `remotion.media` at every start. Under this ticket's own egress restriction
+  that download fails and the service never renders. The spike works around it with a symlink; **this
+  ticket threads `browserExecutable` through `createRemotionRenderAdapter` instead**, so the path is
+  pinned rather than derived from where the process is standing.
+- **Egress restricted to the synthesizer's host breaks every render as the image stands, and this
+  ticket cannot ship both.** `packages/video/src/design/fonts.ts` loads four faces through
+  `@remotion/google-fonts`, which fetches `woff2` files from `fonts.gstatic.com` inside the headless
+  browser — below `service-host.ts:59`, so the denying adapter never sees them and ADR-0007's rule is
+  breached by a `render`. With no network the render fails outright. **The fix is to self-host the
+  four faces in the image**, which removes the egress and makes the fonts a property of the image;
+  it will move every accepted still hash, which is ticket 09's problem too. This is now the largest
+  open question in the phase.
+
 ## Problem Statement
 
 `service-host.ts` is a Windows program that happens to be written in Node. Its last twelve lines
@@ -153,9 +176,11 @@ unavailable has not tested the adapter.
 - [ ] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image
 - [ ] The service refuses to start when its volume is absent, asserted
 - [ ] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule
+- [ ] The four faces are served from the image, not from `fonts.gstatic.com`, and the render needs no font egress
+- [ ] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start
 - [ ] Egress is restricted to the synthesizer's host
 - [ ] The container builds, boots and rejects a malformed request, reaching no model or network in CI
-- [ ] A showcase render completes in the container, with memory, CPU and wall time recorded
+- [ ] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
 - [ ] The request timeout admits that render, on the platform as well as in the host
 - [ ] The leak scan passes over the image's readable layers
 - [ ] The one-instance ceiling and its reason are written down

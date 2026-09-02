@@ -2,6 +2,36 @@
 
 Status: ready-for-agent
 
+**Amended 2026-09-02, after the topology was chosen and the scope cut was taken.** This ticket
+defines "delivered", so it is the one place where a stale assumption costs the most: everything else
+is scored against it. Five changes. Its argument — that the seams between the pieces are what fails,
+and that what the cloud cannot evidence is reported rather than omitted — is untouched.
+
+- **The title's URL is the preview's, not the submission's.** The service has no public ingress and
+  no domain; it is reached through an SSH tunnel. What arrives *at a URL* is the preview, as a
+  time-limited signed link — [10](10-the-preview-is-reachable-without-a-domain.md). The Brief goes in
+  over a forwarded local port. The destination is unchanged; the sentence describing it was written
+  before anyone chose how the bytes travel.
+- **The crew is local, by the day-one cut, and `cloud-01` leaves the blocked-by list.** Hosting the
+  crew is out of scope and never graduates in this phase — see `map.md`. The first criterion below
+  loses the half that requires a hosted crew and keeps every other half.
+- **"No operator disk in the path" needs saying precisely, because the cut made the loose version
+  false.** The crew runs from a local checkout and reads the Brief off the operator's disk. What must
+  not be on that disk is the **Run store, the render and the four production secrets** — which is the
+  property this phase was for, and which the cut does not touch. Stating it as "no operator disk"
+  now scores the deployment as a failure for a thing it deliberately does.
+- **Three of the five isolation checks cannot be run from outside the tunnel, and would pass
+  vacuously if they were.** *Unauthenticated refused*, *bad MAC refused* and *replay refused* are
+  assertions about ticket 06's host. From outside, nothing connects at all and all three "pass"
+  without the host having been asked anything. **They are run from inside the tunnel, through the
+  forwarded port.** This is the ticket's own rule about the network adapter — *a test that passes
+  only because the network was unavailable has not tested the adapter* — turned on the ticket.
+- **"No public ingress" stops being an application check and becomes a provisioning one.** Under the
+  tunnel it is true by construction, which makes it cheaper to assert and weaker as evidence of
+  anything the service does. Assert it where it now lives: the VM has no external address and the
+  firewall admits nothing on the service's port. Record it as a property of the topology rather than
+  as a thing the service earned.
+
 ## Problem Statement
 
 Every other ticket in this phase moves a piece. This one is the claim they are moved for, and the
@@ -112,16 +142,17 @@ broke.
 **Blocked by:**
 `.scratch/cloud-phase/issues/07-the-trusted-service-is-a-container-without-a-launcher.md`,
 `.scratch/cloud-phase/issues/08-a-second-client-joins-the-first-and-neither-is-nameable-from-above.md`,
-`.scratch/cloud-phase/issues/01-the-crew-is-hostable-and-adk-is-not-the-mechanism.md`
+`.scratch/cloud-phase/issues/10-the-preview-is-reachable-without-a-domain.md`
 
 - [ ] Spend is stated and authorised before the run starts
-- [ ] A Brief is submitted to the hosted crew with no local checkout, launcher or operator disk in the path
-- [ ] A Run completes and a preview is produced, retrieved through the surface, and watched
+- [ ] A Brief is submitted by the local crew to the remote service, with no launcher in the path, and with the Run store, the render and the four production secrets all off the operator's disk
+- [ ] A Run completes and a preview is produced, retrieved through its signed link, and watched
 - [ ] The evidence bundle verifies on a machine that did not produce it
 - [ ] The cloud Run is compared to a known-good local Run and every difference beyond Run id and timestamps is enumerated
 - [ ] A cloud proof sheet exists, with each local assertion carried forward, replaced per ticket 02's ADR, or marked not evidenced with a reason
 - [ ] The "not evidenced" entries were written before the run
-- [ ] Five isolation checks pass from outside: no public ingress, unauthenticated refused, bad MAC refused, replay refused, cross-identity secret read refused
+- [ ] Three host checks pass from inside the tunnel, through the forwarded port: unauthenticated refused, bad MAC refused, replay refused
+- [ ] Two checks pass from outside the service: the VM has no external address and the firewall admits nothing on its port, and the crew identity cannot read a production secret
 - [ ] A non-`record` command is confirmed to reach no network against the deployed container
 - [ ] Wall time, render envelope and spend are recorded
 - [ ] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, asserted
