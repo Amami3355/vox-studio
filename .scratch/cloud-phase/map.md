@@ -138,12 +138,6 @@ them contradict tickets as written; those tickets were edited the same day rathe
 
 In scope, real, and not yet sharp enough to ticket.
 
-- **`resolve_gcloud` in the provisioning wizard does not find an installed SDK on this machine.**
-  It looks for `gcloud` and `gcloud.cmd` on PATH; neither is on PATH here, and `[[ -x ]]` is false
-  for `gcloud.cmd` under Git Bash even though it runs. A re-run of
-  `scripts/provision-cloud-project.sh` today would die at stage 1 claiming the SDK is missing.
-  Ticket 04 hit this, worked around it in its own driver, and did not fix the wizard. One-line fix,
-  needs an owner.
 - **Who owns the run-store mount across a reboot, and which uid the container runs as.** The disk is
   formatted and mounted at `/mnt/disks/vox-runs`, `root:root 755`, with no `/etc/fstab` entry. Ticket
   07's, and named here so it is not discovered.
