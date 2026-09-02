@@ -16,6 +16,9 @@ mkdir -p /mnt/bucket
 # Credentials come from the metadata server, so no key file is mounted and none
 # exists to leak. --implicit-dirs is what makes an empty bucket look like a
 # directory tree at all.
-gcsfuse --implicit-dirs "$CONTROL_BUCKET" /mnt/bucket
+# gcsfuse logs JSON to stdout, which would land in front of the check's own JSON
+# result and make it unparseable. Its output goes to stderr with the rest of the
+# commentary; stdout carries the result and nothing else.
+gcsfuse --implicit-dirs "$CONTROL_BUCKET" /mnt/bucket >&2
 
 exec node /check.mjs /mnt/bucket "$@"

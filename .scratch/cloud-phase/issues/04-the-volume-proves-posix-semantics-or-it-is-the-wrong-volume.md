@@ -1,8 +1,27 @@
 # 04: The volume proves POSIX semantics, or it is the wrong volume
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 03
+
+**Done 2026-09-02. The disk delivers all four primitives and the check is proved to fail.** Evidence
+in [`../ticket-04/FINDINGS.md`](../ticket-04/FINDINGS.md), with the raw results in `positive.json`
+and `control.json`. The check is `scripts/volume-conformance/check.mjs`, driven by `run-check.sh`.
+
+Three things the run settled that the criteria below do not capture, and one qualification on them:
+
+- **`link()` is the only one of the four that discriminates.** The gcsfuse control passed
+  `rename()`, `realpath()` and exclusive create; it failed `link()` with `EPERM`. The other three
+  assertions show the mount is not wrong in those ways, not that it is right.
+- **gcsfuse silently downgraded `0600` to `0644`** and nothing failed. Recorded as an observation,
+  not asserted. On such a mount every private temporary and immutable artifact is world-readable.
+- **Container-Optimized OS carries `mkfs.ext4`, `mount`, `mountpoint`, `lsblk` and `blkid`**, so the
+  privileged-container formatting fallback was never taken.
+- **"Mounted as ticket 07 will mount it" is a bind mount at `/var/lib/vox/runs` chosen here, not by
+  ticket 07**, which has not decided it. The check ran as **uid 0**; the identity is the production
+  service account in the Google sense, since that is the VM's, but the container's uid and the
+  mount's `root:root 755` ownership are ticket 07's to settle, along with persisting the mount
+  across a reboot — no `/etc/fstab` entry was written.
 
 **Amended 2026-09-02, after the topology was chosen. This ticket shrinks, and it should be read
 knowing why rather than assumed to be unchanged.** The volume is a persistent disk attached to a
@@ -130,13 +149,13 @@ on day two and learning it on day eight is the difference between a delivery and
 **Blocked by:**
 `.scratch/cloud-phase/issues/03-the-project-is-a-trust-boundary-and-is-provisioned-as-one.md`
 
-- [ ] A network filesystem is chosen, with its tier, region and mount options written down
-- [ ] A conformance check exists in the repository and is re-runnable
-- [ ] `link()` creates a second name for one inode, and unlinking one leaves the other readable
-- [ ] `rename()` over an existing target is atomic, observed by a concurrent reader that never sees a partial or missing file
-- [ ] `realpath()` resolves through the mount and through a symlink on it
-- [ ] Exclusive create refuses the loser of a race, asserted over repeated races rather than one attempt
-- [ ] The check runs from a container in the chosen region, mounted as ticket 07 will mount it, as the production identity
-- [ ] The check is proved to fail against a mount known to lack the semantics
-- [ ] `RunStore` is unmodified, and no fallback path was added to accommodate a mount
-- [ ] The result is recorded with the mount's identity attached, whether it passed or failed
+- [x] A network filesystem is chosen, with its tier, region and mount options written down
+- [x] A conformance check exists in the repository and is re-runnable
+- [x] `link()` creates a second name for one inode, and unlinking one leaves the other readable
+- [x] `rename()` over an existing target is atomic, observed by a concurrent reader that never sees a partial or missing file
+- [x] `realpath()` resolves through the mount and through a symlink on it
+- [x] Exclusive create refuses the loser of a race, asserted over repeated races rather than one attempt
+- [x] The check runs from a container in the chosen region, mounted as ticket 07 will mount it, as the production identity
+- [x] The check is proved to fail against a mount known to lack the semantics
+- [x] `RunStore` is unmodified, and no fallback path was added to accommodate a mount
+- [x] The result is recorded with the mount's identity attached, whether it passed or failed

@@ -49,7 +49,12 @@ them contradict tickets as written; those tickets were edited the same day rathe
   installed on the operator's machine; the wizard covers that first.
 - **This map is the decision layer only.** `DELIVERY.md` keeps the build order.
 - **The topology is one Compute Engine VM with a persistent disk, not a serverless runtime with a
-  network volume** — [04](issues/04-the-volume-proves-posix-semantics-or-it-is-the-wrong-volume.md).
+  network volume** — [04](issues/04-the-volume-proves-posix-semantics-or-it-is-the-wrong-volume.md),
+  **which is now proved rather than argued**: all four primitives hold on the real `ext4` disk from
+  a container on the box, and the same check goes red on a gcsfuse bucket. **`link()` is the only
+  one of the four that discriminates** — the bucket passed `rename()`, `realpath()` and exclusive
+  create, and downgraded `0600` to `0644` without failing anything. See
+  [`ticket-04/FINDINGS.md`](ticket-04/FINDINGS.md).
   The phase already ships a one-instance ceiling and a synchronous render, so nothing serverless was
   being used; a real ext4 disk makes `RunStore`'s POSIX requirements a property rather than a
   hypothesis, and deletes the phase's largest unknown instead of testing it.
@@ -132,6 +137,16 @@ them contradict tickets as written; those tickets were edited the same day rathe
 ## Not yet specified
 
 In scope, real, and not yet sharp enough to ticket.
+
+- **`resolve_gcloud` in the provisioning wizard does not find an installed SDK on this machine.**
+  It looks for `gcloud` and `gcloud.cmd` on PATH; neither is on PATH here, and `[[ -x ]]` is false
+  for `gcloud.cmd` under Git Bash even though it runs. A re-run of
+  `scripts/provision-cloud-project.sh` today would die at stage 1 claiming the SDK is missing.
+  Ticket 04 hit this, worked around it in its own driver, and did not fix the wizard. One-line fix,
+  needs an owner.
+- **Who owns the run-store mount across a reboot, and which uid the container runs as.** The disk is
+  formatted and mounted at `/mnt/disks/vox-runs`, `root:root 755`, with no `/etc/fstab` entry. Ticket
+  07's, and named here so it is not discovered.
 
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
   what they see while a synchronous render runs for minutes. The tunnel half is now answered —

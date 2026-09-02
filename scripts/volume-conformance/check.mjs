@@ -582,6 +582,21 @@ async function main() {
       }
     }
     observations.push(await observeDirectorySync(scratch));
+    // Recorded rather than asserted, like the directory fsync: `run-store.ts`
+    // asks for 0600 at 1100 and 1524, and a mount that answers with its own
+    // mode leaves every private temporary and immutable world-readable without
+    // failing anything.
+    const race = results.find((entry) => entry.id === 'exclusive-create');
+    const mode = race?.detail?.modeOfCreatedFile ?? null;
+    observations.push({
+      id: 'requested-mode-preserved',
+      result:
+        mode === null
+          ? 'not observed'
+          : mode === '0600'
+            ? 'yes (0600)'
+            : `no — asked for 0600, got ${mode}`,
+    });
   } finally {
     await rm(scratch, { recursive: true, force: true }).then(
       () => observations.push({ id: 'cleanup', result: 'scratch directory removed' }),
