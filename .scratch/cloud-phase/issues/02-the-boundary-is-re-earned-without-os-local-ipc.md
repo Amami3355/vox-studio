@@ -1,6 +1,6 @@
 # 02: The boundary is re-earned without OS-local IPC
 
-Status: ready-for-agent
+Status: done
 Type: grilling
 Blocked by: —
 
@@ -138,12 +138,12 @@ old ADR first is not misled by it.
 
 **Blocked by:** None — and nothing else in this phase may start before it lands.
 
-- [ ] A new ADR states ADR-0007's isolation guarantee independently of the transport that delivered it
-- [ ] It names what replaces the pipe ACL, the restricted OS account, and the absence of a socket
-- [ ] It states that the per-request HMAC survives unchanged, and why channel and body authentication are two answers
-- [ ] It names which recorded isolation probes stop being meaningful, without claiming the substitute is the same measurement
-- [ ] It states that a `render` reaches `fonts.gstatic.com` below the adapter, and separates the adapter's guarantee from the weaker egress allowlist
-- [ ] It states the evidence a cloud deployment must produce, in terms ticket 09 can write a proof sheet from
-- [ ] It permits an authenticated network transport for the remote topology only, and does not authorise a local HTTP listener
-- [ ] ADR-0007 carries a superseded-in-part note pointing at it, and its body is otherwise unchanged
-- [ ] Every reference to ADR-0007's transport clause across the repository is found and is either still correct or amended
+- [x] A new ADR states ADR-0007's isolation guarantee independently of the transport that delivered it
+- [x] It names what replaces the pipe ACL, the restricted OS account, and the absence of a socket
+- [x] It states that the per-request HMAC survives unchanged, and why channel and body authentication are two answers
+- [x] It names which recorded isolation probes stop being meaningful, without claiming the substitute is the same measurement
+- [x] It states that a `render` reaches `fonts.gstatic.com` below the adapter, and separates the adapter's guarantee from the weaker egress allowlist
+- [x] It states the evidence a cloud deployment must produce, in terms ticket 09 can write a proof sheet from
+- [x] It permits an authenticated network transport for the remote topology only, and does not authorise a local HTTP listener
+- [x] ADR-0007 carries a superseded-in-part note pointing at it, and its body is otherwise unchanged
+- [x] Every reference to ADR-0007's transport clause across the repository is found and is either still correct or amended

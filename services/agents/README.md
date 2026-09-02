@@ -65,7 +65,8 @@ structurally rather than leaving it to review.
 
 **`local_client.py` is the only module that knows where production put a Run.** It runs
 `vox.exe` with its working directory set to the work root, one subprocess per command, over the
-authenticated named pipe ADR-0007 requires. Payloads are staged where the work root keeps its
+authenticated named pipe ADR-0007 requires of the local topology — which ADR-0018 keeps as the
+local transport permanently, alongside a network sibling for remote deployments. Payloads are staged where the work root keeps its
 invariant of growing nothing but its Run directories.
 
 `evidence.py` is the one other module that opens a file, and the distinction is the one

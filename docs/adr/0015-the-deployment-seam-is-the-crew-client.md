@@ -78,7 +78,11 @@ service accepts payloads the change is a deletion in one module rather than a re
 agent. `plan.json` remains agent-authored and remains inside the run directory — this decides
 who *handles* the path, not where the file lives.
 
-**3. The production service keeps OS-local IPC. ADR-0007 stands unamended.** No HTTP listener
+**3. The production service keeps OS-local IPC. ADR-0007 stands unamended.** *(The second sentence
+is historical as of 2026-09-02: [ADR-0018](0018-the-isolation-guarantee-outlives-the-named-pipe.md)
+supersedes ADR-0007's transport clause for the remote topology. This decision's substance — no
+local HTTP listener, and the named pipe stays the local transport — is reaffirmed there, unchanged,
+as its decision 7.)* No HTTP listener
 is added for local development, and the crew gets no local-only shortcut in exchange. If the
 HTTP request/response *shape* is later wanted before the cloud phase, the form that preserves
 ADR-0007 is HTTP over the named pipe — same verbs, same JSON bodies, same handler, with only

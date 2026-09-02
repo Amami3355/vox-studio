@@ -1,6 +1,16 @@
 # ADR-0007 — Isolate agent production behind a trusted service
 
-**Status:** accepted · 2026-08-13
+**Status:** accepted · 2026-08-13 · **superseded in part by
+[ADR-0018](0018-the-isolation-guarantee-outlives-the-named-pipe.md), 2026-09-02**
+
+**What ADR-0018 supersedes is the transport clause below — "authenticated OS-local IPC, never TCP
+or HTTP" — and nothing else.** That clause remains correct and binding for the local topology,
+which is unchanged. For a remote deployment, ADR-0018 states the same isolation guarantee
+independently of the transport, names what answers each question the pipe answered, and names
+which recorded isolation probes stop being meaningful there. It also narrows one sentence in the
+Consequences below: the render's headless browser reaches a named font host beneath the denying
+network adapter, so *"denies outbound networking outside `record`"* is precise about the service
+and not about the browser it drives. Read ADR-0018 before citing either.
 
 The Agent production interface must be usable while every readable implementation remains
 unavailable to the agent. The boundary prototype showed that a local Remotion artifact was
