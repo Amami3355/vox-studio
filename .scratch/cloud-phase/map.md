@@ -74,6 +74,15 @@ them contradict tickets as written; those tickets were edited the same day rathe
   host; **ticket 11 built the image and rendered in it, so the escape hatch is not taken** and the
   decision is evidenced rather than assumed. Building from source on the box is ruled out: the
   source on the box is the code-blindness argument leaking.
+- **`sshd` and the firewall answer "who may connect", and nothing inside the container does.**
+  Settled by ADR-0018 decision 2 and corrected the same day in the three places that still said
+  otherwise: the spec's decision 4 and its transport paragraph, ticket 06's caller-authentication
+  and TLS decisions, and ticket 08's client. All three were written against a serverless runtime
+  with an identity layer in front of it; a VM behind a tunnel has none. **The property is unchanged
+  and only its mechanism moved**, and the consequence is subtractive — the network host binds
+  loopback and implements no identity check, and the HTTP client presents no identity and needs no
+  credential beyond the bearer token and HMAC key it already holds. There is no TLS anywhere in this
+  topology; the tunnel is the encrypted channel.
 - **The isolation guarantee is stated independently of the transport, and ADR-0007's transport
   clause is superseded in part** — [ADR-0018](../../docs/adr/0018-the-isolation-guarantee-outlives-the-named-pipe.md),
   accepted 2026-09-02, closing ticket 02 and the spec's prerequisite 1. The guarantee is three
@@ -106,13 +115,6 @@ In scope, real, and not yet sharp enough to ticket.
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
   what they see while a synchronous render runs for minutes. Graduates once 03 lands and there is a
   box to tunnel to.
-- **What answers "who may connect" in ticket 06's own words.** Found while writing ADR-0018 and
-  **not yet fixed**: ticket 06's implementation decisions say the platform terminates TLS in front
-  of the container and that a request must bear an authorised workload identity, and the spec's
-  decision 4 says the same. Both were written against the serverless runtime. The chosen topology
-  is a VM behind an SSH tunnel, which has neither. ADR-0018 decision 2 states the property against
-  the tunnel and is authoritative; **06 contradicts it as written and is a trap for whoever picks
-  it up.** The handoff record calling 05, 06 and 08 topology-independent is wrong about 06.
 - **What the Windows-recorded still hashes mean on Linux.** Fourteen of them differ in the container
   and pass on the host. No longer entangled with the fonts — the font decision leaves them where
   they are — so this is a Windows-versus-Linux question on its own, and ticket 09 asserts recorded

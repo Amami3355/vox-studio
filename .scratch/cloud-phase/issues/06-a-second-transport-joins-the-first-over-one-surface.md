@@ -2,6 +2,28 @@
 
 Status: ready-for-agent
 
+**Amended 2026-09-02, after ADR-0018 was accepted.** This ticket was written against the serverless
+runtime and answered *who may connect* with platform-terminated TLS and an authorised workload
+identity. **The topology is a Compute Engine VM behind an SSH tunnel and has neither**, so two of
+its implementation decisions and one of its testing decisions were wrong as written. They are
+corrected in place below. The spec's own decision 4 carries the same staleness and is annotated
+there;
+[ADR-0018](../../../docs/adr/0018-the-isolation-guarantee-outlives-the-named-pipe.md) decision 2 is
+authoritative for this question.
+
+**The ticket gets smaller, not larger.** The extraction, the shared handler, the parity test and
+the sanitiser widening are untouched — they were always transport-independent, which is what made
+the rest of this ticket look transport-independent too. What goes away is work this ticket never
+had to do: **the network host implements no caller-identity check of its own.** A caller reaching
+the loopback port has already passed `sshd`'s key check, and below that the host has the bearer
+token and the per-request HMAC it already has. Three mechanisms were named; two exist, and neither
+is new.
+
+**Nothing here is encrypted by this ticket, and that is the corrected claim rather than a gap.**
+The SSH tunnel is the encrypted channel. There is no TLS anywhere in this topology — not in the
+container, not in front of it — so a reader greping for a TLS context and finding none is reading
+it correctly this time.
+
 ## Problem Statement
 
 `createProductionIpcHost` is a named-pipe server and says so in its second statement:
@@ -40,11 +62,15 @@ network and calls the same function.
 callers of one command service and both are permanent. The handler that is shared is the boundary
 behaviour — authentication, replay, sanitisation, signing — not the dispatch shape.
 
-**Caller authentication is the platform's answer, and the HMAC stays.** Decision 4: no public
-ingress, and only a request bearing an authorised workload identity is accepted. The per-request
+**Caller authentication is the tunnel's answer, and the HMAC stays.** *Corrected 2026-09-02; the
+paragraph this replaces said "the platform's answer" and named a workload identity.* No public
+ingress: the firewall admits nothing, the host binds loopback on the VM, and the only route in is
+an SSH tunnel gated by a key the operator holds. `sshd` answers *who may connect*. The per-request
 HMAC is not replaced by that, because it authenticates the request *body* rather than the channel,
 and the Run ledger's integrity story already rests on it. Two questions, two answers, and collapsing
-them into one is the mistake this decision exists to prevent.
+them into one is the mistake this decision exists to prevent — which is why **the network host adds
+no third mechanism**: an identity check inside the container would be a second, weaker answer to a
+question `sshd` has already answered, and it would be the one a reader trusted.
 
 ## Implementation Decisions
 
@@ -57,12 +83,20 @@ them into one is the mistake this decision exists to prevent.
   local topology and it must be written down rather than discovered.** The mitigation for this phase
   is one instance and a short skew window; a shared cache is a later ticket and the wrong shape to
   invent under a deadline.
-- **The container serves plain HTTP on its assigned port and the platform terminates TLS.** Decision
-  3 says "authenticated TLS" and this is how the runtime delivers it — the socket inside the sandbox
-  is not the socket the caller reached. Saying so plainly matters, because a reader who greps for a
-  TLS context in the container and finds none will conclude the transport is unencrypted. It is not;
-  the encryption and the identity check are in front of the container, and ticket 02's ADR is where
-  the guarantee is argued.
+- **The container serves plain HTTP on a loopback-bound port, and the SSH tunnel is the encrypted
+  channel.** *Corrected 2026-09-02; this decision previously said the platform terminates TLS,
+  which was true of the serverless runtime and is not true of a VM.* Decision 3 says "authenticated
+  TLS"; **what this topology delivers instead is an SSH tunnel, and the difference is worth naming
+  rather than reading TLS into it.** Encryption in transit is `ssh`'s, between the operator's
+  machine and the VM. Inside the VM the hop from the tunnel's endpoint to the container's port is
+  loopback on a box with no public ingress. There is no TLS context anywhere in this topology, so
+  a reader who greps for one and finds nothing is reading it correctly.
+  [ADR-0018](../../../docs/adr/0018-the-isolation-guarantee-outlives-the-named-pipe.md) decision 2
+  is where the guarantee is argued.
+- **The host binds loopback, not `0.0.0.0`, and this is the host's own business rather than the
+  firewall's.** The firewall is the outer lock and is ticket 03's; a host bound to every interface
+  behind a correct firewall is one misapplied rule away from being reachable, and the rule lives in
+  a different system from the code. Bind address is one line and it fails closed.
 - **No local HTTP listener is added.** ADR-0015 decision 3 and this spec's decision 3. The new host
   is bound in the cloud entry point (ticket 07) and nowhere else. A developer who wants it locally
   wants it for convenience, and that is exactly the shortcut the crew spec forbids.
@@ -104,9 +138,13 @@ intention, and it is the highest-value test in this ticket.
 **Nothing in CI opens a public socket or reaches the network.** The second host is exercised over a
 loopback ephemeral port inside the test process; the workspace's network sentinel stays in force.
 
-**The workload-identity check is not unit-tested, and the ticket says so.** It is the platform's,
-asserted by ticket 03's from-outside verification and ticket 09's proof. A mock of it tests the
-mock.
+**The channel's authentication is not unit-tested, and the ticket says so.** *Corrected 2026-09-02;
+this previously named a workload-identity check.* It is `sshd`'s and the firewall's, asserted by
+ticket 03's from-outside verification and ticket 09's proof. A mock of it tests the mock.
+
+**The bind address is unit-tested, because it is this ticket's own.** The host listens on loopback
+and a test asserts the address it was given, which is the one line of the ingress posture that
+lives in this repository rather than in a firewall rule.
 
 ## Out of Scope
 
@@ -125,6 +163,7 @@ mock.
 - [ ] A second host serves ticket 05's payload surface over the network; the pipe host still serves argv
 - [ ] The per-request HMAC, replay cache and skew window apply to both hosts, asserted on each refusal separately
 - [ ] `internalPath` is widened to strip container-shaped POSIX paths, asserted, and `internalMarkers` and `stackLine` are unchanged
+- [ ] The network host binds loopback, asserted, and implements no caller-identity check of its own
 - [ ] The idle timeout admits a synchronous render on both hosts
 - [ ] A transport-parity test drives one Run over both hosts and compares envelopes
 - [ ] The per-instance replay cache's weakening is written down in the module and in the ADR's evidence list

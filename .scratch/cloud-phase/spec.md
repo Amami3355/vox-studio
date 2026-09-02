@@ -51,8 +51,11 @@ caller reads off a shared disk and become something the surface hands back on re
 the descriptor the envelope already published.
 
 **A second transport joins the first.** The same request surface is served over the named pipe
-locally, unchanged, and over authenticated TLS in the cloud. ADR-0015 named this shape in
-advance: same verbs, same JSON bodies, same handler, only the socket differs.
+locally, unchanged, and over an authenticated network channel in the cloud. ADR-0015 named this
+shape in advance: same verbs, same JSON bodies, same handler, only the socket differs. *(Amended
+2026-09-02: this read "over authenticated TLS", written against a serverless runtime that would
+have terminated it. The chosen topology is a VM behind an SSH tunnel and there is no TLS in it —
+see decision 4 below and ADR-0018 decision 2.)*
 
 **A second client joins the first.** The crew gains `HttpProductionClient` beside
 `LocalProductionClient`, held to the same interface and the same contract tests. No crew tool,
@@ -221,13 +224,23 @@ reopen it.
 ### 4. Caller authentication replaces the restricted account
 
 Locally, "who is calling" is answered by the pipe ACL, the restricted OS principal and the shared
-HMAC. Remotely it is answered by the platform: the production service runs with no public ingress
-and accepts only requests bearing an authorised service identity. The per-request HMAC stays,
-because it authenticates the request body rather than the channel and is what the Run ledger's
-integrity story already rests on.
+HMAC. Remotely it is answered by the channel: the production service runs with no public ingress,
+binds loopback on its VM behind a firewall that admits nothing, and is reached only through an SSH
+tunnel gated by a key the operator holds. The per-request HMAC stays, because it authenticates the
+request body rather than the channel and is what the Run ledger's integrity story already rests on.
 
-The isolation guarantee this replaces is ADR-0007's, and the amendment that prerequisite 1
-requires is where it is argued rather than here.
+**Amended 2026-09-02.** The paragraph above read: *"Remotely it is answered by the platform: the
+production service runs with no public ingress and accepts only requests bearing an authorised
+service identity."* That was written against a serverless runtime with an identity layer in front
+of it. The topology chosen on 2026-09-02 is a Compute Engine VM and has no such layer, so the
+property is delivered by `sshd` and the firewall instead. **The property is unchanged; only its
+mechanism moved.** Tickets 06 and 08 were corrected the same day. This has one consequence worth
+stating: the network host and the HTTP client implement **no caller-identity check of their own**,
+because the channel was authenticated before either of them saw a byte.
+
+The isolation guarantee this replaces is ADR-0007's, and
+[ADR-0018](../../docs/adr/0018-the-isolation-guarantee-outlives-the-named-pipe.md) — accepted
+2026-09-02, satisfying prerequisite 1 — is where it is argued rather than here.
 
 ### 5. The crew stays local first, and moves second
 

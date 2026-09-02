@@ -40,7 +40,16 @@ local-only.
 
 **`HttpProductionClient` speaks ticket 05's payload surface over ticket 06's host.** A command name,
 a Run id, a payload object; an envelope back. It signs the request body with the per-request HMAC
-the host verifies, presents its workload identity, and holds no path, no work root and no launcher.
+the host verifies, carries the bearer token as the launcher capability it already holds, and holds
+no path, no work root and no launcher.
+
+*Corrected 2026-09-02, alongside ticket 06: this sentence previously said the client "presents its
+workload identity", which was written against the serverless runtime. The topology is a VM behind an
+SSH tunnel, so **the client's base URL is a forwarded local port** and the channel was authenticated
+by `sshd` before the client sent anything. The client presents no identity of its own and needs no
+credential beyond the token and the HMAC key it already uses locally — which is one fewer thing for
+this ticket to build, not one more. See
+[ADR-0018](../../../docs/adr/0018-the-isolation-guarantee-outlives-the-named-pipe.md) decision 2.*
 
 **Artifact retrieval comes back through the surface.** A Run id and a descriptor from an envelope,
 bytes and a digest out, and the digest is checked on arrival — the same refusal
