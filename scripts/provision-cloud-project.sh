@@ -341,10 +341,35 @@ say "noticing on the invoice."
 say ""
 say "Your billing accounts:"
 gc billing accounts list --format='table(name,displayName,open)' || true
+note "Only an account with OPEN=True can be linked. A closed one cannot be used."
 ask VOX_BILLING_ACCOUNT "Billing account ID (the XXXXXX-XXXXXX-XXXXXX part):"
 if [[ -n "${VOX_BILLING_ACCOUNT:-}" ]]; then
-  gc billing projects link "$VOX_CLOUD_PROJECT" --billing-account="$VOX_BILLING_ACCOUNT" >/dev/null
   write_env VOX_BILLING_ACCOUNT "$VOX_BILLING_ACCOUNT"
+  # Not fatal: the common failure here is a quota, and it has a specific remedy the operator
+  # can act on. Killing the wizard at stage 3 of 13 teaches them nothing they can use.
+  if LINK_ERROR=$(gc billing projects link "$VOX_CLOUD_PROJECT" \
+       --billing-account="$VOX_BILLING_ACCOUNT" 2>&1 >/dev/null); then
+    ok "linked $VOX_CLOUD_PROJECT to $VOX_BILLING_ACCOUNT"
+  else
+    bad "could not link the project to $VOX_BILLING_ACCOUNT"
+    printf '%s\n' "$LINK_ERROR" | sed 's/^/    /'
+    if grep -q 'quota' <<<"$LINK_ERROR"; then
+      say ""
+      warn "That is the projects-per-billing-account cap, not a problem with your project."
+      say "Google allows five linked projects per billing account unless the quota is raised."
+      say "These are the projects currently holding the slots:"
+      gc billing projects list --billing-account="$VOX_BILLING_ACCOUNT" \
+        --format='table(projectId,billingEnabled)' 2>/dev/null | sed 's/^/    /' || true
+      say ""
+      say "Free one slot, then re-run this wizard:"
+      note "  gcloud billing projects unlink PROJECT_ID"
+      warn "Unlinking disables every paid service on that project. Pick one you are done with."
+      note "Or request a raise, which takes days: https://support.google.com/code/contact/billing_quota_increase"
+    fi
+    SKIPPED+=("billing not linked to $VOX_CLOUD_PROJECT")
+    say ""
+    confirm "Stop here and fix billing? (recommended — nothing after this stage will work)" && exit 1
+  fi
 fi
 
 if [[ "$(gc billing projects describe "$VOX_CLOUD_PROJECT" --format='value(billingEnabled)' 2>/dev/null)" == "True" ]]; then
