@@ -1,6 +1,27 @@
 # 07: The trusted service is a container, without a launcher
 
 Status: ready-for-agent
+Type: task
+Blocked by: 03, 06, 11
+
+**Amended 2026-09-02, after the topology was chosen.** Four changes, and the ticket's argument is
+otherwise intact:
+
+- **The runtime is Container-Optimized OS on a Compute Engine VM**, pulling the image from Artifact
+  Registry, with the platform owning restart. A plain Debian VM running Docker under a systemd unit
+  is the named escape hatch, and ticket 11 decides whether it is needed.
+- **The one-instance ceiling stops being a promise and becomes a fact.** It was recorded as a limit
+  nobody had confirmed the runtime would honour — the replay cache is per-process and a second
+  instance silently weakens ticket 06's guarantee. One VM running one container is structural. **That
+  standing unverified claim is retired.**
+- **The Remotion envelope moves to [ticket 11](11-remotion-renders-in-the-image-or-the-image-is-wrong.md)
+  and lands before this ticket starts.** It was scheduled here with a day either side, which is the
+  wrong shape for a risk that invalidates the machine type: 11 is unblocked, runs against local
+  Docker, and needs no project. This ticket consumes its measured number rather than discovering it.
+- **`VOX_LEDGER_ROOT` and `VOX_CALIBRATION_PATH` point into the persistent disk**, bind-mounted into
+  the container. The refusal-to-start rule below is unchanged and matters more here, not less: a
+  container that starts without its disk and writes a Run to its own ephemeral filesystem produces a
+  Run that vanishes on the next restart, and the platform restarts it for you.
 
 ## Problem Statement
 

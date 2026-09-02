@@ -1,6 +1,29 @@
 # 04: The volume proves POSIX semantics, or it is the wrong volume
 
 Status: ready-for-agent
+Type: task
+Blocked by: 03
+
+**Amended 2026-09-02, after the topology was chosen. This ticket shrinks, and it should be read
+knowing why rather than assumed to be unchanged.** The volume is a persistent disk attached to a
+Compute Engine VM and formatted `ext4` — not a managed network filesystem, and not a mount whose
+semantics are delivered by a protocol implementation between the store and the kernel. `link()`,
+`rename()`, `realpath()` and exclusive-create are properties of the filesystem itself, so the
+question this ticket was written to answer is largely answered by the choice of disk.
+
+**What survives, and why it is still worth an hour.** The check still runs, from the container, as
+the production identity, against the real disk — because ADR-0015's warning was about *the mount as
+the runtime delivers it*, and a container bind-mounting a host disk is still a layer between the
+store and the kernel. What is retired is the reason this was the phase's largest unknown. It is now
+a short conformance check rather than a risk, and **ticket 11 has taken its place as the largest
+unknown.**
+
+**The negative control is now free and should not be dropped.** `DELIVERY.md` offered deferring it
+to buy back a day. That trade was priced against a check that needed a second provisioned mount; a
+FUSE-mounted bucket is a contrast this topology can produce cheaply, and the discipline is worth more
+than the hour. Take the cut only if the day is genuinely gone.
+
+Everything below stands as written, reading "mount" as the disk as the container sees it.
 
 ## Problem Statement
 

@@ -1,6 +1,22 @@
 # 03: The project is a trust boundary, and is provisioned as one
 
 Status: ready-for-agent
+Type: task
+Blocked by: —
+
+**Amended 2026-09-02, after the topology was chosen.** The topology is a Compute Engine VM with a
+persistent disk in `europe-west1`, reached only through an SSH tunnel. Three consequences for this
+ticket, and nothing else changes:
+
+- **The region is decided: `europe-west1`.** It no longer needs choosing, only citing.
+- **`gcloud` is not installed on the operator's machine.** Installing and authenticating it is the
+  wizard's first step, and it was not budgeted when this ticket was written.
+- **The wizard provisions a VM, a persistent disk, an Artifact Registry repository and a firewall
+  that admits nothing** — not a serverless service and not a managed filesystem. Ingress being closed
+  is now a property of the firewall and the absence of an external address, which is cheaper to
+  verify than a platform setting and cannot be left half-applied.
+
+The two-identities decision below is untouched and remains the point of the ticket.
 
 ## Problem Statement
 
@@ -27,10 +43,13 @@ attaching billing and deciding ownership are human actions in a console, and the
 Provision the smallest topology that keeps the two sides' secrets apart, and record the shape so
 that it is reproducible rather than remembered.
 
-**Two service identities, not one.** The production service runs as one workload identity; the crew
-runs as another. The production identity can read the four production secrets and nothing else. The
-crew identity can read its model credential and nothing else. Neither can read the other's. This is
-decision 8 made operational, and it is the whole point of the ticket.
+**Two service identities, not one.** *Amended 2026-09-02.* The production service runs as the VM's
+service account; the crew runs locally under its own credential and is never given the VM's. The
+production identity can read the four production secrets and nothing else. The crew holds its model
+credential and the `VOX_IPC_TOKEN` capability, and neither of those is a production secret. Neither
+side can read the other's. This is decision 8 made operational, and it is the whole point of the
+ticket — the crew being local does not soften it, because the secrets the boundary exists to
+separate all live on the VM either way.
 
 **Secrets live in the managed store from the first day**, not in a shell environment that is "moved
 later". `service-host.ts` reads them from `process.env` today and will continue to — what changes is

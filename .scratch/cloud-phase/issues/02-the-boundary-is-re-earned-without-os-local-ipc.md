@@ -1,6 +1,15 @@
 # 02: The boundary is re-earned without OS-local IPC
 
 Status: ready-for-agent
+Type: grilling
+Blocked by: —
+
+**Amended 2026-09-02, after the topology was chosen.** This ticket was written before the runtime
+was decided and assumed a serverless one. The topology is a Compute Engine VM with a persistent
+disk, no public ingress, no domain, and an SSH tunnel as the only route in; the crew stays local.
+The ADR's four questions are unchanged and its argument is unchanged. What changes is the answer to
+the second one — see the amended paragraph below — and the ADR must now be written against a tunnel
+and a firewall rather than against a platform's identity layer. See `map.md`.
 
 ## Problem Statement
 
@@ -40,11 +49,21 @@ issue a command production did not publish. The named pipe was one way to delive
 restates the guarantee in terms that survive a transport change, so that a future topology can be
 judged against it rather than against a socket type.
 
-**What replaces the pipe ACL.** No public ingress, and a caller bearing an authorised workload
-identity — the platform answers *who is calling* where the ACL used to. The per-request HMAC stays,
-unchanged, because it authenticates the request body rather than the channel and the Run ledger's
-integrity story already rests on it. Two independent answers to two different questions, which is
-the property the local topology has and which is easy to lose by assuming TLS covers both.
+**What replaces the pipe ACL.** *Amended 2026-09-02.* No public ingress and no listening socket the
+network can reach: the service binds loopback on its VM, the firewall admits nothing, and the only
+route in is an SSH tunnel gated by a key the operator holds. The tunnel answers *who may reach the
+service at all* where the absence of a socket used to, and the SSH key answers *who may connect*
+where the ACL used to. The per-request MAC stays, unchanged, because it authenticates the request
+body rather than the channel and the Run ledger's integrity story already rests on it. Two
+independent answers to two different questions, which is the property the local topology has and
+which is easy to lose by assuming one channel covers both.
+
+**The bearer capability is not new and must not be described as if it were.** `VOX_IPC_TOKEN` is
+already what authorises a caller: `proof/codex-agent.ts:415` scrubs the agent's environment and then
+re-applies the token by name, as the launcher capability. It authorises *calling* the service and
+reveals none of the four production secrets, which `service-host.ts:26-36` reads and the crew never
+holds. The ADR should say so plainly, because a reader who assumes the crew gains a secret at the
+transport change will conclude decision 8 broke, and it did not.
 
 **What replaces the restricted OS account.** The container is the isolation unit. The agent has no
 filesystem in common with the service, which is a *stronger* separation than the local topology

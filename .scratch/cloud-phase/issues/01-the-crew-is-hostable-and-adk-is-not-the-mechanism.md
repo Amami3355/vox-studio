@@ -1,6 +1,16 @@
 # 01: The crew is hostable, and the framework's deploy command is not the mechanism
 
-Status: ready-for-agent
+Status: out-of-scope
+
+**Closed 2026-09-02 as out of scope for this phase, not cancelled.** The scope cut taken on day one
+keeps the crew local and drives the remote service from a checkout, which buys back two days out of
+a seven-day plan that had no slack. This is the spec's own decision 5 first milestone rather than a
+retreat. What is lost is the "no local checkout in the path" half of ticket 09's first criterion, and
+nothing else — the run store, the render and the four production secrets are all still off the
+operator's machine.
+
+Blocked by crew-20, which is out of scope with it. Reopen both as a fresh effort if the destination
+is redrawn; the argument below did not stop being right. See `map.md`.
 
 ## Problem Statement
 
