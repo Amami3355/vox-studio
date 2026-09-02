@@ -238,13 +238,18 @@ bad() { printf '  %s✗ %s%s\n' "$RED" "$1" "$RESET"; VERIFY_FAILURES=$((VERIFY_
 # one where a generated value is better than a typed one. Nothing is returned through a file.
 SECRET_VALUE=""
 capture_secret() {
-  local name="$1" prompt="$2" generatable="${3:-no}" value=""
-  if [[ "$generatable" == "generate" ]]; then
+  local name="$1" prompt="$2" generatable="${3:-no}" value="" exists="no"
+  # A re-run must not make the operator retype secrets it already holds, and must never store an
+  # empty version because they pressed Enter expecting it to keep what is there.
+  if gc secrets describe "$name" >/dev/null 2>&1; then exists="yes"; fi
+  if [[ "$exists" == "yes" ]]; then
+    note "$name is already in Secret Manager. Press Enter to keep the value it has."
+  elif [[ "$generatable" == "generate" ]]; then
     note "Press Enter on an empty prompt and the wizard generates 32 random bytes for you."
   fi
   ask_secret _CAPTURED "$prompt"
   value="${_CAPTURED:-}"
-  if [[ -z "$value" && "$generatable" == "generate" ]]; then
+  if [[ -z "$value" && "$exists" == "no" && "$generatable" == "generate" ]]; then
     if command -v openssl >/dev/null 2>&1; then
       value=$(openssl rand -hex 32)
       ok "generated a 32-byte value for $name"
@@ -260,6 +265,17 @@ capture_secret() {
 # The value reaches gcloud on stdin, never on the command line.
 store_secret() {
   local name="$1" accessor="$2"
+  if [[ -z "$SECRET_VALUE" ]]; then
+    if gc secrets describe "$name" >/dev/null 2>&1; then
+      gc secrets add-iam-policy-binding "$name" \
+        --member="serviceAccount:$accessor" \
+        --role=roles/secretmanager.secretAccessor >/dev/null
+      ok "$name kept as it is, readable by $accessor"
+    else
+      bad "$name was left empty and does not exist yet — re-run and give it a value"
+    fi
+    return 0
+  fi
   if gc secrets describe "$name" >/dev/null 2>&1; then
     note "$name already exists; adding a new version"
   else
@@ -582,12 +598,43 @@ note "and both the synthesizer and the font host sit behind CDNs. See ticket 07.
 stage "The persistent disk the run store needs"
 say "RunStore uses hardlinks, atomic rename and lock files. That is a real filesystem or"
 say "it is the wrong storage, and ticket 04 proves it on this disk before anything trusts it."
-if gc compute disks describe "$DISK" --zone="$ZONE" >/dev/null 2>&1; then
-  ok "disk $DISK already exists in $ZONE"
-else
-  gc compute disks create "$DISK" --size="$DISK_SIZE" --type=pd-balanced --zone="$ZONE" >/dev/null
-  ok "created $DISK ($DISK_SIZE, pd-balanced) in $ZONE"
+# The region is a decision; the zone inside it is not. A zone can be out of capacity for a disk
+# type at any moment, which is a Google-side shortage rather than anything wrong here, so try the
+# region's zones in turn and record whichever one supplies it. Stages 12 and 13 follow this zone.
+ZONE_CANDIDATES=("$ZONE" "${REGION}-c" "${REGION}-d")
+DISK_ZONE=""
+for candidate in "${ZONE_CANDIDATES[@]}"; do
+  if gc compute disks describe "$DISK" --zone="$candidate" >/dev/null 2>&1; then
+    DISK_ZONE="$candidate"
+    ok "disk $DISK already exists in $candidate"
+    break
+  fi
+done
+if [[ -z "$DISK_ZONE" ]]; then
+  for candidate in "${ZONE_CANDIDATES[@]}"; do
+    printf '  %s…%s asking %s for a %s %s disk\n' "$DIM" "$RESET" "$candidate" "$DISK_SIZE" "pd-balanced"
+    if DISK_ERROR=$(gc compute disks create "$DISK" \
+         --size="$DISK_SIZE" --type=pd-balanced --zone="$candidate" 2>&1 >/dev/null); then
+      DISK_ZONE="$candidate"
+      ok "created $DISK ($DISK_SIZE, pd-balanced) in $candidate"
+      break
+    fi
+    if grep -q 'ZONE_RESOURCE_POOL_EXHAUSTED' <<<"$DISK_ERROR"; then
+      warn "$candidate has no capacity for this disk right now; trying the next zone"
+    else
+      bad "could not create the disk in $candidate"
+      printf '%s\n' "$DISK_ERROR" | sed 's/^/    /'
+      break
+    fi
+  done
 fi
+if [[ -z "$DISK_ZONE" ]]; then
+  bad "no zone in $REGION could supply the disk — try again later, or lower DISK_SIZE"
+  note "The region is a recorded decision and is not the thing to change here."
+  exit 1
+fi
+ZONE="$DISK_ZONE"
+write_env VOX_CLOUD_ZONE "$ZONE"
 write_env VOX_CLOUD_DISK "$DISK"
 
 # ── 12 ────────────────────────────────────────────────────────────────────
