@@ -359,7 +359,16 @@ say "Your billing accounts:"
 gc billing accounts list --format='table(name,displayName,open)' || true
 note "Only an account with OPEN=True can be linked. A closed one cannot be used."
 ask VOX_BILLING_ACCOUNT "Billing account ID (the XXXXXX-XXXXXX-XXXXXX part):"
-if [[ -n "${VOX_BILLING_ACCOUNT:-}" ]]; then
+
+# Ask what is true before trying to make it true. Re-linking an already-linked project fails
+# against the projects-per-account cap, which reads exactly like the first-run failure and sends
+# the operator to unlink something they still need.
+ALREADY_LINKED=$(gc billing projects describe "$VOX_CLOUD_PROJECT" \
+  --format='value(billingEnabled)' 2>/dev/null || true)
+if [[ "$ALREADY_LINKED" == "True" ]]; then
+  ok "billing is already attached to $VOX_CLOUD_PROJECT"
+  [[ -n "${VOX_BILLING_ACCOUNT:-}" ]] && write_env VOX_BILLING_ACCOUNT "$VOX_BILLING_ACCOUNT"
+elif [[ -n "${VOX_BILLING_ACCOUNT:-}" ]]; then
   write_env VOX_BILLING_ACCOUNT "$VOX_BILLING_ACCOUNT"
   # Not fatal: the common failure here is a quota, and it has a specific remedy the operator
   # can act on. Killing the wizard at stage 3 of 13 teaches them nothing they can use.
