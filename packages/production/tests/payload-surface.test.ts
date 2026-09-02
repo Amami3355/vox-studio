@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { chmod, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { dispatchProductionArgv } from '../src/commands/dispatch';
@@ -106,6 +106,21 @@ describe('materialising a payload', () => {
     const staged = join(fixture.root, 'public', 'run-surface', 'decision.json');
     expect(JSON.parse(await readFile(staged, 'utf8'))).toEqual(DECISION);
   });
+
+  it('writes a replacement authorisation to replacement-authorisation.json, the third name', async () => {
+    fixture = await createCommandFixture(stubs());
+    const surface = surfaceFor(fixture);
+    const runId = await toPreflight(surface);
+
+    await surface.execute({
+      command: 'run.record',
+      runId,
+      payload: AUTHORISATION as unknown as Record<string, unknown>,
+    });
+
+    const staged = join(fixture.root, 'public', RUN_DIRECTORY, 'replacement-authorisation.json');
+    expect(JSON.parse(await readFile(staged, 'utf8'))).toEqual(AUTHORISATION);
+  });
 });
 
 const VALID_MP4 = Buffer.from([
@@ -125,6 +140,31 @@ const stubs = () => ({
 
 /** The bytes the surface writes, so the argv side stages a byte-identical file. */
 const staged = (payload: unknown): string => `${JSON.stringify(payload, null, 2)}\n`;
+
+/**
+ * `run.record` is the only command whose payload is optional, so it is the only staged filename
+ * that a chain driven without one never writes. It is asserted here on its own.
+ */
+const AUTHORISATION = {
+  protocolVersion: 1,
+  kind: 'replacement_grant',
+  reason: 'The previous dispatch left no complete durable response.',
+} as const;
+
+const toPreflight = async (surface: ProductionPayloadSurface): Promise<string> => {
+  const init = await surface.execute({
+    command: 'run.init',
+    payload: REQUEST as unknown as Record<string, unknown>,
+  });
+  const runId = init.envelope.run?.id as string;
+  await surface.execute({
+    command: 'run.validate',
+    runId,
+    payload: VALID_PLAN as unknown as Record<string, unknown>,
+  });
+  await surface.execute({ command: 'run.preflight', runId });
+  return runId;
+};
 
 const CHAIN = [
   'run.init',
@@ -243,7 +283,71 @@ describe('the surface is a relocation, not a reimplementation', () => {
     expect(viaSurface.envelope).toEqual(JSON.parse(argv.stdout));
   });
 
-  it('serves the two contract commands, which name no Run and take no payload', async () => {
+  it('produces the argv envelope for a record carrying a replacement authorisation', async () => {
+    fixture = await createCommandFixture(stubs());
+    const viaSurface = await (async () => {
+      const surface = surfaceFor(fixture as CommandFixture);
+      const runId = await toPreflight(surface);
+      return surface.execute({
+        command: 'run.record',
+        runId,
+        payload: AUTHORISATION as unknown as Record<string, unknown>,
+      });
+    })();
+    await fixture.cleanup();
+
+    fixture = await createCommandFixture(stubs());
+    const runArgument = `public/${RUN_DIRECTORY}`;
+    await writeFile(join(fixture.root, 'request-argv.json'), staged(REQUEST), 'utf8');
+    await dispatchProductionArgv(fixture.service, fixture.root, [
+      'production',
+      'run',
+      'init',
+      '--request',
+      'request-argv.json',
+      '--out',
+      runArgument,
+    ]);
+    await writeFile(
+      join(fixture.root, 'public', RUN_DIRECTORY, 'plan.json'),
+      staged(VALID_PLAN),
+      'utf8',
+    );
+    await dispatchProductionArgv(fixture.service, fixture.root, [
+      'production',
+      'run',
+      'validate',
+      '--run',
+      runArgument,
+      '--plan',
+      `${runArgument}/plan.json`,
+    ]);
+    await dispatchProductionArgv(fixture.service, fixture.root, [
+      'production',
+      'run',
+      'preflight',
+      '--run',
+      runArgument,
+    ]);
+    await writeFile(
+      join(fixture.root, 'public', RUN_DIRECTORY, 'replacement-authorisation.json'),
+      staged(AUTHORISATION),
+      'utf8',
+    );
+    const argv = await dispatchProductionArgv(fixture.service, fixture.root, [
+      'production',
+      'run',
+      'record',
+      '--run',
+      runArgument,
+      '--replacement-authorisation',
+      `${runArgument}/replacement-authorisation.json`,
+    ]);
+
+    expect(viaSurface.envelope).toEqual(JSON.parse(argv.stdout));
+  }, 60_000);
+
+  it('serves the two contract commands, which name no Run and take a payload only to name a category', async () => {
     fixture = await createCommandFixture();
     const surface = surfaceFor(fixture);
 
@@ -317,6 +421,26 @@ describe('artifact retrieval', () => {
 
     await expect(
       surface.fetchArtifact(runId, { ...descriptor, path: '../../secrets.json' }),
+    ).rejects.toMatchObject({ code: 'ARTIFACT_OUTSIDE_RUN' });
+  });
+
+  it('refuses a descriptor that escapes through a symlink, not only through ..', async () => {
+    fixture = await createCommandFixture();
+    const { surface, runId } = await validated(fixture);
+    // A lexical containment check passes this: every segment is an ordinary name and nothing
+    // climbs. Only resolving the link says the bytes are outside the Run. A junction is used
+    // because Windows grants it without the privilege a file symlink needs.
+    const outside = join(fixture.root, 'outside');
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(outside, 'secrets.json'), '{"provider":"key"}', 'utf8');
+    await symlink(outside, join(fixture.root, 'public', RUN_DIRECTORY, 'escape'), 'junction');
+
+    await expect(
+      surface.fetchArtifact(runId, {
+        kind: 'plan_snapshot',
+        path: 'escape/secrets.json',
+        sha256: '0'.repeat(64),
+      }),
     ).rejects.toMatchObject({ code: 'ARTIFACT_OUTSIDE_RUN' });
   });
 

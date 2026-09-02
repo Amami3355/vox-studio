@@ -155,7 +155,7 @@ on day two and learning it on day eight is the difference between a delivery and
 - [x] `rename()` over an existing target is atomic, observed by a concurrent reader that never sees a partial or missing file
 - [x] `realpath()` resolves through the mount and through a symlink on it
 - [x] Exclusive create refuses the loser of a race, asserted over repeated races rather than one attempt
-- [x] The check runs from a container in the chosen region, mounted as ticket 07 will mount it, as the production identity
+- [~] The check runs from a container in the chosen region, mounted as ticket 07 will mount it, as the production identity — **the first two hold; the third is now recorded rather than asserted.** The 2026-09-02 run captured no identity at all: `check.mjs` records uid, gid, node and hostname, and `PRODUCTION_SA` was read from `~/.vox-cloud.env` and used only for the control bucket's IAM binding, so `FINDINGS.md`'s named service account was the operator's declaration and not a measurement. The driver now writes `identity.txt` from the VM's own metadata server beside the result, and the container still runs as uid 0, which is ticket 07's to settle
 - [x] The check is proved to fail against a mount known to lack the semantics
 - [x] `RunStore` is unmodified, and no fallback path was added to accommodate a mount
 - [x] The result is recorded with the mount's identity attached, whether it passed or failed

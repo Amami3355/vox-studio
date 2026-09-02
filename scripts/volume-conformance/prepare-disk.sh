@@ -23,15 +23,50 @@ fail() {
 [[ -e "$BY_ID" ]] || fail "no attached disk named '${DISK_NAME}' (looked for ${BY_ID})"
 DEVICE="$(readlink -f "$BY_ID")"
 
+# Three answers, not two. A probe that found a filesystem prints it; a probe that
+# ran and found nothing prints nothing; a probe that could not run at all returns
+# non-zero. Collapsing the third into the second is how a script that promises
+# never to reformat a disk reformats one: `blkid` exits 2 for "nothing here" and
+# something else entirely when it cannot read the device, and `|| true` cannot
+# tell those apart.
+#
+# The probe is chosen here rather than inside the function, because the function
+# is called in a command substitution and anything it assigns dies with the
+# subshell.
+if command -v blkid >/dev/null 2>&1; then
+  FS_PROBE="blkid"
+elif command -v lsblk >/dev/null 2>&1; then
+  FS_PROBE="lsblk"
+else
+  FS_PROBE="none"
+fi
+
 detect_fs() {
-  if command -v blkid >/dev/null 2>&1; then
-    blkid -o value -s TYPE "$DEVICE" 2>/dev/null || true
-  elif command -v lsblk >/dev/null 2>&1; then
-    lsblk -no FSTYPE "$DEVICE" 2>/dev/null | head -n1 || true
-  fi
+  local output status
+  case "$FS_PROBE" in
+    blkid)
+      output="$(blkid -o value -s TYPE "$DEVICE" 2>/dev/null)"
+      status=$?
+      case "$status" in
+        0) printf '%s' "$output"; return 0 ;;
+        2) return 0 ;;
+        *) return 1 ;;
+      esac
+      ;;
+    lsblk)
+      output="$(lsblk -no FSTYPE "$DEVICE" 2>/dev/null | head -n1)"
+      status=$?
+      [[ "$status" -eq 0 ]] || return 1
+      printf '%s' "${output//[[:space:]]/}"
+      return 0
+      ;;
+    *) return 1 ;;
+  esac
 }
 
-EXISTING_FS="$(detect_fs)"
+if ! EXISTING_FS="$(detect_fs)"; then
+  fail "cannot tell whether ${DEVICE} already carries a filesystem — the ${FS_PROBE} probe did not answer. Refusing to format: 'cannot tell' is not 'blank', and this disk is the run store."
+fi
 FORMATTED="no"
 MKFS_VIA="n/a"
 MKFS_OPTIONS="-m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard"
@@ -53,7 +88,7 @@ if [[ -z "$EXISTING_FS" ]]; then
     fail "no mkfs.ext4 on the host and no docker to borrow one from"
   fi
   FORMATTED="yes"
-  EXISTING_FS="$(detect_fs)"
+  EXISTING_FS="$(detect_fs)" || EXISTING_FS="unknown"
 fi
 
 mkdir -p "$MOUNT_POINT"
@@ -78,6 +113,7 @@ disk_name=${DISK_NAME}
 by_id=${BY_ID}
 device=${DEVICE}
 filesystem=${EXISTING_FS}
+fs_probe=${FS_PROBE}
 uuid=${UUID}
 formatted_this_run=${FORMATTED}
 mkfs_via=${MKFS_VIA}

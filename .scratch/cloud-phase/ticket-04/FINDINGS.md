@@ -1,8 +1,15 @@
 # Ticket 04 — findings
 
 **Run:** 2026-09-02 · **Check:** `scripts/volume-conformance/check.mjs`, driven by `run-check.sh`
-**Where:** a `node:22-bookworm-slim` container on `vox-service`, `europe-west1-c`, whose identity is
-`vox-production@studio-prod-7f3a.iam.gserviceaccount.com`
+**Where:** a `node:22-bookworm-slim` container on `vox-service`, `europe-west1-c`
+
+**Corrected 2026-09-02, in review.** This header previously named
+`vox-production@studio-prod-7f3a.iam.gserviceaccount.com` as the identity the check ran under. That
+was the operator's `VOX_PRODUCTION_SA` declaration read out of `~/.vox-cloud.env`, where it exists
+to bind the control bucket's IAM. **Nothing in this run measured it**: the result records uid, gid,
+node version and hostname, and the container ran as uid 0. The driver now writes `identity.txt` from
+the VM's metadata server beside the result, so a later run evidences what this one asserted. The
+four primitive verdicts below are unaffected — they are properties of the mount, not of the caller.
 
 ## The verdict
 

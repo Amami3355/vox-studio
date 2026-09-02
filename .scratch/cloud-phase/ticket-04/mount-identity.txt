@@ -1,0 +1,15 @@
+disk_name=vox-runs
+by_id=/dev/disk/by-id/google-vox-runs
+device=/dev/sdb
+filesystem=ext4
+uuid=9e0cfa13-c5ae-404c-952f-f14ebcc990a1
+formatted_this_run=no
+mkfs_via=n/a
+mkfs_options=-m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard
+mount_point=/mnt/disks/vox-runs
+mounted_this_run=no
+mount_line=/dev/sdb /mnt/disks/vox-runs ext4 rw,relatime,discard 0 0
+ownership=root:root 755
+persists_across_reboot=no
+kernel=Linux 6.6.153+ x86_64
+os=Container-Optimized OS from Google

@@ -1,0 +1,106 @@
+{
+  "check": "volume-conformance",
+  "ticket": "cloud-phase/04",
+  "schemaVersion": 1,
+  "verdict": "pass",
+  "startedAt": "2026-09-02T18:38:27.452Z",
+  "finishedAt": "2026-09-02T18:38:31.536Z",
+  "parameters": {
+    "renames": 200,
+    "contentBytes": 1048576,
+    "rounds": 200,
+    "racers": 4
+  },
+  "mount": {
+    "requestedPath": "/var/lib/vox/runs",
+    "canonicalPath": "/var/lib/vox/runs",
+    "device": "/dev/sdb",
+    "mountPoint": "/var/lib/vox/runs",
+    "fsType": "ext4",
+    "mountOptions": "rw,relatime,discard",
+    "statfsType": "0xef53",
+    "statfsTypeName": "ext2/ext3/ext4",
+    "sizeBytes": 52521566208,
+    "freeBytes": 52504764416
+  },
+  "process": {
+    "uid": 0,
+    "gid": 0,
+    "node": "v22.23.2",
+    "platform": "linux/x64",
+    "hostname": "1e93bd0ffb31",
+    "containerized": true
+  },
+  "results": [
+    {
+      "id": "link",
+      "title": "link() creates a second name for one inode",
+      "status": "pass",
+      "detail": {
+        "inode": "131077",
+        "sameInode": true,
+        "nlinkWhileLinked": 2,
+        "nlinkAfterUnlink": 1,
+        "bytesMatchWhileLinked": true,
+        "bytesMatchAfterUnlink": true
+      }
+    },
+    {
+      "id": "rename-over-existing",
+      "title": "rename() over an existing target is atomic to a concurrent reader",
+      "status": "pass",
+      "detail": {
+        "renames": 200,
+        "contentBytes": 1048576,
+        "reads": 2482,
+        "observed": [
+          "new",
+          "old"
+        ],
+        "unexpected": []
+      }
+    },
+    {
+      "id": "realpath",
+      "title": "realpath() resolves through the mount and through a symlink on it",
+      "status": "pass",
+      "detail": {
+        "canonicalParent": "/var/lib/vox/runs/.volume-conformance-5555f824-00fc-464c-9732-52d6d8474b33/realpath/real",
+        "resolvesToExpectedChild": true,
+        "parentIsInsideMount": true,
+        "symlinkSupported": true,
+        "resolvesThroughSymlink": true,
+        "escapeResolvesOutside": true
+      }
+    },
+    {
+      "id": "exclusive-create",
+      "title": "exclusive create refuses the loser of a repeated race",
+      "status": "pass",
+      "detail": {
+        "rounds": 200,
+        "racersPerRound": 4,
+        "roundsWithExactlyOneWinner": 200,
+        "roundsWithMoreThanOneWinner": 0,
+        "roundsWithNoWinner": 0,
+        "loserErrorCodesOtherThanEEXIST": [],
+        "modeOfCreatedFile": "0600",
+        "firstFailures": []
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "directory-fsync",
+      "result": "ok"
+    },
+    {
+      "id": "requested-mode-preserved",
+      "result": "yes (0600)"
+    },
+    {
+      "id": "cleanup",
+      "result": "scratch directory removed"
+    }
+  ]
+}

@@ -16,6 +16,13 @@ coverage/
 !.scratch/**/
 !.scratch/*.md
 !.scratch/**/*.md
+# The cloud phase's evidence is the exception. A FINDINGS.md that cites a result
+# file nobody else can open is an assertion, not a record, and the branch is
+# pushed now: these are small, textual, and the thing the criteria are ticked
+# against. Renders and frames stay out — this names the evidence, not a folder.
+!.scratch/cloud-phase/**/*.json
+!.scratch/cloud-phase/**/*.log
+!.scratch/cloud-phase/**/*.txt
 
 # The crew is a self-contained Python project; its environment, caches and build metadata
 # are local.

@@ -18,6 +18,10 @@
 
 set -euo pipefail
 
+# What this run will exit with. A driver that reports a finding and then exits 0
+# cannot gate the caller that runs it, and ticket 07 will run this one.
+EXIT_STATUS=0
+
 # ── presentation, matching scripts/provision-cloud-project.sh ──────────────
 if [[ -t 1 ]] && command -v tput >/dev/null 2>&1 && [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
   BOLD=$(tput bold); DIM=$(tput dim); RESET=$(tput sgr0)
@@ -192,8 +196,10 @@ stage "The check runs in a container, on the real disk"
 if [[ "$CONTROL_ONLY" == "yes" ]]; then
   note "skipped: --control-only"
 else
-  say "Mounted where ticket 07 will mount it, on the VM whose identity is the"
-  say "production service account. $CHECK_ARGS"
+  say "Mounted at the path ticket 04 chose for it — ticket 07 has not decided its"
+  say "own, and this is a proposal to it, not a report of its decision. The"
+  say "container runs as uid 0; the production identity owns the VM, not this"
+  say "process. $CHECK_ARGS"
   RUN_CMD="sudo docker run --rm -v ${MOUNT_POINT}:${IN_CONTAINER} -v ${REMOTE_WORK}/check.mjs:/check.mjs:ro ${IMAGE} node /check.mjs ${IN_CONTAINER} ${CHECK_ARGS}"
   set +e
   on_vm "$RUN_CMD" > "$EVIDENCE_DIR/positive.raw" 2> >(tee "$EVIDENCE_DIR/positive.log" >&2)
@@ -201,10 +207,26 @@ else
   set -e
   extract_json < "$EVIDENCE_DIR/positive.raw" > "$EVIDENCE_DIR/positive.json"
   rm -f "$EVIDENCE_DIR/positive.raw"
+  # The criterion says "as the production identity", so the identity is read off
+  # the box and written down rather than assumed from the env file. What the
+  # container ran as is in the result's own `process` block; these two are the
+  # VM's identity, and they are not the same claim.
+  VM_SA="$(on_vm "curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email" 2>/dev/null || echo unreadable)"
+  {
+    echo "declared_production_sa=${PRODUCTION_SA:-unset}"
+    echo "vm_service_account=${VM_SA}"
+    echo "container_ran_as_uid=0 (root; see positive.json .process.uid)"
+    echo "note=the VM carries this identity; the check's own process ran as root inside the container"
+  } > "$EVIDENCE_DIR/identity.txt"
+  note "identity: .scratch/cloud-phase/ticket-04/identity.txt"
   if [[ "$POSITIVE_STATUS" == "0" ]]; then
     ok "every asserted primitive holds on $MOUNT_POINT"
   else
     bad "the real disk did not pass (exit $POSITIVE_STATUS) — this is a finding, not a failure to hide"
+    # A finding is not something to hide, and it is not something to exit 0 on
+    # either: a check that always returns success cannot gate anything that runs
+    # it, and ticket 07 will want to run this one.
+    EXIT_STATUS=1
   fi
   note "result: .scratch/cloud-phase/ticket-04/positive.json"
 fi
@@ -219,6 +241,10 @@ else
   say ""
   note "This creates gs://$CONTROL_BUCKET in $REGION, grants the production identity"
   note "object access on that bucket alone, and deletes both at the end."
+  note "Ticket 04 leaves provisioning to ticket 03. This is the one place it"
+  note "crosses that line: the control needs a mount that lacks POSIX semantics"
+  note "and a bucket is the only one to hand. One bucket, one identity, reversed"
+  note "below unless you pass --keep-bucket."
   if confirm "Create the control bucket and run it?"; then
     if gc storage buckets describe "gs://$CONTROL_BUCKET" --project="$PROJECT" >/dev/null 2>&1; then
       ok "bucket gs://$CONTROL_BUCKET already exists"
@@ -249,10 +275,17 @@ else
     set -e
     extract_json < "$EVIDENCE_DIR/control.raw" > "$EVIDENCE_DIR/control.json"
     rm -f "$EVIDENCE_DIR/control.raw"
-    if [[ "$CONTROL_STATUS" != "0" ]]; then
-      ok "the check went red on the bucket (exit $CONTROL_STATUS) — it can detect a wrong mount"
-    else
+    # Exit 1 is a refusal; exit 3 is the check saying it could not tell. Only the
+    # first shows it can detect a wrong mount, and the difference is the whole
+    # reason the third word exists.
+    if [[ "$CONTROL_STATUS" == "1" ]]; then
+      ok "the check refused the bucket (exit 1) — it can detect a wrong mount"
+    elif [[ "$CONTROL_STATUS" == "0" ]]; then
       bad "the check PASSED on a FUSE-mounted bucket. Do not trust its pass on the disk."
+      EXIT_STATUS=1
+    else
+      bad "the control ended at exit $CONTROL_STATUS, which is not a refusal — it did not demonstrate detection"
+      EXIT_STATUS=1
     fi
     note "result: .scratch/cloud-phase/ticket-04/control.json"
 
@@ -282,3 +315,5 @@ printf '\n'
 note "Next: write the finding into .scratch/cloud-phase/ticket-04/FINDINGS.md and"
 note "tick ticket 04's criteria against these files, whichever way they fell."
 printf '\n'
+
+exit "$EXIT_STATUS"

@@ -2,10 +2,10 @@
 // Volume conformance check — cloud-phase ticket 04.
 //
 // `RunStore` is built on four filesystem primitives that object storage does not
-// have: `link()` at run-store.ts:733, `rename()` over an existing target at 1504
-// and 1537, `realpath()` at 1314-1372, and exclusive create at 1100, 1465, 1524
-// and 1545. This exercises those four against a real mount, from the process
-// shape the service will run in, and reports what it observed.
+// have: `link()` at run-store.ts:733, `rename()` over an existing target at 1537,
+// `realpath()` at 1314-1372, and exclusive create at 1100, 1465 and 1524. This
+// exercises those four against a real mount, from the process shape the service
+// will run in, and reports what it observed.
 //
 // It constructs no `RunStore` and imports nothing from the workspace. A check
 // that depends on the store cannot be trusted to tell you the store's
@@ -15,8 +15,10 @@
 //   node check.mjs <mount-path> [--renames=N] [--size=BYTES] [--rounds=N] [--racers=N]
 //
 // The JSON result goes to stdout and the human summary to stderr, so the result
-// survives a pipe. Exit 0 when every asserted primitive holds, 1 when one does
-// not or could not be proved, 2 when the check itself broke.
+// survives a pipe. Exit 0 when every asserted primitive holds, 1 when one is
+// refused, 3 when one could not be evidenced either way, and 2 when the check
+// itself broke. `not-evidenced` is ADR-0018's third word and it is not `fail`:
+// a race the reader never witnessed has refuted nothing.
 
 import { fork } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -196,7 +198,7 @@ async function checkLink(scratch) {
       detail: { stage: 'link', error: describe(error) },
       because:
         errorCode(error) === 'EXDEV'
-          ? 'link() crossed a device boundary inside one mount; run-store.ts:746 fails the publication.'
+          ? 'link() crossed a device boundary inside one mount; run-store.ts:747 fails the publication.'
           : 'link() is not available on this mount, so an artifact cannot be published without copying it.',
     };
   }
@@ -305,7 +307,7 @@ async function checkRename(scratch, options) {
   }
   if (observed.length < 2) {
     return {
-      status: 'inconclusive',
+      status: 'not-evidenced',
       detail,
       because:
         'the reader never observed a transition, so the race it was there to witness did not happen. Raise --renames or --size.',
@@ -529,8 +531,9 @@ function summarise(result) {
     `  options  ${result.mount.mountOptions ?? '?'}`,
     `  process  uid=${result.process.uid} gid=${result.process.gid} node=${result.process.node} host=${result.process.hostname} containerized=${result.process.containerized}`,
   ];
+  const glyph = { pass: '✓', fail: '✗', 'not-evidenced': '?' };
   for (const entry of result.results) {
-    lines.push(`  ${entry.status === 'pass' ? '✓' : '✗'} ${entry.id}: ${entry.status}`);
+    lines.push(`  ${glyph[entry.status] ?? '✗'} ${entry.id}: ${entry.status}`);
     if (entry.because) lines.push(`      ${entry.because}`);
   }
   for (const entry of result.observations) {
@@ -604,7 +607,15 @@ async function main() {
     );
   }
 
-  const verdict = results.every((entry) => entry.status === 'pass') ? 'pass' : 'fail';
+  // ADR-0018 fixes three words and this scores in all three. A check that could
+  // not be evidenced is not a check that failed: collapsing it into `fail` is the
+  // same conflation in the other direction as scoring it a pass, and the sheet
+  // has to be able to say which of the two happened.
+  const verdict = results.some((entry) => entry.status === 'fail')
+    ? 'fail'
+    : results.every((entry) => entry.status === 'pass')
+      ? 'pass'
+      : 'not-evidenced';
   const result = {
     check: 'volume-conformance',
     ticket: 'cloud-phase/04',
@@ -632,7 +643,7 @@ async function main() {
   };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   console.error(summarise(result));
-  return verdict === 'pass' ? 0 : 1;
+  return verdict === 'pass' ? 0 : verdict === 'fail' ? 1 : 3;
 }
 
 const role = process.argv.find((entry) => entry.startsWith('--role='))?.slice('--role='.length);

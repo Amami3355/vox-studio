@@ -1,0 +1,11 @@
+volume conformance — PASS
+  mount    /var/lib/vox/runs (ext4 on /dev/sdb, statfs ext2/ext3/ext4)
+  options  rw,relatime,discard
+  process  uid=0 gid=0 node=v22.23.2 host=1e93bd0ffb31 containerized=true
+  ✓ link: pass
+  ✓ rename-over-existing: pass
+  ✓ realpath: pass
+  ✓ exclusive-create: pass
+  · directory-fsync: ok
+  · requested-mode-preserved: yes (0600)
+  · cleanup: scratch directory removed

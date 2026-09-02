@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve, sep } from 'node:path';
+import { mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, resolve, sep } from 'node:path';
+import { ZodError } from 'zod';
 import { handleContractIndex, handleContractShow } from '../contracts/handlers';
 import {
   type ArtifactDescriptor,
@@ -52,7 +53,12 @@ const canonicalPayload = (payload: CommandPayload): string =>
 
 const shortId = (): string => randomBytes(6).toString('hex');
 
-const failure = (command: CommandId, code: string, message: string): CommandExecution => ({
+const failure = (
+  command: CommandId,
+  code: string,
+  message: string,
+  exitCode: 1 | 2 = 1,
+): CommandExecution => ({
   envelope: resultEnvelopeSchema.parse({
     protocolVersion: PROTOCOL_VERSION,
     command,
@@ -63,8 +69,24 @@ const failure = (command: CommandId, code: string, message: string): CommandExec
     error: { code, message, details: null },
     next: [],
   }) as ResultEnvelope,
-  exitCode: 1,
+  exitCode,
 });
+
+/**
+ * Resolves a path the way `Path.resolve()` does in `local_client.py`: symlinks followed, and a
+ * path that does not exist yet resolved as far as it does exist. Node's `path.resolve` is
+ * lexical and never touches the disk, so a containment check built on it alone is satisfied by
+ * a symlink that leaves the Run.
+ */
+const resolveThroughLinks = async (path: string): Promise<string> => {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(path);
+    if (parent === path) return path;
+    return join(await resolveThroughLinks(parent), basename(path));
+  }
+};
 
 /**
  * The payload-shaped surface: a command name, a Run id where the command names one, and a
@@ -97,7 +119,19 @@ export class ProductionPayloadSurface {
       if (error instanceof ProductionSurfaceError) {
         return failure(request.command, error.code, error.message);
       }
-      throw error;
+      // Everything else is what the argv path calls a failed command, and it answers with an
+      // envelope rather than a thrown error. A surface that throws here would hand a transport
+      // a raw Node error carrying an absolute host path, where `dispatchProductionArgv` hands
+      // back a `COMMAND_FAILED` envelope for the transport to sanitise. Same classification as
+      // `service.ts`'s catch-all, so the failure path has the parity the success path has.
+      const malformed = error instanceof ZodError || error instanceof SyntaxError;
+      const message = error instanceof Error ? error.message : String(error);
+      return failure(
+        request.command,
+        malformed ? 'INVALID_INPUT' : 'COMMAND_FAILED',
+        message,
+        malformed ? 2 : 1,
+      );
     }
   }
 
@@ -110,7 +144,7 @@ export class ProductionPayloadSurface {
    */
   async fetchArtifact(runId: string, descriptor: ArtifactDescriptor): Promise<RetrievedArtifact> {
     const runRoot = join(this.runsRoot, await this.directoryFor(runId));
-    const target = this.within(runRoot, descriptor.path);
+    const target = await this.within(runRoot, descriptor.path);
     let bytes: Uint8Array;
     try {
       bytes = await readFile(target);
@@ -135,10 +169,15 @@ export class ProductionPayloadSurface {
    * from envelopes this service wrote, so this should never fire. It is here because the
    * alternative to checking is trusting a string to stay inside a boundary, and the boundary is
    * the product.
+   *
+   * Both sides are resolved through symlinks, because `local_client.py:243` uses
+   * `Path.resolve()` and a lexical check is a weaker refusal wearing the same name. The phase
+   * treats the escaping symlink as live: `check.mjs` asserts the volume resolves one out of the
+   * mount precisely because `run-store.ts`'s containment depends on it.
    */
-  private within(runRoot: string, relative: string): string {
-    const target = resolve(runRoot, relative);
-    const root = resolve(runRoot);
+  private async within(runRoot: string, relative: string): Promise<string> {
+    const target = await resolveThroughLinks(resolve(runRoot, relative));
+    const root = await resolveThroughLinks(resolve(runRoot));
     if (target === root || !target.startsWith(`${root}${sep}`)) {
       throw new ProductionSurfaceError(
         'ARTIFACT_OUTSIDE_RUN',
