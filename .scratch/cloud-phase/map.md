@@ -74,6 +74,16 @@ them contradict tickets as written; those tickets were edited the same day rathe
   host; **ticket 11 built the image and rendered in it, so the escape hatch is not taken** and the
   decision is evidenced rather than assumed. Building from source on the box is ruled out: the
   source on the box is the code-blindness argument leaking.
+- **The four faces stay on `fonts.gstatic.com`, and the egress rule names it.** Settled by the user
+  on 2026-09-02, against a recommendation to self-host them in the image. The render's egress
+  allowlist carries two hosts — the synthesizer's and `fonts.gstatic.com` — each with its reason
+  written down. The denying adapter at `service-host.ts:59` is unchanged and still refuses everything
+  the service attempts; what is given up is the second lock, because font traffic below the adapter
+  now has a permitted path out. **ADR-0007's property is therefore weaker than it was and ADR-0018
+  states the weaker one rather than inheriting the old wording** — see
+  [02](issues/02-the-boundary-is-re-earned-without-os-local-ipc.md) and
+  [07](issues/07-the-trusted-service-is-a-container-without-a-launcher.md). One consequence is
+  bought back: the accepted still hashes do not move.
 - **The crew holding `VOX_IPC_TOKEN` is not a violation of decision 8, and never was.** Verified in
   `proof/codex-agent.ts:415`, which scrubs the environment and then re-applies the token by name as
   *the launcher capability*. It authorises calling the service; it reveals none of the four
@@ -87,16 +97,10 @@ In scope, real, and not yet sharp enough to ticket.
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
   what they see while a synchronous render runs for minutes. Graduates once 03 lands and there is a
   box to tunnel to.
-- **Where the four faces come from.** New on 2026-09-02, and now the largest open question in the
-  phase. `packages/video/src/design/fonts.ts` loads Archivo, Instrument Serif, Inter and JetBrains
-  Mono through `@remotion/google-fonts`, which fetches `woff2` files from `fonts.gstatic.com`
-  *inside the headless browser* — below `service-host.ts:59`, where the denying adapter cannot see
-  them. Ticket 11 measured it: with no network the render fails outright. Ticket 07's egress
-  restriction and this image are contradictory as they stand. Self-hosting the faces in the image is
-  the obvious repair and it moves every accepted still hash, which is ticket 09's problem as well.
 - **What the Windows-recorded still hashes mean on Linux.** Fourteen of them differ in the container
-  and pass on the host. Sharpens once the font question above is answered, because answering it
-  moves them again.
+  and pass on the host. No longer entangled with the fonts — the font decision leaves them where
+  they are — so this is a Windows-versus-Linux question on its own, and ticket 09 asserts recorded
+  fixtures are unchanged across the phase, which cannot currently hold on both platforms at once.
 - **The Linux-path corpus for the widened sanitiser expression.** `internalPath` needs a container
   path to redact; what the corpus must contain is a ticket 06 question and is not answerable before
   the container path shape is known.

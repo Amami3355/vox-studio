@@ -46,6 +46,34 @@ which reproduces the working image in full for this ticket to promote rather tha
   it will move every accepted still hash, which is ticket 09's problem too. This is now the largest
   open question in the phase.
 
+**Amended a third time 2026-09-02, when the user settled the font question.** The contradiction
+above is resolved the other way: **`fonts.gstatic.com` is added to the egress allowlist and the
+faces continue to be fetched at render time.** Self-hosting was recommended and was not taken; the
+decision is the user's and it is recorded here rather than argued again.
+
+- **The egress rule names two hosts, not one**: the synthesizer's host, and `fonts.gstatic.com`.
+  Both are written down with the reason each is there, because an allowlist whose entries have no
+  stated cause grows without anyone deciding to grow it.
+- **`fonts.gstatic.com` is the only font host observed, and that is a measurement, not a guarantee.**
+  Ticket 11's `--network none` run named exactly four failing loads and all four were `gstatic`;
+  `@remotion/google-fonts` carries its CSS in the bundle, so `fonts.googleapis.com` was never
+  reached. If a future face resolves through a host not on this list the render fails the same way,
+  and the same negative control finds it.
+- **ADR-0007's claim weakens, and ADR-0018 must say so rather than inherit it.** The property being
+  deployed is no longer "the render reaches nothing" — it is "the render reaches two hosts named in
+  advance, and the denying adapter still refuses everything the service itself attempts". The
+  adapter's guarantee at `service-host.ts:59` is untouched. What is lost is the second lock: font
+  traffic below the adapter now has a permitted path out, so the egress rule is no longer a
+  redundant confirmation of the adapter for that traffic. See ticket 02.
+- **The still-hash divergence is now independent of this ticket.** Self-hosting would have moved
+  every accepted hash; fetching the same faces from the same host does not. The fourteen failing
+  fixtures remain exactly what ticket 11 measured — a Windows-versus-Linux question — and are
+  ticket 09's to settle on their own timetable.
+- **The negative control changes shape and does not go away.** `--network none` will now fail by
+  design, so it stops being the proof. The proof for this ticket is a container run with egress
+  restricted to the two allowed hosts and everything else refused, which must render green while a
+  non-`record` command attempting any egress is still refused by the adapter.
+
 ## Problem Statement
 
 `service-host.ts` is a Windows program that happens to be written in Node. Its last twelve lines
@@ -176,9 +204,10 @@ unavailable has not tested the adapter.
 - [ ] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image
 - [ ] The service refuses to start when its volume is absent, asserted
 - [ ] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule
-- [ ] The four faces are served from the image, not from `fonts.gstatic.com`, and the render needs no font egress
 - [ ] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start
-- [ ] Egress is restricted to the synthesizer's host
+- [ ] Egress is restricted to two hosts — the synthesizer's, and `fonts.gstatic.com` — each with its reason written down
+- [ ] A render completes in the container under that restriction, with every other host refused
+- [ ] The weakened ADR-0007 property is stated in ADR-0018, not inherited
 - [ ] The container builds, boots and rejects a malformed request, reaching no model or network in CI
 - [ ] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
 - [ ] The request timeout admits that render, on the platform as well as in the host

@@ -11,6 +11,30 @@ The ADR's four questions are unchanged and its argument is unchanged. What chang
 the second one — see the amended paragraph below — and the ADR must now be written against a tunnel
 and a firewall rather than against a platform's identity layer. See `map.md`.
 
+**Amended again 2026-09-02, after the font decision.** The ADR gains a fifth thing to state, and one
+of its scope exclusions below needs reading carefully rather than at face value.
+
+**A `render` reaches the network, and the ADR must say so in its own words.** Ticket 11 measured it
+and the user settled it: the four faces stay on `fonts.gstatic.com`, fetched by the headless browser
+*below* `service-host.ts:59`, where the denying adapter cannot see them. ADR-0007 reads as though
+`record` is the only command with outbound traffic. That was never quite true in the local topology
+either — the fetch happened there too, silently, over a machine with a network — but locally nothing
+claimed otherwise. In the cloud it becomes a written property of the deployment, because the egress
+rule has to name `fonts.gstatic.com` for renders to work at all.
+
+- **The exclusion "not `record`'s network exception" still stands, and is narrower than it looks.**
+  This ticket does not reopen *why* `record` may reach outbound network or what else might. It does
+  have to state accurately what the render path does, because ticket 09's proof sheet will otherwise
+  score a property the deployment does not have.
+- **State the guarantee at the layer that actually holds it.** The adapter's rule — the service
+  itself reaches nothing but what `record` needs — is untouched and provable. The egress rule is a
+  second, weaker lock: two named hosts rather than one, and font traffic below the adapter has a
+  permitted path out. The honest sentence separates the two locks instead of presenting the pair as
+  one property.
+- **This is a claim ticket 09 must be able to evidence.** "No unexpected egress" is not scorable
+  against an allowlist with an unexplained entry on it. "Egress is limited to two hosts, each named
+  with its cause, and everything else is refused" is.
+
 ## Problem Statement
 
 ADR-0007 contains one sentence that forbids this entire spec:
@@ -118,6 +142,7 @@ old ADR first is not misled by it.
 - [ ] It names what replaces the pipe ACL, the restricted OS account, and the absence of a socket
 - [ ] It states that the per-request HMAC survives unchanged, and why channel and body authentication are two answers
 - [ ] It names which recorded isolation probes stop being meaningful, without claiming the substitute is the same measurement
+- [ ] It states that a `render` reaches `fonts.gstatic.com` below the adapter, and separates the adapter's guarantee from the weaker egress allowlist
 - [ ] It states the evidence a cloud deployment must produce, in terms ticket 09 can write a proof sheet from
 - [ ] It permits an authenticated network transport for the remote topology only, and does not authorise a local HTTP listener
 - [ ] ADR-0007 carries a superseded-in-part note pointing at it, and its body is otherwise unchanged
