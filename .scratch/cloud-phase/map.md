@@ -143,6 +143,14 @@ them contradict tickets as written; those tickets were edited the same day rathe
   are unchanged and permanently coexist as the two callers of one command service. **06, 08 and 10
   are unblocked.**
 
+- **A recorded still hash is scoped to the platform that recorded it** —
+  [13](issues/13-the-recorded-still-hashes-are-a-property-of-a-platform.md). The Linux set is not
+  re-accepted as canonical, which would invert which platform is trusted and which nobody has argued
+  for. Thirty-two recorded literals across seven files move; the twenty-six assertions that compare
+  two renders to each other are platform-agnostic and stay as they are. Settled with the user on
+  2026-09-02 after four consecutive handoffs deferred it. Ticket 09's claim narrows to *unchanged for
+  the platform that recorded them*, and ticket 13 owes it that wording.
+
 ## Not yet specified
 
 In scope, real, and not yet sharp enough to ticket.
@@ -159,10 +167,6 @@ In scope, real, and not yet sharp enough to ticket.
 - **What owns container restart on Container-Optimized OS.** `create-with-container` is deprecated
   and ticket 07 must choose a mechanism rather than inherit one. A `cloud-init` unit is the near
   neighbour and has not been tried.
-- **What the Windows-recorded still hashes mean on Linux.** Fourteen of them differ in the container
-  and pass on the host. No longer entangled with the fonts — the font decision leaves them where
-  they are — so this is a Windows-versus-Linux question on its own, and ticket 09 asserts recorded
-  fixtures are unchanged across the phase, which cannot currently hold on both platforms at once.
 - **The Linux-path corpus for the widened sanitiser expression.** `internalPath` needs a container
   path to redact; what the corpus must contain is a ticket 06 question and is not answerable before
   the container path shape is known.
