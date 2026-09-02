@@ -7,7 +7,7 @@
 # check runs from a container on the real VM, against the real disk, under the
 # production identity. Running it anywhere else proves something adjacent.
 #
-#   scripts/volume-conformance/run-check.sh [--skip-control] [--control-only] [--keep-bucket]
+#   scripts/volume-conformance/run-check.sh [--yes] [--skip-control] [--control-only] [--keep-bucket]
 #
 # On Windows, run it through Git's bash rather than PowerShell's `bash`, which
 # resolves to WSL's stub:
@@ -40,6 +40,13 @@ bad()  { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
 die()  { bad "$1"; exit 1; }
 confirm() {
   local reply=""
+  # --yes exists so the run works with no terminal attached. Without it and
+  # without a terminal, `read` sees EOF and the answer is no, which would skip
+  # the control silently — the one outcome this check cannot afford.
+  if [[ "${ASSUME_YES:-no}" == "yes" ]]; then
+    printf '  %s? %s [y/N] %syes (--yes)%s\n' "$YELLOW" "$1" "$GREEN" "$RESET"
+    return 0
+  fi
   printf '  %s? %s [y/N] ' "$YELLOW" "$1"
   read -r reply || true
   [[ "$reply" =~ ^[Yy] ]]
@@ -48,11 +55,13 @@ confirm() {
 SKIP_CONTROL="no"
 CONTROL_ONLY="no"
 KEEP_BUCKET="no"
+ASSUME_YES="no"
 for argument in "$@"; do
   case "$argument" in
     --skip-control) SKIP_CONTROL="yes" ;;
     --control-only) CONTROL_ONLY="yes" ;;
     --keep-bucket)  KEEP_BUCKET="yes" ;;
+    --yes|-y)       ASSUME_YES="yes" ;;
     *) die "unknown option $argument" ;;
   esac
 done
