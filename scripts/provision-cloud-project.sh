@@ -218,10 +218,25 @@ CREW_SECRET="VOX_CREW_MODEL_KEY"
 # others, and a wizard that dies on `command -v gcloud` after the operator has just installed it
 # is the worst possible moment to be wrong about this.
 GCLOUD=""
+# PATH alone is not enough on a Windows box where the SDK installed itself but the shell predates
+# the PATH it added — the state the operator's machine was in when ticket 04 needed it. So the
+# install locations are searched after PATH.
+#
+# The SDK's extensionless `gcloud` is a shell script and is executable under Git Bash; the
+# `gcloud.cmd` beside it is not — `[[ -x ]]` is false for it even though it runs. Hence the shell
+# wrapper is preferred at every location, the .cmd is a fallback, and the test is `-f` not `-x`.
 resolve_gcloud() {
   local candidate
   for candidate in gcloud gcloud.cmd; do
     if command -v "$candidate" >/dev/null 2>&1; then GCLOUD="$candidate"; return 0; fi
+  done
+  for candidate in \
+    "$HOME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud" \
+    "$HOME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd" \
+    "/c/Program Files (x86)/Google/Cloud SDK/google-cloud-sdk/bin/gcloud" \
+    "/c/Program Files (x86)/Google/Cloud SDK/google-cloud-sdk/bin/gcloud.cmd" \
+    "$HOME/google-cloud-sdk/bin/gcloud"; do
+    if [[ -f "$candidate" ]]; then GCLOUD="$candidate"; return 0; fi
   done
   return 1
 }
@@ -305,7 +320,7 @@ else
   warn "Close this terminal and open a new one afterwards, or the new PATH will not be visible."
   pause "Press Enter once the installer has finished and you have re-opened the terminal."
   if ! resolve_gcloud; then
-    bad "still cannot find gcloud on PATH — re-open the terminal and re-run this wizard"
+    bad "still cannot find gcloud, on PATH or where the SDK installs — re-open the terminal and re-run this wizard"
     exit 1
   fi
   ok "found $GCLOUD"
