@@ -109,10 +109,20 @@ not be described as one property**:
 - **The adapter is the strong lock and it is unchanged.** `network: { request: async () =>
   reject('NETWORK_POLICY_DENIED') }` refuses every outbound request the service itself makes
   outside `record`. It is enforced in code, it is total, and nothing in this ADR weakens it.
-- **The egress allowlist is the weak lock.** It names two hosts — the synthesizer's, and
-  `fonts.gstatic.com` — each recorded with the reason it is there. For the synthesizer it is a
-  second, independent confirmation of the adapter. **For font traffic it is not**, because that
-  traffic originates below the adapter and now has a permitted path out.
+- **The egress allowlist is the weak lock, and weaker still than this ADR first claimed.**
+  *Corrected 2026-09-02, the same day, while ticket 03's wizard was being written.* The original
+  wording said the rule "names two hosts". **A VPC firewall rule cannot name a host.**
+  `gcloud compute firewall-rules create` takes `--destination-ranges`, which is CIDR, and both the
+  synthesizer and the font host sit behind CDNs with wide, shifting address ranges. Restricting
+  egress by hostname needs Secure Web Proxy or FQDN objects in Cloud NGFW — real products, real
+  cost, and the wrong thing to adopt under this deadline.
+
+  So for this phase the two-host list is **documented intent, not an enforced control**, and the
+  adapter is the only egress lock the deployment actually enforces. That is a smaller claim than
+  the one this ADR was accepted with, and it is written here rather than discovered by ticket 09
+  trying to evidence it. What remains true and worth keeping: the list is the record of which
+  outbound destinations this system is *supposed* to have, and a destination appearing in a
+  traffic log that is not on it is a finding.
 
 **So ADR-0007's `record`-only wording is narrowed here rather than repeated.** The honest property
 is: *the service reaches nothing outside `record`, and the render's browser reaches one named font
@@ -175,9 +185,11 @@ alongside it. A deployment claiming this guarantee produces:
   sanitised on the way out.
 - Proof the service refuses to start without its persistent volume — the failure it prevents is
   silent, which is why it is asserted rather than assumed.
-- A render completing under the real egress restriction, with every host outside the two named
-  ones refused. **`--network none` is no longer the control**, because decision 5 makes it fail by
-  design; the control is the restriction itself.
+- A render completing with outbound traffic observed and compared against the two intended
+  destinations. **`--network none` is no longer the control**, because decision 5 makes it fail by
+  design. *Corrected 2026-09-02: this previously said "with every host outside the two named ones
+  refused", which assumed an enforcement the firewall cannot perform. What the deployment can
+  produce is an observation, not a refusal, and the sheet must not score an observation as one.*
 - A non-`record` command attempting egress and being refused **by the adapter**, demonstrated
   independently of the egress rule. A test that passes only because the network was unavailable
   has not tested the adapter — which is the generalisation ticket 11 earned, and it is recorded
@@ -217,7 +229,13 @@ re-baselining of the accepted still hashes.
   existed before this ADR and was invisible while nothing depended on it.
 - **The egress allowlist is a governed list, not a configuration detail.** Two entries, each with
   its recorded cause. An entry added without one is a defect against this ADR even if the
-  deployment works.
+  deployment works. It is enforced by nothing at the network layer in this phase — see decision 5
+  — so it governs review rather than traffic, and anyone citing it should say which.
+- **The VM reaches the internet through Cloud NAT, and that is not optional.** An instance with no
+  external address cannot reach a non-Google host at all; Private Google Access covers Artifact
+  Registry and Secret Manager but not the synthesizer and not the font host. Closed ingress and a
+  working `record` are therefore both properties of the network design rather than of one setting,
+  and the gateway is a standing cost this phase's envelope now carries.
 - **ADR-0015 decision 3's sentence "ADR-0007 stands unamended" is now historical.** Its substance
   — no local HTTP listener — is reaffirmed by decision 7 here and is unchanged.
 - **Nothing in `packages/production` changes because of this ADR.** The service, the launcher, the

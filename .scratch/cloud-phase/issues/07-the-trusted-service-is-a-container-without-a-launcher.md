@@ -70,9 +70,28 @@ decision is the user's and it is recorded here rather than argued again.
   fixtures remain exactly what ticket 11 measured — a Windows-versus-Linux question — and are
   ticket 09's to settle on their own timetable.
 - **The negative control changes shape and does not go away.** `--network none` will now fail by
-  design, so it stops being the proof. The proof for this ticket is a container run with egress
-  restricted to the two allowed hosts and everything else refused, which must render green while a
-  non-`record` command attempting any egress is still refused by the adapter.
+  design, so it stops being the proof. The proof for this ticket is a run on the VM with outbound
+  traffic observed, which must render green while a non-`record` command attempting any egress is
+  still refused by the adapter.
+
+**Amended a fourth time 2026-09-02, from the Google Cloud docs read while writing ticket 03's
+wizard.** Three corrections, and two of them shrink what this ticket can claim:
+
+- **Egress cannot be restricted to a host.** `gcloud compute firewall-rules create` takes
+  `--destination-ranges`, which is CIDR only, and both the synthesizer and the font host sit behind
+  CDNs. The two-host list is **documented intent, not an enforced control**, and the denying
+  adapter is the only egress lock this deployment actually enforces. ADR-0018 decision 5 was
+  corrected the same day. Enforcing it properly means Secure Web Proxy or Cloud NGFW FQDN objects,
+  which is a later ticket and a real cost.
+- **The VM reaches the internet through Cloud NAT.** An instance with no external address reaches
+  no non-Google host without it — Private Google Access covers Artifact Registry and Secret
+  Manager, and covers neither the synthesizer nor the font host. Ticket 03's wizard provisions the
+  router and the gateway; this ticket inherits them and should not be surprised by the line item.
+- **`gcloud compute instances create-with-container` is deprecated.** The docs say deploying a
+  container at VM creation through the container startup agent is on its way out. This ticket's
+  "the platform owns restart" needs a mechanism that is not that flag — a `cloud-init` unit on
+  Container-Optimized OS is the near neighbour — and **choosing it is this ticket's work, not an
+  assumption it may inherit.** The wizard creates the bare VM and stops there deliberately.
 
 ## Problem Statement
 
@@ -205,8 +224,8 @@ unavailable has not tested the adapter.
 - [ ] The service refuses to start when its volume is absent, asserted
 - [ ] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule
 - [ ] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start
-- [ ] Egress is restricted to two hosts — the synthesizer's, and `fonts.gstatic.com` — each with its reason written down
-- [ ] A render completes in the container under that restriction, with every other host refused
+- [ ] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list
+- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations
 - [ ] The weakened ADR-0007 property is stated in ADR-0018, not inherited
 - [ ] The container builds, boots and rejects a malformed request, reaching no model or network in CI
 - [ ] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU

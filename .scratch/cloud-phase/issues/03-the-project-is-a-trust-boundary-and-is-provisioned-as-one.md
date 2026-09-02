@@ -18,6 +18,33 @@ ticket, and nothing else changes:
 
 The two-identities decision below is untouched and remains the point of the ticket.
 
+**Amended again 2026-09-02. The wizard exists: [`scripts/provision-cloud-project.sh`](../../../scripts/provision-cloud-project.sh),
+thirteen stages, idempotent, safe to stop and re-run.** It is committed rather than left in
+`.scratch/` because this ticket's own criterion is that an operator who has not seen the project
+can follow it. Nothing below changes; what follows is what writing it settled and what it found.
+
+- **The route in is IAP TCP forwarding, and the route out is Cloud NAT.** Settled by the user on
+  2026-09-02 against the alternative of an external address behind a deny-all rule. **A VM with no
+  external address cannot reach the internet at all** — Private Google Access covers Artifact
+  Registry and Secret Manager and covers neither the synthesizer nor the font host — so NAT is what
+  makes "no external address" survivable rather than an extra. Ingress is one allow from
+  `35.235.240.0/20` on `tcp:22` to tagged hosts, plus a deny-all at priority 65000 that beats the
+  default network's permissive rules. The gateway is a standing cost the envelope now carries; on
+  the order of ten currency units for a week.
+- **Egress cannot be restricted to a host, and the wizard says so on screen rather than
+  pretending.** Firewall rules take CIDR ranges. See ticket 07's fourth amendment and ADR-0018
+  decision 5, both corrected the same day.
+- **The wizard stops at a bare VM.** `create-with-container` is deprecated, and choosing what owns
+  restart is ticket 07's decision rather than something to bury in a provisioning script.
+- **Secrets are generated where generating beats typing.** `VOX_GRANT_KEY` and `VOX_RUN_HMAC_KEY`
+  are 32 random bytes offered at an empty prompt. Every secret goes to Secret Manager on stdin —
+  never a file, never an argv element, never the operator's shell history.
+- **The captured configuration lands outside the repository**, at `~/.vox-cloud.env`, and holds no
+  secret. The last criterion below is a property of the script, not a hope about the operator.
+- **Stage 8 runs three commands, not two.** The two refusals the ticket asks for, and one grant.
+  Two refusals also happen when nothing works at all, and a proof that cannot distinguish those is
+  the vacuous pass this project has already been bitten by once.
+
 ## Problem Statement
 
 There is no Google Cloud project. Prerequisite 2 of this spec asks for one *"with billing, and a

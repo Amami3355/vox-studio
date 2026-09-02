@@ -74,6 +74,18 @@ them contradict tickets as written; those tickets were edited the same day rathe
   host; **ticket 11 built the image and rendered in it, so the escape hatch is not taken** and the
   decision is evidenced rather than assumed. Building from source on the box is ruled out: the
   source on the box is the code-blindness argument leaking.
+- **The VM has no external address; IAP is the way in and Cloud NAT is the way out.** Settled by
+  the user on 2026-09-02, against an external address behind a deny-all rule. The forcing fact came
+  from the docs: **an instance with no external address reaches no non-Google host without NAT**,
+  and Private Google Access does not cover the synthesizer or the font host, so `record` and every
+  render depend on the gateway. Ingress is one allow from `35.235.240.0/20` on `tcp:22`, plus a
+  deny-all at priority 65000. The NAT gateway is a standing cost the envelope now carries.
+  Provisioned by [`scripts/provision-cloud-project.sh`](../../scripts/provision-cloud-project.sh).
+- **Egress is not restrictable to a host, so the two-host list governs review and not traffic.**
+  VPC firewall rules take CIDR ranges; the synthesizer and `fonts.gstatic.com` are both behind
+  CDNs. **The denying adapter is the only enforced egress lock in this phase.** ADR-0018 decision 5
+  and ticket 07 were corrected the same day, on the day the ADR was accepted. Enforcing the list
+  needs Secure Web Proxy or Cloud NGFW FQDN objects and is a later ticket.
 - **`sshd` and the firewall answer "who may connect", and nothing inside the container does.**
   Settled by ADR-0018 decision 2 and corrected the same day in the three places that still said
   otherwise: the spec's decision 4 and its transport paragraph, ticket 06's caller-authentication
@@ -113,8 +125,13 @@ them contradict tickets as written; those tickets were edited the same day rathe
 In scope, real, and not yet sharp enough to ticket.
 
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
-  what they see while a synchronous render runs for minutes. Graduates once 03 lands and there is a
-  box to tunnel to.
+  what they see while a synchronous render runs for minutes. The tunnel half is now answered —
+  `gcloud compute ssh <instance> --tunnel-through-iap`, and ticket 03's wizard proves it reaches
+  the box in its last stage. What the operator watches during a three-minute synchronous render is
+  still unwritten, and graduates once 07 deploys something to watch.
+- **What owns container restart on Container-Optimized OS.** `create-with-container` is deprecated
+  and ticket 07 must choose a mechanism rather than inherit one. A `cloud-init` unit is the near
+  neighbour and has not been tried.
 - **What the Windows-recorded still hashes mean on Linux.** Fourteen of them differ in the container
   and pass on the host. No longer entangled with the fonts — the font decision leaves them where
   they are — so this is a Windows-versus-Linux question on its own, and ticket 09 asserts recorded
