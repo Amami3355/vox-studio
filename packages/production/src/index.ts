@@ -12,6 +12,7 @@ export * from './commands/service';
 export * from './render/assets';
 export * from './render/remotion';
 export * from './commands/dispatch';
+export * from './commands/payload-surface';
 export * from './ipc/authentication';
 export * from './ipc/framing';
 export * from './ipc/host';

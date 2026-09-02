@@ -1,6 +1,29 @@
 # 05: The service gains a payload-shaped surface, above the command service
 
-Status: ready-for-agent
+Status: done
+
+## What the criteria do not capture
+
+Named here because ticket 06 serves this surface and ticket 08 calls it, and each inherits
+something the checkboxes above tick without describing.
+
+- **The surface is constructed with a runs root, not the ledger root.** The criterion says "its own
+  ledger root". Taken literally that puts public Run directories inside the private trusted area the
+  ledger occupies, which contradicts the split every existing fixture builds and the volume ticket 04
+  mounted. The surface takes `runsRoot` — the crew's work root moved across the boundary — and the
+  service keeps its own `ledgerRoot`. Confirmed with the user before a line was written.
+- **A Run id resolves by scanning checkpoints, exactly as `local_client.py:_directory` does.** The
+  directory is `run-<hex12>` and the id lives in its `run.json`, so the mapping is a search with a
+  cache in front of it, not a computation. A store with many Runs makes that search longer; nothing
+  in this phase makes it a problem, and nothing measures where it becomes one.
+- **The wrong-Run refusal is `ARTIFACT_MISSING`, not an error of its own.** A descriptor another Run
+  published resolves cleanly inside this Run and is simply not there. Distinguishing "not yours" from
+  "not there" would mean gating retrieval on the Run's published descriptor set, which risks refusing
+  a legitimate descriptor that reached an envelope without reaching the bindings. Three refusals and
+  three distinct codes, but the third is absence rather than ownership.
+- **`packages/production/src/index.ts` is modified.** One export line. The criterion says the service,
+  the dispatcher, `vox.exe` and the proof harness are unmodified, and all four are; the barrel had to
+  name the new module or no transport could import it.
 
 ## Problem Statement
 
@@ -121,13 +144,13 @@ container to be written or tested. Start it in parallel with ticket 03.
 
 **Blocked by:** `.scratch/cloud-phase/issues/02-the-boundary-is-re-earned-without-os-local-ipc.md`
 
-- [ ] A module above `ProductionCommandService` accepts a command, a Run id and a payload, and returns the envelope
-- [ ] It materialises each payload into the Run under the filename `local_client.py` writes today, asserted by name
-- [ ] It resolves a Run id against its own ledger root, and no caller passes a root
-- [ ] It handles the payload that has nowhere durable to live until the Run exists
-- [ ] Artifact retrieval takes a Run id and an envelope descriptor, and returns bytes and a digest
-- [ ] The digest is recomputed rather than echoed, proved by a corrupted artifact
-- [ ] Retrieval refuses a descriptor resolving outside its Run, with distinct errors for escape, wrong Run, and missing Run
-- [ ] Every command driven through the surface produces the envelope the argv path produces, compared field by field
-- [ ] `ProductionCommandService`, `dispatchProductionArgv`, `vox.exe` and the proof harness are unmodified
-- [ ] No command, envelope field or contract changes
+- [x] A module above `ProductionCommandService` accepts a command, a Run id and a payload, and returns the envelope
+- [x] It materialises each payload into the Run under the filename `local_client.py` writes today, asserted by name
+- [x] It resolves a Run id against its own ledger root, and no caller passes a root
+- [x] It handles the payload that has nowhere durable to live until the Run exists
+- [x] Artifact retrieval takes a Run id and an envelope descriptor, and returns bytes and a digest
+- [x] The digest is recomputed rather than echoed, proved by a corrupted artifact
+- [x] Retrieval refuses a descriptor resolving outside its Run, with distinct errors for escape, wrong Run, and missing Run
+- [x] Every command driven through the surface produces the envelope the argv path produces, compared field by field
+- [x] `ProductionCommandService`, `dispatchProductionArgv`, `vox.exe` and the proof harness are unmodified
+- [x] No command, envelope field or contract changes

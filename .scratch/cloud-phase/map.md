@@ -134,6 +134,15 @@ them contradict tickets as written; those tickets were edited the same day rathe
   production secrets, which stay service-side in `service-host.ts:26-36`. The bearer capability moves
   to the second transport unchanged, so the crew-side change is small.
 
+- **The payload-shaped surface is constructed with a runs root, not the ledger root** —
+  [05](issues/05-the-service-gains-a-payload-shaped-surface.md), which is done. Ticket 05's criterion
+  said "its own ledger root"; taken literally that puts public Run directories inside the private
+  trusted area, contradicting the split every fixture builds and the volume ticket 04 mounted. The
+  surface takes `runsRoot` and the command service keeps its `ledgerRoot`. Settled with the user on
+  2026-09-02 before the module was written. `ProductionCommandService` and `dispatchProductionArgv`
+  are unchanged and permanently coexist as the two callers of one command service. **06, 08 and 10
+  are unblocked.**
+
 ## Not yet specified
 
 In scope, real, and not yet sharp enough to ticket.
