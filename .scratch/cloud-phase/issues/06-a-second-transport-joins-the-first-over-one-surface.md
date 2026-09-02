@@ -66,9 +66,14 @@ them into one is the mistake this decision exists to prevent.
 - **No local HTTP listener is added.** ADR-0015 decision 3 and this spec's decision 3. The new host
   is bound in the cloud entry point (ticket 07) and nowhere else. A developer who wants it locally
   wants it for convenience, and that is exactly the shortcut the crew spec forbids.
-- **`sanitizeBoundaryText`'s marker list is reviewed for container-shaped paths.** Decision 10 names
-  this and it is easy to miss: the current expression is built around Windows drive letters, and a
-  POSIX container path will not match it. A sanitiser that silently stops sanitising is worse than
+- **`sanitize.ts`'s `internalPath` expression does not match a container path, and this is measured
+  rather than suspected.** It is
+  `/(?:file:\/{2,3})?[A-Za-z]:[\\/][^\s"'<>]*/gi` — it requires a drive letter, so `/workspace/run/…`
+  or `/mnt/runs/…` passes through unredacted. **The other two expressions survive the move and must
+  not be rewritten alongside it:** `internalMarkers` already spells its separator `[\\/]` and matches
+  `node_modules` and `packages/production` on both platforms, and `stackLine` is separator-
+  independent. So this is one expression to widen, not a sanitiser to rebuild. Decision 10 predicted
+  the class; this is the specific instance. A sanitiser that silently stops sanitising is worse than
   one that was never there, because the proof sheet still scores it.
 - **The idle timeout accommodates a synchronous render.** `DEFAULT_IPC_SOCKET_TIMEOUT_MS` was already
   raised to fifteen minutes for a two-minute eight-scene render. The network host and the platform's
@@ -119,7 +124,7 @@ mock.
 - [ ] `createProductionIpcHost`'s existing tests pass unchanged over the extraction, before the second host exists
 - [ ] A second host serves ticket 05's payload surface over the network; the pipe host still serves argv
 - [ ] The per-request HMAC, replay cache and skew window apply to both hosts, asserted on each refusal separately
-- [ ] `sanitizeBoundaryText` strips container-shaped POSIX paths, asserted
+- [ ] `internalPath` is widened to strip container-shaped POSIX paths, asserted, and `internalMarkers` and `stackLine` are unchanged
 - [ ] The idle timeout admits a synchronous render on both hosts
 - [ ] A transport-parity test drives one Run over both hosts and compares envelopes
 - [ ] The per-instance replay cache's weakening is written down in the module and in the ADR's evidence list
