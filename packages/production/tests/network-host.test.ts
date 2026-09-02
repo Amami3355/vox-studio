@@ -1,0 +1,304 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
+import { ProductionPayloadSurface } from '../src/commands/payload-surface';
+import type { CommandExecution } from '../src/commands/service';
+import { payloadRequestSigningText, signIpc } from '../src/ipc/authentication';
+import { type ProductionNetworkHost, createProductionNetworkHost } from '../src/ipc/network-host';
+import { type CommandFixture, createCommandFixture } from './command-fixture';
+import { IPC_SECRET, callNetwork, signedPayloadRequest } from './ipc-fixture';
+import { REQUEST } from './run-fixture';
+
+let fixture: CommandFixture | null = null;
+let host: ProductionNetworkHost | null = null;
+afterEach(async () => {
+  await host?.close();
+  await fixture?.cleanup();
+  host = null;
+  fixture = null;
+});
+
+const surfaceFor = (open: CommandFixture): ProductionPayloadSurface =>
+  new ProductionPayloadSurface({
+    service: open.service,
+    runsRoot: join(open.root, 'public'),
+    createRunDirectory: () => 'run-network',
+  });
+
+const start = async (
+  open: CommandFixture,
+  options: Partial<Parameters<typeof createProductionNetworkHost>[0]> = {},
+): Promise<number> => {
+  host = createProductionNetworkHost({
+    port: 0,
+    secret: IPC_SECRET,
+    surface: surfaceFor(open),
+    ...options,
+  });
+  return host.listen();
+};
+
+describe('the network host', () => {
+  it('serves the payload surface and answers with the response shape the pipe already defines', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    const response = await callNetwork(port, signedPayloadRequest('contract.index'));
+    const envelope = JSON.parse(response.stdout) as { command: string; outcome: string };
+
+    expect(response).toMatchObject({ exitCode: 0, stderr: '' });
+    expect(response.stdout.endsWith('\n')).toBe(true);
+    expect(envelope).toMatchObject({ command: 'contract.index', outcome: 'succeeded' });
+  });
+
+  it('drives a Run from a payload and names it by id afterwards', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    const init = await callNetwork(port, signedPayloadRequest('run.init', { payload: REQUEST }));
+    const created = (JSON.parse(init.stdout) as { run: { id: string } }).run;
+    const status = await callNetwork(
+      port,
+      signedPayloadRequest('run.status', { runId: created.id }),
+    );
+
+    expect(init.exitCode).toBe(0);
+    expect(created).toMatchObject({ id: 'run-command-test', stage: 'initialized' });
+    expect(JSON.parse(status.stdout)).toMatchObject({
+      command: 'run.status',
+      outcome: 'succeeded',
+      run: { id: 'run-command-test' },
+    });
+  });
+
+  it('answers an unpublished command with an envelope rather than a dropped socket', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    const response = await callNetwork(port, signedPayloadRequest('run.teleport'));
+
+    expect(response.exitCode).toBe(1);
+    expect(JSON.parse(response.stdout)).toMatchObject({
+      command: null,
+      outcome: 'failed',
+      error: { code: 'UNKNOWN_COMMAND' },
+    });
+  });
+});
+
+describe('the network host refusing a request', () => {
+  it('refuses a replayed requestId', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const once = signedPayloadRequest('contract.index');
+    await callNetwork(port, once);
+
+    await expect(callNetwork(port, once)).rejects.toThrow();
+  });
+
+  it('refuses a request outside the skew window', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    await expect(
+      callNetwork(
+        port,
+        signedPayloadRequest('contract.index', { timestampMs: Date.now() - 60_000 }),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a bad MAC', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    await expect(
+      callNetwork(port, { ...signedPayloadRequest('contract.index'), mac: '0'.repeat(64) }),
+    ).rejects.toThrow();
+  });
+
+  it('refuses an argv MAC replayed onto the payload surface', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const unsigned = {
+      protocolVersion: 1 as const,
+      requestId: crypto.randomUUID(),
+      timestampMs: Date.now(),
+      command: 'contract.index',
+      runId: null,
+      payload: null,
+    };
+    const foreign = {
+      ...unsigned,
+      // The argv transport's domain tag over the same envelope fields.
+      mac: signIpc(
+        IPC_SECRET,
+        payloadRequestSigningText(unsigned).replace(
+          'VOX-IPC-PAYLOAD-REQUEST-1',
+          'VOX-IPC-REQUEST-1',
+        ),
+      ),
+    };
+
+    await expect(callNetwork(port, foreign)).rejects.toThrow();
+  });
+
+  it('refuses a request that is not a POST to the command path', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    await expect(
+      callNetwork(port, signedPayloadRequest('contract.index'), { method: 'GET' }),
+    ).rejects.toThrow();
+    await expect(
+      callNetwork(port, signedPayloadRequest('contract.index'), { path: '/anything-else' }),
+    ).rejects.toThrow();
+  });
+
+  it('leaks no reason with any of them', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+
+    const refusal = await callNetwork(port, { not: 'a request' }).catch((error: Error) => error);
+
+    expect(refusal).toBeInstanceOf(Error);
+    expect((refusal as Error).message).not.toMatch(/IPC_|MAC|replay|skew/i);
+  });
+});
+
+describe('the network host binding', () => {
+  it('binds loopback by default', async () => {
+    fixture = await createCommandFixture();
+    await start(fixture);
+
+    expect(host?.address()).toMatchObject({ address: '127.0.0.1' });
+  });
+
+  it('refuses any bind address that is not loopback', async () => {
+    fixture = await createCommandFixture();
+    const surface = surfaceFor(fixture);
+
+    expect(() =>
+      createProductionNetworkHost({
+        port: 0,
+        bindAddress: '0.0.0.0',
+        secret: IPC_SECRET,
+        surface,
+      }),
+    ).toThrow(/loopback/i);
+    expect(() =>
+      createProductionNetworkHost({
+        port: 0,
+        bindAddress: '10.0.0.4',
+        secret: IPC_SECRET,
+        surface,
+      }),
+    ).toThrow(/loopback/i);
+  });
+
+  it('refuses `localhost`, which is a name this process cannot resolve for itself', async () => {
+    fixture = await createCommandFixture();
+
+    // It resolves through `/etc/hosts` and NSS. Admitting it would admit whatever that file
+    // says, which is not a decision this code gets to make.
+    expect(() =>
+      createProductionNetworkHost({
+        port: 0,
+        bindAddress: 'localhost',
+        secret: IPC_SECRET,
+        surface: surfaceFor(fixture as CommandFixture),
+      }),
+    ).toThrow(/loopback/i);
+  });
+});
+
+describe('the network host idle timeout', () => {
+  const slowSurface = (delayMs: number): { execute: () => Promise<CommandExecution> } => ({
+    execute: async () => {
+      await new Promise((wake) => setTimeout(wake, delayMs));
+      return {
+        envelope: {
+          protocolVersion: 1,
+          command: 'contract.index',
+          outcome: 'succeeded',
+          run: null,
+          data: null,
+          artifacts: [],
+          error: null,
+          next: [],
+        },
+        exitCode: 0,
+      } as unknown as CommandExecution;
+    },
+  });
+
+  it('drops a command that outlasts the configured timeout', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture, { surface: slowSurface(600), socketTimeoutMs: 100 });
+
+    await expect(callNetwork(port, signedPayloadRequest('contract.index'))).rejects.toThrow();
+  });
+
+  it('serves the same command when the timeout admits a render', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture, { surface: slowSurface(600), socketTimeoutMs: 10_000 });
+
+    const response = await callNetwork(port, signedPayloadRequest('contract.index'));
+
+    expect(response.exitCode).toBe(0);
+  });
+});
+
+/**
+ * ADR-0015 decision 3 and ADR-0018 decision 7: the network transport is authorised for the
+ * remote topology only, so that a later session cannot cite it to add a convenience listener on
+ * a developer's laptop. The named pipe is the local transport permanently; the two are siblings,
+ * not stages.
+ *
+ * The allowlist is the cloud entry point and nothing else. It is empty until ticket 07 writes
+ * one, and a session that adds a second name to it is changing an ADR.
+ */
+describe('where the network host may be bound', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  /**
+   * The whole repository, not just `packages/`. A scan narrowed to where the host happens to
+   * live today would let ticket 07 put its entry point in `apps/`, `scripts/` or `services/`
+   * and still pass an allowlist that says nothing may bind it.
+   */
+  const repositoryRoot = resolve(here, '../../..');
+  const cloudEntryPoints: string[] = [];
+
+  const sourceFiles = (from: string): string[] =>
+    readdirSync(from).flatMap((name) => {
+      const path = join(from, name);
+      if (['node_modules', 'dist', 'tests', '.git', '.scratch'].includes(name)) return [];
+      if (statSync(path).isDirectory()) return sourceFiles(path);
+      return path.endsWith('.ts') || path.endsWith('.mts') ? [path] : [];
+    });
+
+  it('is constructed in the cloud entry point and nowhere else', () => {
+    const scanned = sourceFiles(repositoryRoot);
+    // A scan that found nothing would pass this test for the wrong reason.
+    expect(scanned).toContain(
+      resolve(repositoryRoot, 'packages/production/src/ipc/network-host.ts'),
+    );
+
+    const binding = scanned.filter((path) => {
+      if (path.endsWith(join('ipc', 'network-host.ts'))) return false;
+      return /createProductionNetworkHost\s*\(/.test(readFileSync(path, 'utf8'));
+    });
+
+    expect(binding.map((path) => relative(repositoryRoot, path))).toEqual(cloudEntryPoints);
+  });
+
+  it('is not reachable from the local service entry point', () => {
+    const local = readFileSync(
+      resolve(repositoryRoot, 'packages/production/src/ipc/service-host.ts'),
+      'utf8',
+    );
+
+    expect(local).not.toContain('network-host');
+    expect(local).not.toContain('createProductionNetworkHost');
+  });
+});

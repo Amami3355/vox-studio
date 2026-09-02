@@ -8,6 +8,7 @@ import {
   type CommandId,
   PROTOCOL_VERSION,
   type ResultEnvelope,
+  commandIdSchema,
   contractCategorySchema,
   resultEnvelopeSchema,
 } from '../contracts/schemas';
@@ -53,8 +54,19 @@ const canonicalPayload = (payload: CommandPayload): string =>
 
 const shortId = (): string => randomBytes(6).toString('hex');
 
+/**
+ * The envelope's `command` is a published id or `null`, and a caller reaching this surface over
+ * the network can name a string that is neither. The argv path answers that with a `null`
+ * command and an envelope; this keeps the two paths saying the same thing, rather than throwing
+ * a schema error out of the failure path that exists to avoid throwing.
+ */
+const publishedCommand = (command: string): CommandId | null => {
+  const parsed = commandIdSchema.safeParse(command);
+  return parsed.success ? parsed.data : null;
+};
+
 const failure = (
-  command: CommandId,
+  command: CommandId | null,
   code: string,
   message: string,
   exitCode: 1 | 2 = 1,
@@ -117,7 +129,7 @@ export class ProductionPayloadSurface {
       return await this.route(request);
     } catch (error) {
       if (error instanceof ProductionSurfaceError) {
-        return failure(request.command, error.code, error.message);
+        return failure(publishedCommand(request.command), error.code, error.message);
       }
       // Everything else is what the argv path calls a failed command, and it answers with an
       // envelope rather than a thrown error. A surface that throws here would hand a transport
@@ -127,7 +139,7 @@ export class ProductionPayloadSurface {
       const malformed = error instanceof ZodError || error instanceof SyntaxError;
       const message = error instanceof Error ? error.message : String(error);
       return failure(
-        request.command,
+        publishedCommand(request.command),
         malformed ? 'INVALID_INPUT' : 'COMMAND_FAILED',
         message,
         malformed ? 2 : 1,

@@ -1,6 +1,6 @@
 # 06: A second transport joins the first, over one surface
 
-Status: ready-for-agent
+Status: done
 
 **Amended 2026-09-02, after ADR-0018 was accepted.** This ticket was written against the serverless
 runtime and answered *who may connect* with platform-terminated TLS and an authorised workload
@@ -158,14 +158,46 @@ lives in this repository rather than in a firewall rule.
 
 **Blocked by:** `.scratch/cloud-phase/issues/05-the-service-gains-a-payload-shaped-surface.md`
 
-- [ ] The authenticate-dispatch-sanitise-sign sequence is one function, called by both hosts
-- [ ] `createProductionIpcHost`'s existing tests pass unchanged over the extraction, before the second host exists
-- [ ] A second host serves ticket 05's payload surface over the network; the pipe host still serves argv
-- [ ] The per-request HMAC, replay cache and skew window apply to both hosts, asserted on each refusal separately
-- [ ] `internalPath` is widened to strip container-shaped POSIX paths, asserted, and `internalMarkers` and `stackLine` are unchanged
-- [ ] The network host binds loopback, asserted, and implements no caller-identity check of its own
-- [ ] The idle timeout admits a synchronous render on both hosts
-- [ ] A transport-parity test drives one Run over both hosts and compares envelopes
-- [ ] The per-instance replay cache's weakening is written down in the module and in the ADR's evidence list
-- [ ] No local HTTP listener is bound outside the cloud entry point
-- [ ] No CI test opens a public socket or reaches the network
+- [x] The authenticate-dispatch-sanitise-sign sequence is one function, called by both hosts
+- [x] `createProductionIpcHost`'s existing tests pass unchanged over the extraction, before the second host exists
+- [x] A second host serves ticket 05's payload surface over the network; the pipe host still serves argv
+- [x] The per-request HMAC, replay cache and skew window apply to both hosts, asserted on each refusal separately
+- [x] `internalPath` is widened to strip container-shaped POSIX paths, asserted, and `internalMarkers` and `stackLine` are unchanged
+- [x] The network host binds loopback, asserted, and implements no caller-identity check of its own
+- [x] The idle timeout admits a synchronous render on both hosts
+- [x] A transport-parity test drives one Run over both hosts and compares envelopes
+- [x] The per-instance replay cache's weakening is written down in the module and in the ADR's evidence list
+- [x] No local HTTP listener is bound outside the cloud entry point
+- [x] No CI test opens a public socket or reaches the network
+
+## What was built, 2026-09-02
+
+- **`src/ipc/boundary.ts`** is the shared sequence: parse, skew, replay, HMAC, audit hooks,
+  sanitise, sign. `host.ts` lost everything but its pipe path, its `node:net` server and its argv
+  dispatch, and its three existing tests passed over the extraction before the second host was
+  written. The per-instance replay cache's weakening is stated at the seam that carries it and in
+  ADR-0018 decision 8.
+- **`src/ipc/network-host.ts`** is the second host: `POST /command`, `ipcResponseSchema`'s
+  envelope, loopback-only bind that throws on anything else, and the frame ceiling reused as a
+  body ceiling. Every refusal destroys the socket — no status code, because a status code is a
+  reason and a reason is an oracle.
+- **The payload request has its own domain tag**, `VOX-IPC-PAYLOAD-REQUEST-1`. Nothing in the
+  ticket asked for it; a shared prefix would have let an argv MAC authenticate a payload request,
+  which is one forgeable surface between two transports. The payload is canonicalised before
+  signing, because a caller's bytes and this process's bytes are only the same bytes if key order
+  is.
+- **`internalPath` became three alternatives from one**, and only the third is new: a `file:`
+  URI, the original drive-letter path, and an absolute POSIX path of two or more segments. Its
+  lookbehind keeps it out of `and/or` and out of a URL's `//`; the two-segment floor keeps a bare
+  `/` in prose. `internalMarkers` and `stackLine` are byte-identical.
+
+**One thing outside the ticket was fixed, and it is named rather than buried.** The payload
+surface's own `UNKNOWN_COMMAND` path could not run: `failure()` fed the caller's string to
+`resultEnvelopeSchema`, which only accepts a published `CommandId`, so an unknown command threw
+out of the failure path that exists to avoid throwing. The argv transport could never reach it —
+argv commands are matched before they are named — and the network host is the first caller able
+to. It now resolves to a `null` command, which is what the argv path answers with.
+
+**Not done here, and not this ticket's:** nothing binds this host. The entry-point allowlist in
+`network-host.test.ts` is empty and a test holds it empty; ticket 07 adds the one name that
+belongs in it.

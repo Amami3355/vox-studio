@@ -143,6 +143,17 @@ them contradict tickets as written; those tickets were edited the same day rathe
   are unchanged and permanently coexist as the two callers of one command service. **06, 08 and 10
   are unblocked.**
 
+- **The two transports share one boundary and separate their signing domains** —
+  [06](issues/06-a-second-transport-joins-the-first-over-one-surface.md), which is done. The
+  authenticate-replay-skew-HMAC-audit-sanitise-sign sequence is `ipc/boundary.ts` and both hosts
+  call it; the pipe host keeps its pipe path and argv, the network host serves ticket 05's payload
+  surface over loopback. **The payload request signs under `VOX-IPC-PAYLOAD-REQUEST-1` rather than
+  the argv tag**, decided while building: one prefix across two transports would let a captured
+  argv MAC authenticate a payload request, which is a forgeable surface neither ticket asked for.
+  The network host binds loopback and fails closed on anything else, and it implements no
+  caller-identity check — the subtractive consequence ADR-0018 decision 2 predicted, now built.
+  **07 and 08 are unblocked.**
+
 - **A recorded still hash is scoped to the platform that recorded it** —
   [13](issues/13-the-recorded-still-hashes-are-a-property-of-a-platform.md). The Linux set is not
   re-accepted as canonical, which would invert which platform is trusted and which nobody has argued
@@ -167,9 +178,6 @@ In scope, real, and not yet sharp enough to ticket.
 - **What owns container restart on Container-Optimized OS.** `create-with-container` is deprecated
   and ticket 07 must choose a mechanism rather than inherit one. A `cloud-init` unit is the near
   neighbour and has not been tried.
-- **The Linux-path corpus for the widened sanitiser expression.** `internalPath` needs a container
-  path to redact; what the corpus must contain is a ticket 06 question and is not answerable before
-  the container path shape is known.
 - **What the local proof harness's Windows-only verdicts become.** Ticket 02's ADR names which
   recorded probes stop meaning anything; what replaces them in the sheet is downstream of that
   naming and of [12](issues/12-the-proof-sheet-says-what-it-cannot-evidence.md).

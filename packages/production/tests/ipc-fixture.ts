@@ -1,18 +1,22 @@
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import { createConnection } from 'node:net';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
   type IpcRequest,
   type IpcResponse,
+  type PayloadIpcRequest,
   ipcResponseSchema,
+  payloadRequestSigningText,
   requestSigningText,
   responseSigningText,
   signIpc,
   verifyIpcMac,
 } from '../src/ipc/authentication';
 import { encodeFrame, readFrame } from '../src/ipc/framing';
+import { PRODUCTION_NETWORK_PATH } from '../src/ipc/network-host';
 
 const execFileAsync = promisify(execFile);
 
@@ -37,26 +41,89 @@ export const signedRequest = (
   return { ...unsigned, mac: signIpc(IPC_SECRET, requestSigningText(unsigned)) };
 };
 
-export const callPipe = async (
-  path: string,
-  request: IpcRequest,
-): Promise<IpcResponse & { stdout: string; stderr: string }> => {
-  const socket = createConnection(path);
-  await new Promise<void>((resolveConnect, rejectConnect) => {
-    socket.once('connect', resolveConnect);
-    socket.once('error', rejectConnect);
-  });
-  socket.write(encodeFrame(request));
-  const response = ipcResponseSchema.parse(await readFrame(socket));
+export type VerifiedResponse = IpcResponse & { stdout: string; stderr: string };
+
+/**
+ * The half of a client that is the same over either transport: parse the response shape, refuse
+ * one this service did not sign, and decode the streams. Both clients below end here, because a
+ * response the caller cannot authenticate is the failure they are both looking for.
+ */
+export const verifiedResponse = (raw: unknown): VerifiedResponse => {
+  const response = ipcResponseSchema.parse(raw);
   const { mac, ...unsigned } = response;
   if (!verifyIpcMac(IPC_SECRET, responseSigningText(unsigned), mac)) {
-    throw new Error('Test client received an unauthenticated IPC response.');
+    throw new Error('Test client received an unauthenticated response.');
   }
   return {
     ...response,
     stdout: Buffer.from(response.stdoutBase64, 'base64').toString('utf8'),
     stderr: Buffer.from(response.stderrBase64, 'base64').toString('utf8'),
   };
+};
+
+export const callPipe = async (path: string, request: IpcRequest): Promise<VerifiedResponse> => {
+  const socket = createConnection(path);
+  await new Promise<void>((resolveConnect, rejectConnect) => {
+    socket.once('connect', resolveConnect);
+    socket.once('error', rejectConnect);
+  });
+  socket.write(encodeFrame(request));
+  return verifiedResponse(await readFrame(socket));
+};
+
+export const signedPayloadRequest = (
+  command: string,
+  overrides: Partial<Omit<PayloadIpcRequest, 'mac'>> = {},
+): PayloadIpcRequest => {
+  const unsigned = {
+    protocolVersion: 1 as const,
+    requestId: randomUUID(),
+    timestampMs: Date.now(),
+    command,
+    runId: null,
+    payload: null,
+    ...overrides,
+  };
+  return { ...unsigned, mac: signIpc(IPC_SECRET, payloadRequestSigningText(unsigned)) };
+};
+
+/**
+ * The network host's client, kept deliberately dumb: it opens a connection, posts one JSON body
+ * and reads one back. A refused request reaches it as a transport error rather than as a status
+ * code, which is the point — the host destroys the socket rather than saying why.
+ */
+export const callNetwork = async (
+  port: number,
+  body: unknown,
+  options: { method?: string; path?: string } = {},
+): Promise<VerifiedResponse> => {
+  const encoded = Buffer.from(JSON.stringify(body), 'utf8');
+  const raw = await new Promise<{ status: number; text: string }>((resolveCall, rejectCall) => {
+    const call = httpRequest(
+      {
+        host: '127.0.0.1',
+        port,
+        method: options.method ?? 'POST',
+        path: options.path ?? PRODUCTION_NETWORK_PATH,
+        headers: { 'content-type': 'application/json', 'content-length': encoded.byteLength },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () =>
+          resolveCall({
+            status: response.statusCode ?? 0,
+            text: Buffer.concat(chunks).toString('utf8'),
+          }),
+        );
+        response.on('error', rejectCall);
+      },
+    );
+    call.on('error', rejectCall);
+    call.end(encoded);
+  });
+  if (raw.status !== 200) throw new Error(`Production network host answered ${raw.status}.`);
+  return verifiedResponse(JSON.parse(raw.text));
 };
 
 export const compileTestLauncher = async (output: string): Promise<void> => {

@@ -196,6 +196,18 @@ alongside it. A deployment claiming this guarantee produces:
   here because it is the discipline that found both defects in the image.
 - The `not-evidenced` verdicts of decision 6, named as such, with the substitute argument stated
   and not scored.
+- **A statement of how many instances are running, because the replay cache is one of them.**
+  *Added 2026-09-02 by ticket 06, which built the second transport.* The per-request HMAC this
+  ADR preserves is paired with a replay cache, and that cache is an in-process `Map` — one
+  container is one cache. A request captured inside the skew window and replayed against a
+  *second* instance is accepted, because that instance has never seen the id. **This is a real
+  weakening relative to the local topology, where one machine ran one host, and it is recorded
+  here rather than left to be discovered.** It is mitigated for this phase by running exactly one
+  instance and by a short skew window; a shared cache is a later ticket. A deployment that scales
+  past one instance has changed a property of this ADR and owes its own decision, so the evidence
+  a deployment produces has to say which case it is in. See
+  `packages/production/src/ipc/boundary.ts`, where the same limit is written at the seam that
+  carries it.
 
 ## Considered and rejected
 
