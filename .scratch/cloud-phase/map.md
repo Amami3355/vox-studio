@@ -60,6 +60,15 @@ them contradict tickets as written; those tickets were edited the same day rathe
   minutes a render, and the cheaper answer. The request timeout and the platform's ceiling both have
   to admit three minutes.
 - **Region is `europe-west1`, chosen once.** The disk, the VM and the proof run all agree on it.
+  **The zone is `europe-west1-c`**, decided by availability rather than preference on 2026-09-02:
+  `-b` had no `pd-balanced` capacity for the run store's disk. The region is the decision and the
+  zone is a fact — tickets 04 and 07 cite `-c`, and the wizard tries the region's zones in turn.
+- **The project is `studio-prod-7f3a`, and it is provisioned** —
+  [03](issues/03-the-project-is-a-trust-boundary-and-is-provisioned-as-one.md) is done. Two
+  identities, five secrets separated and the separation proved by three commands, Artifact
+  Registry, a 50 GB disk, `vox-service` on Container-Optimized OS with no external address, IAP in
+  and Cloud NAT out. The default network's internet-facing allow rules are deleted rather than
+  left shadowed. **04 and 07 are unblocked on this axis.**
 - **The preview is a time-limited signed link**, with the thinnest possible page around it. Streaming
   bytes back through a synchronous render response is the version that fails on the day.
 - **The operator on the 9th is the project's own operator**, nobody else. No third-party

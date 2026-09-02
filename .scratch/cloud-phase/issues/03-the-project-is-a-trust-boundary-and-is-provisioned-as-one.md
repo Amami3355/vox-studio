@@ -1,8 +1,43 @@
 # 03: The project is a trust boundary, and is provisioned as one
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: —
+
+**Provisioned 2026-09-02.** The operator walked the wizard and the project exists. What is there:
+
+| | |
+|---|---|
+| project | `studio-prod-7f3a`, billing attached, budget alert at 10 EUR |
+| region / zone | `europe-west1` / **`europe-west1-c`** |
+| identities | `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`, `vox-crew@…` |
+| secrets | the four production names → production only; `VOX_CREW_MODEL_KEY` → crew only |
+| registry | `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox` |
+| disk | `vox-runs`, 50 GB pd-balanced, `europe-west1-c` |
+| instance | `vox-service`, Container-Optimized OS, `e2-standard-2`, no external address |
+| in | IAP TCP forwarding only — `gcloud compute ssh vox-service --zone=europe-west1-c --tunnel-through-iap` |
+| out | Cloud NAT via `vox-router` / `vox-nat` |
+
+Four things the run itself settled, each of which a later ticket would otherwise assume:
+
+- **The zone is `europe-west1-c`, not `-b`.** `europe-west1-b` returned
+  `ZONE_RESOURCE_POOL_EXHAUSTED` for a 50 GB `pd-balanced` disk — a Google-side shortage, not a
+  configuration error. The region was the decision; the zone was a constant. **Tickets 04 and 07
+  must use `-c`**, and the wizard now tries the region's zones in turn rather than hardcoding one.
+- **The separation is proved, and was re-proved independently after the run.** The crew identity
+  is refused on `ELEVENLABS_API_KEY`; the production identity is refused on `VOX_CREW_MODEL_KEY`;
+  the production identity reads its own secret. The third is what makes the first two mean
+  something.
+- **The default network's `allow-ssh`, `allow-rdp` and `allow-icmp` rules are deleted.** They admit
+  `0.0.0.0/0` at priority 65534 and were inert behind the deny-all at 65000 — which made closed
+  ingress a property of one rule staying in place. `default-allow-internal` is kept. The tunnel was
+  re-verified afterwards and still reaches the instance.
+- **Ingress is evidenced by absence, which is stronger than the criterion asked for and is not the
+  same measurement.** The criterion says an unauthenticated request to the service's address is
+  refused. There is no address: the instance has no external IP, so there is nothing to send the
+  request to. What was evidenced is the empty `accessConfigs`, the three surviving ingress rules,
+  and a working IAP tunnel. Recorded this way rather than ticked as if a refusal had been observed,
+  per ADR-0018 decision 6.
 
 **Amended 2026-09-02, after the topology was chosen.** The topology is a Compute Engine VM with a
 persistent disk in `europe-west1`, reached only through an SSH tunnel. Three consequences for this
@@ -157,13 +192,13 @@ configuration that ticket 07 replaces, the last three are paths into the volume.
 
 **Blocked by:** None (human-run; start immediately, in parallel with ticket 02)
 
-- [ ] A Google Cloud project exists with billing attached and a named owner
-- [ ] One region is chosen and written down, and tickets 04, 07 and cloud-phase 01 cite it
-- [ ] Two workload identities exist: one for the production service, one for the crew
-- [ ] The four production secrets live in the managed secret store, readable by the production identity only
-- [ ] The crew's model credential lives in the managed secret store, readable by the crew identity only
-- [ ] Neither identity can read the other's secrets, proved by two commands that are expected to fail
-- [ ] The production service's address refuses unauthenticated requests, proved from outside
-- [ ] A budget alert is configured
-- [ ] The whole procedure is a wizard that verifies each step, and an operator who has not seen the project can follow it
-- [ ] No credential appears in the repository, a transcript, or a shell history
+- [x] A Google Cloud project exists with billing attached and a named owner
+- [x] One region is chosen and written down, and tickets 04, 07 and cloud-phase 01 cite it
+- [x] Two workload identities exist: one for the production service, one for the crew
+- [x] The four production secrets live in the managed secret store, readable by the production identity only
+- [x] The crew's model credential lives in the managed secret store, readable by the crew identity only
+- [x] Neither identity can read the other's secrets, proved by two commands that are expected to fail
+- [x] The production service's address refuses unauthenticated requests, proved from outside
+- [x] A budget alert is configured
+- [x] The whole procedure is a wizard that verifies each step, and an operator who has not seen the project can follow it
+- [x] No credential appears in the repository, a transcript, or a shell history

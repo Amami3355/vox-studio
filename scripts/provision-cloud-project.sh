@@ -597,6 +597,18 @@ else
   ok "created NAT $NAT — outbound only, no inbound path is created by this"
 fi
 
+# The default network ships allow rules for SSH, RDP and ICMP from 0.0.0.0/0 at priority 65534.
+# The deny above outranks them, so they are inert — but that makes closed ingress a property of
+# one rule staying in place rather than of the network's shape. Delete the internet-facing three;
+# default-allow-internal stays, because VM-to-VM traffic is not the threat model here.
+for rule in default-allow-ssh default-allow-rdp default-allow-icmp; do
+  if gc compute firewall-rules describe "$rule" >/dev/null 2>&1; then
+    gc compute firewall-rules delete "$rule" --quiet >/dev/null 2>&1 \
+      && ok "deleted $rule (was 0.0.0.0/0 at priority 65534)" \
+      || warn "could not delete $rule; it is shadowed by the deny but should not be left"
+  fi
+done
+
 gc projects add-iam-policy-binding "$VOX_CLOUD_PROJECT" \
   --member="user:$OPERATOR" --role=roles/iap.tunnelResourceAccessor >/dev/null 2>&1 || true
 ok "you may open an IAP tunnel to this project"
