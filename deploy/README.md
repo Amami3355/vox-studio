@@ -110,8 +110,15 @@ one. A `tmpfs` would pass. Identifying the specific disk is ticket 04's `identit
 
 None of the following has been executed. Each is listed so it is claimed only once it is true.
 
-- [ ] The VM created from `cloud-init.yaml`, and Container-Optimized OS confirmed to read
-      `user-data` and run it. **Documented intent until then.**
+- [ ] `cloud-init.yaml` applied to the VM, and Container-Optimized OS confirmed to read `user-data`
+      and run it. **Documented intent until then.** The instance exists and runs COS
+      (`cos-stable-121-18867-584-3`) but carries **no `user-data` metadata**, so nothing on it
+      starts a container today.
+- [ ] The image pushed to `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox`, which currently holds
+      **0 items**. 2.06 GB, and the pull time and registry storage cost are still an open item.
+- [ ] `VOX_NETWORK_TOKEN` created in Secret Manager and bound to
+      `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`. The other four secrets exist and are
+      bound; this transport's key was created by ticket 07 and its secret was not.
 - [ ] `prepare-disk.sh`, `run-check.sh` and `check.mjs` run against the real disk.
 - [ ] `identity.txt` written; `check.mjs` exit 3 produced by a real run.
 - [ ] A render completing on the VM with outbound traffic observed and compared against the two

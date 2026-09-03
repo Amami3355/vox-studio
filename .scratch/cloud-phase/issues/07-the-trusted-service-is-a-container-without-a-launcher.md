@@ -225,7 +225,7 @@ unavailable has not tested the adapter.
 - [x] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence
 - [x] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start — and refuses a download outright when the pin is set, so a wrong path fails loudly
 - [x] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list — `deploy/README.md`
-- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations — **not done: no VM has been created by this session**
+- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations — **not done.** *Corrected 2026-09-03:* the VM exists and is running. `studio-prod-7f3a` carries `vox-service` on `cos-stable-121-18867-584-3`, `e2-standard-2`, `europe-west1-c`, no external address, with `vox-runs` attached as device `vox-runs`. What blocks the run is three deploy steps, not provisioning — see "What the conformance run is actually blocked on"
 - [x] The weakened ADR-0007 property is stated in ADR-0018, not inherited
 - [x] The container builds, boots and rejects a malformed request, reaching no model or network in CI — run against a real container, `deploy/container-smoke.mjs`, eight checks
 - [x] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
@@ -330,3 +330,36 @@ offending shape rather than quoting it.
 1018 tests, 1017 passing. The one failure is `record-command.test.ts > treats changed text as a
 distinct autonomous Recording input within budget`, which passes alone in 1.6 s and timed out at
 13.7 s under load — the flake `-f` and `-g` both name. Baseline 965 + 53 new = 1018.
+
+
+## What the conformance run is actually blocked on, checked 2026-09-03
+
+**The project is provisioned and the VM is running.** This section replaces the earlier assumption
+that no infrastructure existed; it was checked with the Cloud CLI rather than inferred.
+
+Present in `studio-prod-7f3a`:
+
+| Resource | State |
+| --- | --- |
+| `vox-service` | RUNNING, `e2-standard-2`, `europe-west1-c`, **`cos-stable-121-18867-584-3`**, no external address |
+| `vox-runs` | 50 GB `pd-balanced`, READY, attached as device name `vox-runs` — so `/dev/disk/by-id/google-vox-runs` in `cloud-init.yaml` is right |
+| Service account | `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`, `cloud-platform` scope |
+| Cloud NAT | router `vox-router`, gateway `vox-nat`, ALL_SUBNETWORKS_ALL_IP_RANGES |
+| Firewall | `vox-allow-iap-ssh` from `35.235.240.0/20`, `vox-deny-all-ingress` from `0.0.0.0/0` |
+| Secrets | `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`, `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID`, each bound to the production SA |
+| Artifact Registry | `vox`, DOCKER, `europe-west1` |
+
+**Three things are missing, and all three are deploy steps rather than provisioning.**
+
+1. **The registry is empty.** `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox` lists 0 items,
+   0.000 MB. The 2.06 GB image has never been pushed. The map's open item on pull time and registry
+   storage cost is still open and is now the thing standing between here and a conformance run.
+2. **`VOX_NETWORK_TOKEN` does not exist in Secret Manager.** Ticket 03 provisioned the four secrets
+   that existed when it ran; this transport's key was created by this ticket and its secret was not.
+   It also needs the production SA bound to it, as the other four are.
+3. **The instance carries no `user-data` metadata** — the key list is empty, so `cloud-init.yaml`
+   has never been applied and nothing on the VM starts a container today. This confirms rather than
+   contradicts what this ticket already recorded.
+
+Unchanged and still owed once those are done: whether the disk survives a reboot, which uid the
+container runs as, `identity.txt`, `check.mjs`'s exit 3, and the tunnel under a three-minute render.

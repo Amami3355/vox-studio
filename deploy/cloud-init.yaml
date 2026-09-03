@@ -11,9 +11,9 @@
 #
 # **What is verified and what is not.** `--metadata-from-file` is confirmed against the gcloud CLI
 # reference. That Container-Optimized OS reads the `user-data` key and runs cloud-init over it is
-# the documented COS contract but has **not been executed by this session** — no VM has been
-# created, and nothing here has run. It is documented intent until the conformance run, and the
-# conformance run is where it becomes evidence. See ticket 07's "What was built".
+# the documented COS contract but has **not been executed**. The VM exists and runs COS, and its
+# metadata key list is empty — checked 2026-09-03 — so this file has never been applied to it.
+# It is documented intent until the conformance run. See ticket 07's "What was built".
 #
 # One instance. Not a scaling group, not a template with more than one. ADR-0018 decision 8: the
 # replay cache is an in-process `Map`, so one container is one cache, and a request captured inside
