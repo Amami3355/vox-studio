@@ -22,6 +22,32 @@ node_modules
 **/tests
 **/*.test.ts
 
+# **Found by ticket 07's deploy wizard**, whose stage 3 warned about an uncommitted `.gitignore` on
+# every run. `.dockerignore` governs the build context and `.gitignore` does not, so the file is
+# inert in a production runtime — but nothing here excluded it, `COPY . .` carried it in, and every
+# edit to it therefore changed the image bytes. The warning was technically true, useless in
+# practice, and firing at the one prompt that asks the operator to judge whether the tag is honest.
+.gitignore
+.gitattributes
+# This file too. Docker reads it from the context root before the context is assembled, so
+# excluding it still applies it — it just stops it being copied into the runtime, where it is the
+# same inert cargo as the two above and would recreate the same false alarm from a different file.
+.dockerignore
+
+# Operator-side only. `scripts/` is the two cloud wizards and the volume conformance harness; all
+# three run on the machine doing the deploying and none is reachable from inside the container.
+# `deploy/` is the exception that must stay, because `docker-entrypoint.sh` is this image's
+# ENTRYPOINT — so the four files in it that the image never reads are excluded by name rather than
+# by excluding the directory. `container-smoke.mjs` and `image-leak-scan.mjs` are `docker cp`'d in
+# at the moment they run and are never read from `/app`; `fetch-service-env.sh` runs on the COS
+# host, not in the container.
+scripts
+deploy/README.md
+deploy/cloud-init.yaml
+deploy/fetch-service-env.sh
+deploy/container-smoke.mjs
+deploy/image-leak-scan.mjs
+
 .git
 .github
 .scratch

@@ -209,6 +209,7 @@ IMAGE_NAME="production"
 LOCAL_IMAGE="vox-production:latest"
 INSTANCE="vox-service"
 CLOUD_INIT="$REPO_ROOT/deploy/cloud-init.yaml"
+DOCKERIGNORE="$REPO_ROOT/.dockerignore"
 SERVICE_ENV="/etc/vox/service.env"
 # Google's documented ceiling for one metadata value. The rendered unit file is a few kilobytes, so
 # this is a guard against a future edit rather than a live worry — but a metadata write that is
@@ -354,6 +355,49 @@ if (( VERIFY_FAILURES > 0 )); then
   halt "a secret the container reads is not readable by the identity the container runs as"
 fi
 
+# excluded_from_context PATH — true when `.dockerignore` confidently keeps PATH out of the build
+# context that `COPY . .` reads.
+#
+# **Conservative by construction.** It implements only the pattern forms this repo's
+# `.dockerignore` actually uses — a bare name, `**/name`, `*.ext`, `**/*.ext`, `name.*`, and a
+# directory prefix — and answers "not excluded" for everything it does not recognise. Docker's
+# matcher is richer than this one. Being wrong in the permissive direction would turn stage 3's
+# warning into a silent pass, which is the exact failure this block exists to undo; being wrong in
+# the strict direction costs the operator one glance at a filename.
+#
+# It also gives up entirely on a negation line. `!pattern` re-includes what an earlier pattern
+# excluded, and honouring the earlier pattern while ignoring the later one would report a file as
+# absent from an image that contains it. There are no negations in the file today; if one appears,
+# this reports every dirty path as reaching the image and the operator reads the names.
+excluded_from_context() {
+  local path="$1" pat base
+  [ -f "$DOCKERIGNORE" ] || return 1
+  grep -q '^[[:space:]]*!' "$DOCKERIGNORE" && return 1
+  base="${path##*/}"
+  while IFS= read -r pat; do
+    pat="${pat%$'\r'}"
+    case "$pat" in ''|'#'*) continue ;; esac
+    pat="${pat#./}"; pat="${pat%/}"
+    # Strip a *literal* leading `**/` only. Unquoted, `${pat#**/}` is a glob that eats any leading
+    # directory, which would turn `deploy/README.md` into `README.md` and exclude every README in
+    # the tree.
+    case "$pat" in '**/'*) pat="${pat#'**/'}" ;; esac
+    [ -n "$pat" ] || continue
+    # An exact path, or anything beneath it when the pattern names a directory.
+    [ "$path" = "$pat" ] && return 0
+    case "$path" in "$pat"/*) return 0 ;; esac
+    # The same name at any depth, as a file or as a directory the path sits under.
+    case "$path" in */"$pat"|*/"$pat"/*) return 0 ;; esac
+    # A glob, read against the basename the way `**/*.ext` and `.env.*` are meant to be. The
+    # unquoted `$pat` is the point rather than an oversight — quoting it, as SC2254 asks, would
+    # match `*.pem` as the four literal characters and silently stop excluding every key file in
+    # the tree. The branch is only reached for patterns that contain a `*`.
+    # shellcheck disable=SC2254
+    case "$pat" in *'*'*) case "$base" in $pat) return 0 ;; esac ;; esac
+  done < "$DOCKERIGNORE"
+  return 1
+}
+
 # ── 3 ─────────────────────────────────────────────────────────────────────
 stage "The local image is present, and it is the one you think it is"
 if ! dk image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
@@ -382,8 +426,43 @@ say ""
 say "The registry tag records which commit produced this image, so a box running an old"
 say "digest can be traced back to a tree rather than to a date."
 GIT_SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "nogit")
-if ! git -C "$REPO_ROOT" diff --quiet 2>/dev/null; then
-  warn "the working tree has uncommitted changes, so tag $GIT_SHA does not fully describe this build"
+# This check used to be `git diff --quiet` over the whole tree behind one unqualified sentence, and
+# running it found three faults:
+#
+#   1. `git diff` alone sees neither *staged* changes nor untracked files. Both land in the image
+#      through `COPY . .`, and a staged-but-uncommitted change is precisely a tag that lies.
+#   2. It named nothing, so an operator had to leave the wizard and go look — at the one prompt in
+#      it that is asking them to think about something else.
+#   3. It never asked whether the dirty files reach the image at all. A `.gitignore` edit that has
+#      been deliberately uncommitted here for weeks made it fire on every single run, and a warning
+#      that fires every time discriminates nothing. It spends the credibility of the judgement it
+#      was protecting: the next firing, on a build that genuinely is misdescribed, reads as noise.
+#
+# So: name the files, and split them by whether the build context carries them. Only the first list
+# is a warning. The second is printed anyway, because "this is dirty and it does not matter" is a
+# thing the operator should be able to check rather than take on trust.
+DIRTY_IN_IMAGE=""
+DIRTY_OUT_OF_IMAGE=""
+while IFS= read -r _dirty; do
+  # `--porcelain` prefixes two status columns and a space; a rename arrives as `old -> new` and it
+  # is the new path that is in the tree.
+  _dirty="${_dirty:3}"
+  case "$_dirty" in *' -> '*) _dirty="${_dirty##* -> }" ;; esac
+  _dirty="${_dirty%\"}"; _dirty="${_dirty#\"}"
+  [ -n "$_dirty" ] || continue
+  if excluded_from_context "$_dirty"; then
+    DIRTY_OUT_OF_IMAGE="${DIRTY_OUT_OF_IMAGE}${_dirty}"$'\n'
+  else
+    DIRTY_IN_IMAGE="${DIRTY_IN_IMAGE}${_dirty}"$'\n'
+  fi
+done < <(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal 2>/dev/null)
+if [ -n "$DIRTY_IN_IMAGE" ]; then
+  warn "these are uncommitted and do reach the image, so tag $GIT_SHA does not fully describe this build:"
+  while IFS= read -r _dirty; do [ -n "$_dirty" ] && note "    $_dirty"; done <<< "$DIRTY_IN_IMAGE"
+fi
+if [ -n "$DIRTY_OUT_OF_IMAGE" ]; then
+  note "  uncommitted, but kept out of the image by .dockerignore, so the tag is unaffected:"
+  while IFS= read -r _dirty; do [ -n "$_dirty" ] && note "    $_dirty"; done <<< "$DIRTY_OUT_OF_IMAGE"
 fi
 TAG="$GIT_SHA"
 say ""
