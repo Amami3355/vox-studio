@@ -359,7 +359,8 @@ stage "The local image is present, and it is the one you think it is"
 if ! dk image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
   say "The image is not on this machine. Building it takes roughly ten minutes:"
   say ""
-  note "  docker build -t $LOCAL_IMAGE -f deploy/Dockerfile ."
+  note "  docker build -t $LOCAL_IMAGE ."
+  note "  (the Dockerfile is at the repo root, not under deploy/)"
   say ""
   say "This wizard does not build it for you. A ten-minute build inside a stage that clears"
   say "the screen hides its own output, and a failed build should be read where it happened."
@@ -367,11 +368,16 @@ if ! dk image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
 fi
 IMAGE_ID=$(dk image inspect "$LOCAL_IMAGE" --format '{{.Id}}')
 IMAGE_CREATED=$(dk image inspect "$LOCAL_IMAGE" --format '{{.Created}}')
-IMAGE_SIZE=$(dk image inspect "$LOCAL_IMAGE" --format '{{.Size}}')
+# `docker image inspect --format '{{.Size}}'` is NOT the figure to show here. Under Docker Desktop's
+# containerd image store it reported 515 MB for an image `docker images` and `docker system df` both
+# put at 2.06 GB — a four-fold understatement, in the two places where the number is the point: what
+# the registry will be billed for, and how long stage 8 should expect to wait for the first pull. An
+# operator told to expect 515 MB would read a normal 2 GB pull as a hung deploy.
+IMAGE_SIZE=$(dk images "$LOCAL_IMAGE" --format '{{.Size}}' | head -n1)
 ok "$LOCAL_IMAGE is present"
 note "  id       ${IMAGE_ID:0:19}"
 note "  built    $IMAGE_CREATED"
-note "  size     $(( IMAGE_SIZE / 1000000 )) MB"
+note "  size     $IMAGE_SIZE"
 say ""
 say "The registry tag records which commit produced this image, so a box running an old"
 say "digest can be traced back to a tree rather than to a date."
@@ -388,7 +394,7 @@ confirm "Is $LOCAL_IMAGE the build you want deployed?" || halt "stopped at your 
 # ── 4 ─────────────────────────────────────────────────────────────────────
 stage "Push, and let the registry say what actually arrived"
 say "This is the first stage that costs money and the first that leaves this machine."
-say "$(( IMAGE_SIZE / 1000000 )) MB of registry storage, billed monthly, plus the transfer."
+say "$IMAGE_SIZE of registry storage, billed monthly, plus the transfer."
 say ""
 warn "The push is not reversible by re-running: a digest that exists in the registry exists."
 confirm "Push $LOCAL_IMAGE to $IMAGE_PATH:$TAG?" || halt "stopped at your request, before anything was pushed"
@@ -616,7 +622,7 @@ say "This is the stage that turns two documented intentions into observed facts:
 say "Container-Optimized OS reads the user-data key and runs cloud-init over it, and that"
 say "the mount unit's escaped name is the one systemd derives. Neither has ever been run."
 say ""
-say "First boot pulls $(( IMAGE_SIZE / 1000000 )) MB through Cloud NAT, so this is slow."
+say "First boot pulls $IMAGE_SIZE from Artifact Registry, so this is slow."
 note "Polling for up to ten minutes. A pull, not a hang."
 
 BOOT_OK="no"

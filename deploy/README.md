@@ -120,8 +120,15 @@ this instance:
 It is the only place two documented-but-unexecuted claims get tested: that Container-Optimized OS
 reads the `user-data` key and runs cloud-init over it, and that `mnt-disks-vox\x2druns.mount` is the
 name systemd derives from the escaped mount path. Both are the documented contract and neither has
-ever been run. Stage 8 polls for ten minutes — first boot pulls 2.06 GB through Cloud NAT — and on
-failure prints the cloud-init journal and both units' status rather than inviting a re-run.
+ever been run. Stage 8 polls for ten minutes — first boot pulls 2.06 GB from Artifact Registry,
+which Private Google Access covers, so it does **not** cross Cloud NAT — and on failure prints the
+cloud-init journal and both units' status rather than inviting a re-run.
+
+The wizard takes that size from `docker images`, not from `docker image inspect --format {{.Size}}`.
+Under Docker Desktop's containerd image store the latter reported **515 MB** for this image where
+`docker images` and `docker system df` both say 2.06 GB, and the number matters in the two places it
+is used: what the registry is billed for, and how long a first pull should be expected to take. An
+operator told to expect 515 MB reads a normal pull as a hung deploy.
 
 ## Exactly one instance
 
