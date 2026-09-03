@@ -1,0 +1,44 @@
+# Promoted from `.scratch/cloud-phase/spike-11/Dockerfile.dockerignore`, then tightened by ticket
+# 07's first real leak scan over the built image — which found two things this file did not
+# exclude. Both are recorded here rather than silently fixed, because the next `COPY . .` will
+# reintroduce whatever this file forgets.
+
+# `node_modules` is installed from the committed lockfile inside the image. Copying the host's
+# tree in would carry Windows-resolved binaries into a Linux image.
+node_modules
+**/node_modules
+
+# **Found by the leak scan:** `services/agents/.venv` is a 130 MB Python virtualenv built on the
+# host, and `COPY . .` was putting it in the image — Windows-built artifacts in a Linux image,
+# carrying `cacert.pem` files the scan correctly flagged as credential-shaped.
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+
+# **Found by the leak scan:** the test suite was in the image. It is not needed to run the service,
+# it is where every fixture secret lives, and an image that carries its own tests has a larger
+# readable surface than the thing it deploys.
+**/tests
+**/*.test.ts
+
+.git
+.github
+.scratch
+dist
+**/dist
+out
+**/out
+docs
+
+# Never, under any circumstances.
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.key
+credentials.json
+service-account.json
+.npmrc
+.netrc

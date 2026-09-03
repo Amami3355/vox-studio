@@ -162,22 +162,38 @@ them contradict tickets as written; those tickets were edited the same day rathe
   2026-09-02 after four consecutive handoffs deferred it. Ticket 09's claim narrows to *unchanged for
   the platform that recorded them*, and ticket 13 owes it that wording.
 
+- **The trusted service is a container, and the restart mechanism is a `cloud-init` systemd unit** —
+  [07](issues/07-the-trusted-service-is-a-container-without-a-launcher.md), 2026-09-03.
+  `create-with-container` is deprecated, so the container is started by a systemd unit delivered
+  through the `user-data` metadata key with `Restart=always`. The cloud entry point is
+  `cloud-host.ts`, which holds the one authorised network-host binding; `service-host.ts` keeps the
+  pipe and both call one shared service construction. The two transports now hold separate key
+  material as well as separate signing domains. **The code runs and the image runs; no VM has been
+  created, so the unit file is documented intent.**
+
+- **The image's leak scan is not the agent distribution's leak scan** — 07, 2026-09-03. ADR-0018
+  decision 8 asked for `scanReadableFiles` over the image's layers, and that cannot be executed: it
+  forbids `.ts` and `ProductionCommandService` because it answers *may the agent read this?*, and the
+  image is the production runtime. `image-scan.ts` replaces it with what an image can honestly carry
+  — no secret material, no agent distribution — and the ADR records the narrowing rather than
+  absorbing it. Running it for the first time found a 130 MB host virtualenv and the whole test suite
+  inside the image.
+
 ## Not yet specified
 
 In scope, real, and not yet sharp enough to ticket.
 
-- **Who owns the run-store mount across a reboot, and which uid the container runs as.** The disk is
-  formatted and mounted at `/mnt/disks/vox-runs`, `root:root 755`, with no `/etc/fstab` entry. Ticket
-  07's, and named here so it is not discovered.
+- **Which uid the container runs as.** Still open. The disk is `root:root 755` and no non-root
+  container has touched it. *Narrowed 2026-09-03 by ticket 07:* the reboot half is answered — a
+  systemd `.mount` unit in `deploy/cloud-init.yaml` replaces the missing `/etc/fstab` entry, and the
+  service unit `Requires=` it so a failed mount stops the service rather than being papered over.
+  **Neither unit has run.**
 
 - **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
   what they see while a synchronous render runs for minutes. The tunnel half is now answered —
   `gcloud compute ssh <instance> --tunnel-through-iap`, and ticket 03's wizard proves it reaches
   the box in its last stage. What the operator watches during a three-minute synchronous render is
   still unwritten, and graduates once 07 deploys something to watch.
-- **What owns container restart on Container-Optimized OS.** `create-with-container` is deprecated
-  and ticket 07 must choose a mechanism rather than inherit one. A `cloud-init` unit is the near
-  neighbour and has not been tried.
 - **What the local proof harness's Windows-only verdicts become.** Ticket 02's ADR names which
   recorded probes stop meaning anything; what replaces them in the sheet is downstream of that
   naming and of [12](issues/12-the-proof-sheet-says-what-it-cannot-evidence.md).

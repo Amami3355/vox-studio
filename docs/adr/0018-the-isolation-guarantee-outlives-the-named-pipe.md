@@ -174,13 +174,46 @@ authenticated network transport **for the remote topology only**, in those words
 session cannot cite it to add a convenience listener on a developer's laptop. The named pipe
 remains the local transport permanently; the two are siblings, not stages.
 
+*Bound 2026-09-03 by ticket 07.* The one entry point authorised to construct the network host is
+`packages/production/src/ipc/cloud-host.ts`, and `network-host.test.ts` holds that allowlist to
+exactly one name by scanning the whole repository. **A session that adds a second name is changing
+this decision**, not configuring a deployment. The container's `CMD`,
+`cloud-service-host.ts`, binds nothing itself — it reads `process.env` and calls the assembly, so
+the assembly stays importable by a test.
+
+The two transports also hold **separate key material**, not only separate signing domains:
+`VOX_NETWORK_TOKEN` against the pipe transport's own variable. Ticket 06 separated the domains,
+which closed the forgery across sockets; separating the keys means a leak of either transport's
+secret does not hand the attacker the other, and it is what makes "the cloud entry point reads no
+pipe configuration" true rather than nominal.
+
 ### 8. The evidence a cloud deployment must produce
 
 Stated here so that the cloud proof sheet can be written from this ADR rather than invented
 alongside it. A deployment claiming this guarantee produces:
 
-- The leak scan, run over the **image's readable layers**. An image layer is a readable file set
-  and the threat model does not care that it arrives as a tarball.
+- A leak scan over the **image's readable layers**. An image layer is a readable file set and the
+  threat model does not care that it arrives as a tarball.
+
+  *Corrected 2026-09-03 by ticket 07, which tried to run it.* This previously said "**the** leak
+  scan", meaning `scanReadableFiles` — the one ADR-0007's release gate applies to the agent
+  distribution. **That scan cannot be run over this image.** It answers *may the agent read this?*
+  and therefore forbids the `.ts` extension, the marker `ProductionCommandService`, and any
+  repository path. The image is the production runtime: it is made of `.ts` files, it contains that
+  class by construction, and it is built at `/app`. Applied to image layers it fails on nearly
+  every file — not because the image leaks anything, but because the two artifacts have opposite
+  contents *by design*. A gate that must be suppressed to pass teaches everyone to suppress it.
+
+  What the image can honestly be scanned for is what a careless `COPY . .` actually produces:
+  **no secret material** — env files, credential files, or any secret-bearing variable *assigned* a
+  value in a layer — and **no agent distribution** travelling inside the service image, those being
+  two different trust domains. That is
+  `packages/production/src/proof/image-scan.ts`. Naming a secret variable stays permitted, because
+  the Dockerfile and the runbook must; assigning one is the finding.
+
+  The narrowing is real and is recorded rather than absorbed: this deployment does **not** evidence
+  that the image is free of agent-readable source, and it never could, because the image is that
+  source.
 - A refusal of a request that is not on the public surface, made over the network transport,
   sanitised on the way out.
 - Proof the service refuses to start without its persistent volume — the failure it prevents is

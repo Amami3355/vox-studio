@@ -256,8 +256,13 @@ describe('the network host idle timeout', () => {
  * a developer's laptop. The named pipe is the local transport permanently; the two are siblings,
  * not stages.
  *
- * The allowlist is the cloud entry point and nothing else. It is empty until ticket 07 writes
- * one, and a session that adds a second name to it is changing an ADR.
+ * The allowlist is the cloud entry point and nothing else. **Ticket 07 wrote the one name on it**,
+ * and a session that adds a second is changing an ADR.
+ *
+ * The name is `cloud-host.ts` rather than `cloud-service-host.ts` — the container's `CMD` — because
+ * the binding lives in the assembly, which holds no side effects at import and can therefore be
+ * driven by `cloud-host.test.ts`. The `CMD` module reads `process.env` and calls it, and binds
+ * nothing itself.
  */
 describe('where the network host may be bound', () => {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -267,7 +272,11 @@ describe('where the network host may be bound', () => {
    * and still pass an allowlist that says nothing may bind it.
    */
   const repositoryRoot = resolve(here, '../../..');
-  const cloudEntryPoints: string[] = [];
+  // Built with `join` because the comparison is against `relative()`, which uses the platform's
+  // separator — a literal POSIX string here would pass on CI and fail on the Windows machine.
+  const cloudEntryPoints: string[] = [
+    join('packages', 'production', 'src', 'ipc', 'cloud-host.ts'),
+  ];
 
   const sourceFiles = (from: string): string[] =>
     readdirSync(from).flatMap((name) => {

@@ -1,0 +1,95 @@
+#cloud-config
+#
+# The restart mechanism, which ticket 07 owed a decision on rather than an assumption.
+#
+# `gcloud compute instances create-with-container` is deprecated — the container startup agent that
+# deploys a container at VM creation is on its way out — so "the platform owns restart" needed a
+# mechanism that is not that flag. This is it: a systemd unit delivered to Container-Optimized OS
+# through cloud-init in the `user-data` metadata key, with `Restart=always`. `gcloud compute
+# instances create` takes `--metadata-from-file=user-data=deploy/cloud-init.yaml`, which is the
+# documented way to hand an instance a file at creation.
+#
+# **What is verified and what is not.** `--metadata-from-file` is confirmed against the gcloud CLI
+# reference. That Container-Optimized OS reads the `user-data` key and runs cloud-init over it is
+# the documented COS contract but has **not been executed by this session** — no VM has been
+# created, and nothing here has run. It is documented intent until the conformance run, and the
+# conformance run is where it becomes evidence. See ticket 07's "What was built".
+#
+# One instance. Not a scaling group, not a template with more than one. ADR-0018 decision 8: the
+# replay cache is an in-process `Map`, so one container is one cache, and a request captured inside
+# the skew window and replayed against a second instance would be accepted because that instance
+# has never seen the id. A deployment that scales past one has changed a property of that ADR and
+# owes its own decision.
+
+write_files:
+  # The disk unit's **filename is the escaped mount path** and is not free to be a friendly name:
+  # systemd derives one from the other, and a `.mount` unit whose name does not match its `Where=`
+  # simply does not start. `/mnt/disks/vox-runs` escapes to `mnt-disks-vox\x2druns.mount` — the
+  # hyphen inside the final segment becomes `\x2d`, because a bare hyphen is the path separator in
+  # an escaped unit name. `systemd-escape -p --suffix=mount /mnt/disks/vox-runs` prints it.
+  #
+  # The mount point itself is ticket 04's: `prepare-disk.sh` formats and mounts `/mnt/disks/vox-runs`
+  # and that is what its conformance run measured.
+  - path: /etc/systemd/system/mnt-disks-vox\x2druns.mount
+    permissions: '0644'
+    owner: root
+    content: |
+      [Unit]
+      Description=Vox persistent Run store
+      Before=vox-production.service
+
+      [Mount]
+      What=/dev/disk/by-id/google-vox-runs
+      Where=/mnt/disks/vox-runs
+      Type=ext4
+      Options=defaults
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/vox-production.service
+    permissions: '0644'
+    owner: root
+    content: |
+      [Unit]
+      Description=Vox trusted Production service
+      # `nofail` is deliberately absent from the mount, and this is a hard dependency rather than a
+      # `Wants=`: if the disk does not mount, this unit does not start, and the service's own
+      # volume check is the second lock rather than the only one.
+      Requires=mnt-disks-vox\x2druns.mount
+      After=gcr-online.target mnt-disks-vox\x2druns.mount
+
+      [Service]
+      Environment="HOME=/home/vox"
+      ExecStartPre=/usr/bin/docker-credential-gcr configure-docker --registries=europe-west1-docker.pkg.dev
+      ExecStartPre=-/usr/bin/docker rm -f vox-production
+      # `--network host` with the service bound to 127.0.0.1 keeps the listener on loopback of the
+      # VM itself, which is where the SSH tunnel lands. A published port would put it on the
+      # container bridge and make the firewall the only thing keeping it private — the mistake
+      # `network-host.ts` refuses one layer down by declining to bind 0.0.0.0.
+      #
+      # The container path is one level up from the `/var/lib/vox/runs` ticket 04 bind-mounted, and
+      # that is ticket 07's change rather than an inherited default: `runs/` cannot be the volume
+      # root, because `ProductionPayloadSurface` reads every directory under `runsRoot` as a Run and
+      # the ledger and calibration must be persistent too. The disk therefore carries `runs/`,
+      # `ledger/` and `calibration.json` side by side.
+      ExecStart=/usr/bin/docker run --rm --name vox-production \
+        --network host \
+        --volume /mnt/disks/vox-runs:/var/lib/vox \
+        --env-file /etc/vox/service.env \
+        ${VOX_IMAGE}
+      ExecStop=/usr/bin/docker stop --time=30 vox-production
+      # The platform owns restart, which is the whole point of this file.
+      Restart=always
+      RestartSec=10
+      # A render is 178 s; a stop that killed it at systemd's default would truncate a preview
+      # mid-write. `docker stop --time=30` and this must both admit the drain.
+      TimeoutStopSec=60
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl enable --now 'mnt-disks-vox\x2druns.mount'
+  - systemctl enable --now vox-production.service

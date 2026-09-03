@@ -1,13 +1,11 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import { createElevenLabsAdapter } from '@vox/voice';
-import { type JsonValue, canonicalJson } from '../canonical-json';
-import { ProductionCommandService } from '../commands/service';
-import type { ReplacementGrant } from '../contracts/schemas';
-import { DurationCalibrationStore } from '../preflight/calibration';
-import { createRemotionRenderAdapter } from '../render/remotion';
 import { createProductionIpcHost } from './host';
 import { startProductionPipeBridge } from './pipe-bridge';
+import {
+  createConfiguredProductionService,
+  resolveProductionServiceConfiguration,
+} from './service-configuration';
 import { resolveSocketTimeoutMs } from './socket-timeout';
 
 const required = (name: string): string => {
@@ -26,43 +24,23 @@ const publicPipePath = required('VOX_PIPE_PATH');
 const publicPipeName = pipeNameFromPath(publicPipePath);
 const privatePipeName = `vox-trusted-${randomUUID()}`;
 const ipcSecret = required('VOX_IPC_TOKEN');
-const grantKey = required('VOX_GRANT_KEY');
-const apiKey = required('ELEVENLABS_API_KEY');
-const ledgerRoot = resolve(required('VOX_LEDGER_ROOT'));
-const runHmacKey = required('VOX_RUN_HMAC_KEY');
-const runKeyId = required('VOX_RUN_KEY_ID');
-const calibrationPath = resolve(required('VOX_CALIBRATION_PATH'));
-const remotionEntryPoint = resolve(required('VOX_REMOTION_ENTRY'));
+
+/**
+ * The service is constructed by `service-configuration.ts`, which the cloud entry point calls too.
+ * What remains in this file is the *local transport* and nothing else: the public pipe path, its
+ * private counterpart, the bridge that forwards between them, and the shared secret those use.
+ *
+ * The construction sits here, before the socket timeout, because that is where it sat before the
+ * extraction. Both read configuration and both can throw, so their order decides which variable an
+ * operator with two things wrong is told about first — and a runbook that greps for the first line
+ * of a failed start should not change because a function moved.
+ *
+ * ADR-0018 decision 7: the named pipe is the local transport permanently. This file does not branch
+ * on a cloud topology and never should — `cloud-host.ts` is its sibling, not a mode of it.
+ */
+const service = createConfiguredProductionService(resolveProductionServiceConfiguration());
 
 const socketTimeoutMs = resolveSocketTimeoutMs(process.env.VOX_IPC_SOCKET_TIMEOUT_MS);
-
-const verifyReplacementGrant = (grant: ReplacementGrant): boolean => {
-  const unsigned = {
-    protocolVersion: grant.protocolVersion,
-    grantId: grant.grantId,
-    runId: grant.runId,
-    recordingInputSha256: grant.recordingInputSha256,
-    issuedAt: grant.issuedAt,
-  };
-  const expected = createHmac('sha256', grantKey)
-    .update(canonicalJson(unsigned as unknown as JsonValue))
-    .digest();
-  const actual = Buffer.from(grant.grant, 'hex');
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-};
-
-const service = new ProductionCommandService({
-  ledgerRoot,
-  hmacKey: runHmacKey,
-  keyId: runKeyId,
-  calibrationStore: new DurationCalibrationStore(calibrationPath),
-  network: { request: async () => Promise.reject(new Error('NETWORK_POLICY_DENIED')) },
-  synthesizer: createElevenLabsAdapter({ apiKey }),
-  verifyReplacementGrant,
-  renderer: createRemotionRenderAdapter({ entryPoint: remotionEntryPoint }),
-  compilerVersion: '1',
-  rendererVersion: 'remotion-4.0.508',
-});
 
 const host = createProductionIpcHost({
   pipePath: `\\\\.\\pipe\\${privatePipeName}`,

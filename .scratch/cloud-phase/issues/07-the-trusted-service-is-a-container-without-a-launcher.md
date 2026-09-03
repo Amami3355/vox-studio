@@ -1,6 +1,6 @@
 # 07: The trusted service is a container, without a launcher
 
-Status: ready-for-agent
+Status: awaiting-conformance-run
 Type: task
 Blocked by: 03, 06, 11
 
@@ -216,19 +216,117 @@ unavailable has not tested the adapter.
 `.scratch/cloud-phase/issues/04-the-volume-proves-posix-semantics-or-it-is-the-wrong-volume.md`,
 `.scratch/cloud-phase/issues/06-a-second-transport-joins-the-first-over-one-surface.md`
 
-- [ ] Constructing `ProductionCommandService` from configuration is extracted and called by both entry points
-- [ ] A cloud entry point binds ticket 06's host, imports no pipe bridge, and reads no pipe configuration
-- [ ] `service-host.ts` is unchanged in behaviour and still starts the local service
-- [ ] Secrets are read from the environment the managed store populates, with no code change to how they are read
-- [ ] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image
-- [ ] The service refuses to start when its volume is absent, asserted
-- [ ] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule
-- [ ] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start
-- [ ] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list
-- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations
-- [ ] The weakened ADR-0007 property is stated in ADR-0018, not inherited
-- [ ] The container builds, boots and rejects a malformed request, reaching no model or network in CI
-- [ ] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
-- [ ] The request timeout admits that render, on the platform as well as in the host
-- [ ] The leak scan passes over the image's readable layers
-- [ ] The one-instance ceiling and its reason are written down
+- [x] Constructing `ProductionCommandService` from configuration is extracted and called by both entry points
+- [x] A cloud entry point binds ticket 06's host, imports no pipe bridge, and reads no pipe configuration
+- [x] `service-host.ts` is unchanged in behaviour and still starts the local service
+- [x] Secrets are read from the environment the managed store populates, with no code change to how they are read
+- [x] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image
+- [x] The service refuses to start when its volume is absent, asserted — in unit tests and by a real container, which printed `VOLUME_NOT_MOUNTED` and exited 1
+- [x] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence
+- [x] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start — and refuses a download outright when the pin is set, so a wrong path fails loudly
+- [x] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list — `deploy/README.md`
+- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations — **not done: no VM has been created by this session**
+- [x] The weakened ADR-0007 property is stated in ADR-0018, not inherited
+- [x] The container builds, boots and rejects a malformed request, reaching no model or network in CI — run against a real container, `deploy/container-smoke.mjs`, eight checks
+- [x] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
+- [~] The request timeout admits that render, on the platform as well as in the host — **host half only.** 15 minutes against a measured 178 s, asserted. The platform half is the tunnel and has not been measured
+- [x] The leak scan passes over the image's readable layers — **with a narrowing recorded in ADR-0018 decision 8**, because the agent-distribution scan cannot be run over an image that is the production runtime
+- [x] The one-instance ceiling and its reason are written down — `deploy/README.md` and `deploy/cloud-init.yaml`
+
+## What was built, 2026-09-03
+
+**The code half is done and the deployment half is not.** Everything below runs; nothing below has
+touched a VM. That split is the honest state of this ticket and is why its status is
+`awaiting-conformance-run` rather than `done`.
+
+### The second entry point
+
+`service-configuration.ts` holds what both topologies share — the environment resolver and the
+`ProductionCommandService` construction, denying network adapter and grant verifier included.
+`service-host.ts` now calls it and keeps only the local transport: the public pipe path, its private
+counterpart, the bridge, and the secret those use. **The construction stayed above the socket
+timeout on purpose**, because both can throw and their order decides which variable an operator with
+two things wrong is told about first.
+
+`cloud-host.ts` is the assembly and holds the one authorised `createProductionNetworkHost` call —
+the name `network-host.test.ts` had been holding an empty allowlist for. `cloud-service-host.ts` is
+the container's `CMD` and holds no logic, so the assembly stays importable and is driven by twelve
+tests over a real loopback socket rather than by a text scan.
+
+The two transports now hold **separate key material**, not only separate signing domains:
+`VOX_NETWORK_TOKEN`. Ticket 06 separated the domains, which closed the cross-socket forgery;
+separating the keys means a leak of one transport's secret does not hand over the other. ADR-0018
+decision 7 records it.
+
+### The volume check is a device comparison, not an existence check
+
+The mount point is created **by the image**, so when the disk fails to attach the directory is still
+there and still writable — and every Run lands on the container's own filesystem and vanishes at the
+next restart, which the platform performs for you. `existsSync` cannot tell those apart. Comparing
+the device number against the parent can. A real container printed `VOLUME_NOT_MOUNTED` and exited 1.
+
+Its known limit, written where the function is: it proves a *separate* filesystem, not the intended
+one. A `tmpfs` passes. `identity.txt` is the check that would close that, and it still has never
+been written.
+
+### The image
+
+Promoted from `spike-11/Dockerfile`, with the symlink replaced by a build-time recorded path and
+`VOX_BROWSER_EXECUTABLE`. `createRemotionRenderAdapter` also passes `onBrowserDownload` when the pin
+is set, which **refuses** the download rather than performing it — so a wrong pin fails loudly
+instead of silently falling back to 92 MB from `remotion.media`.
+
+### Three things the ticket did not ask for, with their causes
+
+1. **`onBrowserDownload` refusing outright.** Reading Remotion's installed types to confirm
+   `browserExecutable` turned up a hook that fires when it is about to download. Pinning a path is a
+   claim; refusing the download is a check that can fail.
+2. **`.dockerignore` tightened, found by running the leak scan for the first time.** `COPY . .` was
+   putting `services/agents/.venv` — a 130 MB Windows-built Python virtualenv, `cacert.pem` files
+   included — and the whole test suite into a Linux production image. Image 2.24 GB → 2.06 GB,
+   scanned files 30,155 → 320.
+3. **A readiness gate in `container-smoke.mjs`.** Its refusal checks compared `status === 0`, which
+   is what a destroyed socket *and* a service that never started both produce. Run against a
+   container still binding, it printed three green refusals and proved nothing. It now waits for the
+   port, fails loudly if it never comes, and requires a refusal to be `ECONNRESET`/`EPIPE` rather
+   than `ECONNREFUSED`. **The gate was then made to fail on purpose, against a port with nothing on
+   it, before being believed.**
+
+### The leak-scan criterion could not be met as written
+
+ADR-0018 decision 8 said "the leak scan, run over the image's readable layers", meaning
+`scanReadableFiles`. **That scan cannot run over this image.** It answers *may the agent read this?*
+and forbids the `.ts` extension, the marker `ProductionCommandService`, and any repository path —
+and the image is the production runtime, made of exactly those. It would fail on nearly every file
+by design, and a gate that must be suppressed to pass is not a gate.
+
+`image-scan.ts` is what replaces it: no secret material, no agent distribution. The ADR is corrected
+rather than the criterion quietly ticked, and **the narrowing is stated: this deployment does not
+evidence that the image is free of agent-readable source, and never could.**
+
+The scan found two false-positive classes against real files before it was believed — an assignment
+to an identifier (`VOX_IPC_TOKEN: ipcSecret` in `harness.ts`, which is source code doing its job),
+and a negated character class matching newlines so a value ran across lines into the next quote.
+Both are pinned by tests. It also flagged its own source, which is why its comments describe the
+offending shape rather than quoting it.
+
+### What is documented intent rather than evidence
+
+- **`cloud-init.yaml` has never run.** `--metadata-from-file` is confirmed against the gcloud
+  reference; that Container-Optimized OS reads `user-data` and runs cloud-init over it is the
+  documented COS contract and **was not executed by this session**.
+- **The container path moved from ticket 04's `/var/lib/vox/runs` to `/var/lib/vox`**, because
+  `ProductionPayloadSurface` reads every directory under `runsRoot` as a Run and the ledger and
+  calibration must be persistent too. The host mount point is unchanged at `/mnt/disks/vox-runs`.
+  **No conformance run has exercised the new layout.**
+- **The systemd `.mount` unit is named `mnt-disks-vox\x2druns.mount`** because systemd derives the
+  name from the path and a mismatch simply does not start. That was corrected by reasoning, not by
+  a run.
+- The shell scripts, `identity.txt`, `check.mjs`'s exit 3 and the tunnel under a three-minute render
+  are all still owed, unchanged.
+
+### Suite
+
+1018 tests, 1017 passing. The one failure is `record-command.test.ts > treats changed text as a
+distinct autonomous Recording input within budget`, which passes alone in 1.6 s and timed out at
+13.7 s under load — the flake `-f` and `-g` both name. Baseline 965 + 53 new = 1018.
