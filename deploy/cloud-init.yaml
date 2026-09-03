@@ -1,5 +1,21 @@
 #cloud-config
 #
+# **This file is a template and is never uploaded as it stands.** Its ExecStart line ends in a
+# VOX_IMAGE placeholder — written in the shell's brace-substitution form, and deliberately not
+# repeated literally in this comment, for the reason at the bottom of this header. Nothing in the
+# repository defines that name, and there is no Environment= or EnvironmentFile= in the unit that
+# could: systemd expands an undefined substitution to **nothing**, not to an error. Uploaded
+# unrendered, this unit would run `docker run` with no image argument, fail, and be restarted every
+# ten seconds for ever by Restart=always, on a box reachable only through an IAP tunnel.
+#
+# `scripts/deploy-cloud-service.sh` stage 5 is what fills it in, with a **digest** read back from
+# Artifact Registry rather than the tag that was pushed. The digest is the point: a moving tag under
+# Restart=always means a restart weeks later can quietly bring up a different image, with nothing on
+# the VM recording that anything changed. That stage refuses to hand on a file with any
+# substitution left unresolved, and the check is a literal one — which is why this comment describes
+# the placeholder instead of spelling it, since prose that spells it would trip the check on a file
+# that had rendered correctly.
+#
 # The restart mechanism, which ticket 07 owed a decision on rather than an assumption.
 #
 # `gcloud compute instances create-with-container` is deprecated — the container startup agent that

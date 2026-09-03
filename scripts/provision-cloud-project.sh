@@ -207,10 +207,16 @@ ROUTER="vox-router"
 NAT="vox-nat"
 IAP_RANGE="35.235.240.0/20"    # the only range Google's IAP TCP forwarding connects from
 
-# The four production secret names are fixed by the code and reused verbatim, per ticket 03's
-# Further Notes. `service-host.ts` reads each through `required()` and will keep doing so; what
+# The production secret names are fixed by the code and reused verbatim, per ticket 03's Further
+# Notes. `service-host.ts` reads the first four through `required()` and will keep doing so; what
 # changes is who populates the environment.
-PRODUCTION_SECRETS=(ELEVENLABS_API_KEY VOX_GRANT_KEY VOX_RUN_HMAC_KEY VOX_RUN_KEY_ID)
+#
+# `VOX_NETWORK_TOKEN` is the fifth and arrived with ticket 07, after this wizard's first run. It is
+# read the same way — `required(env, 'VOX_NETWORK_TOKEN')` in `cloud-host.ts` — but by the *other*
+# transport's host, and it holds **different key material from the pipe transport's `VOX_IPC_TOKEN`
+# on purpose**: the two sign under different domain tags, and one value serving both would make the
+# separation ADR-0018 decision 7 records a fiction. Never populate them from the same secret.
+PRODUCTION_SECRETS=(ELEVENLABS_API_KEY VOX_GRANT_KEY VOX_RUN_HMAC_KEY VOX_RUN_KEY_ID VOX_NETWORK_TOKEN)
 CREW_SECRET="VOX_CREW_MODEL_KEY"
 
 # ── gcloud, resolved once ─────────────────────────────────────────────────
@@ -489,7 +495,7 @@ done
 ok "you can impersonate both identities for the proof in stage 8"
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
-stage "The four production secrets, readable by production alone"
+stage "The five production secrets, readable by production alone"
 say "These names are fixed by the code and are reused verbatim. Input is hidden, and no"
 say "value is written to disk or passed on a command line."
 capture_secret ELEVENLABS_API_KEY "ELEVENLABS_API_KEY:"
@@ -500,6 +506,15 @@ capture_secret VOX_RUN_HMAC_KEY "VOX_RUN_HMAC_KEY:" generate
 store_secret VOX_RUN_HMAC_KEY "$VOX_PRODUCTION_SA"
 capture_secret VOX_RUN_KEY_ID "VOX_RUN_KEY_ID (an identifier, e.g. vox-cloud-key-v1):"
 store_secret VOX_RUN_KEY_ID "$VOX_PRODUCTION_SA"
+
+say ""
+say "The fifth is the network transport's signing key, and it is the one a re-run of this"
+say "wizard is most likely to be here for: ticket 03 provisioned four, and ticket 07 added"
+say "a transport with its own key material."
+warn "This is NOT the pipe transport's VOX_IPC_TOKEN. Different key, different domain tag."
+note "Reusing one value for both would erase a separation that is otherwise enforced in code."
+capture_secret VOX_NETWORK_TOKEN "VOX_NETWORK_TOKEN:" generate
+store_secret VOX_NETWORK_TOKEN "$VOX_PRODUCTION_SA"
 
 for name in "${PRODUCTION_SECRETS[@]}"; do
   if gc secrets describe "$name" >/dev/null 2>&1; then ok "$name exists"; else bad "$name is missing"; fi
@@ -527,6 +542,15 @@ if gc secrets versions access latest --secret=ELEVENLABS_API_KEY \
   PROOF_FAILURES=$((PROOF_FAILURES + 1))
 else
   ok "refused: the crew identity cannot read ELEVENLABS_API_KEY"
+fi
+
+printf '  %s…%s crew identity reading the network transport key (must fail)\n' "$DIM" "$RESET"
+if gc secrets versions access latest --secret=VOX_NETWORK_TOKEN \
+     --impersonate-service-account="$VOX_CREW_SA" >/dev/null 2>&1; then
+  bad "THE CREW IDENTITY READ VOX_NETWORK_TOKEN — it could sign requests as the crew's own client"
+  PROOF_FAILURES=$((PROOF_FAILURES + 1))
+else
+  ok "refused: the crew identity cannot read VOX_NETWORK_TOKEN"
 fi
 
 printf '  %s…%s production identity reading the crew secret (must fail)\n' "$DIM" "$RESET"
@@ -741,6 +765,11 @@ note "  disk         $DISK ($DISK_SIZE) in $ZONE"
 note "  instance     $INSTANCE, no external address, reachable only through IAP"
 printf '\n  %sNext%s\n' "$BOLD" "$RESET"
 note "  ticket 04 — prove POSIX semantics on $DISK before the run store trusts it"
-note "  ticket 07 — build and push the image, and mount the disk into the container"
+note "  deploying  — scripts/deploy-cloud-service.sh, which pushes the image, renders the"
+note "               unit file against its digest and applies the user-data metadata."
+note "               It is a separate wizard because it needs docker, and this one needs"
+note "               only gcloud; and because provisioning happens once where a deploy"
+note "               happens every release. It checks what this wizard created and"
+note "               refuses to run ahead of it."
 note "  the tunnel — gc compute ssh $INSTANCE --zone=$ZONE --tunnel-through-iap"
 printf '\n'
