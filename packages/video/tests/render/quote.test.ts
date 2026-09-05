@@ -15,6 +15,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { hashStill, renderHarness } from './harness';
+import { expectRecordedStills } from './still-hashes';
 
 /** Everything has landed and settled here; all four examples run 180 frames. */
 const SETTLED_FRAME = 120;
@@ -62,23 +63,28 @@ describe('QuoteScene runtime', () => {
       renderHash('example-quote-driven', HOLD_FRAME),
     ]);
 
-    expect({ canonical, longCopy, empty, held }).toEqual({
-      // Accepted 2026-08-16, the first key frames for this capability. Reviewed on stills at
-      // the frames named above, on `editorial-paper`:
-      //
-      //   canonical — eyebrow in accent, the mark one step over the quote, the quote on two
-      //     lines at the top of the ladder, and the signature reading as one block: name in
-      //     ink over role in inkMuted, one gap apart and on one entrance.
-      //   longCopy  — the same frame with the ladder dropped a step. Six lines, the column
-      //     holding all of them, nothing near the quiet border.
-      //   empty     — the rule and QUOTE PENDING, and nothing else, because this example
-      //     carries an empty eyebrow too. Degraded typographically, never to black.
-      //   held      — the eyebrow alone on the frame. This is the picture `revealQuote`
-      //     exists to produce, and the whole reason the baseline is taken at 60.
-      canonical: '0b2cdfd88e7642305a25b2dea06f8c90',
-      longCopy: '361ab7a81a167f917217624ae8e5914b',
-      empty: '14718ef860858efdd00f7c40e3b0b82c',
-      held: '80d7ae0e6e6dffbb3dfc17f8faa8a45e',
-    });
+    expectRecordedStills(
+      { canonical, longCopy, empty, held },
+      {
+        // Accepted 2026-08-16 on Windows, the first key frames for this capability. Reviewed
+        // on stills at the frames named above, on `editorial-paper`:
+        //
+        //   canonical — eyebrow in accent, the mark one step over the quote, the quote on two
+        //     lines at the top of the ladder, and the signature reading as one block: name in
+        //     ink over role in inkMuted, one gap apart and on one entrance.
+        //   longCopy  — the same frame with the ladder dropped a step. Six lines, the column
+        //     holding all of them, nothing near the quiet border.
+        //   empty     — the rule and QUOTE PENDING, and nothing else, because this example
+        //     carries an empty eyebrow too. Degraded typographically, never to black.
+        //   held      — the eyebrow alone on the frame. This is the picture `revealQuote`
+        //     exists to produce, and the whole reason the baseline is taken at 60.
+        win32: {
+          canonical: '0b2cdfd88e7642305a25b2dea06f8c90',
+          longCopy: '361ab7a81a167f917217624ae8e5914b',
+          empty: '14718ef860858efdd00f7c40e3b0b82c',
+          held: '80d7ae0e6e6dffbb3dfc17f8faa8a45e',
+        },
+      },
+    );
   });
 });

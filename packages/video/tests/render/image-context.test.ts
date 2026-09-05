@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { PLACEHOLDER_ASSET_URI } from '../../src/assets/resolver';
 import type { AssetRef, ResolvedSceneAssets } from '../../src/core/assets';
 import { hashStill, renderHarness } from './harness';
+import { expectRecordedStills } from './still-hashes';
 
 const READY_ASSET: AssetRef = {
   status: 'ready',
@@ -83,34 +84,39 @@ describe('ImageContextScene runtime', () => {
       renderHash('example-driven-context'),
     ]);
 
-    expect({ canonical, empty, longCopy, driven }).toEqual({
-      // Re-accepted 2026-08-14 when `editorial-paper` became the default theme. All three
-      // moved, and this time *that* is the corroboration: a palette reaches every pixel of
-      // every frame, so an unchanged hash would have meant the theme had not arrived. The
-      // previous acceptance is the mirror of it — a camera-allowance change left `empty`
-      // alone precisely because `editorialStatic` has no camera. A baseline that moves for
-      // the whole reason and not part of it is the thing being checked here.
-      //
-      // Reviewed before accepting, per this file's header: the ready asset, the placeholder
-      // plate, the eyebrow, the title and the caption were each read on paper at frame 120.
-      canonical: 'deeb7727f43aac8958e2e4fb6e163369',
-      empty: '5c23bdadca1da65d59564540b73bd4b9',
-      // `longCopy` is unchanged by the 2026-08-20 header work, and that it is unchanged is
-      // the point. `useTitleStep` gained a height budget that day, and an intermediate
-      // version of it counted lines instead — under which this headline dropped a step to
-      // reach four and this hash moved. The rule it shipped as is a *share* of the scene:
-      // five lines here are 326px of a 1008px box, under the half a header may take, so
-      // the fit leaves the frame exactly where a human accepted it in the first place. A
-      // baseline that had moved would have meant the share was doing something the sentence
-      // it comes from never asked for.
-      longCopy: 'e26133541a06a7ec683d2915f506b5c8',
-      // Accepted 2026-08-15, the first key frame for the only example carrying events.
-      // It shares `identityKey` with `canonical` and still hashes differently, which is the
-      // corroboration here: same media, same layout, same theme, and the only variable left
-      // is the plan holding the copy back. An equal hash would have meant the events were
-      // not reaching the frame at all. Reviewed on stills before accepting: at frame 120 the
-      // plate carries the resolved photograph and the copy column is deliberately empty.
-      driven: '58a8bc4c5e1883d54d48844b2488700d',
-    });
+    expectRecordedStills(
+      { canonical, empty, longCopy, driven },
+      {
+        win32: {
+          // Re-accepted 2026-08-14 on Windows when `editorial-paper` became the default theme.
+          // All three moved, and this time *that* is the corroboration: a palette reaches every
+          // pixel of every frame, so an unchanged hash would have meant the theme had not
+          // arrived. The previous acceptance is the mirror of it — a camera-allowance change
+          // left `empty` alone precisely because `editorialStatic` has no camera. A baseline
+          // that moves for the whole reason and not part of it is the thing being checked here.
+          //
+          // Reviewed before accepting, per this file's header: the ready asset, the placeholder
+          // plate, the eyebrow, the title and the caption were each read on paper at frame 120.
+          canonical: 'deeb7727f43aac8958e2e4fb6e163369',
+          empty: '5c23bdadca1da65d59564540b73bd4b9',
+          // `longCopy` is unchanged by the 2026-08-20 header work, and that it is unchanged is
+          // the point. `useTitleStep` gained a height budget that day, and an intermediate
+          // version of it counted lines instead — under which this headline dropped a step to
+          // reach four and this hash moved. The rule it shipped as is a *share* of the scene:
+          // five lines here are 326px of a 1008px box, under the half a header may take, so
+          // the fit leaves the frame exactly where a human accepted it in the first place. A
+          // baseline that had moved would have meant the share was doing something the sentence
+          // it comes from never asked for.
+          longCopy: 'e26133541a06a7ec683d2915f506b5c8',
+          // Accepted 2026-08-15, the first key frame for the only example carrying events.
+          // It shares `identityKey` with `canonical` and still hashes differently, which is the
+          // corroboration here: same media, same layout, same theme, and the only variable left
+          // is the plan holding the copy back. An equal hash would have meant the events were
+          // not reaching the frame at all. Reviewed on stills before accepting: at frame 120 the
+          // plate carries the resolved photograph and the copy column is deliberately empty.
+          driven: '58a8bc4c5e1883d54d48844b2488700d',
+        },
+      },
+    );
   });
 });

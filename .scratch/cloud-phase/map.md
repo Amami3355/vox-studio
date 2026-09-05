@@ -168,6 +168,16 @@ them contradict tickets as written; those tickets were edited the same day rathe
   two renders to each other are platform-agnostic and stay as they are. Settled with the user on
   2026-09-02 after four consecutive handoffs deferred it. Ticket 09's claim narrows to *unchanged for
   the platform that recorded them*, and ticket 13 owes it that wording.
+  **Built 2026-09-06, seam only.** `tests/render/still-hashes.ts` holds two entry points because the
+  suites have two call shapes; the thirty-two literals moved under a `win32` key with their
+  acceptance prose attached, none was re-accepted and none moved. An unrecorded platform **fails with
+  a named reason rather than skipping** — the same rule ticket 12 applies to the proof sheet, which
+  is why Linux's fourteen reds now read as one unrecorded platform instead of fourteen regressions.
+  The identifier is `process.platform`, knowingly coarser than the font stack that actually varies.
+  The seam has its own test in the *default* suite, which is where the unrecorded-platform case can
+  be reached from a Windows host at all. Ticket 09's criterion carries the narrowed wording.
+  **Recording a Linux set is deliberately not done and its owner is still unnamed** — the one part of
+  13 left open, and the shape a fifth deferral would take if it goes unwatched.
 
 - **The trusted service is a container, and the restart mechanism is a `cloud-init` systemd unit** —
   [07](issues/07-the-trusted-service-is-a-container-without-a-launcher.md), 2026-09-03.

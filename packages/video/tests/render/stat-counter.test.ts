@@ -18,6 +18,7 @@ import { BACKDROP_CONTROL_ID } from '../../src/runtime/BackdropControl';
 import { compositionIdFor, controlIdFor } from '../../src/runtime/compositionIds';
 import { hashStill, renderHarness } from './harness';
 import { type Bitmap, type Region, decodePng, hashRegions } from './png';
+import { expectRecordedStills } from './still-hashes';
 
 /** Everything has landed and settled here; all four examples run 150 frames. */
 const SETTLED_FRAME = 120;
@@ -172,29 +173,34 @@ describe('StatCounterScene runtime', () => {
       renderHash('example-stat-driven', HOLD_FRAME),
     ]);
 
-    expect({ canonical, negative, empty, held }).toEqual({
-      // Accepted 2026-08-16, the first key frames for this capability. Reviewed on stills at
-      // the frames named above, on `editorial-paper`:
-      //
-      //   canonical — the label in ink, the value at the top display step in accent with
-      //     the unit a step down beside it, and the sublabel muted beneath, one entrance
-      //     staggering label → value → sublabel.
-      //   negative  — the same frame with a signed value in the negative colour.
-      //   empty     — the rule and STAT PENDING, and nothing else, because this example
-      //     carries an empty label too. Degraded typographically, never to black.
-      //   held      — the label alone on the frame. This is the picture `revealStat`
-      //     exists to produce, and the whole reason the baseline is taken at 60.
-      //
-      // `held` re-accepted 2026-08-17, and it is the only one that moved. The value block is
-      // now reserved rather than unmounted, so the label sits where it will still be sitting
-      // once the number lands instead of centring on itself and jumping up a beat later. The
-      // still is the same label, higher on the frame, with the column it is about to share
-      // held open beneath it. The other three are untouched: `canonical` and `negative` were
-      // never held back, and `empty` reserves nothing.
-      canonical: '3a65c4d8bde17829083ced127e506a53',
-      negative: '03182c02f34b51fd8ac8233bdf3c6c80',
-      empty: 'b261d2fd9800a0b05510bdff425528f7',
-      held: 'f29c135cf138ae19aab600b1b2e2b0c2',
-    });
+    expectRecordedStills(
+      { canonical, negative, empty, held },
+      {
+        // Accepted 2026-08-16 on Windows, the first key frames for this capability. Reviewed
+        // on stills at the frames named above, on `editorial-paper`:
+        //
+        //   canonical — the label in ink, the value at the top display step in accent with
+        //     the unit a step down beside it, and the sublabel muted beneath, one entrance
+        //     staggering label → value → sublabel.
+        //   negative  — the same frame with a signed value in the negative colour.
+        //   empty     — the rule and STAT PENDING, and nothing else, because this example
+        //     carries an empty label too. Degraded typographically, never to black.
+        //   held      — the label alone on the frame. This is the picture `revealStat`
+        //     exists to produce, and the whole reason the baseline is taken at 60.
+        //
+        // `held` re-accepted 2026-08-17, and it is the only one that moved. The value block is
+        // now reserved rather than unmounted, so the label sits where it will still be sitting
+        // once the number lands instead of centring on itself and jumping up a beat later. The
+        // still is the same label, higher on the frame, with the column it is about to share
+        // held open beneath it. The other three are untouched: `canonical` and `negative` were
+        // never held back, and `empty` reserves nothing.
+        win32: {
+          canonical: '3a65c4d8bde17829083ced127e506a53',
+          negative: '03182c02f34b51fd8ac8233bdf3c6c80',
+          empty: 'b261d2fd9800a0b05510bdff425528f7',
+          held: 'f29c135cf138ae19aab600b1b2e2b0c2',
+        },
+      },
+    );
   });
 });

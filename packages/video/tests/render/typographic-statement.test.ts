@@ -20,6 +20,7 @@ import { compile } from '../../src/compile';
 import type { CompiledDocument } from '../../src/compile/document';
 import type { TimedBeat } from '../../src/core/types';
 import { hashStill, renderHarness } from './harness';
+import { expectRecordedStills } from './still-hashes';
 
 /**
  * Frames in the examples, which all run 120.
@@ -79,33 +80,38 @@ describe('TypographicStatementScene runtime', () => {
       renderHash('example-statement-driven', SWEEP_FRAME),
     ]);
 
-    expect({ canonical, longCopy, empty, held, swept }).toEqual({
-      // Accepted 2026-08-22, the first key frames for this capability, and re-accepted the same
-      // day after code review moved the ordinal and the empty-state label to full knock (see
-      // `cutGeometry.unspokenMix`). Reviewed on stills at
-      // the frames named above, on `editorial-paper`:
-      //
-      //   canonical — the accent taken to full bleed, the eyebrow and the statement knocked
-      //     out of it in Instrument Serif at the top of the scale, two lines, and the
-      //     ordinal small in mono in the bottom corner.
-      //   longCopy  — the same card on the `negative` ground, the fit having taken the
-      //     statement down the scale to four lines. Nothing near the ordinal or the border.
-      //   empty     — a faint rule and STATEMENT PENDING in full knock, and nothing else,
-      //     because this example carries an empty eyebrow and ordinal too. Degraded
-      //     typographically, never to black and never to unreadable ink on a hot ground:
-      //     the label is 26px at the density floor, so it is held to 4.5:1 and not to the
-      //     3:1 the sweep's recessive tone clears.
-      //   held      — the eyebrow and the ordinal alone on the ground, mid-entrance. This is
-      //     the picture `revealStatement` exists to produce.
-      //   swept     — "Nobody is" in full, "left" carrying the mark, and the rest of the
-      //     sentence recessive but still legible. This is the picture `advanceWord` exists
-      //     to produce, and the reason the recession is a mix rather than a fade.
-      canonical: 'f0577ec9e3209bc3e4569f5e420f8f1e',
-      longCopy: '33e41cb24bd5eb26456adb4c14c15f83',
-      empty: '1e011f825a1561736d461ea731eca49b',
-      held: '311836b94badebaf10fa414cade89fe9',
-      swept: '14dbef1ec41309130451ae2f4906ae17',
-    });
+    expectRecordedStills(
+      { canonical, longCopy, empty, held, swept },
+      {
+        // Accepted 2026-08-22 on Windows, the first key frames for this capability, and
+        // re-accepted the same day after code review moved the ordinal and the empty-state
+        // label to full knock (see `cutGeometry.unspokenMix`). Reviewed on stills at
+        // the frames named above, on `editorial-paper`:
+        //
+        //   canonical — the accent taken to full bleed, the eyebrow and the statement knocked
+        //     out of it in Instrument Serif at the top of the scale, two lines, and the
+        //     ordinal small in mono in the bottom corner.
+        //   longCopy  — the same card on the `negative` ground, the fit having taken the
+        //     statement down the scale to four lines. Nothing near the ordinal or the border.
+        //   empty     — a faint rule and STATEMENT PENDING in full knock, and nothing else,
+        //     because this example carries an empty eyebrow and ordinal too. Degraded
+        //     typographically, never to black and never to unreadable ink on a hot ground:
+        //     the label is 26px at the density floor, so it is held to 4.5:1 and not to the
+        //     3:1 the sweep's recessive tone clears.
+        //   held      — the eyebrow and the ordinal alone on the ground, mid-entrance. This is
+        //     the picture `revealStatement` exists to produce.
+        //   swept     — "Nobody is" in full, "left" carrying the mark, and the rest of the
+        //     sentence recessive but still legible. This is the picture `advanceWord` exists
+        //     to produce, and the reason the recession is a mix rather than a fade.
+        win32: {
+          canonical: 'f0577ec9e3209bc3e4569f5e420f8f1e',
+          longCopy: '33e41cb24bd5eb26456adb4c14c15f83',
+          empty: '1e011f825a1561736d461ea731eca49b',
+          held: '311836b94badebaf10fa414cade89fe9',
+          swept: '14dbef1ec41309130451ae2f4906ae17',
+        },
+      },
+    );
   }, 120_000);
 });
 

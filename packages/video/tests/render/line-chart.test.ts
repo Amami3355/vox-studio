@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { compositionIdFor, controlIdFor } from '../../src/runtime/compositionIds';
 import { hashStill, renderHarness } from './harness';
 import { type Bitmap, decodePng } from './png';
+import { expectRecordedStill } from './still-hashes';
 
 const harness = renderHarness();
 
@@ -91,16 +92,17 @@ describe('LineChartScene runtime', () => {
 
   it('keeps the visually accepted canonical key frame stable', async () => {
     const canonical = hashStill(await still('example-line-canonical', 180));
-    expect(canonical).toBe(
-      // Accepted 2026-08-22 after inspecting the 1920×1080 still: a strong two-level
-      // editorial header, quiet zero-based ruler, six proportionally spaced month labels,
-      // every observation marked, and one warm straight-segment trend inside the safe area.
+    expectRecordedStill(canonical, {
+      // Accepted 2026-08-22 on Windows after inspecting the 1920×1080 still: a strong
+      // two-level editorial header, quiet zero-based ruler, six proportionally spaced month
+      // labels, every observation marked, and one warm straight-segment trend inside the
+      // safe area.
 
       // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
       // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
       // Inspected at 1920×1080; each claim above still reads.
-      '38d3f2d80c6bd691ee181578399c4839',
-    );
+      win32: '38d3f2d80c6bd691ee181578399c4839',
+    });
   });
 
   /**
@@ -111,36 +113,36 @@ describe('LineChartScene runtime', () => {
    */
   it('keeps irregular calendar spacing visible in the accepted comparison frame', async () => {
     const comparison = hashStill(await still('example-line-comparison', 180));
-    expect(comparison).toBe(
-      // Accepted 2026-08-22: Jan→Mar is visibly wider than Mar→Apr, while the two
+    expectRecordedStill(comparison, {
+      // Accepted 2026-08-22 on Windows: Jan→Mar is visibly wider than Mar→Apr, while the two
       // straight series remain distinct on the 3.8%..4.6% extent ruler.
       //
       // Re-accepted 2026-08-22 after the legend stopped dividing the plot into equal
       // shares and started measuring its own entries: the two keys now sit together at the
       // left of the plot instead of a third of the width apart. Inspected at 1920×1080;
       // the spacing claim above is unchanged and still visible.
-      'a6dc0656db7c3dad25e6592b0edab7c7',
-    );
+      win32: 'a6dc0656db7c3dad25e6592b0edab7c7',
+    });
   });
 
   it('keeps the durable annotation attached with its point value', async () => {
     const annotated = hashStill(await still('example-line-driven', 239));
-    expect(annotated).toBe(
-      // Accepted 2026-08-22 at the last frame: the connector terminates at Jun and the
-      // card still reads “Journeys · Jun · 63 m” plus the complete annotation copy.
+    expectRecordedStill(annotated, {
+      // Accepted 2026-08-22 on Windows at the last frame: the connector terminates at Jun and
+      // the card still reads “Journeys · Jun · 63 m” plus the complete annotation copy.
 
       // Re-accepted 2026-08-22: `trend-axis.ts` stopped declaring its own tick count of
       // five beside `scale.ts`'s argued four, so the ruler carries one gridline fewer.
       // Inspected at 1920×1080; each claim above still reads.
-      '8fc50f34e458a368eeb713c2f8d48dda',
-    );
+      win32: '8fc50f34e458a368eeb713c2f8d48dda',
+    });
   });
 
   it('keeps the focused value legible while non-target series recede', async () => {
     const focused = hashStill(await still('example-line-density-edge', 239));
-    expect(focused).toBe(
-      // Accepted 2026-08-22: North remains warm and carries “12/25 · 117 k”; Central
-      // and Coastal retain their identities at visibly quieter emphasis.
+    expectRecordedStill(focused, {
+      // Accepted 2026-08-22 on Windows: North remains warm and carries “12/25 · 117 k”;
+      // Central and Coastal retain their identities at visibly quieter emphasis.
       //
       // Re-accepted 2026-08-22 for the measured legend, same as the comparison frame.
       // Inspected at 1920×1080: the three keys now read as one row, and the recession
@@ -154,8 +156,8 @@ describe('LineChartScene runtime', () => {
       // useful boundary of 17, which is what the spec asked it to teach. Inspected at
       // 1920×1080: seven of seventeen date labels survive the thinning, every observation
       // keeps its marker, and the recession claim above still reads.
-      '040b36a8ffe145dc6cb5fa851350c347',
-    );
+      win32: '040b36a8ffe145dc6cb5fa851350c347',
+    });
   });
 
   /**
@@ -171,15 +173,16 @@ describe('LineChartScene runtime', () => {
         239,
       ),
     );
-    expect(mixed).toBe(
-      // Accepted 2026-08-22: the labelled zero rule bisects both the rising negative-to-
-      // positive line and the alternating series; all three ceiling labels remain readable.
+    expectRecordedStill(mixed, {
+      // Accepted 2026-08-22 on Windows: the labelled zero rule bisects both the rising
+      // negative-to-positive line and the alternating series; all three ceiling labels
+      // remain readable.
       //
       // Re-accepted 2026-08-22 after measured legend packing, collision-safe date lanes and
       // unbreakable card wrapping. Inspected at 1920×1080: all labels and both cards remain
       // readable and contained, with the plot clear of the header and frame edges.
-      'afe7cf6d7311f2825bb309d410ba56e3',
-    );
+      win32: 'afe7cf6d7311f2825bb309d410ba56e3',
+    });
   });
 
   /**

@@ -16,6 +16,7 @@ import { parseUtcDate } from '../../src/core/time-axis';
 import { compositionIdFor } from '../../src/runtime/compositionIds';
 import { hashStill, renderHarness } from './harness';
 import { type Bitmap, decodePng } from './png';
+import { expectRecordedStill } from './still-hashes';
 
 const harness = renderHarness();
 
@@ -147,15 +148,15 @@ describe('TimelineScene runtime', () => {
   });
 
   it('keeps the visually accepted canonical key frame stable', async () => {
-    expect(hashStill(await still('example-timeline-canonical', 180))).toBe(
-      // Accepted 2026-08-22 after inspecting the 1920×1080 still: a two-level editorial
+    expectRecordedStill(hashStill(await still('example-timeline-canonical', 180)), {
+      // Accepted 2026-08-22 on Windows after inspecting the 1920×1080 still: a two-level
       // header over one hairline axis; four dated events proportionally spaced, with the
       // crowded November label lifted onto a second lane; "CAP IN FORCE · 13 MONTHS" in its
       // own strip between the axis and the labels, drawn across exactly the stretch it
       // names; three year marks under the axis. Everything inside the safe area, and every
       // run of type at `inkMuted` or darker.
-      'dd9350cab1312bc88ccf2d459435fc18',
-    );
+      win32: 'dd9350cab1312bc88ccf2d459435fc18',
+    });
   });
 
   /**
@@ -187,31 +188,32 @@ describe('TimelineScene runtime', () => {
   });
 
   it('keeps the durable annotation attached to the moment it explains', async () => {
-    expect(hashStill(await still('example-timeline-driven', 269))).toBe(
-      // Accepted 2026-08-23 at the last frame: the connector drops from the Karlsruhe mark,
-      // turns, and runs into the callout's own rule, so the note is attached to the moment
-      // rather than floating under the axis. The card is titled with that event's label and
-      // carries the whole annotation on two lines, clear of the frame's bottom edge.
-      '48b264e80fa190a012c755ef3e2e3314',
-    );
+    expectRecordedStill(hashStill(await still('example-timeline-driven', 269)), {
+      // Accepted 2026-08-23 on Windows at the last frame: the connector drops from the
+      // Karlsruhe mark, turns, and runs into the callout's own rule, so the note is attached
+      // to the moment rather than floating under the axis. The card is titled with that
+      // event's label and carries the whole annotation on two lines, clear of the frame's
+      // bottom edge.
+      win32: '48b264e80fa190a012c755ef3e2e3314',
+    });
   });
 
   it('keeps the two-lane density edge readable', async () => {
-    expect(hashStill(await still('example-timeline-density-edge', 180))).toBe(
-      // Accepted 2026-08-23: six events, exactly the recommended edge. The crowded March
-      // dates use separate lanes while the first and last remain labelled. The fifteen-month
-      // investigation band spans exactly the stretch it names.
-      '50e4556bcf480e09566041ecdd97e27f',
-    );
+    expectRecordedStill(hashStill(await still('example-timeline-density-edge', 180)), {
+      // Accepted 2026-08-23 on Windows: six events, exactly the recommended edge. The crowded
+      // March dates use separate lanes while the first and last remain labelled. The
+      // fifteen-month investigation band spans exactly the stretch it names.
+      win32: '50e4556bcf480e09566041ecdd97e27f',
+    });
   });
 
   it('keeps the empty chronology a designed frame rather than a bare axis', async () => {
-    expect(hashStill(await still('example-timeline-empty', 120))).toBe(
-      // Accepted 2026-08-22: the title holds under its accent rule, and a hairline with
-      // "NO DATED EVENTS AVAILABLE" set quietly beneath it stands in for the chronology.
+    expectRecordedStill(hashStill(await still('example-timeline-empty', 120)), {
+      // Accepted 2026-08-22 on Windows: the title holds under its accent rule, and a hairline
+      // with "NO DATED EVENTS AVAILABLE" set quietly beneath it stands in for the chronology.
       // No axis is drawn — an axis with nothing on it reads as a broken render rather than
       // as an empty one. The same shape `line_chart` gives its own empty case.
-      '2dc1ef4d03ce2efaf7f126aaeb73e17c',
-    );
+      win32: '2dc1ef4d03ce2efaf7f126aaeb73e17c',
+    });
   });
 });

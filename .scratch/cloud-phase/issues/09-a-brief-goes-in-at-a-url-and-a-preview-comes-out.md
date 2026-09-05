@@ -165,7 +165,7 @@ broke.
 - [x] Two checks pass from outside the service: the VM has no external address, direct IAP to port 8080 is refused and the service binds loopback; the crew identity has no production-secret binding. The identity result is an IAM-policy observation, not a live denied read
 - [x] The deployed image's denying adapter is confirmed with egress available on the VM; the live smoke reaches its control endpoint and then receives `NETWORK_POLICY_DENIED`
 - [x] Wall time, render envelope and spend are recorded
-- [x] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, asserted from pre-cloud `7caac82`: six prompt-building functions, 38 existing crew fixtures, the prefix census and seven recorded still-hash files are unchanged; the only new fixture is the transport signing vector
+- [x] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, **for the platform that recorded them**, asserted from pre-cloud `7caac82`: six prompt-building functions, 38 existing crew fixtures, the prefix census and seven recorded still-hash files are unchanged; the only new fixture is the transport signing vector. The narrowing is ticket 13's, taken 2026-09-06: a recorded still hash is a property of the platform that recorded it, so an unqualified "unchanged" could not hold on Windows and Linux at once and this claim never meant to assert that it did. The literals themselves did not move — 13 scoped them without re-accepting any
 - [x] No code was changed by this ticket; follow-up fixes are owned by ticket 07 and the crew CLI defect
 
 ## Answer

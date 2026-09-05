@@ -15,6 +15,7 @@ import type { CompiledDocument } from '../../src/compile/document';
 import type { AssetRef, ResolvedSceneAssets } from '../../src/core/assets';
 import type { TimedBeat } from '../../src/core/types';
 import { hashStill, renderHarness } from './harness';
+import { expectRecordedStills } from './still-hashes';
 
 /**
  * Ready stand-ins with real transparency, so the containment and the bottom-anchored
@@ -172,36 +173,41 @@ describe('CharacterExplainerScene runtime', () => {
       renderHash('example-explainer-empty', SETTLED_FRAME),
     ]);
 
-    expect({ entrance, settled, accentPeak, square, edge, empty }).toEqual({
-      // Accepted 2026-08-23, the first key frames for this capability. Reviewed on stills
-      // at the frames named above, on `editorial-paper`, and the stills' own md5s match
-      // these hashes — the script and the suite render the same bytes:
-      //
-      //   entrance  — the educator mid-wipe, clipped at the top of the head and standing
-      //     at entrance scale, the label already up and the headline rising behind it.
-      //     This is the picture the default entrance produces before the plan holds it.
-      //   settled   — the figure fully contained — head, hands and open gesture intact —
-      //     on the restrained halo and ground shadow, the copy column carrying the
-      //     eyebrow, the headline and the explanation. Nothing touches a frame edge.
-      //   accentPeak — the same figure at the accent's peak: halo brighter and larger,
-      //     cutout a touch scaled and tilted, copy untouched. This is the picture
-      //     `accentCharacter` exists to produce, mid-window.
-      //   square     — the square stand-in fully contained and bottom-aligned inside the
-      //     same character allowance: head and both shoulders visible, no stretching or
-      //     contact with the live-frame edge. This is the accepted square regime.
-      //   edge      — copy at the schema's own ceilings: a two-line label, a headline
-      //     stepped down the scale onto five lines, a five-line paragraph, all legible
-      //     and all inside the column, the figure unchanged beside them.
-      //   empty     — no authored copy at all: the honest subject plate on the left and
-      //     the EXPLANATION PENDING note over its rule on the right. Degraded to a
-      //     designed state, never to a blank frame.
-      entrance: '2d915750f313a126f8efa40c429ef11a',
-      settled: '064e465b1e7e3ce67f697d91e17509d8',
-      accentPeak: 'e99d05c335e32088b149db760442f85b',
-      square: '4ee77487b1effb4bd319d0d6ed5a0cc8',
-      edge: 'd91faf345ad26260d6db91861afa780a',
-      empty: '1ccb2809080c0fa9c65883115389d112',
-    });
+    expectRecordedStills(
+      { entrance, settled, accentPeak, square, edge, empty },
+      {
+        // Accepted 2026-08-23 on Windows, the first key frames for this capability. Reviewed
+        // on stills at the frames named above, on `editorial-paper`, and the stills' own md5s
+        // match these hashes — the script and the suite render the same bytes:
+        //
+        //   entrance  — the educator mid-wipe, clipped at the top of the head and standing
+        //     at entrance scale, the label already up and the headline rising behind it.
+        //     This is the picture the default entrance produces before the plan holds it.
+        //   settled   — the figure fully contained — head, hands and open gesture intact —
+        //     on the restrained halo and ground shadow, the copy column carrying the
+        //     eyebrow, the headline and the explanation. Nothing touches a frame edge.
+        //   accentPeak — the same figure at the accent's peak: halo brighter and larger,
+        //     cutout a touch scaled and tilted, copy untouched. This is the picture
+        //     `accentCharacter` exists to produce, mid-window.
+        //   square     — the square stand-in fully contained and bottom-aligned inside the
+        //     same character allowance: head and both shoulders visible, no stretching or
+        //     contact with the live-frame edge. This is the accepted square regime.
+        //   edge      — copy at the schema's own ceilings: a two-line label, a headline
+        //     stepped down the scale onto five lines, a five-line paragraph, all legible
+        //     and all inside the column, the figure unchanged beside them.
+        //   empty     — no authored copy at all: the honest subject plate on the left and
+        //     the EXPLANATION PENDING note over its rule on the right. Degraded to a
+        //     designed state, never to a blank frame.
+        win32: {
+          entrance: '2d915750f313a126f8efa40c429ef11a',
+          settled: '064e465b1e7e3ce67f697d91e17509d8',
+          accentPeak: 'e99d05c335e32088b149db760442f85b',
+          square: '4ee77487b1effb4bd319d0d6ed5a0cc8',
+          edge: 'd91faf345ad26260d6db91861afa780a',
+          empty: '1ccb2809080c0fa9c65883115389d112',
+        },
+      },
+    );
   }, 120_000);
 });
 
