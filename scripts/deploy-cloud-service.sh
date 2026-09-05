@@ -440,11 +440,19 @@ if ! dk image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
 fi
 IMAGE_ID=$(dk image inspect "$LOCAL_IMAGE" --format '{{.Id}}')
 IMAGE_CREATED=$(dk image inspect "$LOCAL_IMAGE" --format '{{.Created}}')
-# `docker image inspect --format '{{.Size}}'` is NOT the figure to show here. Under Docker Desktop's
-# containerd image store it reported 515 MB for an image `docker images` and `docker system df` both
-# put at 2.06 GB — a four-fold understatement, in the two places where the number is the point: what
-# the registry will be billed for, and how long stage 8 should expect to wait for the first pull. An
-# operator told to expect 515 MB would read a normal 2 GB pull as a hung deploy.
+# `docker image inspect --format '{{.Size}}'` is NOT the figure to show here, but the reason is not
+# the one this comment gave until the first real push measured it.
+#
+# Under Docker Desktop's containerd image store, `inspect` reports 515 MB where `docker images` and
+# `docker system df` both say 2.06 GB. That was read as a four-fold understatement. **It is not an
+# understatement of the same quantity — the two numbers measure different things, and the smaller
+# one is the one the registry bills.** After the push of 2026-09-05, `gcloud artifacts repositories
+# describe vox` reports the repository at **515.9 MB**: that is the compressed size, which is what
+# is stored and what crosses the wire. 2.06 GB is what it decompresses to on the box's disk.
+#
+# So the figure shown here is still `docker images`, and deliberately, but for the *pull* half only:
+# an operator told to expect 515 MB would read a normal 2 GB pull as a hung deploy. What this
+# wizard must not do is quote 2.06 GB as the storage bill, which stage 4 no longer does.
 IMAGE_SIZE=$(dk images "$LOCAL_IMAGE" --format '{{.Size}}' | head -n1)
 ok "$LOCAL_IMAGE is present"
 note "  id       ${IMAGE_ID:0:19}"
@@ -501,7 +509,9 @@ confirm "Is $LOCAL_IMAGE the build you want deployed?" || halt "stopped at your 
 # ── 4 ─────────────────────────────────────────────────────────────────────
 stage "Push, and let the registry say what actually arrived"
 say "This is the first stage that costs money and the first that leaves this machine."
-say "$IMAGE_SIZE of registry storage, billed monthly, plus the transfer."
+say "$IMAGE_SIZE is the size on disk after the pull. What the registry stores and what"
+say "crosses the wire is the compressed size — measured at 515.9 MB for this image on"
+say "2026-09-05, roughly a quarter of the figure above. The push took 2m36s from here."
 say ""
 warn "The push is not reversible by re-running: a digest that exists in the registry exists."
 confirm "Push $LOCAL_IMAGE to $IMAGE_PATH:$TAG?" || halt "stopped at your request, before anything was pushed"
@@ -580,7 +590,21 @@ RENDERED=$(mktemp)
 trap 'rm -f "${RENDERED:-}"' EXIT
 # A pinned digest rather than the tag: the tag is for humans reading the registry, the digest is
 # what the machine must not be able to drift away from across a restart.
-sed "s|\${VOX_IMAGE}|${IMAGE_REF}|g" "$CLOUD_INIT" > "$RENDERED"
+#
+# The second substitution carries deploy/fetch-service-env.sh into the unit file, base64-encoded,
+# so the box has the fetcher at every boot. It is rendered rather than pasted into cloud-init.yaml
+# so the script has one copy in the repository: a second copy inside a YAML block would drift, and
+# would have to be re-indented by hand every time the original changed.
+#
+# `base64 -w0` because the value is a single YAML scalar and must not wrap. The encoded payload is
+# safe to put on sed's replacement side without escaping — base64's alphabet is [A-Za-z0-9+/=] and
+# contains none of `&`, `|` or `\`. That is a property of the encoding rather than of this file,
+# which is the reason the script is encoded at all: its *plain* text contains all three.
+FETCHER="$REPO_ROOT/deploy/fetch-service-env.sh"
+[[ -f "$FETCHER" ]] || halt "$FETCHER is missing — the unit file cannot be rendered without it"
+FETCH_B64=$(base64 -w0 < "$FETCHER")
+sed -e "s|\${VOX_IMAGE}|${IMAGE_REF}|g" \
+    -e "s|\${VOX_FETCH_SCRIPT_B64}|${FETCH_B64}|g" "$CLOUD_INIT" > "$RENDERED"
 
 if grep -q '\${' "$RENDERED"; then
   say ""
@@ -603,10 +627,21 @@ say ""
 confirm "Is that the image reference you expect?" || halt "stopped at your request, before the VM was touched"
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
-stage "The environment file, fetched by the box from Secret Manager"
-say "The unit passes --env-file $SERVICE_ENV to docker run. cloud-init.yaml does not create"
-say "that file, and docker refuses to start a container whose env-file is absent — which is"
-say "the same ten-second crash loop as a missing image, from a different cause."
+stage "A rehearsal: the box proves it can fetch its secrets, before you reboot it"
+say "The unit passes --env-file $SERVICE_ENV to docker run, and docker refuses to start a"
+say "container whose env-file is absent — the same ten-second crash loop as a missing image,"
+say "from a different cause."
+say ""
+warn "This stage no longer writes the file the deployment uses. It did until 2026-09-05."
+note "/etc on Container-Optimized OS is writable and stateless: it is rebuilt at boot. A"
+note "service.env written here is gone by the time the unit that needs it starts, and the"
+note "first real deploy crash-looped fifty times in eight minutes proving exactly that."
+note "The fetch now runs on the box at every boot, as vox-service-env.service, from the copy"
+note "of the script that stage 5 renders into the unit file."
+say ""
+say "What this stage is still worth is the rehearsal. It runs the same fetch now, on a box"
+say "you can still reach, so a Secret Manager failure is read here rather than inferred from"
+say "a crash loop behind a tunnel after the reboot. What it writes is discarded at that reboot."
 say ""
 say "The box fetches its own values. It already runs as the production identity with the"
 say "cloud-platform scope, and stage 2 has just checked that all five secrets are readable"
@@ -618,7 +653,12 @@ warn "It must never go into instance metadata: metadata is readable by anything 
 note "and packages/production/src/proof/image-scan.ts exists to keep these values out of"
 note "exactly that kind of place."
 
-ENV_STATE=$(on_box_line "stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
+# `sudo` is load-bearing, and this was found by running it: /etc/vox is 0700 root:root and the file
+# inside it 0600 root:root, which is what stage 6 is trying to prove. An unprivileged `stat` on it
+# does not report the mode — it fails with EACCES, so `2>/dev/null || echo MISSING` answered
+# MISSING for a file that was present and correct. The check could only ever have reported the
+# absence it was written to detect, and never the state it claims to read.
+ENV_STATE=$(on_box_line "sudo stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
 
 if [[ -z "$ENV_STATE" ]]; then
   halt "could not reach $INSTANCE over the IAP tunnel to check for $SERVICE_ENV"
@@ -670,9 +710,13 @@ if [[ "$WRITE_ENV_FILE" == "yes" ]]; then
     halt "the box could not write $SERVICE_ENV"
   fi
 
-  ENV_STATE=$(on_box_line "stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
+  ENV_STATE=$(on_box_line "sudo stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
   # Re-read from the box rather than trusting the exit status: the claim that matters before the
   # restart is that the file is there, not that a command which writes it returned zero.
+  # This is the read that would have halted the first real deploy. The fetcher had just written the
+  # file correctly, and the unprivileged `stat` above reported MISSING, so the wizard would have
+  # stopped with "the fetcher reported success but it is not there" — a true-sounding sentence
+  # about a file that was there. See the note at the first read.
   if [[ "$ENV_STATE" == "MISSING" ]]; then
     halt "the fetcher reported success but $SERVICE_ENV is not there"
   fi

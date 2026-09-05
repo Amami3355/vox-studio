@@ -1,6 +1,10 @@
 # 07: The trusted service is a container, without a launcher
 
 Status: awaiting-conformance-run
+**Deployed and running as of 2026-09-05** — `vox-production.service` is `active (running)` on
+`vox-service`, on the pushed digest, answering on `127.0.0.1:8080`. The status stays
+`awaiting-conformance-run` because what the run still owes is a *render* with its egress observed,
+not a boot. See "What the 2026-09-05 deploy established" below.
 Type: task
 Blocked by: 03, 06, 11
 
@@ -352,9 +356,13 @@ Present in `studio-prod-7f3a`:
 **Two things are missing, and both are deploy steps rather than provisioning.** *Corrected
 2026-09-05: this said three, and one of them has since been done — see the note under item 2.*
 
-1. **The registry is empty.** `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox` lists 0 items,
-   0.000 MB. The 2.06 GB image has never been pushed. The map's open item on pull time and registry
-   storage cost is still open and is now the thing standing between here and a conformance run.
+1. ~~**The registry is empty.**~~ **Done, 2026-09-05.** The image is pushed:
+   `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox/production:9db484c`, digest
+   `sha256:99c160c55d7f…`, read back from the registry rather than taken from the local daemon.
+   **2m36s to push.** The registry reports the repository at **515.9 MB** — the compressed size,
+   which is what is stored and transferred; the 2.06 GB carried through eight handoffs is the size
+   after decompression on disk, and the two were being used interchangeably. Registry storage and
+   egress remain unpriced *in currency*; the pull time is still unknown and is stage 8's to measure.
 2. ~~**`VOX_NETWORK_TOKEN` does not exist in Secret Manager.**~~ **Done, 2026-09-04.** It exists and
    is bound to `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`, read live with `gcloud`,
    and all five secrets are now bound to that identity. `deploy/README.md` ticked this on the 4th;
@@ -363,9 +371,81 @@ Present in `studio-prod-7f3a`:
    other exists. What the read covers is existence and the positive binding only; stage 8's
    negative, that the crew identity *cannot* read it, is unrun, and `VOX_CREW_MODEL_KEY`'s own
    binding is unread.
-3. **The instance carries no `user-data` metadata** — the key list is empty, so `cloud-init.yaml`
-   has never been applied and nothing on the VM starts a container today. This confirms rather than
-   contradicts what this ticket already recorded.
+3. ~~**The instance carries no `user-data` metadata.**~~ **Applied 2026-09-05.** The key list was
+   empty and now reads `user-data`. The rendered file passes every check the wizard's stage 5 makes
+   — no placeholder survives, 6354 bytes against the 262144 byte ceiling, `ExecStart` pinning the
+   digest above — and the *stored* value was confirmed byte-identical to it by reading the Compute
+   REST API directly.
+   **But nothing on the VM starts a container yet, because the box has not been rebooted.**
+   `cloud-init` reads `user-data` at boot; applying the metadata to a running machine changes
+   nothing. The stop/start was refused by the agent's auto-mode write gate — which allowed
+   `add-metadata` and not `instances stop`/`start` — so **the claim that COS reads this key and runs
+   cloud-init over it is still unexecuted, and it is now the only thing between here and the
+   conformance run.** An operator running the wizard hits no such gate.
+
+## What the 2026-09-05 deploy established
+
+**The service is deployed and running.** Stages 1 through 8 were performed by hand, following the
+wizard step for step. `vox-production.service` is `active (running)`, `docker inspect` reports the
+container's image as `…/production@sha256:99c160c5…` — **the digest that was pushed** — and the
+service logged `Vox Production service ready on 127.0.0.1:8080`. `ss` confirms the bind is loopback
+and not `0.0.0.0`, so `--network host` behaves as `cloud-init.yaml` claims. **Boot to ready: 55
+seconds. Image pull: 35 seconds.**
+
+**The first boot failed, and that is the most useful result of the day.** `/etc` on COS does not
+survive a restart, so the hand-written `service.env` was gone and the unit crash-looped fifty times
+in eight minutes on a missing `--env-file`. The env fetch moved into the boot path as
+`vox-service-env.service` and the second boot came up clean. Both `deploy/fetch-service-env.sh` and
+`deploy/README.md` had named this assumption as the one that would not fail loudly.
+
+What the run turned from documented intent into observation:
+
+- **The IAP tunnel answers**, and is the vehicle for everything below.
+- **COS carries `curl`, `base64`, `docker`, `docker-credential-gcr` and `findmnt`** — checked by
+  name rather than assumed. Two of those were standing unverified claims.
+- **`/etc` on COS is writable**, probed directly rather than inferred from the documentation. What
+  is *not* yet shown is that it survives a reboot, which is the failure mode that looks like a
+  container starting today and crash-looping tomorrow.
+- **All five secrets are readable by the production identity**, re-read live on the 5th rather than
+  resting on the 4th's read.
+- **`deploy/fetch-service-env.sh` ran on the instance against real Secret Manager**, its first
+  execution outside fakes. It wrote `/etc/vox/service.env`, `600 root:root`, 491 bytes, nine keys,
+  and the four path variables point into `/var/lib/vox` as intended.
+- **COS reads `user-data` and runs cloud-init over it.** All four stages `active (exited)`,
+  `cloud-init.target` up, unit files written to `/etc/systemd/system` dated to the boot. This is the
+  claim the phase has carried as documented intent since the topology was chosen, and the
+  `create-with-container` deprecation that prompted the whole cloud-init route cost nothing.
+- **cloud-init rewrites `/etc` on every boot, not once per instance** — which is what makes the
+  env-file fix sound rather than a coincidence. The second boot materialised two units that had
+  never existed on that box.
+- **The mount unit's escaped name is the one systemd derives.** `mnt-disks-vox\x2druns.mount`,
+  `loaded active mounted`, `/dev/sdb` on `/mnt/disks/vox-runs`, `ext4`. Recorded on 2026-09-03 as
+  "corrected by reasoning, not by a run"; the reasoning was right.
+- **`assertWritesLandOnVolume` ran on the instance and passed.** New code in the boot path, where
+  being wrong fails the deployment closed, and previously exercised only by unit tests and one local
+  container start.
+- **The uid is root.** `uid=0(root) gid=0(root)`. This was an open question and now has an answer
+  that wants a decision: the production runtime runs as root in the VM. Inherited from the image
+  rather than chosen here, and it belongs in ticket 12's proof sheet as a stated property.
+
+And two defects it found, both of the shape this phase keeps naming:
+
+- **The wizard's stage 6 could not have verified what it claimed.** Its `stat` ran unprivileged
+  against a 0600 file in a 0700 directory, so it read EACCES and reported `MISSING` — and would have
+  halted the deploy with "the fetcher reported success but it is not there" *immediately after the
+  fetcher succeeded*. Fixed with `sudo` on both reads. A check that can only ever return its failure
+  branch is not a check.
+- **The registry size and the disk size were being used as one number.** 515.9 MB stored versus
+  2.06 GB on disk; the wizard's stage 3 comment argued explicitly that the smaller figure was a
+  four-fold understatement of the same quantity. It is not the same quantity. Corrected in the
+  wizard and in `deploy/README.md`.
+
+And one near-miss worth carrying, because it produced a convincing false alarm: **reading the
+applied metadata back with `gcloud` on Windows showed a payload 15 bytes short with eight `?` in
+it**, which reads as a metadata write that corrupted the file the machine boots from. The stored
+value is in fact byte-identical; `gcloud`'s stdout encoding does the replacing, and it does it
+through `PYTHONIOENCODING=utf-8` and a UTF-8 console alike. **A verification that runs through the
+tool being verified is not independent of it.** The REST API is, and is what settled it.
 
 Unchanged and still owed once those are done: whether the disk survives a reboot, which uid the
 container runs as, `identity.txt`, `check.mjs`'s exit 3, and the tunnel under a three-minute render.

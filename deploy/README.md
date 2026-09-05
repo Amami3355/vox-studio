@@ -242,6 +242,41 @@ Prefix the whole command with `MSYS_NO_PATHCONV=1` when starting it by hand from
 same rewrite the wizard's `dk()` comment warns about for `docker run --volume`, arriving through
 `-e` instead.
 
+**Do not prefix `gcloud` with it.** Found on 2026-09-05, deploying for the first time: the Windows
+`gcloud` wrapper locates its own `lib/gcloud.py` through a path that MSYS is *supposed* to convert,
+so `MSYS_NO_PATHCONV=1 gcloud …` fails before it parses an argument, with
+`can't open file 'C:\c\Users\…\lib\gcloud.py'`. The rule is per-tool and the two tools want opposite
+things: **`docker` needs the rewrite suppressed, `gcloud` needs it left alone.** The deploy wizard
+never hits this because it passes no absolute POSIX paths to either.
+
+### `gcloud`'s own output cannot verify what `gcloud` uploaded, on Windows
+
+Also 2026-09-05, and the more dangerous of the two. Reading the applied `user-data` back with
+`gcloud compute instances describe --format='value(metadata.items[0].value)'` returned a value
+**15 bytes shorter than the file that was uploaded**, with all eight em-dashes replaced by `?`. That
+looks exactly like a metadata write that mangled its payload, which for a file the machine boots
+from is a stop-everything result.
+
+It is not. Read from the Compute REST API with `curl` and a bearer token — no Python between the
+bytes and the file — **the stored value is byte-identical: 6354 bytes, eight U+2014, no `?`.** The
+replacement happens in gcloud's *stdout* encoding on Windows, and it survives both
+`PYTHONIOENCODING=utf-8` and setting the PowerShell console to UTF-8, because the CLI's output is a
+redirected pipe in every case.
+
+**So a diff between a rendered file and a `gcloud`-printed read-back is not evidence of anything on
+Windows.** To check what a metadata write actually stored:
+
+```sh
+TOK=$(gcloud auth print-access-token)
+curl -s -H "Authorization: Bearer $TOK" \
+  "https://compute.googleapis.com/compute/v1/projects/<project>/zones/<zone>/instances/<instance>" \
+  -o instance.json
+```
+
+and read `metadata.items[].value` out of the JSON. The wizard does not read the metadata back at
+all, so it is not affected — but anyone verifying a deploy by hand will hit this, and the false
+result points at the scariest possible cause.
+
 ## Environment
 
 | Variable | Where it points |
@@ -258,20 +293,65 @@ same rewrite the wizard's `dk()` comment warns about for `docker run --volume`, 
 
 ## What the conformance run still owes
 
-**One of the following has been executed; the other nine have not.** Each is listed so it is
-claimed only once it is true, and the one tick below carries the date and the method that earned it.
+**Eight of the following have been executed; four have not.** Each is listed so it is claimed only
+once it is true, and every tick below carries the date and the method that earned it.
+
+**Seven were earned on 2026-09-05**, in the first session to spend money and touch the instance.
+**The deployment is up: `vox-production.service` is `active (running)` on `vox-service`, running the
+digest that was pushed, with the service answering on `127.0.0.1:8080`.** The steps were performed
+by hand rather than through the wizard, following its stages step for step.
+
+**It did not work the first time, and the failure is the most valuable thing in this section.** The
+first boot crash-looped fifty times in eight minutes because `/etc` on COS does not survive a
+restart — see the env-file item below. The design changed in response, and the second boot came up
+in 55 seconds.
+
+What remains unticked is what needs a *render* rather than a boot: the outbound traffic comparison,
+the adapter refusal on the instance, the tunnel under three minutes, and ticket 04's `identity.txt`.
 
 **The first three now have a vehicle rather than only a description**: the wizard stage named
 against each performs it. A stage existing is not the step being done — every one of these stays
 unticked until a run has happened.
 
 - [ ] `cloud-init.yaml` **rendered and** applied to the VM, and Container-Optimized OS confirmed to
-      read `user-data` and run it. **Documented intent until then.** The instance exists and runs COS
-      (`cos-stable-121-18867-584-3`) but carries **no `user-data` metadata**, so nothing on it
-      starts a container today. — *deploy wizard stages 5, 7 and 8.*
-- [ ] The image pushed to `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox`, which currently holds
-      **0 items**. 2.06 GB, and the pull time and registry storage cost are still an open item — and
-      stage 8's ten-minute poll is where the pull time stops being unknown. — *deploy wizard stage 4.*
+      read `user-data` and run it. **Half done, 2026-09-05, and the unticked half is the load-bearing
+      one.** Rendered against the pushed digest — no placeholder survives, 6354 bytes against the
+      262144 byte metadata ceiling, `ExecStart` pinning `sha256:99c160c5…` — and **applied**: the
+      instance's metadata key list was empty and now reads `user-data`. The stored value was verified
+      byte-identical to the rendered file by reading it back through the Compute REST API rather than
+      through `gcloud`, which on Windows mangles it in the printing (see above).
+      **Executed on the reboot of 2026-09-05, and this is the claim the whole phase had been
+      carrying as documented intent.** Container-Optimized OS read the `user-data` key and ran
+      cloud-init over it: `cloud-init-local`, `cloud-init`, `cloud-config` and `cloud-final` all
+      reached `active (exited)` and `cloud-init.target` came up, with the unit files it writes
+      appearing in `/etc/systemd/system` dated to that boot. **`gcloud compute instances
+      create-with-container` was never needed, and the deprecation noted in ticket 07's fourth
+      amendment cost this deployment nothing.** — *deploy wizard stages 5, 7 and 8.*
+- [x] **The mount unit's systemd-escaped name is the one systemd derives.** `mnt-disks-vox\x2druns.mount`
+      came up `loaded active mounted`, description "Vox persistent Run store", with
+      `/dev/sdb` on `/mnt/disks/vox-runs` as `ext4`. That name was worked out by reasoning on
+      2026-09-03 and explicitly recorded as "corrected by reasoning, not by a run". It has now been
+      run, and the reasoning was right.
+- [x] The image pushed to `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox`. **Done 2026-09-05**,
+      by hand rather than through the wizard, following its stages 3 and 4 step for step. Tag
+      `9db484c`, digest `sha256:99c160c5…`, and **the digest was read back from the registry** with
+      `gcloud artifacts docker images describe --format='value(image_summary.digest)'` — which also
+      retires the standing doubt about whether that field name is right. **The push took 2m36s.**
+      Two untagged manifests landed alongside the tagged one and are believed to be buildkit
+      attestation manifests; that is an inference, not a read, and the unit pins the tagged digest
+      regardless.
+      **The storage figure was wrong by a factor of four, in the safe direction.** The repository
+      reports **515.9 MB**, not the 2.06 GB carried across eight handoffs: 515.9 MB is the
+      compressed size that is stored and transferred, and 2.06 GB is what it decompresses to on
+      disk. The wizard's stage 3 comment had these the other way round and is corrected.
+      **Registry storage and egress are still unpriced in currency** — the size is now measured, the
+      rate is not; `cloud.google.com/artifact-registry/pricing` did not come back through the doc
+      tools on the 5th.
+      **Pull time: 35 seconds**, measured on the instance's second boot — `09:04:51` "Pulling from"
+      to `09:05:26` "Status: Downloaded". Within the region, from a `e2-standard-2`. The wizard's
+      stage 8 polls for ten minutes and warns the operator that a first pull is slow; the real
+      figure is seventeen times inside that budget, and the poll is now generous rather than tight.
+      — *deploy wizard stage 4.*
 - [x] `VOX_NETWORK_TOKEN` created in Secret Manager and bound to
       `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`. **Read live with `gcloud` on
       2026-09-04: it exists, and all five of `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`,
@@ -284,15 +364,62 @@ unticked until a run has happened.
       by the right identity is not evidence that it is unreadable by the wrong one.
       — *provisioning wizard stage 6 creates it, stage 8 proves the crew cannot read it, and the
       deploy wizard's stage 2 refuses to deploy without it.*
-- [ ] `/etc/vox/service.env` written on the VM at mode 0600 by `deploy/fetch-service-env.sh`, with
-      COS confirmed to carry `curl` and `base64` and the metadata server confirmed to issue a token
-      for the instance's identity. The script has been run end-to-end against fakes, as root, in a
-      container; it has never run on the VM. — *deploy wizard stage 6.*
-- [ ] `/etc/vox/service.env` still present after a reboot — i.e. `/etc` on COS is the writable
-      overlay it is documented to be. This is the one assumption in the env-file path that does
-      **not** fail loudly: it looks like a container that starts today and crash-loops tomorrow.
+- [x] `/etc/vox/service.env` written on the VM at mode 0600 by `deploy/fetch-service-env.sh`.
+      **Done 2026-09-05, on the instance, against real Secret Manager.** COS carries `curl` and
+      `base64` — checked by name before the run, along with `docker`, `docker-credential-gcr` and
+      `findmnt`. The metadata server issued a token for the instance's identity (1024 bytes) and all
+      five secrets were read: `ELEVENLABS_API_KEY` (51), `VOX_GRANT_KEY` (64), `VOX_RUN_HMAC_KEY`
+      (64), `VOX_RUN_KEY_ID` (12), `VOX_NETWORK_TOKEN` (64). The file is `600 root:root`, 491 bytes,
+      nine keys, in a `/etc/vox` that is `700 root:root`. No value passed through the terminal.
+      **This run found a defect in the wizard stage that performs it.** Stage 6 verified the file
+      with an *unprivileged* `stat`, which on a 0600 file inside a 0700 directory fails with EACCES
+      rather than printing a mode — so `2>/dev/null || echo MISSING` answered `MISSING` for a file
+      that was present and correct, and the wizard would have halted with "the fetcher reported
+      success but it is not there" immediately after succeeding. Both reads now use `sudo`. The
+      check could only ever have reported the absence it was written to detect and never the state
+      it claimed to read. — *deploy wizard stage 6.*
+- [x] `/etc/vox/service.env` still present after a reboot. **Answered 2026-09-05, and the answer was
+      no — this assumption was wrong, and the design changed because of it.**
+      `/etc` on Container-Optimized OS is writable and **stateless**: it is rebuilt at boot. The file
+      was written over the tunnel at mode 0600 and verified present; after the restart `/etc/vox` did
+      not exist at all, and `vox-production.service` crash-looped **fifty times in eight minutes** on
+      `docker: open /etc/vox/service.env: no such file or directory`. This item predicted the exact
+      symptom — "a container that starts today and crash-loops tomorrow" — and it arrived on the same
+      day rather than the next one.
+      **The fix is that the box fetches its secrets at every boot**, as `vox-service-env.service`: a
+      oneshot with `RemainAfterExit=yes`, ordered `Before=vox-production.service`, which takes a hard
+      `Requires=` on it so a failed fetch stops the service rather than letting docker fail every ten
+      seconds. `deploy/fetch-service-env.sh` is rendered into the unit file base64-encoded by the
+      wizard's stage 5, so it keeps one copy in the repository. A oneshot rather than an
+      `ExecStartPre` because `Restart=always` with `RestartSec=10` would otherwise ask Secret Manager
+      for five secrets every ten seconds for as long as nobody was watching.
+      **Verified on the second boot**: the unit ran at 09:04:49, fetched all five secrets, and wrote
+      the file at `600 root:root`, 491 bytes — with the fetcher itself present at `700 root:root`,
+      7818 bytes, byte-identical to the repository's copy.
+- [x] **cloud-init rewrites `/etc` on every boot, not once per instance.** Not previously on this
+      list, and it is what makes the fix above sound. The written unit files carried the new boot's
+      timestamp while `/etc/vox` was gone, and the second boot materialised two units that had never
+      existed on the box before. COS also configures `runcmd` at `always` frequency, in
+      `/etc/cloud/cloud.cfg`.
 - [ ] `prepare-disk.sh`, `run-check.sh` and `check.mjs` run against the real disk.
 - [ ] `identity.txt` written; `check.mjs` exit 3 produced by a real run.
+- [x] **The service starts on the instance and binds loopback.** 2026-09-05:
+      `Vox Production service ready on 127.0.0.1:8080`, `node` holding the socket, with `ss` showing
+      the bind is `127.0.0.1` and not `0.0.0.0` — so `--network host` puts the listener on the VM's
+      loopback, where the IAP tunnel lands, exactly as `cloud-init.yaml`'s comment claims. Boot to
+      ready was **55 seconds**, pull included.
+      **`assertWritesLandOnVolume` ran on the instance for the first time and passed.** It was added
+      on 2026-09-05 to close a review finding, failed correctly on its first local execution, and had
+      never run on the VM — new code in the boot path, where being wrong fails the deployment closed.
+      It is now exercised where it matters.
+- [x] **The uid the container runs as.** Answered, and the answer wants a decision rather than a
+      tick: **`uid=0(root) gid=0(root)`.** The volume is `root:root` and its only content is
+      ticket 04's `lost+found`, so nothing has yet been written by a non-root process — the standing
+      note that "the mount is `root:root` 755 with no non-root container having touched it" is still
+      exactly true, and is now true of a container that is itself root. Running the production
+      runtime as root inside the VM is not something this phase decided; it is something it
+      inherited from the image, and it belongs in ticket 12's proof sheet as a stated property
+      rather than being discovered by whoever reads the Dockerfile next.
 - [ ] A render completing on the VM with outbound traffic observed and compared against the two
       destinations above. `--network none` is **not** the control — it now fails by design.
 - [ ] A non-`record` command attempting egress and being refused **by the adapter**, with the

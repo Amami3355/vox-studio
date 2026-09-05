@@ -38,6 +38,57 @@
 # owes its own decision.
 
 write_files:
+  # ── the env file is fetched at every boot, because /etc on COS does not survive one ──────────
+  #
+  # **Measured on 2026-09-05, on this instance.** `/etc/vox/service.env` was written by hand over
+  # the tunnel before the first boot, at mode 0600, verified present. After the restart the
+  # directory did not exist at all, and `vox-production.service` crash-looped fifty times in eight
+  # minutes on `docker: open /etc/vox/service.env: no such file or directory`. `/etc` on
+  # Container-Optimized OS is writable and **stateless** — it is rebuilt at boot. Both
+  # `deploy/fetch-service-env.sh` and `deploy/README.md` had named this as the one assumption in
+  # the env-file path that would not fail loudly; it failed on the same day instead.
+  #
+  # So the fetch belongs to boot, not to a deploy. That was already the design's own sentence —
+  # *the box fetches its own values* — it simply was not wired into the boot path. The script is
+  # carried here rather than copied to the box, base64-encoded so its quoting survives YAML, and
+  # the wizard substitutes it from `deploy/fetch-service-env.sh` at render time so there is one
+  # copy of it in the repository and not two.
+  - path: /etc/vox/fetch-service-env.sh
+    permissions: '0700'
+    owner: root
+    encoding: b64
+    content: ${VOX_FETCH_SCRIPT_B64}
+
+  # A oneshot ordered *before* the service, rather than an ExecStartPre on it. Two reasons, and the
+  # second is the load-bearing one:
+  #
+  #   - `Restart=always` with `RestartSec=10` means an ExecStartPre re-runs on every crash cycle,
+  #     so a service failing for an unrelated reason would ask Secret Manager for five secrets
+  #     every ten seconds, for as long as nobody was looking.
+  #   - `RemainAfterExit=yes` plus `Requires=` makes a failed fetch stop the service from starting
+  #     at all. That is the fail-closed shape the rest of this deployment already uses: the volume
+  #     check refuses to start without its disk, and this refuses to start without its secrets,
+  #     rather than starting a container that is missing one and finding out later.
+  - path: /etc/systemd/system/vox-service-env.service
+    permissions: '0644'
+    owner: root
+    content: |
+      [Unit]
+      Description=Fetch Vox production secrets from Secret Manager
+      # It talks to the metadata server and to secretmanager.googleapis.com, so it needs the
+      # network up — not merely configured.
+      Wants=network-online.target
+      After=network-online.target
+      Before=vox-production.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/bin/bash /etc/vox/fetch-service-env.sh
+
+      [Install]
+      WantedBy=multi-user.target
+
   # The disk unit's **filename is the escaped mount path** and is not free to be a friendly name:
   # systemd derives one from the other, and a `.mount` unit whose name does not match its `Where=`
   # simply does not start. `/mnt/disks/vox-runs` escapes to `mnt-disks-vox\x2druns.mount` — the
@@ -73,7 +124,12 @@ write_files:
       # `Wants=`: if the disk does not mount, this unit does not start, and the service's own
       # volume check is the second lock rather than the only one.
       Requires=mnt-disks-vox\x2druns.mount
-      After=gcr-online.target mnt-disks-vox\x2druns.mount
+      # The env file is the same kind of dependency as the disk and is declared the same way: a
+      # hard `Requires=`, so a fetch that fails keeps this unit from starting instead of letting
+      # docker fail on a missing --env-file every ten seconds. That is what happened on the first
+      # boot, and the fifty restarts were all the same error.
+      Requires=vox-service-env.service
+      After=gcr-online.target mnt-disks-vox\x2druns.mount vox-service-env.service
 
       [Service]
       Environment="HOME=/home/vox"
@@ -108,4 +164,7 @@ write_files:
 runcmd:
   - systemctl daemon-reload
   - systemctl enable --now 'mnt-disks-vox\x2druns.mount'
+  # Before the service, and separately, so that a failure to reach Secret Manager is reported by
+  # the unit that does the reaching rather than as a docker argument error three layers down.
+  - systemctl enable --now vox-service-env.service
   - systemctl enable --now vox-production.service
