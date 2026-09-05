@@ -51,6 +51,19 @@ class NetworkEgressAttempted(RuntimeError):
     """Raised when a test reaches for the network. Never caught; the test fails."""
 
 
+_ADMITTED: set[tuple[str, int]] = set()
+"""Endpoints a test started itself, and may therefore talk to. See `admit_endpoint`."""
+
+
+def _admitted(address: Any) -> bool:
+    if not isinstance(address, tuple) or len(address) < 2:
+        return False
+    try:
+        return (str(address[0]), int(address[1])) in _ADMITTED
+    except (TypeError, ValueError):
+        return False
+
+
 @pytest.fixture(autouse=True)
 def network_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail any test that attempts egress, mirroring the proofs' zero-network probes.
@@ -58,17 +71,65 @@ def network_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
     Both the connect calls and name resolution are closed off. Resolution matters on its own:
     a DNS lookup leaks the fact that a fictional Brief was researched even when the request
     that follows it never completes.
+
+    **The one hole is an exact endpoint a test opened itself**, registered through
+    `admit_endpoint` and gone again when that test ends. `HttpProductionClient` has to speak to
+    a socket to be tested at all, and the alternatives were both worse: mocking the transport
+    would leave the half of the client that is HTTP untested, and admitting loopback wholesale
+    would retire `test_a_socket_of_its_own_cannot_connect_either`, which is a real assertion —
+    the crew's own service is on loopback in this topology, so "loopback is safe" is exactly the
+    reasoning the sentinel exists to refuse.
+
+    Nothing else changes: a port nobody registered is refused on loopback the same as anywhere,
+    and name resolution stays closed regardless, because a test that knows its own port has no
+    name to look up.
     """
+
+    original_connect = socket.socket.connect
+    original_create_connection = socket.create_connection
+    original_getaddrinfo = socket.getaddrinfo
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
         raise NetworkEgressAttempted(
             "A test attempted network egress. Crew tests run against recorded fixtures."
         )
 
-    monkeypatch.setattr(socket.socket, "connect", refuse)
+    def connect(self: socket.socket, address: Any, *args: Any, **kwargs: Any) -> Any:
+        if _admitted(address):
+            return original_connect(self, address, *args, **kwargs)
+        return refuse()
+
+    def create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
+        if _admitted(address):
+            return original_create_connection(address, *args, **kwargs)
+        return refuse()
+
+    def getaddrinfo(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
+        # `create_connection` resolves before it connects, so an admitted endpoint has to be
+        # resolvable or the hole it was given is not usable. It is the same endpoint either
+        # way, and a name that is not one of them is still refused.
+        if _admitted((host, port)):
+            return original_getaddrinfo(host, port, *args, **kwargs)
+        return refuse()
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
-    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    monkeypatch.setattr(socket, "create_connection", create_connection)
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+
+
+@pytest.fixture
+def admit_endpoint() -> Iterator[Any]:
+    """Opens the sentinel for one address a test is serving itself, and closes it again."""
+    opened: list[tuple[str, int]] = []
+
+    def admit(host: str, port: int) -> None:
+        opened.append((host, int(port)))
+        _ADMITTED.add((host, int(port)))
+
+    yield admit
+    for endpoint in opened:
+        _ADMITTED.discard(endpoint)
 
 
 def recorded(name: str) -> str:

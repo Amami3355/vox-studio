@@ -1,0 +1,74 @@
+{
+  "secret": "vox-signing-vector-secret-0123456789-abcdef",
+  "cases": [
+    {
+      "name": "payload request with an object payload",
+      "kind": "payload",
+      "request": {
+        "protocolVersion": 1,
+        "requestId": "3f2a1c44-9f1e-4b6a-8c2d-7e5b0a9d1c33",
+        "timestampMs": 1757030400000,
+        "command": "run.validate",
+        "runId": "run-vector-01",
+        "payload": {
+          "zeta": [
+            1,
+            2,
+            3
+          ],
+          "alpha": "an em dash — and a café",
+          "beta": {
+            "nested": true,
+            "alpha": null
+          }
+        }
+      },
+      "signingText": "VOX-IPC-PAYLOAD-REQUEST-1\n36:3f2a1c44-9f1e-4b6a-8c2d-7e5b0a9d1c33\n13:1757030400000\n12:run.validate\n13:run-vector-01\n89:{\"alpha\":\"an em dash — and a café\",\"beta\":{\"alpha\":null,\"nested\":true},\"zeta\":[1,2,3]}",
+      "mac": "57c05c66b3d55750cfe7381586d00041a3eecd25bf42957bc6ec9f6e5e921640"
+    },
+    {
+      "name": "payload request naming no Run and carrying no payload",
+      "kind": "payload",
+      "request": {
+        "protocolVersion": 1,
+        "requestId": "0c9d8e7f-6a5b-4c3d-9e1f-2a3b4c5d6e7f",
+        "timestampMs": 1757030400001,
+        "command": "contract.index",
+        "runId": null,
+        "payload": null
+      },
+      "signingText": "VOX-IPC-PAYLOAD-REQUEST-1\n36:0c9d8e7f-6a5b-4c3d-9e1f-2a3b4c5d6e7f\n13:1757030400001\n14:contract.index\n0:\n0:",
+      "mac": "6c31b0fc3d8fbad44fc132e9774f51c6af5ea6c2fb0a1dea8235163a7340539c"
+    },
+    {
+      "name": "artifact request for a published descriptor",
+      "kind": "artifact",
+      "request": {
+        "protocolVersion": 1,
+        "requestId": "a1b2c3d4-e5f6-4718-9a0b-1c2d3e4f5a6b",
+        "timestampMs": 1757030400002,
+        "runId": "run-vector-01",
+        "descriptor": {
+          "kind": "plan_snapshot",
+          "path": "inputs/plans/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08.json",
+          "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      },
+      "signingText": "VOX-IPC-ARTIFACT-REQUEST-1\n36:a1b2c3d4-e5f6-4718-9a0b-1c2d3e4f5a6b\n13:1757030400002\n13:run-vector-01\n13:plan_snapshot\n82:inputs/plans/9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08.json\n64:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "mac": "d4d3a643d9ed841c1ef7e3999c8913ad0cf546de5a42a2c325504f470d56cafa"
+    },
+    {
+      "name": "response to a command that succeeded",
+      "kind": "response",
+      "request": {
+        "protocolVersion": 1,
+        "requestId": "5e4d3c2b-1a09-4f8e-b7d6-c5b4a3928170",
+        "exitCode": 0,
+        "stdoutBase64": "eyJvdXRjb21lIjoic3VjY2VlZGVkIn0K",
+        "stderrBase64": ""
+      },
+      "signingText": "VOX-IPC-RESPONSE-1\n36:5e4d3c2b-1a09-4f8e-b7d6-c5b4a3928170\n1:0\n32:eyJvdXRjb21lIjoic3VjY2VlZGVkIn0K\n0:",
+      "mac": "70e75db0905a36f45e54c0611c16e37c9a51311ecff29a96cc4da99c2a374f4a"
+    }
+  ]
+}

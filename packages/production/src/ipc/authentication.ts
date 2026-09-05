@@ -45,8 +45,34 @@ export const payloadRequestSchema = z
   })
   .strict();
 
+/**
+ * The artifact route's request: a Run id and the descriptor an envelope published. It carries no
+ * command and no payload, because it is not a command — it names bytes that already exist.
+ *
+ * `descriptor` is the whole descriptor rather than its path alone. The digest travels because it
+ * is what authenticates the response: the caller recomputes it on arrival, and a route that took
+ * only a path would leave the caller checking bytes against a value it never sent.
+ */
+export const artifactRequestSchema = z
+  .object({
+    protocolVersion: z.literal(IPC_PROTOCOL_VERSION),
+    requestId: z.uuid(),
+    timestampMs: z.number().int().nonnegative(),
+    runId: z.string().min(1),
+    descriptor: z
+      .object({
+        kind: z.string().min(1),
+        path: z.string().min(1),
+        sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      })
+      .strict(),
+    mac: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
 export type PayloadIpcRequest = z.infer<typeof payloadRequestSchema>;
+export type ArtifactIpcRequest = z.infer<typeof artifactRequestSchema>;
 export type IpcResponse = z.infer<typeof ipcResponseSchema>;
 
 const field = (value: string): string => `${Buffer.byteLength(value, 'utf8')}:${value}`;
@@ -77,6 +103,27 @@ export const payloadRequestSigningText = (request: Omit<PayloadIpcRequest, 'mac'
     field(request.command),
     field(request.runId ?? ''),
     field(request.payload === null ? '' : canonicalJson(request.payload as JsonValue)),
+  ].join('\n');
+
+/**
+ * The artifact request's signing text, with a third domain tag for the same reason the second one
+ * exists: a MAC computed over a command must not authenticate a retrieval, and a shared prefix is
+ * how two routes end up with one forgeable surface between them.
+ *
+ * The descriptor's three fields are signed separately rather than as canonical JSON. They are
+ * three strings, so length-prefixing them is the whole of what canonicalisation would buy, and a
+ * signing rule a second language has to reimplement is worth keeping free of a JSON canonicaliser
+ * it would otherwise need only here.
+ */
+export const artifactRequestSigningText = (request: Omit<ArtifactIpcRequest, 'mac'>): string =>
+  [
+    'VOX-IPC-ARTIFACT-REQUEST-1',
+    field(request.requestId),
+    field(String(request.timestampMs)),
+    field(request.runId),
+    field(request.descriptor.kind),
+    field(request.descriptor.path),
+    field(request.descriptor.sha256),
   ].join('\n');
 
 export const responseSigningText = (response: Omit<IpcResponse, 'mac'>): string =>

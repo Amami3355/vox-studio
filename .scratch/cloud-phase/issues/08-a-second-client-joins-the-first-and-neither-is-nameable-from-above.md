@@ -1,6 +1,6 @@
 # 08: A second client joins the first, and neither is nameable from above
 
-Status: ready-for-agent
+Status: done
 
 **Promoted 2026-09-05 by [10](10-the-preview-is-reachable-without-a-domain.md), and it gained the
 transport's missing half.** This ticket was about to be demoted as invisible in a demo. With the
@@ -151,14 +151,59 @@ makes it a good candidate to run in parallel with ticket 07's containerisation r
 **Blocked by:**
 `.scratch/cloud-phase/issues/06-a-second-transport-joins-the-first-over-one-surface.md`
 
-- [ ] The behavioural suite is split into contract expectations and launcher expectations, as a pure move that passes first
-- [ ] The contract suite runs over the in-memory client, `LocalProductionClient` and `HttpProductionClient`
-- [ ] `HttpProductionClient` implements `ProductionClient` with no added or removed method
-- [ ] It is constructed with an address and an identity source, and has nowhere to put a work root
-- [ ] It signs the request body with the rule the host verifies, proved against a recorded vector on both sides
-- [ ] It presents an identity it was given and holds no production credential
-- [ ] Artifact retrieval checks the digest on arrival and refuses moved bytes, a missing artifact, and a descriptor outside its Run
-- [ ] A timeout surfaces as `ProductionUnavailable` and no command is retried
-- [ ] The structural no-`Path` test covers the new implementation
-- [ ] A Run driven over the new client produces an evidence bundle that verifies
-- [ ] No test, tool, instruction, prompt or fixture can tell which client it holds
+- [x] The behavioural suite is split into contract expectations and launcher expectations, as a pure move that passes first
+- [x] The contract suite runs over the in-memory client, `LocalProductionClient` and `HttpProductionClient`
+- [x] `HttpProductionClient` implements `ProductionClient` with no added or removed method
+- [x] It is constructed with an address and an identity source, and has nowhere to put a work root
+- [x] It signs the request body with the rule the host verifies, proved against a recorded vector on both sides
+- [x] It presents an identity it was given and holds no production credential
+- [x] Artifact retrieval checks the digest on arrival and refuses moved bytes, a missing artifact, and a descriptor outside its Run
+- [x] A timeout surfaces as `ProductionUnavailable` and no command is retried
+- [x] The structural no-`Path` test covers the new implementation
+- [x] A Run driven over the new client produces an evidence bundle that verifies
+- [x] No test, tool, instruction, prompt or fixture can tell which client it holds
+
+## What the criteria do not capture
+
+**Done 2026-09-05.** The suite is 401 crew tests and 1044 vitest tests, both green, with one
+known flake — `render-command.test.ts`'s receipt-reuse case timed out under the full run and
+passed alone, which is the shape this repository already records as a flake rather than a
+failure.
+
+Six things the ticks above do not say.
+
+- **The transport was missing its read-back half and nobody had noticed.**
+  `ProductionPayloadSurface.fetchArtifact` was complete and routed nowhere: not a case in
+  `route()`'s switch, and `network-host.ts` served exactly one path. So this ticket built the
+  route as well as the client — `POST /artifact`, signed as `/command` is, answering
+  `application/octet-stream`. That is why ticket 10's "05 should not need a new capability" was
+  already false when it was written.
+- **The response carries no MAC on the artifact route, and that is a decision.** Those bytes are
+  authenticated by the descriptor's digest, which the caller holds because a MAC'd envelope
+  published it and which the client recomputes on arrival. `test_it_checks_the_digest_itself_
+  rather_than_trusting_the_answer` drives a service that lies about the bytes, which is what
+  makes that argument checkable rather than merely stated.
+- **A surface refusal is told from bytes by content type, not by status code.** The host answers
+  200 or it answers nothing: a status code is a reason, and the boundary publishes no reasons.
+  `ARTIFACT_MISSING` and its siblings arrive as a JSON body, exactly as the command route puts
+  them in an envelope.
+- **One authenticator now serves both routes, so they share one replay cache.** Two caches would
+  let a request id captured on one route be spent again on the other. `createBoundaryAuthenticator`
+  is the extraction; `boundary.ts`'s replay note is corrected from "per-boundary" to
+  "per-authenticator", and the process-scoped weakness it describes is unchanged.
+- **The network sentinel gained exactly one hole and kept its own tests.** `admit_endpoint`
+  opens a single address a test is serving on and closes it again; `127.0.0.1:9` is refused as
+  before, so `test_a_socket_of_its_own_cannot_connect_either` did not have to be retired.
+  Admitting loopback wholesale was the tempting move and is the reasoning the sentinel exists to
+  refuse — the service is *on* loopback in this topology.
+- **The stub service proves the HTTP and nothing about the signing.** It verifies with the same
+  `vox_crew.wire` the client signs with, so two copies of one mistake would agree perfectly. The
+  rule is held by `services/agents/tests/fixtures/ipc-signing-vectors.json`, recorded from the
+  TypeScript definition by `pnpm --filter @vox/production record:signing-vectors` and asserted
+  by both languages against the recording. Its non-ASCII case caught nothing this time, which is
+  the point of writing it before it is needed.
+
+**What this ticket did not do:** run any of it against the real host. The Python suite cannot
+start the TypeScript service — the two halves are separate projects on purpose — so the client's
+half is proved here and the host's half by `network-host.test.ts`. **The two have never spoken to
+each other**, and the first time they do will be ticket 09's Run.

@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 from conftest import recorded, recorded_bytes
+from stub_service import SECRET, StubProductionService
 from test_complete_run import REQUEST, RUN_ID
 from test_converge import (
     RETURNS_MORE_THAN_ALLOWED,
@@ -35,6 +36,7 @@ from vox_crew.converge import (
     ConvergedRun,
     converge,
 )
+from vox_crew.http_client import HttpProductionClient
 from vox_crew.evidence import (
     ARTIFACTS,
     ASSERTIONS,
@@ -447,6 +449,39 @@ def test_what_the_run_never_reached_is_not_evidenced_rather_than_failed() -> Non
     assert verdict["run.rendered"] == FAIL
     assert verdict["preflight.advisory-wording"] == PASS
     assert document(files, ASSERTIONS)["machineVerdict"] == FAIL
+
+
+def test_a_run_driven_over_a_socket_assembles_a_bundle_that_verifies(admit_endpoint) -> None:
+    """The spec's own bar — *a cloud Run produces an evidence bundle that verifies* — over the
+    transport the deployment uses.
+
+    Every byte in this bundle arrived over a network rather than off a local disk. It is the
+    same scripted store and the same convergence as `a_rendered_run` above, reached through
+    `HttpProductionClient` instead of by method call, so a difference between the two bundles is
+    a difference the transport made and nothing else. The artifacts are the half that matters:
+    each came back through the artifact route and was checked against the digest an envelope
+    published before it entered the bundle.
+
+    What answers the socket is `stub_service.py`, and the caveat written there applies — this is
+    the crew's half of the wire. The service's half is `network-host.test.ts`.
+    """
+    service = StubProductionService(a_client())
+    port = service.start()
+    admit_endpoint("127.0.0.1", port)
+    client = HttpProductionClient(f"http://127.0.0.1:{port}", key_source=lambda: SECRET)
+    try:
+        run = converge(client, REQUEST, RepairingAuthor(a_catalog_following_plan()))
+    finally:
+        service.stop()
+
+    bundle = assemble(run)
+
+    assert run.outcome == RENDERED
+    assert verify(bundle.files) == bundle.verdict
+    # The bundle carries the same artifact bytes the local path carries. A transport that
+    # truncated or re-encoded them would still assemble and still verify, because the hash
+    # index is computed over whatever arrived.
+    assert bundle.files[f"{ARTIFACTS}/preview"] == recorded_bytes("preview.mp4")
 
 
 def test_all_four_endings_assemble_a_bundle_that_verifies() -> None:

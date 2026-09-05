@@ -60,6 +60,68 @@ export type ProductionBoundaryOptions<TRequest extends BoundaryRequest> = {
   now?: () => number;
   maxClockSkewMs?: number;
   audit?: ProductionBoundaryAudit<TRequest>;
+  /**
+   * The authenticator to admit requests through. Supplied when a host serves more than one
+   * request shape and they must share one replay cache; omitted, this boundary builds its own.
+   */
+  authenticator?: BoundaryAuthenticator;
+};
+
+/**
+ * Protocol shape, clock skew, replay and the per-request HMAC, separated from the response the
+ * boundary goes on to build. It is separate because the network host serves two request shapes
+ * over one socket — a command, which answers with a signed envelope, and an artifact, which
+ * answers with bytes — and **one replay cache has to cover both.** Two authenticators would let a
+ * request id captured on one route be spent again on the other.
+ */
+export type BoundaryAuthenticator = {
+  authenticate: <TRequest extends BoundaryRequest>(
+    input: unknown,
+    parse: (input: unknown) => TRequest,
+    signingText: (request: Omit<TRequest, 'mac'>) => string,
+  ) => TRequest;
+};
+
+export const createBoundaryAuthenticator = ({
+  secret,
+  now = () => Date.now(),
+  maxClockSkewMs = 30_000,
+}: {
+  secret: string | Uint8Array;
+  now?: () => number;
+  maxClockSkewMs?: number;
+}): BoundaryAuthenticator => {
+  if (Buffer.byteLength(secret) < 32) throw new TypeError('Production IPC secret is too short.');
+  const seen = new Map<string, number>();
+
+  return {
+    authenticate: <TRequest extends BoundaryRequest>(
+      input: unknown,
+      parse: (input: unknown) => TRequest,
+      signingText: (request: Omit<TRequest, 'mac'>) => string,
+    ): TRequest => {
+      let request: TRequest;
+      try {
+        request = parse(input);
+      } catch {
+        throw new BoundaryRefusal('IPC_MALFORMED');
+      }
+      const current = now();
+      if (Math.abs(current - request.timestampMs) > maxClockSkewMs) {
+        throw new BoundaryRefusal('IPC_STALE');
+      }
+      for (const [requestId, expiresAt] of seen) {
+        if (expiresAt < current) seen.delete(requestId);
+      }
+      if (seen.has(request.requestId)) throw new BoundaryRefusal('IPC_REPLAY');
+      const { mac, ...unsigned } = request;
+      if (!verifyIpcMac(secret, signingText(unsigned as unknown as Omit<TRequest, 'mac'>), mac)) {
+        throw new BoundaryRefusal('IPC_AUTH');
+      }
+      seen.set(request.requestId, current + maxClockSkewMs);
+      return request;
+    },
+  };
 };
 
 const publicFailure = (): DispatchResult => ({
@@ -89,10 +151,11 @@ const publicFailure = (): DispatchResult => ({
  * sanitisation, and the signed response. Two hosts call this; neither reimplements it, because
  * a second copy is a second place for the boundary to drift.
  *
- * **The replay cache is per-boundary, and therefore per-process.** `seen` is an in-memory `Map`,
- * so one container is one cache: a request captured inside the skew window and replayed against
- * a *second* instance of this service would be accepted, because that instance has never seen
- * the id. This is a real weakening relative to the local topology, where one machine ran one
+ * **The replay cache is per-authenticator, and therefore per-process.** `seen` is an in-memory
+ * `Map`, so one container is one cache: a request captured inside the skew window and replayed
+ * against a *second* instance of this service would be accepted, because that instance has never
+ * seen the id. Within one process the cache is shared across every request shape a host serves,
+ * which is why {@link createBoundaryAuthenticator} is separable at all. This is a real weakening relative to the local topology, where one machine ran one
  * host. It is mitigated for this phase by running exactly one instance and by a short skew
  * window — a shared cache is a later ticket, and inventing one under a deadline is the wrong
  * shape. A reader adding a second instance is changing this property and should say so.
@@ -102,39 +165,16 @@ export const createProductionBoundary = <TRequest extends BoundaryRequest>({
   parse,
   signingText,
   dispatch,
-  now = () => Date.now(),
-  maxClockSkewMs = 30_000,
+  now,
+  maxClockSkewMs,
   audit,
+  authenticator,
 }: ProductionBoundaryOptions<TRequest>): ProductionBoundary<TRequest> => {
-  if (Buffer.byteLength(secret) < 32) throw new TypeError('Production IPC secret is too short.');
-  const seen = new Map<string, number>();
-
-  const authenticate = (input: unknown): TRequest => {
-    let request: TRequest;
-    try {
-      request = parse(input);
-    } catch {
-      throw new BoundaryRefusal('IPC_MALFORMED');
-    }
-    const current = now();
-    if (Math.abs(current - request.timestampMs) > maxClockSkewMs) {
-      throw new BoundaryRefusal('IPC_STALE');
-    }
-    for (const [requestId, expiresAt] of seen) {
-      if (expiresAt < current) seen.delete(requestId);
-    }
-    if (seen.has(request.requestId)) throw new BoundaryRefusal('IPC_REPLAY');
-    const { mac, ...unsigned } = request;
-    if (!verifyIpcMac(secret, signingText(unsigned as unknown as Omit<TRequest, 'mac'>), mac)) {
-      throw new BoundaryRefusal('IPC_AUTH');
-    }
-    seen.set(request.requestId, current + maxClockSkewMs);
-    return request;
-  };
+  const admit = authenticator ?? createBoundaryAuthenticator({ secret, now, maxClockSkewMs });
 
   return {
     handle: async (input: unknown): Promise<IpcResponse> => {
-      const request = authenticate(input);
+      const request = admit.authenticate(input, parse, signingText);
       const startedAtMs = Date.now();
       let auditContext: unknown;
       try {

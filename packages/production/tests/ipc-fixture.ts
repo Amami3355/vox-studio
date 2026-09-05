@@ -5,9 +5,11 @@ import { createConnection } from 'node:net';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
+  type ArtifactIpcRequest,
   type IpcRequest,
   type IpcResponse,
   type PayloadIpcRequest,
+  artifactRequestSigningText,
   ipcResponseSchema,
   payloadRequestSigningText,
   requestSigningText,
@@ -16,7 +18,7 @@ import {
   verifyIpcMac,
 } from '../src/ipc/authentication';
 import { encodeFrame, readFrame } from '../src/ipc/framing';
-import { PRODUCTION_NETWORK_PATH } from '../src/ipc/network-host';
+import { PRODUCTION_ARTIFACT_PATH, PRODUCTION_NETWORK_PATH } from '../src/ipc/network-host';
 
 const execFileAsync = promisify(execFile);
 
@@ -124,6 +126,69 @@ export const callNetwork = async (
   });
   if (raw.status !== 200) throw new Error(`Production network host answered ${raw.status}.`);
   return verifiedResponse(JSON.parse(raw.text));
+};
+
+export const signedArtifactRequest = (
+  runId: string,
+  descriptor: { kind: string; path: string; sha256: string },
+  overrides: Partial<Omit<ArtifactIpcRequest, 'mac'>> = {},
+): ArtifactIpcRequest => {
+  const unsigned = {
+    protocolVersion: 1 as const,
+    requestId: randomUUID(),
+    timestampMs: Date.now(),
+    runId,
+    descriptor,
+    ...overrides,
+  };
+  return { ...unsigned, mac: signIpc(IPC_SECRET, artifactRequestSigningText(unsigned)) };
+};
+
+export type RetrievedBody = {
+  contentType: string;
+  bytes: Buffer;
+};
+
+/**
+ * The artifact route's client. It reads bytes rather than an envelope, so unlike
+ * {@link callNetwork} it cannot check a response MAC — the descriptor's digest is what
+ * authenticates these bytes, and the caller already holds it from a signed envelope.
+ */
+export const callArtifact = async (
+  port: number,
+  body: unknown,
+  options: { method?: string; path?: string } = {},
+): Promise<RetrievedBody> => {
+  const encoded = Buffer.from(JSON.stringify(body), 'utf8');
+  const raw = await new Promise<{ status: number; contentType: string; bytes: Buffer }>(
+    (resolveCall, rejectCall) => {
+      const call = httpRequest(
+        {
+          host: '127.0.0.1',
+          port,
+          method: options.method ?? 'POST',
+          path: options.path ?? PRODUCTION_ARTIFACT_PATH,
+          headers: { 'content-type': 'application/json', 'content-length': encoded.byteLength },
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () =>
+            resolveCall({
+              status: response.statusCode ?? 0,
+              contentType: String(response.headers['content-type'] ?? ''),
+              bytes: Buffer.concat(chunks),
+            }),
+          );
+          response.on('error', rejectCall);
+        },
+      );
+      call.on('error', rejectCall);
+      call.end(encoded);
+    },
+  );
+  if (raw.status !== 200) throw new Error(`Production artifact route answered ${raw.status}.`);
+  return { contentType: raw.contentType, bytes: raw.bytes };
 };
 
 export const compileTestLauncher = async (output: string): Promise<void> => {

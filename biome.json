@@ -8,7 +8,8 @@
       "**/.remotion",
       "packages/video/src/catalog/*.json",
       "packages/production/src/contracts/generated/*.json",
-      "services/agents/tests/fixtures/artifacts/*"
+      "services/agents/tests/fixtures/artifacts/*",
+      "services/agents/tests/fixtures/ipc-signing-vectors.json"
     ]
   },
   "formatter": {

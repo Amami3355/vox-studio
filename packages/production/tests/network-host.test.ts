@@ -1,13 +1,28 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProductionPayloadSurface } from '../src/commands/payload-surface';
 import type { CommandExecution } from '../src/commands/service';
-import { payloadRequestSigningText, signIpc } from '../src/ipc/authentication';
-import { type ProductionNetworkHost, createProductionNetworkHost } from '../src/ipc/network-host';
-import { type CommandFixture, createCommandFixture } from './command-fixture';
-import { IPC_SECRET, callNetwork, signedPayloadRequest } from './ipc-fixture';
+import {
+  artifactRequestSigningText,
+  payloadRequestSigningText,
+  signIpc,
+} from '../src/ipc/authentication';
+import {
+  type PayloadCommandExecutor,
+  type ProductionNetworkHost,
+  createProductionNetworkHost,
+} from '../src/ipc/network-host';
+import { type CommandFixture, VALID_PLAN, createCommandFixture } from './command-fixture';
+import {
+  IPC_SECRET,
+  callArtifact,
+  callNetwork,
+  signedArtifactRequest,
+  signedPayloadRequest,
+} from './ipc-fixture';
 import { REQUEST } from './run-fixture';
 
 let fixture: CommandFixture | null = null;
@@ -84,6 +99,138 @@ describe('the network host', () => {
       outcome: 'failed',
       error: { code: 'UNKNOWN_COMMAND' },
     });
+  });
+});
+
+/**
+ * Ticket 10 chose the third shape: the preview has no link, and the operator retrieves its bytes
+ * over the same tunnel that carried the Brief. This route is what carries them.
+ *
+ * **The response is not signed, and that is the decision rather than an omission.** These bytes
+ * are authenticated by the descriptor's digest, which the caller holds because a MAC'd envelope
+ * published it, and which the caller recomputes on arrival. A response MAC would authenticate the
+ * channel a second time and prove nothing about the bytes that the digest does not already prove.
+ */
+describe('the network host artifact route', () => {
+  const published = async (open: CommandFixture, port: number) => {
+    const init = await callNetwork(port, signedPayloadRequest('run.init', { payload: REQUEST }));
+    const runId = (JSON.parse(init.stdout) as { run: { id: string } }).run.id;
+    const validated = await callNetwork(
+      port,
+      signedPayloadRequest('run.validate', { runId, payload: VALID_PLAN }),
+    );
+    const artifacts = (
+      JSON.parse(validated.stdout) as {
+        artifacts: { kind: string; path: string; sha256: string }[];
+      }
+    ).artifacts;
+    const descriptor = artifacts.find((each) => each.kind === 'plan_snapshot');
+    if (!descriptor) throw new Error('validate published no plan snapshot.');
+    return { runId, descriptor };
+  };
+
+  it('answers a signed request with the artifact bytes, not an envelope carrying them', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+
+    const retrieved = await callArtifact(port, signedArtifactRequest(runId, descriptor));
+
+    expect(retrieved.contentType).toBe('application/octet-stream');
+    expect(createHash('sha256').update(retrieved.bytes).digest('hex')).toBe(descriptor.sha256);
+    expect(JSON.parse(retrieved.bytes.toString('utf8'))).toEqual(VALID_PLAN);
+  });
+
+  it('answers a surface refusal as JSON, so a caller tells absence from bytes by content type', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+
+    const missing = await callArtifact(
+      port,
+      signedArtifactRequest(runId, {
+        ...descriptor,
+        path: `inputs/plans/${'0'.repeat(64)}.json`,
+      }),
+    );
+
+    expect(missing.contentType).toBe('application/json');
+    expect(JSON.parse(missing.bytes.toString('utf8'))).toMatchObject({ code: 'ARTIFACT_MISSING' });
+  });
+
+  it('names an unknown Run and a descriptor that escapes, each with its own code', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+
+    const absent = await callArtifact(port, signedArtifactRequest('run-absent', descriptor));
+    const outside = await callArtifact(
+      port,
+      signedArtifactRequest(runId, { ...descriptor, path: '../../secrets.json' }),
+    );
+
+    expect(JSON.parse(absent.bytes.toString('utf8'))).toMatchObject({ code: 'UNKNOWN_RUN' });
+    expect(JSON.parse(outside.bytes.toString('utf8'))).toMatchObject({
+      code: 'ARTIFACT_OUTSIDE_RUN',
+    });
+  });
+
+  it('refuses a payload MAC replayed onto the artifact route', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+    const signed = signedArtifactRequest(runId, descriptor);
+    const foreign = {
+      ...signed,
+      mac: signIpc(
+        IPC_SECRET,
+        artifactRequestSigningText(signed).replace(
+          'VOX-IPC-ARTIFACT-REQUEST-1',
+          'VOX-IPC-PAYLOAD-REQUEST-1',
+        ),
+      ),
+    };
+
+    await expect(callArtifact(port, foreign)).rejects.toThrow();
+  });
+
+  it('refuses a bad MAC, a replay and a stale request, saying nothing about which', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+    const once = signedArtifactRequest(runId, descriptor);
+    await callArtifact(port, once);
+
+    const replayed = await callArtifact(port, once).catch((error: Error) => error);
+    await expect(
+      callArtifact(port, { ...signedArtifactRequest(runId, descriptor), mac: '0'.repeat(64) }),
+    ).rejects.toThrow();
+    await expect(
+      callArtifact(
+        port,
+        signedArtifactRequest(runId, descriptor, { timestampMs: Date.now() - 60_000 }),
+      ),
+    ).rejects.toThrow();
+
+    expect(replayed).toBeInstanceOf(Error);
+    expect((replayed as Error).message).not.toMatch(/IPC_|MAC|replay|skew/i);
+  });
+
+  it('shares one replay cache with the command route', async () => {
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(fixture, port);
+    const command = signedPayloadRequest('contract.index');
+    await callNetwork(port, command);
+
+    // The same request id, signed for the other route. The MAC is valid there, so only a
+    // shared cache refuses it — and two caches would let a captured id be spent twice.
+    await expect(
+      callArtifact(
+        port,
+        signedArtifactRequest(runId, descriptor, { requestId: command.requestId }),
+      ),
+    ).rejects.toThrow();
   });
 });
 
@@ -214,7 +361,12 @@ describe('the network host binding', () => {
 });
 
 describe('the network host idle timeout', () => {
-  const slowSurface = (delayMs: number): { execute: () => Promise<CommandExecution> } => ({
+  const slowSurface = (delayMs: number): PayloadCommandExecutor => ({
+    // The timeout is about the command route, and a stub that could serve an artifact would be
+    // claiming this test covers one.
+    fetchArtifact: async () => {
+      throw new Error('The idle-timeout stub serves no artifacts.');
+    },
     execute: async () => {
       await new Promise((wake) => setTimeout(wake, delayMs));
       return {

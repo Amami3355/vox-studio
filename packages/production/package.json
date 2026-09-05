@@ -22,6 +22,7 @@
     "verify:proof": "tsx scripts/verify-proof.ts",
     "sign:verdict": "tsx scripts/sign-verdict.ts",
     "record:crew-fixtures": "tsx scripts/record-crew-fixtures.ts",
+    "record:signing-vectors": "tsx scripts/record-signing-vectors.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,26 +1,29 @@
-"""The production client: one interface, payload-shaped, with a local implementation.
+"""What is true of the local client because it is the launcher's, and of no other client.
 
 These run a real subprocess against a stub launcher, so everything from the method call to the
 command line is under test. Only the service behind the pipe is replaced.
+
+**The expectations that are about the interface are not here.** They moved to
+`test_client_contract.py`, which runs them over every implementation, and what is left is the
+part a second client cannot satisfy and should not be asked to: the argv this one builds, the
+working directory it runs in, where it stages a payload on the caller's own disk, how it finds a
+Run directory it did not open, and the launcher diagnostic it preserves when stdout is not an
+envelope.
+
+The split is why a network client can be held to the same suite at all. A test that asserts an
+argv is not a stricter version of a test that asserts a plan crossed as an object — it is a
+different test, about a mechanism, and leaving the two mixed is what makes a second
+implementation arrive with a suite of its own.
 """
 
 from __future__ import annotations
 
-import hashlib
-import inspect
 import json
 from pathlib import Path
 
 import pytest
 from conftest import recorded
-from vox_crew.client import (
-    ArtifactCorrupted,
-    ArtifactMissing,
-    ArtifactOutsideRun,
-    ProductionClient,
-    UnknownRun,
-)
-from vox_crew.envelopes import ArtifactDescriptor, MalformedEnvelope
+from vox_crew.envelopes import MalformedEnvelope
 from vox_crew.local_client import LocalProductionClient
 
 RUN_ID = "0f6d4a3e-2c11-4c1a-9d7b-8a5f2e9c4d10"
@@ -44,36 +47,6 @@ def initialised(work_root: Path, launcher) -> tuple[LocalProductionClient, str]:
     directory = argv[argv.index("--out") + 1]
     client.stub.forget()
     return client, directory
-
-
-def test_the_interface_never_takes_or_returns_a_path() -> None:
-    """The defect this ticket names by name, caught structurally rather than by review.
-
-    A path on this interface would work locally and strand the crew in the cloud phase, where
-    the Run's disk is not the crew's disk. The local implementation is the only module allowed
-    to know a Run has a directory, so the interface it implements may not mention one.
-    """
-    forbidden = ("path", "root", "dir", "file", "cwd")
-    for name, method in inspect.getmembers(ProductionClient, inspect.isfunction):
-        if name.startswith("_"):
-            continue
-        signature = inspect.signature(method)
-        for parameter in signature.parameters.values():
-            if parameter.name == "self":
-                continue
-            assert not any(
-                word in parameter.name.lower() for word in forbidden
-            ), f"ProductionClient.{name} takes a path-shaped parameter {parameter.name!r}"
-            assert "Path" not in str(
-                parameter.annotation
-            ), f"ProductionClient.{name} annotates {parameter.name!r} as a path"
-        assert "Path" not in str(
-            signature.return_annotation
-        ), f"ProductionClient.{name} returns a path"
-
-
-def test_the_local_implementation_is_the_interface() -> None:
-    assert issubclass(LocalProductionClient, ProductionClient)
 
 
 def test_asks_for_the_contract_index_from_inside_the_work_root(work_root, launcher) -> None:
@@ -201,60 +174,6 @@ def test_finds_a_run_it_did_not_initialise(work_root, launcher) -> None:
     client.status(RUN_ID)
 
     assert client.stub.argvs[0] == ["production", "run", "status", "--run", "run-abandoned"]
-
-
-def test_refuses_a_run_id_it_cannot_place(work_root, launcher) -> None:
-    client = client_for(work_root, launcher, {"*": {"stdout": recorded(INITIALISED)}})
-    with pytest.raises(UnknownRun):
-        client.status("a-run-that-was-never-initialised")
-
-
-def test_retrieves_an_artifact_by_run_id_and_descriptor(work_root, launcher) -> None:
-    client, directory = initialised(work_root, launcher)
-    body = json.dumps({"ok": False, "errors": [{"means": "m", "repair": "r"}]}).encode("utf-8")
-    report = work_root / directory / "artifacts" / "validation" / ("3f" * 32)
-    report.mkdir(parents=True)
-    (report / "report.json").write_bytes(body)
-    descriptor = ArtifactDescriptor(
-        kind="validation_report",
-        path=f"artifacts/validation/{'3f' * 32}/report.json",
-        sha256=hashlib.sha256(body).hexdigest(),
-    )
-
-    artifact = client.fetch_artifact(RUN_ID, descriptor)
-
-    assert artifact.kind == "validation_report"
-    assert artifact.data == body
-    assert artifact.json()["errors"][0]["repair"] == "r"
-
-
-def test_refuses_an_artifact_whose_bytes_moved(work_root, launcher) -> None:
-    client, directory = initialised(work_root, launcher)
-    (work_root / directory / "artifacts").mkdir(parents=True)
-    (work_root / directory / "artifacts" / "report.json").write_bytes(b"different bytes")
-    descriptor = ArtifactDescriptor(
-        kind="validation_report", path="artifacts/report.json", sha256="0" * 64
-    )
-
-    with pytest.raises(ArtifactCorrupted):
-        client.fetch_artifact(RUN_ID, descriptor)
-
-
-def test_reports_a_missing_artifact_as_missing(work_root, launcher) -> None:
-    client, directory = initialised(work_root, launcher)
-    descriptor = ArtifactDescriptor(kind="preview", path="artifacts/absent.mp4", sha256="0" * 64)
-
-    with pytest.raises(ArtifactMissing):
-        client.fetch_artifact(RUN_ID, descriptor)
-
-
-def test_refuses_to_read_outside_the_run_it_was_given(work_root, launcher) -> None:
-    """The descriptor comes from an envelope, but the client does not take that on trust."""
-    client, directory = initialised(work_root, launcher)
-    descriptor = ArtifactDescriptor(kind="brief", path="../request.json", sha256="0" * 64)
-
-    with pytest.raises(ArtifactOutsideRun):
-        client.fetch_artifact(RUN_ID, descriptor)
 
 
 def test_says_so_when_production_writes_something_that_is_not_an_envelope(

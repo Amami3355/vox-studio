@@ -3,16 +3,38 @@ import type { AddressInfo } from 'node:net';
 import type { ProductionPayloadSurface } from '../commands/payload-surface';
 import type { CommandId } from '../contracts/schemas';
 import {
+  type ArtifactIpcRequest,
   MAX_IPC_FRAME_BYTES,
   type PayloadIpcRequest,
+  artifactRequestSchema,
+  artifactRequestSigningText,
   payloadRequestSchema,
   payloadRequestSigningText,
 } from './authentication';
-import { type ProductionBoundaryAudit, createProductionBoundary } from './boundary';
+import {
+  type ProductionBoundaryAudit,
+  createBoundaryAuthenticator,
+  createProductionBoundary,
+} from './boundary';
 import { DEFAULT_IPC_SOCKET_TIMEOUT_MS } from './socket-timeout';
 
-/** The one route this host serves. A request anywhere else is closed, not answered. */
+/** Commands: a payload in, a signed envelope back. A request anywhere else is closed. */
 export const PRODUCTION_NETWORK_PATH = '/command';
+
+/**
+ * Artifacts: a Run id and a published descriptor in, the bytes back.
+ *
+ * **A second route, not a second host.** ADR-0018 decision 7 pins the one entry point authorised
+ * to construct this host, and that is unchanged — `cloud-host.ts` is still the only name on the
+ * allowlist. What this adds is the read-back direction of the crew's contract, which
+ * `ProductionPayloadSurface.fetchArtifact` has always implemented and no transport ever carried.
+ *
+ * It is a POST under the same HMAC as `/command`, through the same authenticator and therefore
+ * the same replay cache. It grants a browser nothing: a browser cannot sign a body, and this
+ * route asks for a signature exactly as the other one does. Ticket 10 records why the shape that
+ * *would* have admitted one — a signed link on a GET — was not taken.
+ */
+export const PRODUCTION_ARTIFACT_PATH = '/artifact';
 
 /**
  * The addresses this host will bind. `0.0.0.0` is not among them: the firewall is the outer
@@ -27,8 +49,8 @@ export const PRODUCTION_NETWORK_PATH = '/command';
  */
 const LOOPBACK = new Set(['127.0.0.1', '::1']);
 
-/** Only the method the surface needs, so a test can drive the host with a stub. */
-export type PayloadCommandExecutor = Pick<ProductionPayloadSurface, 'execute'>;
+/** Only the methods the host needs, so a test can drive it with a stub. */
+export type PayloadCommandExecutor = Pick<ProductionPayloadSurface, 'execute' | 'fetchArtifact'>;
 
 export type ProductionNetworkHost = {
   /** Resolves with the bound port, which is the one the caller asked for unless it was 0. */
@@ -77,11 +99,14 @@ export const createProductionNetworkHost = ({
   if (!LOOPBACK.has(bindAddress)) {
     throw new TypeError('The Production network host binds loopback only.');
   }
+  // One authenticator for both routes, so they share one replay cache. See `boundary.ts`.
+  const authenticator = createBoundaryAuthenticator({ secret, now, maxClockSkewMs });
   const boundary = createProductionBoundary<PayloadIpcRequest>({
     secret,
     now,
     maxClockSkewMs,
     audit,
+    authenticator,
     parse: (input) => payloadRequestSchema.parse(input),
     signingText: payloadRequestSigningText,
     dispatch: async (request) => {
@@ -131,11 +156,55 @@ export const createProductionNetworkHost = ({
       });
     });
 
+  /**
+   * The artifact route's answer. Bytes on success and a refusal object on a surface error, told
+   * apart by content type rather than by status code — this host answers 200 or it answers
+   * nothing, because a status code is a reason and the boundary publishes no reasons.
+   *
+   * **A surface refusal is not a boundary refusal and is not hidden.** `ARTIFACT_MISSING` and its
+   * siblings are what the command route already puts in an envelope for a caller to read; the
+   * boundary's silence covers a bad MAC, a replay and a stale request, and those still close the
+   * socket below.
+   *
+   * **The response carries no MAC.** The descriptor's digest authenticates these bytes: the
+   * caller holds it because a signed envelope published it, and recomputes it on arrival. A
+   * response MAC would attest the channel a second time and say nothing about the bytes that the
+   * digest does not already say.
+   */
+  const serveArtifact = async (input: unknown, response: ServerResponse): Promise<void> => {
+    const request = authenticator.authenticate<ArtifactIpcRequest>(
+      input,
+      (candidate) => artifactRequestSchema.parse(candidate),
+      artifactRequestSigningText,
+    );
+    let body: Buffer;
+    let contentType: string;
+    try {
+      const retrieved = await surface.fetchArtifact(request.runId, request.descriptor);
+      body = Buffer.from(retrieved.bytes);
+      contentType = 'application/octet-stream';
+    } catch (error) {
+      const code =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : 'ARTIFACT_UNAVAILABLE';
+      // The message is the surface's own and has been through no sanitiser, so it is dropped
+      // rather than forwarded: `payload-surface.ts` writes host paths into some of them.
+      body = Buffer.from(JSON.stringify({ code }), 'utf8');
+      contentType = 'application/json';
+    }
+    response.writeHead(200, { 'content-type': contentType, 'content-length': body.byteLength });
+    response.end(body);
+  };
+
   const handle = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
-      if (request.method !== 'POST' || request.url !== PRODUCTION_NETWORK_PATH) {
-        throw new Error('IPC_ROUTE_UNKNOWN');
+      if (request.method !== 'POST') throw new Error('IPC_ROUTE_UNKNOWN');
+      if (request.url === PRODUCTION_ARTIFACT_PATH) {
+        await serveArtifact(await readBody(request), response);
+        return;
       }
+      if (request.url !== PRODUCTION_NETWORK_PATH) throw new Error('IPC_ROUTE_UNKNOWN');
       const signed = await boundary.handle(await readBody(request));
       const body = Buffer.from(JSON.stringify(signed), 'utf8');
       response.writeHead(200, {
