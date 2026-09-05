@@ -55,6 +55,16 @@ _ADMITTED: set[tuple[str, int]] = set()
 """Endpoints a test started itself, and may therefore talk to. See `admit_endpoint`."""
 
 
+def admitted_endpoints() -> frozenset[tuple[str, int]]:
+    """What the sentinel is currently open for, for the test that asserts it closes again.
+
+    A copy, and a function rather than the set itself: the hole in a network sentinel is worth
+    reading through a name that says it is being read, and worth being unable to widen from a
+    test that only meant to look at it.
+    """
+    return frozenset(_ADMITTED)
+
+
 def _admitted(address: Any) -> bool:
     if not isinstance(address, tuple) or len(address) < 2:
         return False

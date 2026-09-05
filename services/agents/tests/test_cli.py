@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 from conftest import recorded, recorded_bytes
+from stub_service import SECRET, StubProductionService
 from test_complete_run import (
     PLAN,
     VALIDATION_REPORT,
@@ -28,6 +29,7 @@ from test_complete_run import (
 from test_teaching_surface import CATEGORIES, StubClient, projection
 from vox_crew import cli
 from vox_crew.evidence import ASSERTIONS, COMMANDS, PASS, TRANSCRIPT, read_bundle, verify
+from vox_crew.http_client import KEY_VARIABLE
 from vox_crew.planner import AdkPlanAuthor, HandedPlanAuthor
 
 EXPECTED = recorded("contract-index.stdout") + "".join(projection(name) for name in CATEGORIES)
@@ -430,3 +432,122 @@ def test_choosing_a_model_for_a_handed_plan_is_refused(work_root) -> None:
         cli.parse_arguments(
             ["--work-root", str(work_root), "--plan", "plan.json", "--model", "gemini-3.6-pro"]
         )
+
+
+# --- Which client the command builds -------------------------------------------------------
+#
+# The command builds its own client, which is why the tests above drive it through a stub
+# launcher rather than a stub client. That is also why this section exists at all: an
+# invocation had no way to ask for the network client, so `HttpProductionClient` was reachable
+# only by injection from a test — implemented, tested, and constructed by nothing that ships.
+
+
+def test_no_service_address_means_the_launcher_on_this_machine(work_root) -> None:
+    arguments = cli.parse_arguments(["--work-root", str(work_root)])
+
+    assert arguments.service_address is None
+
+
+def test_a_service_address_and_a_launcher_name_two_different_clients(work_root) -> None:
+    """A launcher is the local client's whole mechanism, and the network client has none.
+
+    Resolved by precedence rather than refused, an invocation handing both would spawn a
+    launcher and produce its Run on the operator's disk after being told to reach a service
+    that exists so the Run does not land there.
+    """
+    with pytest.raises(SystemExit):
+        cli.parse_arguments(
+            [
+                "--work-root",
+                str(work_root),
+                "--service-address",
+                "127.0.0.1:8080",
+                "--launcher",
+                "python",
+            ]
+        )
+
+
+def test_a_service_address_reaches_production_over_a_socket_and_spawns_nothing(
+    work_root, admit_endpoint, monkeypatch, capsys
+) -> None:
+    """The command as ticket 09's Run invokes it: an address, a key in the environment, no launcher.
+
+    This is the first test in the suite where the *command* holds the network client rather
+    than a test handing one to a seam. It is deliberately the whole path — argv to socket —
+    because the gap it closes was not in any client's behaviour: both halves were correct and
+    nothing constructed the network one.
+
+    Discovery is the command that can be driven end-to-end for free. It opens no Run, reaches
+    no model and writes nothing, so what it proves is exactly the seam under test: that argv
+    reaches a socket at all.
+    """
+    stub = StubProductionService(StubClient(recorded("contract-index.stdout")))
+    port = stub.start()
+    admit_endpoint("127.0.0.1", port)
+    monkeypatch.setenv(KEY_VARIABLE, SECRET)
+    try:
+        exit_code = cli.main(
+            [
+                "--work-root",
+                str(work_root),
+                "--service-address",
+                f"127.0.0.1:{port}",
+                "--discovery-only",
+            ],
+            client=None,
+        )
+    finally:
+        stub.stop()
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == EXPECTED
+    # The work root carries a bootstrapped `vox.exe`, so its presence says nothing about what
+    # ran. What says it is the service: every command the convergence asked for arrived here,
+    # over the socket, which is a place a spawned launcher's answers could not have come from.
+    assert [request["command"] for request in stub.requests] == [
+        "contract.index",
+        *(["contract.show"] * len(CATEGORIES)),
+    ]
+
+
+def test_the_signing_key_is_never_a_flag(work_root) -> None:
+    """A key in argv is a key in the process table, and in the shell history that launched it.
+
+    The client reads it per request from the environment; nothing here is allowed to offer a
+    more convenient way to supply it.
+    """
+    with pytest.raises(SystemExit):
+        cli.parse_arguments(
+            ["--work-root", str(work_root), "--service-address", "127.0.0.1:8080", "--key", SECRET]
+        )
+
+
+def test_the_command_builds_the_network_client_from_the_address_it_was_given(
+    work_root, monkeypatch
+) -> None:
+    """The address reaches the client's constructor unaltered, and no launcher is built.
+
+    The end-to-end test above proves the socket; this one names what would break silently if
+    the two clients were ever selected the other way round.
+    """
+    built: list[str] = []
+
+    def record(address: str, **options: Any) -> Any:
+        built.append(address)
+        return StubClient(recorded("contract-index.stdout"))
+
+    monkeypatch.setattr(cli, "HttpProductionClient", record)
+    monkeypatch.setattr(
+        cli,
+        "LocalProductionClient",
+        lambda *args, **kwargs: pytest.fail("A service address must not spawn a launcher."),
+    )
+
+    exit_code = cli.main(
+        ["--work-root", str(work_root), "--service-address", "vox.internal:9443", "--discovery-only"],
+        client=None,
+    )
+
+    assert exit_code == 0
+    assert built == ["vox.internal:9443"]

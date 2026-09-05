@@ -55,19 +55,39 @@ assertion reads.
 ## How it is put together
 
 **`client.py` is the deployment seam** (ADR-0015), not the transport. One interface, two
-implementations — the local one here, an HTTP one when production moves to Cloud Run — and no
-tool, agent instruction or test may branch on which is active. Its methods are payload-shaped
-in both directions: a Run is named by its id, inputs the command surface takes as files arrive
-as objects, and artifacts come back through `fetch_artifact`, which takes a Run id and the
+implementations — `local_client.py` here and `http_client.py` beside it — and no tool, agent
+instruction or test may branch on which is active. Its methods are payload-shaped in both
+directions: a Run is named by its id, inputs the command surface takes as files arrive as
+objects, and artifacts come back through `fetch_artifact`, which takes a Run id and the
 descriptor an envelope published. A method that took or returned a path would work locally and
-strand the crew at deployment, which is why `tests/test_local_client.py` asserts against one
-structurally rather than leaving it to review.
+strand the crew at deployment, which is why `tests/test_client_contract.py` asserts against one
+structurally rather than leaving it to review — in the suite that runs over every
+implementation, so the assertion cannot be true of one client and unexamined on another.
 
 **`local_client.py` is the only module that knows where production put a Run.** It runs
 `vox.exe` with its working directory set to the work root, one subprocess per command, over the
 authenticated named pipe ADR-0007 requires of the local topology — which ADR-0018 keeps as the
-local transport permanently, alongside a network sibling for remote deployments. Payloads are staged where the work root keeps its
-invariant of growing nothing but its Run directories.
+local transport permanently, alongside a network sibling for remote deployments. Payloads are
+staged where the work root keeps its invariant of growing nothing but its Run directories.
+
+**`http_client.py` is that sibling, and it knows no disk at all.** It holds an address rather
+than a work root, opens no file and spawns nothing: one signed request per command over the
+second transport, reached through an SSH tunnel to a service with no public ingress. The signing
+key is read from `VOX_NETWORK_TOKEN` per request rather than held in a field, and a response
+whose MAC does not verify is refused rather than parsed — the tunnel says who may connect, the
+MAC says who produced the bytes, and ADR-0018 forbids letting one answer stand for both. An
+artifact's bytes are the one thing it does not check a MAC on: they are authenticated by the
+descriptor's digest, recomputed on arrival.
+
+**`wire.py` is the signing rule, written a second time.** The service defines it in TypeScript
+and there is no way for the crew to share that code, so neither copy is checked against the
+other: both assert against `tests/fixtures/ipc-signing-vectors.json`, which is recorded from the
+TypeScript definition. Two implementations written by one hand agree about a mistake perfectly,
+and this repository has already had a measurement agree with itself and be wrong.
+
+`vox-crew --service-address HOST:PORT` is how an invocation asks for the network client. It
+takes no key: a key in argv is a key in the process table, so it is read from the environment.
+A launcher named alongside an address is refused rather than resolved by precedence.
 
 `evidence.py` is the one other module that opens a file, and the distinction is the one
 ADR-0015 turns on rather than an exception to it. It never learns a Run's disk — every artifact

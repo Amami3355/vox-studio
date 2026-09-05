@@ -138,11 +138,7 @@ class HttpProductionClient(ProductionClient):
         return self._command("run.decline", run_id=run_id, payload=dict(decision))
 
     def fetch_artifact(self, run_id: str, artifact: ArtifactDescriptor) -> Artifact:
-        descriptor = {
-            "kind": artifact.kind,
-            "path": artifact.path,
-            "sha256": artifact.sha256,
-        }
+        descriptor = artifact.as_wire()
         request_id = str(uuid4())
         timestamp_ms = self._now_ms()
         body = {

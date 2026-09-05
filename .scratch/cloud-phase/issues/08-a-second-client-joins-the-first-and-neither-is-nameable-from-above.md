@@ -207,3 +207,38 @@ Six things the ticks above do not say.
 start the TypeScript service — the two halves are separate projects on purpose — so the client's
 half is proved here and the host's half by `network-host.test.ts`. **The two have never spoken to
 each other**, and the first time they do will be ticket 09's Run.
+
+## What the review found, 2026-09-05
+
+`mattpocock-skills:code-review` over `f87c1b6..c5a3922`, both axes. Twelve findings; the list and
+what was done about each is in the commit that follows this edit. Three are worth keeping here
+because they change what a later ticket can assume.
+
+- **The client this ticket shipped had no caller, which is the same shape one paragraph above.**
+  `cli.py` constructed `LocalProductionClient` unconditionally, `parse_arguments` had no address
+  flag, and `__init__.py` exported only the local client — so `HttpProductionClient` was reachable
+  by test injection and by nothing that ships. **Ticket 09's Run could not have been driven from
+  the command line at all.** The fix is `--service-address`, which takes no key: the key stays in
+  `VOX_NETWORK_TOKEN`, read per request, because a key in argv is a key in the process table. A
+  launcher named alongside an address is refused rather than resolved by precedence, since
+  resolving it would spawn a launcher and land the Run on the operator's disk — the one property
+  this phase exists to move off it.
+
+  The shape to carry: **a method that is implemented, tested and never routed reads as done from
+  every angle except the one that matters — and so does a class that is implemented, tested and
+  never constructed.** This ticket found the first and shipped the second in the same commit.
+- **The two canonicalisers disagreed about numbers and about member order.** `json.dumps(54.0)` is
+  `54.0` where `JSON.stringify` gives `54`, and Python's `sorted()` orders keys by code point
+  where JCS orders them by UTF-16 code unit. Either would have arrived as a socket closing with no
+  reason attached, on a plan carrying a calibration point or a Brief carrying an emoji. **The
+  recorded vector — the whole argument for why two hand-written implementations cannot agree about
+  a mistake — had no float case and no supplementary character.** A fifth vector now carries both,
+  and the existing four are byte-identical, so this is an addition and not a protocol change.
+- **The artifact route runs no audit hook.** Ticket 06 calls `boundary.ts` the shared sequence
+  through to audit and sanitise; `serveArtifact` takes parse, skew, replay and HMAC and then
+  answers for itself. `ProductionNetworkHostAudit` is typed to a `PayloadIpcRequest`, so a
+  retrieval is unauditable by construction. **Not fixed, deliberately:** nothing passes an audit
+  to this host — `cloud-host.ts` constructs it without one — so widening the type now would build
+  a mechanism with no caller, which is the failure this whole section is about. **It is owed
+  before anything starts auditing**, and a session that wires up an auditor and does not notice
+  this will get a silent hole rather than a compile error.

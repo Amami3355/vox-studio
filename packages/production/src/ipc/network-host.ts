@@ -50,7 +50,7 @@ export const PRODUCTION_ARTIFACT_PATH = '/artifact';
 const LOOPBACK = new Set(['127.0.0.1', '::1']);
 
 /** Only the methods the host needs, so a test can drive it with a stub. */
-export type PayloadCommandExecutor = Pick<ProductionPayloadSurface, 'execute' | 'fetchArtifact'>;
+export type ServedPayloadSurface = Pick<ProductionPayloadSurface, 'execute' | 'fetchArtifact'>;
 
 export type ProductionNetworkHost = {
   /** Resolves with the bound port, which is the one the caller asked for unless it was 0. */
@@ -90,7 +90,7 @@ export const createProductionNetworkHost = ({
   port: number;
   bindAddress?: string;
   secret: string | Uint8Array;
-  surface: PayloadCommandExecutor;
+  surface: ServedPayloadSurface;
   now?: () => number;
   maxClockSkewMs?: number;
   socketTimeoutMs?: number;
@@ -103,8 +103,8 @@ export const createProductionNetworkHost = ({
   const authenticator = createBoundaryAuthenticator({ secret, now, maxClockSkewMs });
   const boundary = createProductionBoundary<PayloadIpcRequest>({
     secret,
-    now,
-    maxClockSkewMs,
+    // No `now` and no `maxClockSkewMs`: they configure an authenticator and this boundary was
+    // handed one. Passing them here would have been ignored, and read as the skew it enforces.
     audit,
     authenticator,
     parse: (input) => payloadRequestSchema.parse(input),
@@ -170,6 +170,16 @@ export const createProductionNetworkHost = ({
    * caller holds it because a signed envelope published it, and recomputes it on arrival. A
    * response MAC would attest the channel a second time and say nothing about the bytes that the
    * digest does not already say.
+   *
+   * **This route runs no audit hook, and that is a gap rather than a decision.** Ticket 06 calls
+   * `boundary.ts` the shared sequence — parse, skew, replay, HMAC, audit, sanitise, sign — and
+   * this path takes the first four and then answers for itself, so a retrieval cannot be audited
+   * at all: `ProductionNetworkHostAudit` is typed to a `PayloadIpcRequest` and an artifact
+   * request is not one. What keeps it from mattering today is that nothing passes an audit here
+   * — `cloud-host.ts` constructs this host without one — so no observer is losing records it
+   * used to get. Widening the audit type before there is an auditor would be building a
+   * mechanism with no caller, which is the failure this route was added to fix. Recorded in
+   * ticket 08 rather than fixed here, and it is owed before anything starts auditing.
    */
   const serveArtifact = async (input: unknown, response: ServerResponse): Promise<void> => {
     const request = authenticator.authenticate<ArtifactIpcRequest>(

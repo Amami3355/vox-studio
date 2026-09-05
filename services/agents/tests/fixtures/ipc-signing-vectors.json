@@ -41,6 +41,30 @@
       "mac": "6c31b0fc3d8fbad44fc132e9774f51c6af5ea6c2fb0a1dea8235163a7340539c"
     },
     {
+      "name": "payload request carrying numbers and members JSON cannot order for you",
+      "kind": "payload",
+      "request": {
+        "protocolVersion": 1,
+        "requestId": "7d6c5b4a-3928-4170-8e6d-5c4b3a291807",
+        "timestampMs": 1757030400003,
+        "command": "run.validate",
+        "runId": "run-vector-02",
+        "payload": {
+          "😀": "a supplementary character, which sorts on its lead surrogate",
+          "�": "a BMP character above every lead surrogate",
+          "pointMsPerUnit": 54,
+          "uncertaintyMargin": 0.12,
+          "beatCount": 9007199254740991
+        }
+      },
+      "signingText": "VOX-IPC-PAYLOAD-REQUEST-1\n36:7d6c5b4a-3928-4170-8e6d-5c4b3a291807\n13:1757030400003\n12:run.validate\n13:run-vector-02\n196:{\"beatCount\":9007199254740991,\"pointMsPerUnit\":54,\"uncertaintyMargin\":0.12,\"😀\":\"a supplementary character, which sorts on its lead surrogate\",\"�\":\"a BMP character above every lead surrogate\"}",
+      "floatFields": [
+        "pointMsPerUnit",
+        "uncertaintyMargin"
+      ],
+      "mac": "33205a05aef637f59d5ef3676930dcbf6fcf4a89fb47a04ba19949e5a47fd11e"
+    },
+    {
       "name": "artifact request for a published descriptor",
       "kind": "artifact",
       "request": {

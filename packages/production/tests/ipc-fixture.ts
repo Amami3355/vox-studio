@@ -5,6 +5,7 @@ import { createConnection } from 'node:net';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
+  type ArtifactDescriptorWire,
   type ArtifactIpcRequest,
   type IpcRequest,
   type IpcResponse,
@@ -130,7 +131,7 @@ export const callNetwork = async (
 
 export const signedArtifactRequest = (
   runId: string,
-  descriptor: { kind: string; path: string; sha256: string },
+  descriptor: ArtifactDescriptorWire,
   overrides: Partial<Omit<ArtifactIpcRequest, 'mac'>> = {},
 ): ArtifactIpcRequest => {
   const unsigned = {

@@ -41,6 +41,7 @@ from .context import RESIDENT_CHARS_ALLOWED, ContextBudgetExceeded, tokens
 from .converge import RENDERED, converge
 from .envelopes import MalformedEnvelope, ResultEnvelope
 from .evidence import BundleInvalid, EvidenceLeaked, assemble, write_bundle
+from .http_client import KEY_VARIABLE, HttpProductionClient
 from .local_client import DEFAULT_LAUNCHER, LocalProductionClient
 from .planner import (
     AdkPlanAuthor,
@@ -65,6 +66,7 @@ class Arguments:
     evidence: Path
     discovery_only: bool
     model: str | None
+    service_address: str | None
 
     @property
     def request(self) -> Path:
@@ -125,6 +127,18 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
             "is the launcher in the work root."
         ),
     )
+    parser.add_argument(
+        "--service-address",
+        default=None,
+        metavar="HOST:PORT",
+        help=(
+            "Reach production over the network at this address instead of spawning a launcher "
+            "on this machine. The address is a forwarded local port and the signing key is "
+            f"read from {KEY_VARIABLE} at each request, never from a flag: a key in argv is a "
+            "key in the process table. The Brief is still read from the work root, and the "
+            "evidence bundle is still written there."
+        ),
+    )
     parsed = parser.parse_args(argv)
     # A handed plan never reaches a model, so a model named alongside one is a
     # misunderstanding of which author the invocation is asking for. Accepting it silently
@@ -137,6 +151,13 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
     # name is unstable but it still names one model, which is what a bundle records.
     if parsed.model is not None and "latest" in parsed.model:
         parser.error("--model needs a pinned name; an alias cannot tell a bundle what authored a plan.")
+    # A launcher is the local client's whole mechanism and the network client has none, so an
+    # invocation naming both is asking for two different clients. Refused rather than resolved
+    # by precedence: a run that silently spawned a launcher after being handed an address would
+    # produce its Run on the operator's disk, which is the one property this phase exists to
+    # move off it.
+    if parsed.service_address is not None and parsed.launcher is not None:
+        parser.error("--launcher names a client --service-address does not reach.")
     work_root = parsed.work_root
     return Arguments(
         work_root=work_root,
@@ -145,6 +166,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
         evidence=work_root / parsed.evidence,
         discovery_only=parsed.discovery_only,
         model=parsed.model,
+        service_address=parsed.service_address,
     )
 
 
@@ -183,10 +205,19 @@ def _verbatim(stream: IO[str]) -> IO[str]:
 
 
 def _missing(arguments: Arguments, client: ProductionClient | None) -> str | None:
-    """What the invocation names and the disk does not have, before anything is spawned."""
+    """What the invocation names and the disk does not have, before anything is spawned.
+
+    The work root is needed for both clients and for different reasons. The local client is
+    launched out of it; the network client never opens it, but the Brief is still read from it
+    and the evidence bundle is still written into it — which is what ticket 09 means by the
+    crew staying local. So what a network invocation needs is a directory carrying a Brief,
+    and not a bootstrapped one: there is no launcher in that path to bootstrap.
+    """
     if client is None and not arguments.work_root.is_dir():
         return f"no work root at {arguments.work_root}"
     if not arguments.discovery_only and not arguments.request.is_file():
+        if arguments.service_address is not None:
+            return f"no {REQUEST} in {arguments.work_root}: there is no Brief to submit"
         return f"no {REQUEST} in {arguments.work_root}: it is not a bootstrapped work root"
     if arguments.plan is not None and not arguments.plan.is_file():
         return f"no plan at {arguments.plan}"
@@ -232,7 +263,11 @@ def main(
         return 2
 
     if client is None:
-        client = LocalProductionClient(arguments.work_root, launcher_command=arguments.launcher)
+        client = (
+            HttpProductionClient(arguments.service_address)
+            if arguments.service_address is not None
+            else LocalProductionClient(arguments.work_root, launcher_command=arguments.launcher)
+        )
 
     def show(envelope: ResultEnvelope) -> None:
         out.write(envelope.raw)

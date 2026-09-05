@@ -52,19 +52,50 @@ export type ProductionBoundary<TRequest extends BoundaryRequest> = {
   handle: (input: unknown) => Promise<IpcResponse>;
 };
 
+/**
+ * How the boundary admits a request: by building its own authenticator, or by being handed one.
+ *
+ * These are separate members rather than optional fields on one object because `now` and
+ * `maxClockSkewMs` configure an authenticator, and a boundary that was handed one has nothing
+ * left to configure. As a single shape they could be passed together, silently ignored, and read
+ * back by a reviewer as the skew this boundary enforces — which it would not be.
+ */
+type BoundaryAdmission =
+  | {
+      /** The clock and the window the boundary's own authenticator is built with. */
+      now?: () => number;
+      maxClockSkewMs?: number;
+      authenticator?: never;
+    }
+  | {
+      /**
+       * The authenticator to admit requests through. Supplied when a host serves more than one
+       * request shape and they must share one replay cache; omitted, this boundary builds its
+       * own. The clock and the window belong to whoever built it.
+       */
+      authenticator: BoundaryAuthenticator;
+      now?: never;
+      maxClockSkewMs?: never;
+    };
+
 export type ProductionBoundaryOptions<TRequest extends BoundaryRequest> = {
   secret: string | Uint8Array;
   parse: (input: unknown) => TRequest;
   signingText: (request: Omit<TRequest, 'mac'>) => string;
   dispatch: (request: TRequest) => Promise<DispatchResult>;
-  now?: () => number;
-  maxClockSkewMs?: number;
   audit?: ProductionBoundaryAudit<TRequest>;
-  /**
-   * The authenticator to admit requests through. Supplied when a host serves more than one
-   * request shape and they must share one replay cache; omitted, this boundary builds its own.
-   */
-  authenticator?: BoundaryAuthenticator;
+} & BoundaryAdmission;
+
+/**
+ * The one rule about the secret itself, in one place because two things now hold it.
+ *
+ * A boundary signs its responses with this secret whether or not it built the authenticator that
+ * verifies requests with it. Left inside `createBoundaryAuthenticator`, the check was skipped
+ * exactly when a caller supplied its own — so the shortest secret in the system would still have
+ * signed every response, and the guard would have read as covering both directions.
+ */
+const assertUsableSecret = (secret: string | Uint8Array): void => {
+  if (Buffer.byteLength(secret) < 32) throw new TypeError('Production IPC secret is too short.');
 };
 
 /**
@@ -91,7 +122,7 @@ export const createBoundaryAuthenticator = ({
   now?: () => number;
   maxClockSkewMs?: number;
 }): BoundaryAuthenticator => {
-  if (Buffer.byteLength(secret) < 32) throw new TypeError('Production IPC secret is too short.');
+  assertUsableSecret(secret);
   const seen = new Map<string, number>();
 
   return {
@@ -155,10 +186,11 @@ const publicFailure = (): DispatchResult => ({
  * `Map`, so one container is one cache: a request captured inside the skew window and replayed
  * against a *second* instance of this service would be accepted, because that instance has never
  * seen the id. Within one process the cache is shared across every request shape a host serves,
- * which is why {@link createBoundaryAuthenticator} is separable at all. This is a real weakening relative to the local topology, where one machine ran one
- * host. It is mitigated for this phase by running exactly one instance and by a short skew
- * window — a shared cache is a later ticket, and inventing one under a deadline is the wrong
- * shape. A reader adding a second instance is changing this property and should say so.
+ * which is why {@link createBoundaryAuthenticator} is separable at all. This is a real weakening
+ * relative to the local topology, where one machine ran one host. It is mitigated for this phase
+ * by running exactly one instance and by a short skew window — a shared cache is a later ticket,
+ * and inventing one under a deadline is the wrong shape. A reader adding a second instance is
+ * changing this property and should say so.
  */
 export const createProductionBoundary = <TRequest extends BoundaryRequest>({
   secret,
@@ -170,6 +202,8 @@ export const createProductionBoundary = <TRequest extends BoundaryRequest>({
   audit,
   authenticator,
 }: ProductionBoundaryOptions<TRequest>): ProductionBoundary<TRequest> => {
+  // Unconditionally, because this boundary signs responses with it either way.
+  assertUsableSecret(secret);
   const admit = authenticator ?? createBoundaryAuthenticator({ secret, now, maxClockSkewMs });
 
   return {

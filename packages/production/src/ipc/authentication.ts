@@ -73,6 +73,13 @@ export const artifactRequestSchema = z
 export type IpcRequest = z.infer<typeof ipcRequestSchema>;
 export type PayloadIpcRequest = z.infer<typeof payloadRequestSchema>;
 export type ArtifactIpcRequest = z.infer<typeof artifactRequestSchema>;
+/**
+ * The descriptor as it travels, named once so callers stop re-declaring the three strings.
+ *
+ * Derived from the schema rather than written beside it: a fourth field added to the request
+ * would otherwise leave every hand-written copy of this shape compiling and wrong.
+ */
+export type ArtifactDescriptorWire = ArtifactIpcRequest['descriptor'];
 export type IpcResponse = z.infer<typeof ipcResponseSchema>;
 
 const field = (value: string): string => `${Buffer.byteLength(value, 'utf8')}:${value}`;

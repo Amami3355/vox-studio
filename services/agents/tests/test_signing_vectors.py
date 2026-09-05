@@ -34,6 +34,23 @@ VECTORS = json.loads(
 CASES = VECTORS["cases"]
 
 
+def payload_of(case: dict) -> dict | None:
+    """The case's payload, with the members JSON could not say were floats restored as floats.
+
+    JSON has one number type, so a recording cannot tell `54` from `54.0` — and `54.0` is the
+    whole of the case: `json.dumps` writes it back as `54.0` where the other side writes `54`.
+    Reading the recording naively would hand this side an `int`, take the integer path, and pass
+    while proving nothing about the shape the vector exists for.
+    """
+    payload = case["request"]["payload"]
+    if payload is None:
+        return None
+    return {
+        key: float(value) if key in case.get("floatFields", []) else value
+        for key, value in payload.items()
+    }
+
+
 def signing_text_for(case: dict) -> str:
     request = case["request"]
     if case["kind"] == "payload":
@@ -42,7 +59,7 @@ def signing_text_for(case: dict) -> str:
             timestamp_ms=request["timestampMs"],
             command=request["command"],
             run_id=request["runId"],
-            payload=request["payload"],
+            payload=payload_of(case),
         )
     if case["kind"] == "artifact":
         return artifact_request_signing_text(
@@ -66,8 +83,25 @@ def test_the_recording_carries_a_case_for_each_shape_a_caller_signs() -> None:
         "artifact",
         "payload",
         "payload",
+        "payload",
         "response",
     ]
+
+
+def test_the_float_case_is_still_a_float_after_the_recording_round_trip() -> None:
+    """The guard on the guard: if this reads back as an `int`, the case below proves nothing.
+
+    `payload_of` exists because JSON cannot carry the difference, and a recording regenerated
+    without `floatFields` would silently take the integer path — green, and testing the one
+    thing it was written to catch not at all.
+    """
+    case = next(case for case in CASES if case.get("floatFields"))
+    payload = payload_of(case)
+
+    assert payload is not None
+    for name in case["floatFields"]:
+        assert isinstance(payload[name], float), f"{name} is not a float in the vector"
+    assert payload["pointMsPerUnit"] == 54.0
     assert len(VECTORS["secret"]) >= 32
 
 

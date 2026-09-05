@@ -35,6 +35,11 @@ import { CREW_FIXTURE_DIRECTORY } from './crew-fixture-directory';
  * - a request naming no Run and carrying no payload, because both become `0:` and a
  *   reimplementation that omits the fields instead produces a shorter text that still looks
  *   plausible;
+ * - a payload carrying an integral number and two keys either side of U+E000, because
+ *   `JSON.stringify` does numbers and member order for free here and the other side does not:
+ *   Python writes `54.0` where this writes `54`, and orders keys by code point where JCS orders
+ *   them by UTF-16 code unit. Both are invisible until a plan carries a calibration point or a
+ *   Brief carries an emoji, and both arrive as a dropped socket with no reason;
  * - an artifact request, whose domain tag must differ from the payload one;
  * - a response, because the crew verifies what answered the socket rather than trusting it,
  *   and that rule crosses the language boundary the same way the request rules do.
@@ -52,6 +57,8 @@ type SigningVector = {
     request: Record<string, unknown>;
     signingText: string;
     mac: string;
+    /** Members the Python half must read back as floats. See the recorder. */
+    floatFields?: string[];
   }[];
 };
 
@@ -75,6 +82,7 @@ describe('the recorded signing vectors', () => {
     // checked against nothing at all.
     expect(VECTORS.cases.map((entry) => entry.kind).sort()).toEqual([
       'artifact',
+      'payload',
       'payload',
       'payload',
       'response',
@@ -102,5 +110,22 @@ describe('the recorded signing vectors', () => {
     expect(Buffer.byteLength(rest.join(':'), 'utf8')).toBe(Number(declared));
     expect(Buffer.byteLength(rest.join(':'), 'utf8')).toBeGreaterThan(rest.join(':').length);
     expect(Object.keys(payload)).not.toEqual([...Object.keys(payload)].sort());
+  });
+
+  it('writes an integral number without a fractional part and orders members by code unit', () => {
+    // Both properties are `JSON.stringify`'s, which is why nothing on this side would notice
+    // losing them. They are named here so the recorded text cannot be regenerated into
+    // agreement with a reimplementation that has drifted.
+    const entry = VECTORS.cases.find((each) => each.floatFields);
+    if (!entry) throw new Error('The vector carrying the number and member-order case is gone.');
+    const canonical = entry.signingText.split('\n').at(-1) as string;
+
+    expect(canonical).toContain('"pointMsPerUnit":54,');
+    expect(canonical).not.toContain('54.0');
+    // U+1F600 sorts on its lead surrogate D83D, so it lands before U+FFFD. Ordering by code
+    // point — which is what Python's `sorted()` does — puts them the other way round.
+    expect(canonical.indexOf(String.fromCodePoint(0x1f600))).toBeLessThan(
+      canonical.indexOf(String.fromCodePoint(0xfffd)),
+    );
   });
 });

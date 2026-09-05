@@ -94,6 +94,7 @@ from .evidence import (
     verify,
     write_bundle,
 )
+from .http_client import HttpProductionClient
 from .local_client import LocalProductionClient
 from .planner import (
     AdkPlanAuthor,
@@ -162,6 +163,7 @@ __all__ = [
     "Finding",
     "HASH_INDEX",
     "HandedPlanAuthor",
+    "HttpProductionClient",
     "InstructionsLeaked",
     "LeakScan",
     "LocalProductionClient",

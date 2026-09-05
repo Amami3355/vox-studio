@@ -6,13 +6,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ProductionPayloadSurface } from '../src/commands/payload-surface';
 import type { CommandExecution } from '../src/commands/service';
 import {
+  type ArtifactDescriptorWire,
   artifactRequestSigningText,
   payloadRequestSigningText,
   signIpc,
 } from '../src/ipc/authentication';
 import {
-  type PayloadCommandExecutor,
   type ProductionNetworkHost,
+  type ServedPayloadSurface,
   createProductionNetworkHost,
 } from '../src/ipc/network-host';
 import { type CommandFixture, VALID_PLAN, createCommandFixture } from './command-fixture';
@@ -112,7 +113,7 @@ describe('the network host', () => {
  * channel a second time and prove nothing about the bytes that the digest does not already prove.
  */
 describe('the network host artifact route', () => {
-  const published = async (open: CommandFixture, port: number) => {
+  const published = async (port: number) => {
     const init = await callNetwork(port, signedPayloadRequest('run.init', { payload: REQUEST }));
     const runId = (JSON.parse(init.stdout) as { run: { id: string } }).run.id;
     const validated = await callNetwork(
@@ -121,7 +122,7 @@ describe('the network host artifact route', () => {
     );
     const artifacts = (
       JSON.parse(validated.stdout) as {
-        artifacts: { kind: string; path: string; sha256: string }[];
+        artifacts: ArtifactDescriptorWire[];
       }
     ).artifacts;
     const descriptor = artifacts.find((each) => each.kind === 'plan_snapshot');
@@ -132,7 +133,7 @@ describe('the network host artifact route', () => {
   it('answers a signed request with the artifact bytes, not an envelope carrying them', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
 
     const retrieved = await callArtifact(port, signedArtifactRequest(runId, descriptor));
 
@@ -144,7 +145,7 @@ describe('the network host artifact route', () => {
   it('answers a surface refusal as JSON, so a caller tells absence from bytes by content type', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
 
     const missing = await callArtifact(
       port,
@@ -161,7 +162,7 @@ describe('the network host artifact route', () => {
   it('names an unknown Run and a descriptor that escapes, each with its own code', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
 
     const absent = await callArtifact(port, signedArtifactRequest('run-absent', descriptor));
     const outside = await callArtifact(
@@ -175,10 +176,27 @@ describe('the network host artifact route', () => {
     });
   });
 
+  it('is as closed to a browser as the command route is', async () => {
+    // Ticket 10 turns on this: a browser cannot sign a body, so it cannot speak to this service
+    // at all, and that is the whole reason the preview has no link. The command route has this
+    // test; the route that actually carries a render did not, and the property was resting on
+    // which statement `handle` checks first. A GET is what a forwarded-port link would send.
+    fixture = await createCommandFixture();
+    const port = await start(fixture);
+    const { runId, descriptor } = await published(port);
+
+    await expect(
+      callArtifact(port, signedArtifactRequest(runId, descriptor), { method: 'GET' }),
+    ).rejects.toThrow();
+    await expect(
+      callArtifact(port, { protocolVersion: 1, runId, descriptor, requestId: 'no-mac-at-all' }),
+    ).rejects.toThrow();
+  });
+
   it('refuses a payload MAC replayed onto the artifact route', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
     const signed = signedArtifactRequest(runId, descriptor);
     const foreign = {
       ...signed,
@@ -197,7 +215,7 @@ describe('the network host artifact route', () => {
   it('refuses a bad MAC, a replay and a stale request, saying nothing about which', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
     const once = signedArtifactRequest(runId, descriptor);
     await callArtifact(port, once);
 
@@ -219,7 +237,7 @@ describe('the network host artifact route', () => {
   it('shares one replay cache with the command route', async () => {
     fixture = await createCommandFixture();
     const port = await start(fixture);
-    const { runId, descriptor } = await published(fixture, port);
+    const { runId, descriptor } = await published(port);
     const command = signedPayloadRequest('contract.index');
     await callNetwork(port, command);
 
@@ -361,7 +379,7 @@ describe('the network host binding', () => {
 });
 
 describe('the network host idle timeout', () => {
-  const slowSurface = (delayMs: number): PayloadCommandExecutor => ({
+  const slowSurface = (delayMs: number): ServedPayloadSurface => ({
     // The timeout is about the command route, and a stub that could serve an artifact would be
     // claiming this test covers one.
     fetchArtifact: async () => {

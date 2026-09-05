@@ -40,6 +40,49 @@ RESPONSE_DOMAIN = "VOX-IPC-RESPONSE-1"
 PROTOCOL_VERSION = 1
 
 
+# The largest integer a double holds exactly, and therefore the largest one both sides of this
+# wire can agree about. `Number.MAX_SAFE_INTEGER` on the other side.
+MAX_EXACT_INTEGER = 2**53 - 1
+
+
+def _by_utf16_code_unit(key: Any) -> bytes:
+    """The order RFC 8785 sorts members in, which is not Python's.
+
+    JCS orders keys by UTF-16 code unit; `sorted()` orders strings by code point. The two agree
+    everywhere below U+10000 and disagree above it, because a supplementary character sorts on
+    its lead surrogate (U+D800..U+DBFF) and therefore *below* U+E000..U+FFFF rather than above.
+    Encoding to UTF-16 big-endian and comparing bytes is that order exactly, and the vector with
+    an emoji and a U+FFFD key is what holds this to the host's answer rather than to this
+    comment.
+    """
+    return str(key).encode("utf-16-be")
+
+
+def _canonical_number(value: float) -> str:
+    """A float as ECMAScript renders it, which is what the other side's `JSON.stringify` does.
+
+    `json.dumps` is not that function and the difference is not cosmetic: it writes `54.0` where
+    ECMAScript writes `54`, so a plan carrying a calibration point signed a text the host could
+    never produce, and the socket would have closed with no reason given — the boundary
+    publishes none. Integral floats are the whole of the divergence in the range this wire
+    carries, and they are exactly the shape a duration or a millisecond-per-unit arrives as.
+
+    The exponent forms are refused rather than guessed at. Python writes `1e-07` where
+    ECMAScript writes `1e-7`, and nothing in a Brief, a plan or a report has ever carried one —
+    so the honest answer is to fail here, loudly, in the process that still has the number,
+    rather than to sign a text and have a socket close in a tunnel on the far side of it.
+    """
+    if not isfinite(value):
+        raise TypeError("Canonical JSON rejects non-finite numbers.")
+    if abs(value) < 1e21 and value == int(value):
+        # `int()` also folds -0.0 to 0, which is what `JSON.stringify(-0)` answers.
+        return str(int(value))
+    text = repr(value)
+    if "e" in text or "E" in text:
+        raise TypeError(f"Canonical JSON has no agreed exponent form for {text}.")
+    return text
+
+
 def canonical_json(value: Any) -> str:
     """RFC 8785 canonical JSON, for the value shapes an envelope payload carries."""
     if value is None:
@@ -49,17 +92,22 @@ def canonical_json(value: Any) -> str:
     if value is False:
         return "false"
     if isinstance(value, int):
+        # Beyond 2**53 a JSON number is not a value the other side can hold: the host parses it
+        # into a double and loses digits, so it would sign a different text for the same
+        # document and drop the socket without a reason. Refused here, where the number still
+        # exists, rather than surviving as a silent disagreement. RFC 8785 says the same thing
+        # by way of I-JSON.
+        if abs(value) > MAX_EXACT_INTEGER:
+            raise TypeError("Canonical JSON carries no integer the other side cannot hold.")
         return json.dumps(value)
     if isinstance(value, float):
-        if not isfinite(value):
-            raise TypeError("Canonical JSON rejects non-finite numbers.")
-        return json.dumps(value)
+        return _canonical_number(value)
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False)
     if isinstance(value, Mapping):
         members = ",".join(
             f"{json.dumps(str(key), ensure_ascii=False)}:{canonical_json(value[key])}"
-            for key in sorted(value)
+            for key in sorted(value, key=_by_utf16_code_unit)
         )
         return f"{{{members}}}"
     # A `str` is a Sequence too, and is handled above. Sets, tuples of mixed intent and every

@@ -14,7 +14,7 @@ from __future__ import annotations
 import socket
 
 import pytest
-from conftest import _ADMITTED, NetworkEgressAttempted
+from conftest import NetworkEgressAttempted, admitted_endpoints
 
 
 def test_a_connection_attempt_fails_the_test() -> None:
@@ -60,4 +60,4 @@ def test_an_endpoint_a_test_opened_itself_is_reachable_and_only_that_one(
 
 def test_no_admission_outlives_the_test_that_opened_it() -> None:
     """A hole left open would silently admit every later test in the session."""
-    assert _ADMITTED == set()
+    assert admitted_endpoints() == frozenset()

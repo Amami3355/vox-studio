@@ -36,7 +36,6 @@ from vox_crew.converge import (
     ConvergedRun,
     converge,
 )
-from vox_crew.http_client import HttpProductionClient
 from vox_crew.evidence import (
     ARTIFACTS,
     ASSERTIONS,
@@ -58,6 +57,7 @@ from vox_crew.evidence import (
     write_bundle,
 )
 from vox_crew.context import tokens
+from vox_crew.http_client import HttpProductionClient
 from vox_crew.planner import scan_for_leaks
 
 

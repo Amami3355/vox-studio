@@ -8,7 +8,11 @@ import {
   signIpc,
   verifyIpcMac,
 } from '../src/ipc/authentication';
-import { BoundaryRefusal, createProductionBoundary } from '../src/ipc/boundary';
+import {
+  BoundaryRefusal,
+  createBoundaryAuthenticator,
+  createProductionBoundary,
+} from '../src/ipc/boundary';
 import { IPC_SECRET, signedRequest } from './ipc-fixture';
 
 const served = { exitCode: 0 as const, stdout: 'served\n', stderr: '' };
@@ -160,6 +164,22 @@ describe('the shared boundary', () => {
         parse: (input) => ipcRequestSchema.parse(input),
         signingText: requestSigningText,
         dispatch: async () => served,
+      }),
+    ).toThrow(/too short/i);
+  });
+
+  it('refuses a secret too short to be one even when it did not build the authenticator', () => {
+    // The guard used to live only in `createBoundaryAuthenticator`, so it was skipped in exactly
+    // the case a caller supplied its own — and the boundary signs its *responses* with this
+    // secret whichever way it was admitted. A short secret would have signed every one of them
+    // while the guard read as covering both directions.
+    expect(() =>
+      createProductionBoundary<IpcRequest>({
+        secret: 'short',
+        parse: (input) => ipcRequestSchema.parse(input),
+        signingText: requestSigningText,
+        dispatch: async () => served,
+        authenticator: createBoundaryAuthenticator({ secret: 'a'.repeat(32) }),
       }),
     ).toThrow(/too short/i);
   });

@@ -58,6 +58,14 @@ class ArtifactDescriptor:
     path: str
     sha256: str
 
+    def as_wire(self) -> dict[str, str]:
+        """The three fields as a retrieval request carries and signs them.
+
+        Here rather than at the caller because the signing text and the request body must agree
+        about them exactly, and two hand-built copies of one shape are two chances to disagree.
+        """
+        return {"kind": self.kind, "path": self.path, "sha256": self.sha256}
+
 
 @dataclass(frozen=True, slots=True)
 class RunHandle:
