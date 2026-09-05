@@ -1,6 +1,6 @@
 # 09: A Brief goes in at a URL, and a preview comes out
 
-Status: ready-for-agent
+Status: done
 
 **Amended 2026-09-02, after the topology was chosen and the scope cut was taken.** This ticket
 defines "delivered", so it is the one place where a stale assumption costs the most: everything else
@@ -157,13 +157,26 @@ broke.
 - [x] Spend is stated and authorised before the run starts
 - [x] A Brief is submitted by the local crew to the remote service, with no launcher in the path, and with the Run store, the render and the four production secrets all off the operator's disk
 - [x] A Run completes and a preview is produced, retrieved over the tunnel by its published descriptor, and watched — user verdict on 2026-09-05: “the video is ok”
-- [ ] The evidence bundle verifies on a machine that did not produce it
-- [ ] The cloud Run is compared to a known-good local Run and every difference beyond Run id and timestamps is enumerated
+- [x] The evidence bundle verifies on a machine that did not produce it — nine files assembled on Windows and verified with the existing reader on `vox-service`; integrity verified, with the bundle's honest `fail` verdict traced to `CALIBRATION_MISSING`
+- [x] The cloud Run is compared to a known-good local Run and every difference beyond Run id and timestamps is enumerated — calibration, non-reproducible Take and downstream timing/media, plus the recorded render-recovery history
 - [x] A cloud proof sheet exists, with each local assertion carried forward, replaced per ticket 02's ADR, or marked not evidenced with a reason
 - [x] The "not evidenced" entries were written before the run
 - [x] Three host checks pass from inside the tunnel, through the forwarded port: unauthenticated refused, bad MAC refused, replay refused
 - [x] Two checks pass from outside the service: the VM has no external address, direct IAP to port 8080 is refused and the service binds loopback; the crew identity has no production-secret binding. The identity result is an IAM-policy observation, not a live denied read
 - [x] The deployed image's denying adapter is confirmed with egress available on the VM; the live smoke reaches its control endpoint and then receives `NETWORK_POLICY_DENIED`
 - [x] Wall time, render envelope and spend are recorded
-- [ ] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, asserted
+- [x] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, asserted from pre-cloud `7caac82`: six prompt-building functions, 38 existing crew fixtures, the prefix census and seven recorded still-hash files are unchanged; the only new fixture is the transport signing vector
 - [x] No code was changed by this ticket; follow-up fixes are owned by ticket 07 and the crew CLI defect
+
+## Answer
+
+**Delivered 2026-09-05.** Run `23aace30-7d2c-4715-b5f8-77003fcd57e1` carried the known Brief
+through the local crew and remote Production service to an accepted preview, with the Run store,
+render and four production secrets off the operator's disk. The cloud proof sheet records which
+isolation properties were carried forward, replaced or not evidenced. The bundle was reconstructed
+from the original transcript, the recovery receipt and artifacts retrieved through the published
+surface, then verified on the VM rather than on the Windows machine that assembled it.
+
+The complete local-versus-cloud comparison and invariant evidence live in
+[`../run-2026-09-05.md`](../run-2026-09-05.md). No new Run or Take was created to close this ticket,
+and the VM is stopped.

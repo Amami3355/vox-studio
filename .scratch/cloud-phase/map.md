@@ -188,6 +188,15 @@ them contradict tickets as written; those tickets were edited the same day rathe
   absorbing it. Running it for the first time found a 130 MB host virtualenv and the whole test suite
   inside the image.
 
+- **The destination is delivered** — [09](issues/09-a-brief-goes-in-at-a-url-and-a-preview-comes-out.md),
+  2026-09-05. The local crew drove the remote Production service to a preview the user accepted;
+  the Run store, render and four production secrets stayed off the operator's disk. The recovered
+  nine-file bundle verified on `vox-service`, the cloud Run was compared semantically with the
+  known-good local Run, and the crew's prompt construction plus recorded fixtures were unchanged
+  from the pre-cloud baseline. The bundle's own machine verdict remains honestly `fail` because the
+  empty cloud calibration store could not clear a Preflight duration risk; authoritative compilation
+  was green. The VM was stopped after the evidence was retrieved.
+
 ## Findings awaiting a later decision
 
 In scope, real, and not yet sharp enough to ticket.
