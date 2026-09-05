@@ -219,7 +219,8 @@ one. A `tmpfs` would pass. Identifying the specific disk is ticket 04's `identit
 
 ## What the conformance run still owes
 
-None of the following has been executed. Each is listed so it is claimed only once it is true.
+**One of the following has been executed; the other nine have not.** Each is listed so it is
+claimed only once it is true, and the one tick below carries the date and the method that earned it.
 
 **The first three now have a vehicle rather than only a description**: the wizard stage named
 against each performs it. A stage existing is not the step being done — every one of these stays
@@ -232,9 +233,16 @@ unticked until a run has happened.
 - [ ] The image pushed to `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox`, which currently holds
       **0 items**. 2.06 GB, and the pull time and registry storage cost are still an open item — and
       stage 8's ten-minute poll is where the pull time stops being unknown. — *deploy wizard stage 4.*
-- [ ] `VOX_NETWORK_TOKEN` created in Secret Manager and bound to
-      `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`. The other four secrets exist and are
-      bound; this transport's key was created by ticket 07 and its secret was not.
+- [x] `VOX_NETWORK_TOKEN` created in Secret Manager and bound to
+      `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`. **Read live with `gcloud` on
+      2026-09-04: it exists, and all five of `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`,
+      `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID` and `VOX_NETWORK_TOKEN` are bound to that identity.**
+      This is the only item on this list that is true, and it is why the deploy wizard's stage 2
+      lets an operator through to stage 3.
+      **What is ticked here is existence and the positive binding, and nothing more.** Stage 8's
+      separate assertion — that the crew identity *cannot* read this secret — is a negative and has
+      not been run; `VOX_CREW_MODEL_KEY`'s own binding was not read either. A secret being readable
+      by the right identity is not evidence that it is unreadable by the wrong one.
       — *provisioning wizard stage 6 creates it, stage 8 proves the crew cannot read it, and the
       deploy wizard's stage 2 refuses to deploy without it.*
 - [ ] `/etc/vox/service.env` written on the VM at mode 0600 by `deploy/fetch-service-env.sh`, with
@@ -250,4 +258,12 @@ unticked until a run has happened.
       destinations above. `--network none` is **not** the control — it now fails by design.
 - [ ] A non-`record` command attempting egress and being refused **by the adapter**, with the
       network available, so the test is of the adapter and not of the network's absence.
+      **Demonstrated in a local container on 2026-09-04, and left unticked deliberately.**
+      `deploy/container-smoke.mjs` went all-green against `vox-production:latest`
+      (`sha256:92f9ca76…`) on Docker Desktop, control included: the container could reach
+      `8.8.8.8:53`, and `deniedNetworkAdapter` still refused with `NETWORK_POLICY_DENIED`. What
+      that buys is the *code path*, on a machine that is not the VM, under a runtime that is not
+      COS and a network that is not the VPC. This list is what the **conformance run** owes, and
+      the conformance run happens on the instance — so the local green is evidence toward this
+      item, not the item.
 - [ ] The tunnel measured under a three-minute synchronous render.
