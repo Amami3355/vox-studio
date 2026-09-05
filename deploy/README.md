@@ -191,9 +191,35 @@ does not change: `resolveProductionServiceConfiguration` still reads `process.en
 — it refuses env files, credential files, and any of the secret-bearing variables *assigned* a
 value in any layer. Naming one is permitted; the Dockerfile and this file both do.
 
+**What that scan looks at, since the sentence above used to imply more than the code did.** Until
+2026-09-05 `deploy/image-leak-scan.mjs` walked `/app` alone — the right first root, because `/app` is
+where a careless `COPY . .` lands, and not where a credential in a Node image usually ends up.
+`/root/.npmrc` is written by npm and pnpm as a matter of course, has been named in the scan's
+`CREDENTIAL_FILENAMES` since it was written, and nothing ever walked the directory holding it. The
+scan now walks `/app`, `/root`, `/pnpm` and `/etc/vox`, skipping the package store on the auxiliary
+roots for the same stated reason it skips `node_modules`, and reporting an absent root as absent
+rather than passing over it silently.
+
+**The widened scan was run against the image on 2026-09-05 and passed**: 307 files under `/app`, 3 under `/root`, 0 under `/pnpm`, `/etc/vox` absent — 310 files, no violations. Two things that only a run could say. **There is no `/root/.npmrc` in this image**, so the credential the widening went looking for is not there; that is now a measurement rather than a hope. And **`/pnpm` contributed nothing**, because its only child is the `store` directory the auxiliary skip list excludes by design — the root is walked, and it has nothing else in it. Docker Desktop under Windows, so it is a statement about the image, which is the same image everywhere, rather than about COS.
+
+`SECRET_NAMES` in that scan is deliberately not the same list as the deploy wizard's
+`PRODUCTION_SECRETS`. The wizard's list is *what to fetch from Secret Manager*, so it carries
+`VOX_RUN_KEY_ID`, an identifier rather than a secret. The scan's list is *what must never be baked
+into an image*, so it drops the identifier and adds `VOX_IPC_TOKEN`, which is a real secret in the
+local topology and would be a real finding here. Both lists are right; neither is drifting.
+
 ## The volume
 
 `VOX_LEDGER_ROOT` and `VOX_CALIBRATION_PATH` are on ticket 04's disk, mounted at `/var/lib/vox`.
+
+**They are on it because the code requires it, which was not true until 2026-09-05.** The mount
+check proves a separate filesystem is attached; it says nothing about whether anything is written
+to it. All three write paths — `VOX_RUNS_ROOT`, `VOX_LEDGER_ROOT`, `VOX_CALIBRATION_PATH` — could
+point at the container's own filesystem with that check green, and the only thing holding them on
+the volume was a heredoc in `deploy/fetch-service-env.sh` writing them that way. That is a
+deployment artifact agreeing with the code by convention. `assertWritesLandOnVolume` now refuses to
+start on any of the three, and `VOX_REMOTION_ENTRY` is deliberately exempt: it is read from the
+image, not written to.
 `VOX_REMOTION_ENTRY` is in the image, because it is production source.
 
 **The service refuses to start if the disk did not attach.** The mount point exists in the image —
@@ -202,6 +228,19 @@ Run would land on the container's own filesystem and vanish at the next restart,
 platform restarting the container for you. `persistent-volume.ts` compares device numbers against
 the parent directory instead. Its known limit: it proves a *separate* filesystem, not the intended
 one. A `tmpfs` would pass. Identifying the specific disk is ticket 04's `identity.txt`.
+
+**The containment check found something the first time it ran, and it was in the runbook.** Starting
+the container from Git Bash on Windows with `-e VOX_RUNS_ROOT=/var/lib/vox/runs` does not set that
+value: MSYS rewrites any argument that looks like an absolute POSIX path, and the service received
+`/app/C:/Program Files/Git/var/lib/vox/runs`. **Every previous local smoke run passed with those
+three variables mangled**, because nothing compared them to the mount — the mount itself is set by
+the image, so `assertPersistentVolumeMounted` was reading a correct value while all three write
+paths pointed into the container's own filesystem. This is the exact failure the volume check
+exists to prevent, sitting underneath a green volume check for as long as the recipe has existed.
+
+Prefix the whole command with `MSYS_NO_PATHCONV=1` when starting it by hand from Git Bash. It is the
+same rewrite the wizard's `dk()` comment warns about for `docker run --volume`, arriving through
+`-e` instead.
 
 ## Environment
 

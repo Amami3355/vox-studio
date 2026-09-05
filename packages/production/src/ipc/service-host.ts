@@ -4,15 +4,10 @@ import { createProductionIpcHost } from './host';
 import { startProductionPipeBridge } from './pipe-bridge';
 import {
   createConfiguredProductionService,
+  required,
   resolveProductionServiceConfiguration,
 } from './service-configuration';
 import { resolveSocketTimeoutMs } from './socket-timeout';
-
-const required = (name: string): string => {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing trusted service configuration: ${name}`);
-  return value;
-};
 
 const pipeNameFromPath = (value: string): string => {
   const prefix = '\\\\.\\pipe\\';
@@ -20,10 +15,10 @@ const pipeNameFromPath = (value: string): string => {
   return value.slice(prefix.length);
 };
 
-const publicPipePath = required('VOX_PIPE_PATH');
+const publicPipePath = required(process.env, 'VOX_PIPE_PATH');
 const publicPipeName = pipeNameFromPath(publicPipePath);
 const privatePipeName = `vox-trusted-${randomUUID()}`;
-const ipcSecret = required('VOX_IPC_TOKEN');
+const ipcSecret = required(process.env, 'VOX_IPC_TOKEN');
 
 /**
  * The service is constructed by `service-configuration.ts`, which the cloud entry point calls too.

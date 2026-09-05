@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ProductionCommandService } from '../src/commands/service';
 import {
-  PRODUCTION_SERVICE_ENVIRONMENT,
+  SHARED_SERVICE_ENVIRONMENT,
   createConfiguredProductionService,
   deniedNetworkAdapter,
   resolveProductionServiceConfiguration,
@@ -75,9 +75,9 @@ describe('the configuration both entry points resolve', () => {
    * The shared resolver is the place that would quietly acquire one, so it is pinned here.
    */
   it('names no pipe configuration at all', () => {
-    expect(PRODUCTION_SERVICE_ENVIRONMENT).not.toContain('VOX_PIPE_PATH');
-    expect(PRODUCTION_SERVICE_ENVIRONMENT).not.toContain('VOX_IPC_TOKEN');
-    expect([...PRODUCTION_SERVICE_ENVIRONMENT].sort()).toEqual(Object.keys(COMPLETE).sort());
+    expect(SHARED_SERVICE_ENVIRONMENT).not.toContain('VOX_PIPE_PATH');
+    expect(SHARED_SERVICE_ENVIRONMENT).not.toContain('VOX_IPC_TOKEN');
+    expect([...SHARED_SERVICE_ENVIRONMENT].sort()).toEqual(Object.keys(COMPLETE).sort());
   });
 });
 

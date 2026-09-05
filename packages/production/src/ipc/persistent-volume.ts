@@ -1,5 +1,5 @@
 import { statSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 /**
  * The two filesystem questions this check asks, injectable so both answers can be stubbed.
@@ -66,5 +66,41 @@ export const assertPersistentVolumeMounted = (
     throw new Error(
       `VOLUME_NOT_MOUNTED: ${mountPoint} exists but shares a device with ${parent}, so it is a directory in the image rather than the attached disk. A Run written here would be lost at the next restart.`,
     );
+  }
+};
+
+/**
+ * Refuses to continue unless every path the service writes to actually sits on the mounted volume.
+ *
+ * **`assertPersistentVolumeMounted` above proves the disk is attached, and proves nothing about
+ * whether anything is written to it.** The mount can be present and correct while
+ * `VOX_LEDGER_ROOT`, `VOX_CALIBRATION_PATH` and `VOX_RUNS_ROOT` all point at the container's own
+ * filesystem, because those are separate variables and nothing compared them. The failure is then
+ * exactly the one the mount check exists to prevent — Runs written somewhere that disappears at
+ * the next restart — reached by a one-line environment edit, past a guard that stays green.
+ *
+ * They sit on the volume today because a heredoc in `deploy/fetch-service-env.sh` writes them
+ * that way. That is a deployment artifact agreeing with the code by convention; this is the code
+ * requiring it.
+ *
+ * A path equal to the mount point is inside it. `relative()` is used rather than a prefix test
+ * because `/var/lib/voxen` must not count as being under `/var/lib/vox`, and string prefixes say
+ * it does.
+ */
+export const assertWritesLandOnVolume = (
+  mountPoint: string,
+  paths: Readonly<Record<string, string>>,
+): void => {
+  const volume = resolve(mountPoint);
+
+  for (const [name, value] of Object.entries(paths)) {
+    const path = resolve(value);
+    const step = relative(volume, path);
+    if (step === '') continue;
+    if (step.startsWith('..') || isAbsolute(step)) {
+      throw new Error(
+        `VOLUME_ESCAPED: ${name} is ${path}, which is not under the persistent volume at ${volume}. A Run written there would be lost at the next restart, and the mount being correct would not have told you.`,
+      );
+    }
   }
 };

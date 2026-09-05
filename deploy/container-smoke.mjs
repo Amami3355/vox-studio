@@ -1,6 +1,7 @@
 // The container's own smoke check, run from inside it.
 //
-// Run through tsx rather than node: the adapter check below imports a TypeScript module.
+// Run through tsx rather than node: this script imports TypeScript modules — the signing text it
+// signs with, and the network adapter it asserts.
 //
 // This is the "builds, boots, and rejects a malformed request, reaching no model or network"
 // assertion from cloud-phase ticket 01's testing decisions, applied to this service. It runs
@@ -11,31 +12,33 @@
 //   docker exec <container> /app/packages/production/node_modules/.bin/tsx /tmp/smoke.mjs
 //
 // Exit 0 means every case below behaved. Any other exit is a failure and prints which.
-import { createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { request } from 'node:http';
 import { connect } from 'node:net';
+/**
+ * **The signing text is imported, not reproduced.**
+ *
+ * This file used to carry its own `field()` and `signingText()` under a comment promising they
+ * were "kept in step with `authentication.ts`". Nothing enforced that promise, and the two had
+ * already parted: the copy here serialised the payload with `JSON.stringify` where the real one
+ * canonicalises it. Only a `null` payload hid it.
+ *
+ * A drift in a *test's* copy of the signing text is not a failing test. It is a forged-MAC check
+ * and a replay check that both go green while asserting nothing — the container answers no
+ * request either way, so every refusal below stays a refusal and the control is the only thing
+ * that would notice. That is the exact shape this phase keeps naming, in the one file whose whole
+ * job is to prove the boundary holds.
+ *
+ * The import is possible because this script already runs under `tsx`, which is why the adapter
+ * check below can reach a `.ts` module at all.
+ */
+import {
+  payloadRequestSigningText,
+  signIpc,
+} from '/app/packages/production/src/ipc/authentication.ts';
 
 const SECRET = process.env.VOX_NETWORK_TOKEN;
 const PORT = Number(process.env.VOX_NETWORK_PORT ?? 8080);
-
-/**
- * The payload transport's signing text, kept in step with `authentication.ts`.
- *
- * Each field is length-prefixed — `<utf8 bytes>:<value>` — so that a value containing a newline
- * cannot be re-split into two fields. `protocolVersion` is deliberately not in the text: it is in
- * the schema, not the signature.
- */
-const field = (value) => `${Buffer.byteLength(value, 'utf8')}:${value}`;
-
-const signingText = (unsigned) =>
-  [
-    'VOX-IPC-PAYLOAD-REQUEST-1',
-    field(unsigned.requestId),
-    field(String(unsigned.timestampMs)),
-    field(unsigned.command),
-    field(unsigned.runId ?? ''),
-    field(unsigned.payload === null ? '' : JSON.stringify(unsigned.payload)),
-  ].join('\n');
 
 const signed = (command) => {
   const unsigned = {
@@ -46,10 +49,7 @@ const signed = (command) => {
     runId: null,
     payload: null,
   };
-  return {
-    ...unsigned,
-    mac: createHmac('sha256', SECRET).update(signingText(unsigned)).digest('hex'),
-  };
+  return { ...unsigned, mac: signIpc(SECRET, payloadRequestSigningText(unsigned)) };
 };
 
 const post = (body) =>
@@ -201,6 +201,18 @@ check(
   refusal instanceof Error && refusal.message === 'NETWORK_POLICY_DENIED',
   String(refusal),
 );
+
+// **What the two checks above do not prove, said here rather than left to be assumed.**
+//
+// This asserts the adapter *object*, imported into this process, with egress demonstrably
+// available. It does not dispatch a command through the listening service, so it is not evidence
+// that the running host was constructed with this adapter rather than another — that wiring is
+// asserted in-process by `packages/production/tests/cloud-host.test.ts`, against the same assembly
+// the container runs.
+//
+// ADR-0018 decision 8's criterion is a *non-`record` command* attempting egress and being refused.
+// Read strictly, this is narrower than that, and the checklist in deploy/README.md records it as
+// evidence toward the item rather than as the item. A green line here is not a conformance run.
 
 console.info(failures.length === 0 ? '\nall checks passed' : `\n${failures.length} failed`);
 process.exit(failures.length === 0 ? 0 : 1);

@@ -220,17 +220,17 @@ unavailable has not tested the adapter.
 - [x] A cloud entry point binds ticket 06's host, imports no pipe bridge, and reads no pipe configuration
 - [x] `service-host.ts` is unchanged in behaviour and still starts the local service
 - [x] Secrets are read from the environment the managed store populates, with no code change to how they are read
-- [x] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image
+- [x] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image — **enforced rather than arranged, 2026-09-05.** This was true only because a heredoc in `deploy/fetch-service-env.sh` wrote it that way: all three write paths could point off the volume with the mount check green, which is the failure that check exists to prevent, reached by a one-line env edit. `assertWritesLandOnVolume` now refuses to start on it
 - [x] The service refuses to start when its volume is absent, asserted — in unit tests and by a real container, which printed `VOLUME_NOT_MOUNTED` and exited 1
-- [x] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence
+- [x] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence. **Scoped 2026-09-05:** what the smoke asserts is the adapter *object*, imported into the smoke's own process with egress demonstrably available. It dispatches no command through the listening service, so it is not evidence that the running host was built with this adapter — that wiring is asserted in-process by `cloud-host.test.ts`. Read strictly, ADR-0018 decision 8's *non-`record` command attempting egress* is wider than this, and `deploy/README.md` keeps its bullet unticked for that reason
 - [x] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start — and refuses a download outright when the pin is set, so a wrong path fails loudly
 - [x] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list — `deploy/README.md`
 - [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations — **not done.** *Corrected 2026-09-03:* the VM exists and is running. `studio-prod-7f3a` carries `vox-service` on `cos-stable-121-18867-584-3`, `e2-standard-2`, `europe-west1-c`, no external address, with `vox-runs` attached as device `vox-runs`. What blocks the run is three deploy steps, not provisioning — see "What the conformance run is actually blocked on"
 - [x] The weakened ADR-0007 property is stated in ADR-0018, not inherited
-- [x] The container builds, boots and rejects a malformed request, reaching no model or network in CI — run against a real container, `deploy/container-smoke.mjs`, eight checks
+- [x] The container builds, boots and rejects a malformed request, reaching no model or network — run against a real container, `deploy/container-smoke.mjs`, eight checks. **"in CI" struck 2026-09-05:** there is no CI job for this. It was a manual `docker exec` on Docker Desktop under Windows, on a bridge network — not COS, not the VM, not the VPC. The same assertion is worth different amounts in different places, and the conformance run happens on the instance
 - [x] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
 - [~] The request timeout admits that render, on the platform as well as in the host — **host half only.** 15 minutes against a measured 178 s, asserted. The platform half is the tunnel and has not been measured
-- [x] The leak scan passes over the image's readable layers — **with a narrowing recorded in ADR-0018 decision 8**, because the agent-distribution scan cannot be run over an image that is the production runtime
+- [x] The leak scan passes over the image's readable layers — **with a narrowing recorded in ADR-0018 decision 8**, because the agent-distribution scan cannot be run over an image that is the production runtime. **A second narrowing, found and closed 2026-09-05:** the scan walked `/app` alone while claiming the image's layers, so `/root/.npmrc` — the likeliest baked credential in a Node image, and named in `CREDENTIAL_FILENAMES` since the scan was written — was never looked at. It now walks `/app`, `/root`, `/pnpm` and `/etc/vox`, and reports an absent root rather than passing over it in silence. **The widened scan was run on 2026-09-05 and passed** — 310 files across `/app`, `/root` and `/pnpm`, with `/etc/vox` absent and no violations. There is no `/root/.npmrc` in this image, which is the credential the widening was looking for, and `/pnpm` contributed nothing because its only child is the skipped `store`
 - [x] The one-instance ceiling and its reason are written down — `deploy/README.md` and `deploy/cloud-init.yaml`
 
 ## What was built, 2026-09-03
@@ -346,17 +346,23 @@ Present in `studio-prod-7f3a`:
 | Service account | `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`, `cloud-platform` scope |
 | Cloud NAT | router `vox-router`, gateway `vox-nat`, ALL_SUBNETWORKS_ALL_IP_RANGES |
 | Firewall | `vox-allow-iap-ssh` from `35.235.240.0/20`, `vox-deny-all-ingress` from `0.0.0.0/0` |
-| Secrets | `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`, `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID`, each bound to the production SA |
+| Secrets | `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`, `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID` and — since 2026-09-04 — `VOX_NETWORK_TOKEN`, each bound to the production SA |
 | Artifact Registry | `vox`, DOCKER, `europe-west1` |
 
-**Three things are missing, and all three are deploy steps rather than provisioning.**
+**Two things are missing, and both are deploy steps rather than provisioning.** *Corrected
+2026-09-05: this said three, and one of them has since been done — see the note under item 2.*
 
 1. **The registry is empty.** `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox` lists 0 items,
    0.000 MB. The 2.06 GB image has never been pushed. The map's open item on pull time and registry
    storage cost is still open and is now the thing standing between here and a conformance run.
-2. **`VOX_NETWORK_TOKEN` does not exist in Secret Manager.** Ticket 03 provisioned the four secrets
-   that existed when it ran; this transport's key was created by this ticket and its secret was not.
-   It also needs the production SA bound to it, as the other four are.
+2. ~~**`VOX_NETWORK_TOKEN` does not exist in Secret Manager.**~~ **Done, 2026-09-04.** It exists and
+   is bound to `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`, read live with `gcloud`,
+   and all five secrets are now bound to that identity. `deploy/README.md` ticked this on the 4th;
+   **this file went on asserting the opposite until the 5th**, which is worse than either statement
+   alone — a later session reading one of the two gets a confident answer and no hint that the
+   other exists. What the read covers is existence and the positive binding only; stage 8's
+   negative, that the crew identity *cannot* read it, is unrun, and `VOX_CREW_MODEL_KEY`'s own
+   binding is unread.
 3. **The instance carries no `user-data` metadata** — the key list is empty, so `cloud-init.yaml`
    has never been applied and nothing on the VM starts a container today. This confirms rather than
    contradicts what this ticket already recorded.

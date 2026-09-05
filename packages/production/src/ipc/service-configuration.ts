@@ -9,14 +9,25 @@ import { DurationCalibrationStore } from '../preflight/calibration';
 import { createRemotionRenderAdapter } from '../render/remotion';
 
 /**
- * Every environment variable the trusted service needs, in either topology.
+ * The environment variables **this resolver requires**, which is a narrower claim than the name it
+ * used to carry. It is not every variable the trusted service reads: each topology's transport
+ * configuration is its own — `VOX_PIPE_PATH` and `VOX_IPC_TOKEN` in `service-host.ts`,
+ * `VOX_NETWORK_TOKEN`, `VOX_VOLUME_ROOT`, `VOX_RUNS_ROOT` and the bind/port pair in
+ * `cloud-host.ts` — and `VOX_BROWSER_EXECUTABLE` is optional and so absent by design.
  *
- * **No pipe key appears here and that is deliberate.** `VOX_PIPE_PATH` and `VOX_IPC_TOKEN` are the
- * local transport's configuration and stay in `service-host.ts`, so the cloud entry point cannot
- * acquire them by sharing this resolver. Ticket 07: *"A configuration key that exists but is
- * ignored is a key someone will set and expect to matter."*
+ * It was `PRODUCTION_SERVICE_ENVIRONMENT`, documented as "every environment variable the trusted
+ * service needs, in either topology", and it never was: five of the cloud host's keys were missing
+ * from it. A list whose name and docstring claim more than its membership is the checklist failure
+ * this phase keeps finding, in code rather than in Markdown.
+ *
+ * **No pipe key appears here and that is deliberate.** They stay in `service-host.ts`, so the
+ * cloud entry point cannot acquire them by sharing this resolver. Ticket 07: *"A configuration key
+ * that exists but is ignored is a key someone will set and expect to matter."*
+ *
+ * Its consumer is the test beside it, which pins the membership to what the resolver actually
+ * demands — every name here must throw when removed, and no name may be missing from it.
  */
-export const PRODUCTION_SERVICE_ENVIRONMENT = [
+export const SHARED_SERVICE_ENVIRONMENT = [
   'VOX_GRANT_KEY',
   'ELEVENLABS_API_KEY',
   'VOX_LEDGER_ROOT',
@@ -37,9 +48,17 @@ export type ProductionServiceConfiguration = {
   browserExecutable: string | undefined;
 };
 
-type Environment = Record<string, string | undefined>;
+export type Environment = Record<string, string | undefined>;
 
-const required = (env: Environment, name: string): string => {
+/**
+ * The one reader of a required variable, exported because there were three of it.
+ *
+ * `cloud-host.ts` and this file held byte-identical copies and `service-host.ts` a third over
+ * `process.env`, all producing the same message. The message is the part that matters: it is what
+ * the operator sees and what the runbook greps for, so three copies of it is three chances for one
+ * of them to drift into a message no runbook matches.
+ */
+export const required = (env: Environment, name: string): string => {
   const value = env[name];
   if (!value) throw new Error(`Missing trusted service configuration: ${name}`);
   return value;

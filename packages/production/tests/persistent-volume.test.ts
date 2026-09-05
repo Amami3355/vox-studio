@@ -2,7 +2,11 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { type VolumeProbe, assertPersistentVolumeMounted } from '../src/ipc/persistent-volume';
+import {
+  type VolumeProbe,
+  assertPersistentVolumeMounted,
+  assertWritesLandOnVolume,
+} from '../src/ipc/persistent-volume';
 
 /**
  * Ticket 07: *"a container that starts without its disk and writes a Run to its own ephemeral
@@ -91,5 +95,55 @@ describe('the default probe, against a real filesystem', () => {
     expect(() => assertPersistentVolumeMounted(join(root as string, 'absent'))).toThrow(
       /VOLUME_ABSENT/,
     );
+  });
+});
+
+/**
+ * The gap the mount check could not see, found by the spec review of `bc5a7dc..4915cef`: the
+ * volume can be mounted, and correct, while every path the service writes to points somewhere
+ * else. `assertPersistentVolumeMounted` stays green throughout, because it was never asked.
+ */
+describe('the paths the service writes to', () => {
+  const VOLUME = '/var/lib/vox';
+
+  it('accepts paths on the volume, and the volume root itself', () => {
+    expect(() =>
+      assertWritesLandOnVolume(VOLUME, {
+        VOX_RUNS_ROOT: '/var/lib/vox/runs',
+        VOX_LEDGER_ROOT: '/var/lib/vox/ledger',
+        VOX_CALIBRATION_PATH: '/var/lib/vox/calibration.json',
+        AT_THE_ROOT: '/var/lib/vox',
+      }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['VOX_LEDGER_ROOT', '/var/lib/ledger'],
+    ['VOX_RUNS_ROOT', '/srv/runs'],
+    ['VOX_CALIBRATION_PATH', '/tmp/calibration.json'],
+  ])('refuses %s when it points off the volume', (name, path) => {
+    expect(() => assertWritesLandOnVolume(VOLUME, { [name]: path })).toThrow(/VOLUME_ESCAPED/);
+  });
+
+  it('names the offending variable and its path, because the operator has to fix one of them', () => {
+    expect(() => assertWritesLandOnVolume(VOLUME, { VOX_LEDGER_ROOT: '/var/lib/ledger' })).toThrow(
+      /VOX_LEDGER_ROOT/,
+    );
+  });
+
+  /**
+   * A string prefix would accept this, and that is the reason `relative()` is used instead. The
+   * sibling directory shares every character of the mount point and is a different filesystem.
+   */
+  it('refuses a sibling whose name merely starts with the mount point', () => {
+    expect(() =>
+      assertWritesLandOnVolume(VOLUME, { VOX_RUNS_ROOT: '/var/lib/voxen/runs' }),
+    ).toThrow(/VOLUME_ESCAPED/);
+  });
+
+  it('refuses a path that climbs back out of the volume', () => {
+    expect(() =>
+      assertWritesLandOnVolume(VOLUME, { VOX_RUNS_ROOT: '/var/lib/vox/../elsewhere' }),
+    ).toThrow(/VOLUME_ESCAPED/);
   });
 });

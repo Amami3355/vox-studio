@@ -257,6 +257,28 @@ resolve_docker() {
 # prefix the call with MSYS_NO_PATHCONV=1 rather than discovering it in a half-finished deploy.
 dk() { "$DOCKER" "$@"; }
 
+# ── the box, over the tunnel ──────────────────────────────────────────────
+# `gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap --command=…` appeared six times
+# with the same four arguments hand-written each time. There are two shapes and they are different
+# enough to be two functions rather than one with a flag:
+#
+#   on_box_line   read one value back. Strips the CR that Git Bash leaves on every line, keeps the
+#                 last line so a login banner cannot be mistaken for the answer, and never fails —
+#                 the caller decides what an empty answer means, because "the tunnel did not
+#                 answer" and "the file is not there" are different faults and callers here treat
+#                 them differently.
+#   on_box        run it and let the operator see the output, passing the exit status through.
+#
+# Neither hides the tunnel: a caller that needs a flag these do not pass should write the call out
+# in full rather than grow a third parameter here.
+on_box_line() {
+  gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap --command="$1" 2>/dev/null \
+    | tr -d '\r' | tail -n1 || true
+}
+on_box() {
+  gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap --command="$1"
+}
+
 VERIFY_FAILURES=0
 ok()  { printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$1"; }
 bad() { printf '  %s✗ %s%s\n' "$RED" "$1" "$RESET"; VERIFY_FAILURES=$((VERIFY_FAILURES + 1)); }
@@ -373,6 +395,12 @@ excluded_from_context() {
   local path="$1" pat base
   [ -f "$DOCKERIGNORE" ] || return 1
   grep -q '^[[:space:]]*!' "$DOCKERIGNORE" && return 1
+  # `git status --porcelain --untracked-files=normal` collapses an untracked directory to a single
+  # entry with a trailing slash. Without stripping it the basename is the empty string, so a
+  # directory called `certs.pem/` would sail past a `*.pem` pattern — the containment branch below
+  # happens to catch the common case, and the glob branch does not. Normalise once, here.
+  path="${path%/}"
+  [ -n "$path" ] || return 1
   base="${path##*/}"
   while IFS= read -r pat; do
     pat="${pat%$'\r'}"
@@ -544,6 +572,11 @@ RENDERED=$(mktemp)
 # The rendered file carries no secret — the whole point of the design is that it carries an image
 # reference and nothing else — but it is still a temp file this wizard owns, and a `halt` two stages
 # later should not leave it behind.
+#
+# This trap is the *only* cleanup. Five hand-written `rm -f "$RENDERED"` calls used to sit beside it
+# on the paths someone happened to think of, which is belt-and-braces that rots: the sixth exit path
+# forgets one, and nobody notices, because the trap quietly covers for it. One mechanism that always
+# runs beats six that usually do.
 trap 'rm -f "${RENDERED:-}"' EXIT
 # A pinned digest rather than the tag: the tag is for humans reading the registry, the digest is
 # what the machine must not be able to drift away from across a restart.
@@ -553,14 +586,12 @@ if grep -q '\${' "$RENDERED"; then
   say ""
   say "Still unsubstituted after rendering:"
   grep -n '\${' "$RENDERED" | sed 's/^/    /'
-  rm -f "$RENDERED"
   halt "the rendered unit file still contains a placeholder"
 fi
 ok "no placeholder survives rendering"
 
 RENDERED_BYTES=$(wc -c < "$RENDERED" | tr -d ' ')
 if (( RENDERED_BYTES > METADATA_MAX_BYTES )); then
-  rm -f "$RENDERED"
   halt "the rendered file is $RENDERED_BYTES bytes, over the $METADATA_MAX_BYTES byte metadata limit"
 fi
 ok "$RENDERED_BYTES bytes, inside the $METADATA_MAX_BYTES byte limit for one metadata value"
@@ -569,7 +600,7 @@ say ""
 say "The line the machine will actually run:"
 grep -A5 'ExecStart=/usr/bin/docker run' "$RENDERED" | sed 's/^/    /'
 say ""
-confirm "Is that the image reference you expect?" || { rm -f "$RENDERED"; halt "stopped at your request, before the VM was touched"; }
+confirm "Is that the image reference you expect?" || halt "stopped at your request, before the VM was touched"
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
 stage "The environment file, fetched by the box from Secret Manager"
@@ -587,8 +618,7 @@ warn "It must never go into instance metadata: metadata is readable by anything 
 note "and packages/production/src/proof/image-scan.ts exists to keep these values out of"
 note "exactly that kind of place."
 
-ENV_STATE=$(gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-  --command="stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING" 2>/dev/null | tr -d '\r' | tail -n1 || true)
+ENV_STATE=$(on_box_line "stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
 
 if [[ -z "$ENV_STATE" ]]; then
   halt "could not reach $INSTANCE over the IAP tunnel to check for $SERVICE_ENV"
@@ -629,8 +659,7 @@ if [[ "$WRITE_ENV_FILE" == "yes" ]]; then
   say ""
   # The script is removed whether it succeeded or not: it is not a secret, but a stray copy in a
   # home directory is one more thing on the box that nobody is maintaining.
-  if gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-       --command='sudo bash ~/fetch-service-env.sh; status=$?; rm -f ~/fetch-service-env.sh; exit $status'; then
+  if on_box 'sudo bash ~/fetch-service-env.sh; status=$?; rm -f ~/fetch-service-env.sh; exit $status'; then
     ok "the box wrote $SERVICE_ENV from Secret Manager"
   else
     say ""
@@ -641,8 +670,7 @@ if [[ "$WRITE_ENV_FILE" == "yes" ]]; then
     halt "the box could not write $SERVICE_ENV"
   fi
 
-  ENV_STATE=$(gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-    --command="stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING" 2>/dev/null | tr -d '\r' | tail -n1 || true)
+  ENV_STATE=$(on_box_line "stat -c '%a %U:%G %s' $SERVICE_ENV 2>/dev/null || echo MISSING")
   # Re-read from the box rather than trusting the exit status: the claim that matters before the
   # restart is that the file is there, not that a command which writes it returned zero.
   if [[ "$ENV_STATE" == "MISSING" ]]; then
@@ -670,16 +698,14 @@ say "nothing on a running machine. The restart is what applies it."
 warn "This stops and starts $INSTANCE. Anything running on it is interrupted."
 note "A stop-then-start rather than a reset: a reset is a hard power cycle, and this box"
 note "carries an ext4 disk that later deploys will find real Run data on."
-confirm "Apply the metadata and restart $INSTANCE?" || { rm -f "$RENDERED"; halt "stopped at your request; the image is pushed but the VM is untouched"; }
+confirm "Apply the metadata and restart $INSTANCE?" || halt "stopped at your request; the image is pushed but the VM is untouched"
 
 if gc compute instances add-metadata "$INSTANCE" --zone="$ZONE" \
      --metadata-from-file="user-data=$RENDERED" >/dev/null; then
   ok "user-data applied to $INSTANCE"
 else
-  rm -f "$RENDERED"
   halt "add-metadata failed — the VM has not been restarted, so nothing has changed"
 fi
-rm -f "$RENDERED"
 
 say ""
 say "Stopping."
@@ -707,9 +733,7 @@ note "Polling for up to ten minutes. A pull, not a hang."
 BOOT_OK="no"
 for attempt in $(seq 1 40); do
   printf '  %s…%s attempt %s/40\r' "$DIM" "$RESET" "$attempt"
-  STATE=$(gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-    --command='systemctl is-active vox-production.service 2>/dev/null || true' 2>/dev/null \
-    | tr -d '\r' | tail -n1 || true)
+  STATE=$(on_box_line 'systemctl is-active vox-production.service 2>/dev/null || true')
   if [[ "$STATE" == "active" ]]; then BOOT_OK="yes"; break; fi
   sleep 15
 done
@@ -719,7 +743,7 @@ if [[ "$BOOT_OK" != "yes" ]]; then
   bad "vox-production.service did not reach active within ten minutes"
   say ""
   say "What the box says. Read this rather than re-running:"
-  gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap --command='
+  on_box '
     echo "--- cloud-init ---";      sudo journalctl -u cloud-init --no-pager -n 25 2>/dev/null || echo none
     echo "--- mount unit ---";      systemctl status "mnt-disks-vox\x2druns.mount" --no-pager 2>&1 | head -15
     echo "--- service unit ---";    systemctl status vox-production.service --no-pager 2>&1 | head -25
@@ -733,9 +757,7 @@ ok "vox-production.service is active"
 
 say ""
 say "Active is not the same claim as running the right image."
-RUNNING=$(gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-  --command='docker inspect --format={{.Config.Image}} vox-production 2>/dev/null || true' 2>/dev/null \
-  | tr -d '\r' | tail -n1 || true)
+RUNNING=$(on_box_line 'docker inspect --format={{.Config.Image}} vox-production 2>/dev/null || true')
 if [[ "$RUNNING" == "$IMAGE_REF" ]]; then
   ok "the running container is $DIGEST"
 else
@@ -745,9 +767,8 @@ fi
 
 say ""
 say "And that the disk is mounted, since the unit requires it and the service checks it."
-gc compute ssh "$INSTANCE" --zone="$ZONE" --tunnel-through-iap \
-  --command='findmnt -no SOURCE,TARGET,FSTYPE /mnt/disks/vox-runs 2>/dev/null || echo "NOT MOUNTED"' \
-  2>/dev/null | tr -d '\r' | sed 's/^/    /' || true
+on_box_line 'findmnt -no SOURCE,TARGET,FSTYPE /mnt/disks/vox-runs 2>/dev/null || echo "NOT MOUNTED"' \
+  | sed 's/^/    /'
 
 if (( VERIFY_FAILURES > 0 )); then
   SKIPPED+=("$VERIFY_FAILURES verification(s) failed — read them before claiming a conformance run")

@@ -1,9 +1,14 @@
 import { resolve } from 'node:path';
 import { ProductionPayloadSurface } from '../commands/payload-surface';
 import { createProductionNetworkHost } from './network-host';
-import { type VolumeProbe, assertPersistentVolumeMounted } from './persistent-volume';
+import {
+  type VolumeProbe,
+  assertPersistentVolumeMounted,
+  assertWritesLandOnVolume,
+} from './persistent-volume';
 import {
   createConfiguredProductionService,
+  required,
   resolveProductionServiceConfiguration,
 } from './service-configuration';
 import { resolveSocketTimeoutMs } from './socket-timeout';
@@ -29,12 +34,6 @@ export type ProductionCloudHost = {
   close: () => Promise<void>;
 };
 
-const required = (env: Record<string, string | undefined>, name: string): string => {
-  const value = env[name];
-  if (!value) throw new Error(`Missing trusted service configuration: ${name}`);
-  return value;
-};
-
 export const startProductionCloudHost = async ({
   env = process.env,
   volumeProbe,
@@ -50,7 +49,8 @@ export const startProductionCloudHost = async ({
    * are gone. The check that prevents it therefore runs before the object that would hide it
    * exists.
    */
-  assertPersistentVolumeMounted(required(env, 'VOX_VOLUME_ROOT'), volumeProbe);
+  const volumeRoot = required(env, 'VOX_VOLUME_ROOT');
+  assertPersistentVolumeMounted(volumeRoot, volumeProbe);
 
   /**
    * **This transport's own secret, not the pipe transport's.** The two sign under different domain
@@ -67,6 +67,21 @@ export const startProductionCloudHost = async ({
   const secret = required(env, 'VOX_NETWORK_TOKEN');
   const runsRoot = resolve(required(env, 'VOX_RUNS_ROOT'));
   const configuration = resolveProductionServiceConfiguration(env);
+
+  /**
+   * The mount being correct is not the same claim as anything being written to it, and until this
+   * ran the second claim rested on a heredoc in `deploy/fetch-service-env.sh` rather than on code.
+   * Three variables can each point off the volume with the mount check still green.
+   *
+   * `VOX_REMOTION_ENTRY` is deliberately not here: it is read from the image, not written to, and
+   * requiring it on the volume would be a guard wider than its claim.
+   */
+  assertWritesLandOnVolume(volumeRoot, {
+    VOX_RUNS_ROOT: runsRoot,
+    VOX_LEDGER_ROOT: configuration.ledgerRoot,
+    VOX_CALIBRATION_PATH: configuration.calibrationPath,
+  });
+
   const socketTimeoutMs = resolveSocketTimeoutMs(env.VOX_IPC_SOCKET_TIMEOUT_MS);
   const bindAddress = env.VOX_NETWORK_BIND ?? '127.0.0.1';
 

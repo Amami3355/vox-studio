@@ -41,6 +41,18 @@ const CREDENTIAL_EXTENSIONS = ['.pem', '.p12', '.pfx', '.key'];
  *
  * `VOX_BROWSER_EXECUTABLE` is deliberately absent: it is a path, not a secret, and the image is
  * supposed to set it.
+ *
+ * **This list deliberately differs from the deploy wizard's `PRODUCTION_SECRETS`, and the two are
+ * not drifting.** They answer different questions. The wizard's list is *what to fetch from
+ * Secret Manager for the running container*, so it includes `VOX_RUN_KEY_ID` — an identifier such
+ * as `smoke-local-1`, which the service needs and which is not sensitive — and excludes
+ * `VOX_IPC_TOKEN`, which the container has no use for. This list is *what must never be found
+ * baked into an image*, so it excludes the identifier and includes the local pipe transport's
+ * token, which is a real secret in the other topology and would be a real finding here.
+ *
+ * Said out loud because the sameness of the two lists is the obvious reading, a review made it,
+ * and the next person to add a secret has to know which list their new name belongs on — possibly
+ * both, possibly neither.
  */
 const SECRET_NAMES = [
   'ELEVENLABS_API_KEY',

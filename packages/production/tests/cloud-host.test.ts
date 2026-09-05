@@ -98,6 +98,22 @@ describe('the cloud entry point', () => {
     await expect(start({}, absent)).rejects.toThrow(/VOLUME_ABSENT/);
   });
 
+  /**
+   * The mount being present is not the claim that matters on its own — what matters is that the
+   * Runs land on it. Until this was wired, all three of these could point at the container's own
+   * filesystem with the mount check green, and the only thing keeping them on the volume was a
+   * heredoc in `deploy/fetch-service-env.sh`.
+   */
+  it.each(['VOX_LEDGER_ROOT', 'VOX_RUNS_ROOT', 'VOX_CALIBRATION_PATH'])(
+    'refuses to start when %s points off the volume, and binds nothing',
+    async (name) => {
+      await expect(start({ [name]: join(tmpdir(), 'vox-elsewhere', 'x') })).rejects.toThrow(
+        /VOLUME_ESCAPED/,
+      );
+      expect(host).toBeNull();
+    },
+  );
+
   it('refuses a request whose body is not the signed shape, by dropping the socket', async () => {
     const port = await start();
 
