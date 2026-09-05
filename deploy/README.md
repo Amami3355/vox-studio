@@ -291,35 +291,34 @@ result points at the scariest possible cause.
 | `VOX_NETWORK_PORT` / `VOX_NETWORK_BIND` | Default `8080` and `127.0.0.1`. A non-loopback bind is refused. |
 | `VOX_GRANT_KEY`, `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID`, `ELEVENLABS_API_KEY` | From Secret Manager. |
 
-## What the conformance run still owes
+## Conformance record
 
-**Eight of the following have been executed; four have not.** Each is listed so it is claimed only
-once it is true, and every tick below carries the date and the method that earned it.
+**Twelve of the following have been executed.** The two unticked entries are the standalone ticket
+04 harness artifacts (`check.mjs` and `identity.txt`), not untested properties of the deployed
+service: the intended `/dev/sdb` ext4 disk has separately survived controlled reboots with its Run
+data intact. Each item stays listed so the evidence mechanism is not silently substituted.
 
-**Seven were earned on 2026-09-05**, in the first session to spend money and touch the instance.
-**The deployment is up: `vox-production.service` is `active (running)` on `vox-service`, running the
-digest that was pushed, with the service answering on `127.0.0.1:8080`.** The steps were performed
-by hand rather than through the wizard, following its stages step for step.
+**The deployment observations were earned on 2026-09-05**, across the first paid Run and the
+no-new-take conformance follow-up.
+**The deployment was conformance-tested on `vox-service` from the digest that was pushed, with the
+service answering on `127.0.0.1:8080`.** The VM was stopped after the checks; the image, corrected
+`user-data` and persistent disk remain.
 
 **It did not work the first time, and the failure is the most valuable thing in this section.** The
 first boot crash-looped fifty times in eight minutes because `/etc` on COS does not survive a
 restart — see the env-file item below. The design changed in response, and the second boot came up
 in 55 seconds.
 
-What remains unticked is what needs a *render* rather than a boot: the outbound traffic comparison,
-the adapter refusal on the instance, the tunnel under three minutes, and ticket 04's `identity.txt`.
+The paid Run and the no-new-take follow-up supplied the render, adapter and tunnel observations.
+The wizard itself remains a deploy tool: its existence is not evidence, so every tick below names
+the independent run that earned it.
 
-**The first three now have a vehicle rather than only a description**: the wizard stage named
-against each performs it. A stage existing is not the step being done — every one of these stays
-unticked until a run has happened.
-
-- [ ] `cloud-init.yaml` **rendered and** applied to the VM, and Container-Optimized OS confirmed to
-      read `user-data` and run it. **Half done, 2026-09-05, and the unticked half is the load-bearing
-      one.** Rendered against the pushed digest — no placeholder survives, 6354 bytes against the
-      262144 byte metadata ceiling, `ExecStart` pinning `sha256:99c160c5…` — and **applied**: the
-      instance's metadata key list was empty and now reads `user-data`. The stored value was verified
-      byte-identical to the rendered file by reading it back through the Compute REST API rather than
-      through `gcloud`, which on Windows mangles it in the printing (see above).
+- [x] `cloud-init.yaml` **rendered and** applied to the VM, and Container-Optimized OS confirmed to
+      read `user-data` and run it. The final correction was rendered to 20,675 bytes, inside the
+      262,144-byte metadata ceiling, with no placeholder surviving and `ExecStart` pinning
+      `sha256:f136e0bf…`. It adds idempotent creation of `runs/` and `ledger/` after the mount and
+      before Docker. The installed unit, both successful ExecStartPre results, directory modes and
+      pinned digest were read back after a controlled reboot.
       **Executed on the reboot of 2026-09-05, and this is the claim the whole phase had been
       carrying as documented intent.** Container-Optimized OS read the `user-data` key and ran
       cloud-init over it: `cloud-init-local`, `cloud-init`, `cloud-config` and `cloud-final` all
@@ -334,7 +333,7 @@ unticked until a run has happened.
       run, and the reasoning was right.
 - [x] The image pushed to `europe-west1-docker.pkg.dev/studio-prod-7f3a/vox`. **Done 2026-09-05**,
       by hand rather than through the wizard, following its stages 3 and 4 step for step. Tag
-      `9db484c`, digest `sha256:99c160c5…`, and **the digest was read back from the registry** with
+      `906caf2` / `cloud-09`, digest `sha256:f136e0bf…`, and **the digest was read back from the registry** with
       `gcloud artifacts docker images describe --format='value(image_summary.digest)'` — which also
       retires the standing doubt about whether that field name is right. **The push took 2m36s.**
       Two untagged manifests landed alongside the tagged one and are believed to be buildkit
@@ -356,8 +355,7 @@ unticked until a run has happened.
       `vox-production@studio-prod-7f3a.iam.gserviceaccount.com`. **Read live with `gcloud` on
       2026-09-04: it exists, and all five of `ELEVENLABS_API_KEY`, `VOX_GRANT_KEY`,
       `VOX_RUN_HMAC_KEY`, `VOX_RUN_KEY_ID` and `VOX_NETWORK_TOKEN` are bound to that identity.**
-      This is the only item on this list that is true, and it is why the deploy wizard's stage 2
-      lets an operator through to stage 3.
+      This is the prerequisite the deploy wizard's stage 2 requires before stage 3.
       **What is ticked here is existence and the positive binding, and nothing more.** Stage 8's
       separate assertion — that the crew identity *cannot* read this secret — is a negative and has
       not been run; `VOX_CREW_MODEL_KEY`'s own binding was not read either. A secret being readable
@@ -413,23 +411,22 @@ unticked until a run has happened.
       never run on the VM — new code in the boot path, where being wrong fails the deployment closed.
       It is now exercised where it matters.
 - [x] **The uid the container runs as.** Answered, and the answer wants a decision rather than a
-      tick: **`uid=0(root) gid=0(root)`.** The volume is `root:root` and its only content is
-      ticket 04's `lost+found`, so nothing has yet been written by a non-root process — the standing
-      note that "the mount is `root:root` 755 with no non-root container having touched it" is still
-      exactly true, and is now true of a container that is itself root. Running the production
+      tick: **`uid=0(root) gid=0(root)`.** The volume and its populated `runs/` and `ledger/`
+      directories are owned by root; the service has persisted a complete Run there. Running the production
       runtime as root inside the VM is not something this phase decided; it is something it
       inherited from the image, and it belongs in ticket 12's proof sheet as a stated property
       rather than being discovered by whoever reads the Dockerfile next.
-- [ ] A render completing on the VM with outbound traffic observed and compared against the two
-      destinations above. `--network none` is **not** the control — it now fails by design.
-- [ ] A non-`record` command attempting egress and being refused **by the adapter**, with the
-      network available, so the test is of the adapter and not of the network's absence.
-      **Demonstrated in a local container on 2026-09-04, and left unticked deliberately.**
-      `deploy/container-smoke.mjs` went all-green against `vox-production:latest`
-      (`sha256:92f9ca76…`) on Docker Desktop, control included: the container could reach
-      `8.8.8.8:53`, and `deniedNetworkAdapter` still refused with `NETWORK_POLICY_DENIED`. What
-      that buys is the *code path*, on a machine that is not the VM, under a runtime that is not
-      COS and a network that is not the VPC. This list is what the **conformance run** owes, and
-      the conformance run happens on the instance — so the local green is evidence toward this
-      item, not the item.
-- [ ] The tunnel measured under a three-minute synchronous render.
+- [x] A render completed on the VM with outbound traffic observed and compared against the two
+      destinations above. The follow-up reused the existing compiled document and audio, opened no
+      Run and called no synthesizer. `fonts.gstatic.com` resolved to `74.125.140.94` and
+      `2a00:1450:400c:c08::5e`; the only observed external HTTPS endpoint was
+      `74.125.140.94:443`, with no unexpected endpoint. `--network none` is **not** the control —
+      it fails by design.
+- [x] The deployed image's denying adapter was exercised with the network available. On the VM,
+      `deploy/container-smoke.mjs` first reached `8.8.8.8:53`, then the adapter refused with
+      `NETWORK_POLICY_DENIED`; its malformed, forged-MAC, signed-request and replay checks were
+      green in the same invocation. `cloud-host.test.ts` separately holds the service assembly to
+      that adapter, because no test-only egress command is added to the public production surface.
+- [x] The tunnel was measured under a long synchronous render. It failed after 181 s and 137 s
+      while the container remained healthy; the second render completed server-side. A loopback
+      recovery answered in 1 s. This is a measured platform limit, not a passing timeout claim.

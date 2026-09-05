@@ -25,11 +25,10 @@
 # instances create` takes `--metadata-from-file=user-data=deploy/cloud-init.yaml`, which is the
 # documented way to hand an instance a file at creation.
 #
-# **What is verified and what is not.** `--metadata-from-file` is confirmed against the gcloud CLI
-# reference. That Container-Optimized OS reads the `user-data` key and runs cloud-init over it is
-# the documented COS contract but has **not been executed**. The VM exists and runs COS, and its
-# metadata key list is empty — checked 2026-09-03 — so this file has never been applied to it.
-# It is documented intent until the conformance run. See ticket 07's "What was built".
+# **Verified on the deployed VM, twice.** Container-Optimized OS reads the `user-data` key and runs
+# cloud-init on each boot. The mount, secret-fetch and production units all came up from this file;
+# after the fresh-volume directory fix below was applied, a second controlled reboot installed the
+# corrected ExecStartPre lines and the service bound `127.0.0.1:8080` from the pinned digest.
 #
 # One instance. Not a scaling group, not a template with more than one. ADR-0018 decision 8: the
 # replay cache is an in-process `Map`, so one container is one cache, and a request captured inside
@@ -134,6 +133,12 @@ write_files:
       [Service]
       Environment="HOME=/home/vox"
       ExecStartPre=/usr/bin/docker-credential-gcr configure-docker --registries=europe-west1-docker.pkg.dev
+      # A mounted fresh disk contains only lost+found. ProductionPayloadSurface stages run.init
+      # inside VOX_RUNS_ROOT and the ledger writes beside it, so both directories must exist before
+      # the container starts. The hard mount dependency above ensures these land on the disk rather
+      # than creating convincing substitutes on the host filesystem.
+      ExecStartPre=/bin/mkdir -p /mnt/disks/vox-runs/runs /mnt/disks/vox-runs/ledger
+      ExecStartPre=/bin/chmod 0700 /mnt/disks/vox-runs/runs /mnt/disks/vox-runs/ledger
       ExecStartPre=-/usr/bin/docker rm -f vox-production
       # `--network host` with the service bound to 127.0.0.1 keeps the listener on loopback of the
       # VM itself, which is where the SSH tunnel lands. A published port would put it on the

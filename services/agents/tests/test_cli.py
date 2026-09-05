@@ -12,6 +12,7 @@ spawning the launcher, and a stub client would answer for both.
 from __future__ import annotations
 
 import json
+from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +139,37 @@ def test_stdout_is_every_envelope_the_convergence_saw_and_nothing_else(
     out = capsys.readouterr().out
     assert out.startswith(EXPECTED)
     assert out.count("\n") == len(logged)
+
+
+def test_stdout_is_utf8_when_windows_gives_the_cli_a_legacy_text_stream(work_root) -> None:
+    """The operator's Windows console must carry every published contract character.
+
+    A real cloud discovery reached an arrow in the teaching surface and crashed because
+    ``sys.stdout`` was cp1252. The command owns its stdout byte contract, so it must select
+    UTF-8 rather than requiring an operator to set ``PYTHONIOENCODING`` first.
+    """
+    bytes_out = BytesIO()
+    windows_stdout = TextIOWrapper(bytes_out, encoding="cp1252")
+    projections = {
+        name: projection(name, {"of": f"{name} \N{RIGHTWARDS ARROW} output"}).replace(
+            "\\u2192", "\N{RIGHTWARDS ARROW}"
+        )
+        for name in CATEGORIES
+    }
+    expected = recorded("contract-index.stdout") + "".join(projections.values())
+
+    try:
+        exit_code = cli.main(
+            ["--work-root", str(work_root), "--discovery-only"],
+            client=StubClient(recorded("contract-index.stdout"), projections),
+            out=windows_stdout,
+        )
+        windows_stdout.flush()
+    finally:
+        windows_stdout.detach()
+
+    assert exit_code == 0
+    assert bytes_out.getvalue().decode("utf-8") == expected
 
 
 def test_the_work_root_grows_the_run_and_the_bundle_and_nothing_else(

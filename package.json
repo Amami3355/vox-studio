@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:wizard": "node deploy/tests/excluded-from-context.test.mjs",
+    "test:deploy": "node deploy/tests/cloud-deployment-contract.test.mjs",
     "test:render": "vitest run --config vitest.render.config.ts",
     "test:stress": "vitest run --config vitest.stress.config.ts",
     "check": "biome check .",

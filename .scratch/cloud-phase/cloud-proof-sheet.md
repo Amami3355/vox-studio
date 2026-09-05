@@ -3,7 +3,9 @@
 **Written 2026-09-05, before the Run, which is the only time it can be written honestly.**
 Ticket 09's own criterion: *"The 'not evidenced' entries are written before the run, not after.
 Deciding what the cloud cannot prove while looking at what it happened to produce is how a proof
-sheet becomes a summary of the outcome."* Nothing below was authored with a result in front of it.
+sheet becomes a summary of the outcome."* Nothing below was authored with a result in front of it;
+the one post-Run factual correction is labelled with its date rather than passed off as pre-Run
+knowledge.
 
 The local sheet's assertion ids are read out of `packages/production/src/proof/assertions.ts`
 rather than transcribed from a previous sheet. Every one of them is dispositioned here:
@@ -73,7 +75,7 @@ itself.
 | Unauthenticated request refused | inside the tunnel, through the forwarded port |
 | Request with a bad body MAC refused | inside the tunnel |
 | Replayed request refused | inside the tunnel |
-| The VM has no external address and the firewall admits nothing on the service's port | outside, as a provisioning fact |
+| The VM has no external address, the service binds loopback and IAP admits only SSH from outside | outside, as a provisioning fact. **Corrected 2026-09-05:** the inherited `default-allow-internal` rule admits internal TCP, so the firewall alone is not the service-port boundary |
 | The crew identity cannot read a production secret | outside, against Secret Manager |
 
 The last two are **provisioning properties, not things the service earned**, and are recorded as

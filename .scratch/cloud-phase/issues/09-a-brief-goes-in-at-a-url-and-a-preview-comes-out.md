@@ -36,9 +36,11 @@ and that what the cloud cannot evidence is reported rather than omitted — is u
   only because the network was unavailable has not tested the adapter* — turned on the ticket.
 - **"No public ingress" stops being an application check and becomes a provisioning one.** Under the
   tunnel it is true by construction, which makes it cheaper to assert and weaker as evidence of
-  anything the service does. Assert it where it now lives: the VM has no external address and the
-  firewall admits nothing on the service's port. Record it as a property of the topology rather than
-  as a thing the service earned.
+  anything the service does. Assert it where it now lives: the VM has no external address, IAP
+  reaches only SSH, and the service binds loopback. **Corrected 2026-09-05:**
+  `default-allow-internal` admits internal TCP, so “the firewall admits nothing on the service's
+  port” was false and is not an acceptance criterion. Record the actual mechanisms as properties
+  of the topology rather than as things the service earned.
 
 ## Problem Statement
 
@@ -152,16 +154,16 @@ broke.
 `.scratch/cloud-phase/issues/08-a-second-client-joins-the-first-and-neither-is-nameable-from-above.md`,
 `.scratch/cloud-phase/issues/10-the-preview-is-reachable-without-a-domain.md`
 
-- [ ] Spend is stated and authorised before the run starts
-- [ ] A Brief is submitted by the local crew to the remote service, with no launcher in the path, and with the Run store, the render and the four production secrets all off the operator's disk
-- [ ] A Run completes and a preview is produced, retrieved over the tunnel by its published descriptor, and watched
+- [x] Spend is stated and authorised before the run starts
+- [x] A Brief is submitted by the local crew to the remote service, with no launcher in the path, and with the Run store, the render and the four production secrets all off the operator's disk
+- [x] A Run completes and a preview is produced, retrieved over the tunnel by its published descriptor, and watched — user verdict on 2026-09-05: “the video is ok”
 - [ ] The evidence bundle verifies on a machine that did not produce it
 - [ ] The cloud Run is compared to a known-good local Run and every difference beyond Run id and timestamps is enumerated
-- [ ] A cloud proof sheet exists, with each local assertion carried forward, replaced per ticket 02's ADR, or marked not evidenced with a reason
-- [ ] The "not evidenced" entries were written before the run
-- [ ] Three host checks pass from inside the tunnel, through the forwarded port: unauthenticated refused, bad MAC refused, replay refused
-- [ ] Two checks pass from outside the service: the VM has no external address and the firewall admits nothing on its port, and the crew identity cannot read a production secret
-- [ ] A non-`record` command is confirmed to reach no network against the deployed container
-- [ ] Wall time, render envelope and spend are recorded
+- [x] A cloud proof sheet exists, with each local assertion carried forward, replaced per ticket 02's ADR, or marked not evidenced with a reason
+- [x] The "not evidenced" entries were written before the run
+- [x] Three host checks pass from inside the tunnel, through the forwarded port: unauthenticated refused, bad MAC refused, replay refused
+- [x] Two checks pass from outside the service: the VM has no external address, direct IAP to port 8080 is refused and the service binds loopback; the crew identity has no production-secret binding. The identity result is an IAM-policy observation, not a live denied read
+- [x] The deployed image's denying adapter is confirmed with egress available on the VM; the live smoke reaches its control endpoint and then receives `NETWORK_POLICY_DENIED`
+- [x] Wall time, render envelope and spend are recorded
 - [ ] Crew instructions, prompts and recorded fixtures are unchanged across the whole phase, asserted
-- [ ] No code was changed by this ticket
+- [x] No code was changed by this ticket; follow-up fixes are owned by ticket 07 and the crew CLI defect

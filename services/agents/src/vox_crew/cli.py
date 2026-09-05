@@ -191,14 +191,14 @@ def author_for(arguments: Arguments) -> PlanAuthor:
 def _verbatim(stream: IO[str]) -> IO[str]:
     """Stops the platform rewriting the envelopes on the way out.
 
-    Text streams translate newlines on Windows, which would make stdout a faithful rendering
-    of the envelopes rather than the envelopes. Nothing else here is allowed to change them,
-    so this is not allowed to either.
+    Windows text streams default to a legacy code page and translate newlines, either of which
+    can make stdout a faithful rendering of the envelopes rather than the envelopes. Nothing
+    else here is allowed to change them, so this is not allowed to either.
     """
     reconfigure = getattr(stream, "reconfigure", None)
     if reconfigure is not None:
         try:
-            reconfigure(newline="")
+            reconfigure(encoding="utf-8", newline="")
         except (ValueError, OSError):
             pass
     return stream

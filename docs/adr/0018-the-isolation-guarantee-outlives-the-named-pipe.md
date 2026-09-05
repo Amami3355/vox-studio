@@ -57,11 +57,12 @@ one breath, and the mechanism is the half that does not travel.
 
 ### 2. What answers *who may reach the service at all*, and *who may connect*
 
-**No public ingress, and no listening socket the network can reach.** The service binds its
-container's port on a VM whose firewall admits nothing from outside; the only route in is an SSH
-tunnel gated by a key the operator holds. The tunnel answers *who may reach the service at all*
-where the absence of a socket used to. The SSH key answers *who may connect* where the pipe ACL
-used to.
+**No public ingress, and no listening socket the network can reach.** The VM has no external
+address, the service binds loopback, and the only route in is an SSH tunnel gated by a key the
+operator holds. The firewall admits IAP only on port 22 from outside, but the project's inherited
+`default-allow-internal` rule admits internal TCP; the firewall alone is therefore not the service-
+port boundary. The tunnel answers *who may reach the service at all* where the absence of a socket
+used to. The SSH key answers *who may connect* where the pipe ACL used to.
 
 **The per-request HMAC survives unchanged, and it answers a third question.** It authenticates the
 request *body*, not the channel, and the Run ledger's integrity story in ADR-0008 already rests on

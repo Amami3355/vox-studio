@@ -73,11 +73,12 @@ issue a command production did not publish. The named pipe was one way to delive
 restates the guarantee in terms that survive a transport change, so that a future topology can be
 judged against it rather than against a socket type.
 
-**What replaces the pipe ACL.** *Amended 2026-09-02.* No public ingress and no listening socket the
-network can reach: the service binds loopback on its VM, the firewall admits nothing, and the only
-route in is an SSH tunnel gated by a key the operator holds. The tunnel answers *who may reach the
-service at all* where the absence of a socket used to, and the SSH key answers *who may connect*
-where the ACL used to. The per-request MAC stays, unchanged, because it authenticates the request
+**What replaces the pipe ACL.** *Amended 2026-09-02; corrected from the live firewall read on
+2026-09-05.* No public ingress and no listening socket the network can reach: the VM has no external
+address, the service binds loopback, and the only route in is an SSH tunnel gated by a key the
+operator holds. `default-allow-internal` admits internal TCP, so the firewall alone is not the
+service-port boundary. The tunnel answers *who may reach the service at all* where the absence of a
+socket used to, and the SSH key answers *who may connect* where the ACL used to. The per-request MAC stays, unchanged, because it authenticates the request
 body rather than the channel and the Run ledger's integrity story already rests on it. Two
 independent answers to two different questions, which is the property the local topology has and
 which is easy to lose by assuming one channel covers both.

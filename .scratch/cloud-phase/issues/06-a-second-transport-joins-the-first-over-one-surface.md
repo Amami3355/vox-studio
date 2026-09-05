@@ -63,9 +63,11 @@ callers of one command service and both are permanent. The handler that is share
 behaviour — authentication, replay, sanitisation, signing — not the dispatch shape.
 
 **Caller authentication is the tunnel's answer, and the HMAC stays.** *Corrected 2026-09-02; the
-paragraph this replaces said "the platform's answer" and named a workload identity.* No public
-ingress: the firewall admits nothing, the host binds loopback on the VM, and the only route in is
-an SSH tunnel gated by a key the operator holds. `sshd` answers *who may connect*. The per-request
+paragraph this replaces said "the platform's answer" and named a workload identity. Corrected again
+from the live firewall read on 2026-09-05.* No public ingress: the VM has no external address, the
+host binds loopback, and the only route in is an SSH tunnel gated by a key the operator holds.
+`default-allow-internal` admits internal TCP, so the firewall alone is not the service-port
+boundary. `sshd` answers *who may connect*. The per-request
 HMAC is not replaced by that, because it authenticates the request *body* rather than the channel,
 and the Run ledger's integrity story already rests on it. Two questions, two answers, and collapsing
 them into one is the mistake this decision exists to prevent — which is why **the network host adds

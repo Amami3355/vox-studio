@@ -37,7 +37,9 @@ any other way, two when the invocation named something that is not there.
 
 Stdout carries production's envelopes and nothing else, in the order they arrived, byte for
 byte, so a run redirected to a file is a record of what the interface said. Everything the crew
-has to say about them goes to stderr.
+has to say about them goes to stderr. The command configures stdout as UTF-8 itself, including on
+Windows consoles whose inherited text stream is `cp1252`; an operator does not need to set
+`PYTHONIOENCODING` for the teaching surface's Unicode to survive.
 
 Two flags change what the command is. `--plan plan.json` hands the crew a plan instead of
 asking a model for one: everything else is the same code — discovery, the review, the

@@ -766,25 +766,26 @@ else
 fi
 
 # ── 8 ─────────────────────────────────────────────────────────────────────
-stage "The unit came up, and it is running the digest that was pushed"
+stage "The service socket came up, and it is running the digest that was pushed"
 say "This is the stage that turns two documented intentions into observed facts: that"
 say "Container-Optimized OS reads the user-data key and runs cloud-init over it, and that"
-say "the mount unit's escaped name is the one systemd derives. Neither has ever been run."
+say "the mount unit's escaped name is the one systemd derives. Both were first observed on"
+say "2026-09-05; this stage re-checks them on every deployment."
 say ""
 say "First boot pulls $IMAGE_SIZE from Artifact Registry, so this is slow."
 note "Polling for up to ten minutes. A pull, not a hang."
 
-BOOT_OK="no"
+READY_OK="no"
 for attempt in $(seq 1 40); do
   printf '  %s…%s attempt %s/40\r' "$DIM" "$RESET" "$attempt"
-  STATE=$(on_box_line 'systemctl is-active vox-production.service 2>/dev/null || true')
-  if [[ "$STATE" == "active" ]]; then BOOT_OK="yes"; break; fi
+  STATE=$(on_box_line 'ss -H -ltn 2>/dev/null | grep -Eq "127\.0\.0\.1:8080([[:space:]]|$)" && echo ready || true')
+  if [[ "$STATE" == "ready" ]]; then READY_OK="yes"; break; fi
   sleep 15
 done
 printf '                                   \r'
 
-if [[ "$BOOT_OK" != "yes" ]]; then
-  bad "vox-production.service did not reach active within ten minutes"
+if [[ "$READY_OK" != "yes" ]]; then
+  bad "the Production service did not bind 127.0.0.1:8080 within ten minutes"
   say ""
   say "What the box says. Read this rather than re-running:"
   on_box '
@@ -793,11 +794,11 @@ if [[ "$BOOT_OK" != "yes" ]]; then
     echo "--- service unit ---";    systemctl status vox-production.service --no-pager 2>&1 | head -25
   ' 2>/dev/null | sed 's/^/    /' || note "the tunnel did not answer"
   say ""
-  note "A unit that is 'activating' is still pulling. A unit restarting every ten seconds is"
-  note "the crash loop this wizard's ordering exists to prevent — read its ExecStart above."
+  note "systemctl active is not readiness: systemd reports active while docker is still pulling,"
+  note "and can report it before any container has bound the socket. Read the unit and journal above."
   halt "the deployment did not come up"
 fi
-ok "vox-production.service is active"
+ok "the Production service is listening on 127.0.0.1:8080"
 
 say ""
 say "Active is not the same claim as running the right image."
@@ -826,9 +827,10 @@ note "  digest     $DIGEST"
 note "  instance   $INSTANCE, restarted with user-data applied"
 printf '\n  %sWhat this has NOT shown%s\n' "$BOLD" "$RESET"
 note "  that a render completes on the VM, with its egress observed"
-note "  that the tunnel survives a three-minute synchronous render"
-note "  that the mount survives a reboot, or that it is the intended disk rather than"
-note "  merely a separate filesystem — ticket 04's identity.txt is what closes that"
+note "  that a long synchronous render response returns through the tunnel — the 2026-09-05"
+note "  conformance run measured the opposite, so use status and artifact recovery"
+note "  ticket 04's standalone identity.txt/check.mjs rerun; the deployed disk itself has"
+note "  survived controlled reboots with its Run data intact"
 printf '\n  %sThe tunnel%s\n' "$BOLD" "$RESET"
 note "  gcloud compute ssh $INSTANCE --zone=$ZONE --tunnel-through-iap"
 printf '\n'

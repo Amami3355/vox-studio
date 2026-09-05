@@ -1,10 +1,10 @@
 # 07: The trusted service is a container, without a launcher
 
-Status: awaiting-conformance-run
-**Deployed and running as of 2026-09-05** — `vox-production.service` is `active (running)` on
-`vox-service`, on the pushed digest, answering on `127.0.0.1:8080`. The status stays
-`awaiting-conformance-run` because what the run still owes is a *render* with its egress observed,
-not a boot. See "What the 2026-09-05 deploy established" below.
+Status: done
+**Deployed and conformance-tested as of 2026-09-05.** The service ran on `vox-service` from the
+pushed digest, answered on `127.0.0.1:8080`, rendered the existing cloud Run while its connections
+were observed, and passed the live adapter refusal with egress available. The VM was stopped after
+the checks; the image, metadata and persistent Run disk remain. See "Closure, 2026-09-05" below.
 Type: task
 Blocked by: 03, 06, 11
 
@@ -226,22 +226,47 @@ unavailable has not tested the adapter.
 - [x] Secrets are read from the environment the managed store populates, with no code change to how they are read
 - [x] The ledger root and the calibration path are on ticket 04's volume; the Remotion entry point is in the image — **enforced rather than arranged, 2026-09-05.** This was true only because a heredoc in `deploy/fetch-service-env.sh` wrote it that way: all three write paths could point off the volume with the mount check green, which is the failure that check exists to prevent, reached by a one-line env edit. `assertWritesLandOnVolume` now refuses to start on it
 - [x] The service refuses to start when its volume is absent, asserted — in unit tests and by a real container, which printed `VOLUME_NOT_MOUNTED` and exited 1
-- [x] The denying network adapter is unchanged and is asserted from inside the container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence. **Scoped 2026-09-05:** what the smoke asserts is the adapter *object*, imported into the smoke's own process with egress demonstrably available. It dispatches no command through the listening service, so it is not evidence that the running host was built with this adapter — that wiring is asserted in-process by `cloud-host.test.ts`. Read strictly, ADR-0018 decision 8's *non-`record` command attempting egress* is wider than this, and `deploy/README.md` keeps its bullet unticked for that reason
+- [x] The denying network adapter is unchanged and is asserted from inside the deployed container, independently of the egress rule — with a reachability control first, so the refusal is the adapter and not the network's absence. The smoke asserts the adapter object from the deployed digest; `cloud-host.test.ts` separately asserts that the running host is constructed with that object. The two observations meet at the image digest rather than at a test-only public command
 - [x] `createRemotionRenderAdapter` is given a pinned `browserExecutable` and downloads no browser at start — and refuses a download outright when the pin is set, so a wrong path fails loudly
 - [x] The two intended egress destinations — the synthesizer's host and `fonts.gstatic.com` — are written down with their reasons, and the ticket states plainly that nothing at the network layer enforces the list — `deploy/README.md`
-- [ ] A render completes on the VM with its outbound traffic observed and compared against those two destinations — **not done.** *Corrected 2026-09-03:* the VM exists and is running. `studio-prod-7f3a` carries `vox-service` on `cos-stable-121-18867-584-3`, `e2-standard-2`, `europe-west1-c`, no external address, with `vox-runs` attached as device `vox-runs`. What blocks the run is three deploy steps, not provisioning — see "What the conformance run is actually blocked on"
+- [x] A render completes on the VM with its outbound traffic observed and compared against those two destinations — the no-new-take probe rendered the existing compiled document and audio while sampling the container's established connections. `fonts.gstatic.com` resolved to `74.125.140.94` and `2a00:1450:400c:c08::5e`; the only observed external HTTPS endpoint was `74.125.140.94:443`, with no unexpected endpoint
 - [x] The weakened ADR-0007 property is stated in ADR-0018, not inherited
 - [x] The container builds, boots and rejects a malformed request, reaching no model or network — run against a real container, `deploy/container-smoke.mjs`, eight checks. **"in CI" struck 2026-09-05:** there is no CI job for this. It was a manual `docker exec` on Docker Desktop under Windows, on a bridge network — not COS, not the VM, not the VPC. The same assertion is worth different amounts in different places, and the conformance run happens on the instance
 - [x] A showcase render completes in the container, with memory, CPU and wall time recorded — done by ticket 11: 2.08 GB peak, 178 s, two vCPU
-- [~] The request timeout admits that render, on the platform as well as in the host — **host half only.** 15 minutes against a measured 178 s, asserted. The platform half is the tunnel and has not been measured
+- [x] The request timeout and platform path are measured rather than assumed. The host allows 15 minutes. The SSH forwarding path failed after 181 s and 137 s while the container remained healthy, so a long synchronous response is a measured platform failure rather than a timeout success; direct loopback recovery returned in 1 s after the server-side render completed
 - [x] The leak scan passes over the image's readable layers — **with a narrowing recorded in ADR-0018 decision 8**, because the agent-distribution scan cannot be run over an image that is the production runtime. **A second narrowing, found and closed 2026-09-05:** the scan walked `/app` alone while claiming the image's layers, so `/root/.npmrc` — the likeliest baked credential in a Node image, and named in `CREDENTIAL_FILENAMES` since the scan was written — was never looked at. It now walks `/app`, `/root`, `/pnpm` and `/etc/vox`, and reports an absent root rather than passing over it in silence. **The widened scan was run on 2026-09-05 and passed** — 310 files across `/app`, `/root` and `/pnpm`, with `/etc/vox` absent and no violations. There is no `/root/.npmrc` in this image, which is the credential the widening was looking for, and `/pnpm` contributed nothing because its only child is the skipped `store`
 - [x] The one-instance ceiling and its reason are written down — `deploy/README.md` and `deploy/cloud-init.yaml`
 
-## What was built, 2026-09-03
+## Closure, 2026-09-05
 
-**The code half is done and the deployment half is not.** Everything below runs; nothing below has
-touched a VM. That split is the honest state of this ticket and is why its status is
-`awaiting-conformance-run` rather than `done`.
+The paid end-to-end Run supplied the capability proof; this follow-up supplied the conformance
+evidence without opening a new Run or calling ElevenLabs.
+
+- `deploy/container-smoke.mjs` ran inside the deployed digest. Its egress control reached
+  `8.8.8.8:53`; `deniedNetworkAdapter` then refused with `NETWORK_POLICY_DENIED`. The malformed,
+  forged-MAC, signed-request and replay checks were green in the same invocation.
+- A fresh render was driven from the existing Run's compiled document and audio while the
+  container's established TCP connections were sampled. The only external HTTPS endpoint was the
+  current IPv4 answer for `fonts.gstatic.com`; no unexpected HTTPS endpoint appeared. The probe
+  preview was 16,798,495 bytes. It was temporary and was removed after the observation.
+- The first real Run exposed that a fresh disk has no `runs/` or `ledger/`. The systemd unit now
+  creates both at mode 0700 after the hard mount dependency and before Docker starts. Corrected
+  `user-data`, still pinned to digest `sha256:f136e0bf…`, was applied and reboot-tested on the VM.
+- The deploy wizard now waits for the `127.0.0.1:8080` listener. It no longer treats
+  `systemctl is-active` as readiness; the real boot proved that state can be green before a
+  container exists.
+- The VM was stopped after the checks. The one-instance ceiling therefore remains structural when
+  the service is started, and no idle compute is intentionally left running.
+
+Two findings are deliberately not repaired by this ticket: the container runs as root, which
+ticket 12 must disposition, and the SSH tunnel cannot carry a long synchronous render response,
+which is the forcing fact for a later asynchronous-render decision.
+
+## What was built before conformance, 2026-09-03
+
+**This section is the pre-deploy record and is preserved as history.** At this point the code half
+was done and nothing below had touched a VM. The closure above records what the later deployment
+and conformance run established.
 
 ### The second entry point
 
@@ -314,7 +339,10 @@ and a negated character class matching newlines so a value ran across lines into
 Both are pinned by tests. It also flagged its own source, which is why its comments describe the
 offending shape rather than quoting it.
 
-### What is documented intent rather than evidence
+### What was documented intent rather than evidence
+
+The closure above supersedes these unknowns; they remain here because they were the explicit list
+the conformance run had to answer rather than a success narrative reconstructed afterward.
 
 - **`cloud-init.yaml` has never run.** `--metadata-from-file` is confirmed against the gcloud
   reference; that Container-Optimized OS reads `user-data` and runs cloud-init over it is the
@@ -447,5 +475,6 @@ value is in fact byte-identical; `gcloud`'s stdout encoding does the replacing, 
 through `PYTHONIOENCODING=utf-8` and a UTF-8 console alike. **A verification that runs through the
 tool being verified is not independent of it.** The REST API is, and is what settled it.
 
-Unchanged and still owed once those are done: whether the disk survives a reboot, which uid the
-container runs as, `identity.txt`, `check.mjs`'s exit 3, and the tunnel under a three-minute render.
+The later Run answered the disk reboot, uid and tunnel questions. The standalone `identity.txt` and
+`check.mjs` exit-3 artifacts remain a ticket 04 harness replay, not an unobserved deployment
+property; `/dev/sdb` and the persisted Run directories identify the deployed disk directly.

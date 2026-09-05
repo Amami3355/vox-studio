@@ -175,8 +175,10 @@ them contradict tickets as written; those tickets were edited the same day rathe
   through the `user-data` metadata key with `Restart=always`. The cloud entry point is
   `cloud-host.ts`, which holds the one authorised network-host binding; `service-host.ts` keeps the
   pipe and both call one shared service construction. The two transports now hold separate key
-  material as well as separate signing domains. **The code runs and the image runs; no VM has been
-  created, so the unit file is documented intent.**
+  material as well as separate signing domains. **Closed 2026-09-05:** the unit was applied and
+  reboot-tested on `vox-service`, the persistent Run disk survived, a render completed with only
+  the current `fonts.gstatic.com` HTTPS endpoint observed, and the deployed adapter refused with
+  egress available. The VM is stopped after conformance; the deployment remains on disk.
 
 - **The image's leak scan is not the agent distribution's leak scan** — 07, 2026-09-03. ADR-0018
   decision 8 asked for `scanReadableFiles` over the image's layers, and that cannot be executed: it
@@ -186,21 +188,20 @@ them contradict tickets as written; those tickets were edited the same day rathe
   absorbing it. Running it for the first time found a 130 MB host virtualenv and the whole test suite
   inside the image.
 
-## Not yet specified
+## Findings awaiting a later decision
 
 In scope, real, and not yet sharp enough to ticket.
 
-- **Which uid the container runs as.** Still open. The disk is `root:root 755` and no non-root
-  container has touched it. *Narrowed 2026-09-03 by ticket 07:* the reboot half is answered — a
-  systemd `.mount` unit in `deploy/cloud-init.yaml` replaces the missing `/etc/fstab` entry, and the
-  service unit `Requires=` it so a failed mount stops the service rather than being papered over.
-  **Neither unit has run.**
+- **The container runs as uid 0.** Observed on `vox-service`, inherited from the image rather than
+  chosen. The disk's `runs/` and `ledger/` directories are `0700 root:root`; cloud-init now creates
+  that layout on a fresh mounted disk before Docker starts. Whether production should become
+  non-root is a ticket 12 decision, not an unknown hidden in the Dockerfile.
 
-- **The operator procedure on the day.** How the tunnel is stood up, what the operator types, and
-  what they see while a synchronous render runs for minutes. The tunnel half is now answered —
-  `gcloud compute ssh <instance> --tunnel-through-iap`, and ticket 03's wizard proves it reaches
-  the box in its last stage. What the operator watches during a three-minute synchronous render is
-  still unwritten, and graduates once 07 deploys something to watch.
+- **A long render needs an asynchronous return path.** The SSH local forward carries short signed
+  requests and a 16.7 MB artifact, but failed after 181 s and 137 s while the server stayed healthy;
+  one failed client call completed its render on the box. For this phase, recovery is `status` then
+  `render` against the existing Run, never a new `record`. A durable asynchronous render operation
+  belongs to the next map.
 - **What the local proof harness's Windows-only verdicts become.** Ticket 02's ADR names which
   recorded probes stop meaning anything; what replaces them in the sheet is downstream of that
   naming and of [12](issues/12-the-proof-sheet-says-what-it-cannot-evidence.md).
