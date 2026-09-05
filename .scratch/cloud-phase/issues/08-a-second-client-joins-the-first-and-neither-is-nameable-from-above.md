@@ -2,6 +2,28 @@
 
 Status: ready-for-agent
 
+**Promoted 2026-09-05 by [10](10-the-preview-is-reachable-without-a-domain.md), and it gained the
+transport's missing half.** This ticket was about to be demoted as invisible in a demo. With the
+preview chosen to arrive as bytes over the tunnel rather than as a link, **this client is the thing
+that fetches the preview** and ticket 09 scores nothing without it.
+
+What it gained: `ProductionPayloadSurface.fetchArtifact` (`payload-surface.ts:157`) is complete and
+**is not routed anywhere**. It is not a case in `route()`'s command switch, and `network-host.ts`
+serves exactly one path, `POST /command`, carrying a `PayloadCommandRequest` into `execute()`. So
+`HttpProductionClient.fetch_artifact` has **nothing on the other side to call**, and this ticket owns
+building it: a second signed route, `POST /artifact`, HMAC-verified exactly as `/command` is, taking
+a Run id and a descriptor and answering `application/octet-stream`.
+
+**Not base64 in an envelope** — that would put a render inside a contract category for a transport's
+convenience. **Read ADR-0018 decision 7 and `network-host.test.ts`'s repository scan before adding
+it**: adding a route is not adding a host, but confirm that reading rather than assume it. And
+`MAX_IPC_FRAME_BYTES` (16 MiB) bounds the *request* only — `readBody` enforces it, the response path
+does not, and **no preview has been measured against that number.**
+
+The paragraph below that predicted this is still the best thing in the ticket: *"the read-back half,
+because streaming bytes over a network is more annoying than reading a file."* The annoyance turned
+out to be that nobody built it at all.
+
 ## Problem Statement
 
 `ProductionClient` (`client.py:80`) is the seam ADR-0015 exists to protect, and it has one

@@ -12,6 +12,14 @@ and that what the cloud cannot evidence is reported rather than omitted — is u
   time-limited signed link — [10](10-the-preview-is-reachable-without-a-domain.md). The Brief goes in
   over a forwarded local port. The destination is unchanged; the sentence describing it was written
   before anyone chose how the bytes travel.
+
+  **Corrected 2026-09-05, when ticket 10 answered.** *There is no signed link and there is no URL.*
+  The preview is retrieved as bytes over the same tunnel, by the descriptor the envelope published;
+  the object-store shape is dead against ADR-0018 decision 5's network adapter, and the
+  forwarded-port link needs a browser-facing route on the boundary that this phase is not taking. The
+  third criterion below is amended to name the mechanism. **The bar is unchanged and *watches* is not
+  redefined** — this ticket's own testing decision already asks for a human playing the render rather
+  than a video element streaming from an origin, and that is still what it asks for.
 - **The crew is local, by the day-one cut, and `cloud-01` leaves the blocked-by list.** Hosting the
   crew is out of scope and never graduates in this phase — see `map.md`. The first criterion below
   loses the half that requires a hosted crew and keeps every other half.
@@ -146,7 +154,7 @@ broke.
 
 - [ ] Spend is stated and authorised before the run starts
 - [ ] A Brief is submitted by the local crew to the remote service, with no launcher in the path, and with the Run store, the render and the four production secrets all off the operator's disk
-- [ ] A Run completes and a preview is produced, retrieved through its signed link, and watched
+- [ ] A Run completes and a preview is produced, retrieved over the tunnel by its published descriptor, and watched
 - [ ] The evidence bundle verifies on a machine that did not produce it
 - [ ] The cloud Run is compared to a known-good local Run and every difference beyond Run id and timestamps is enumerated
 - [ ] A cloud proof sheet exists, with each local assertion carried forward, replaced per ticket 02's ADR, or marked not evidenced with a reason

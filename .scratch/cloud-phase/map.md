@@ -76,6 +76,13 @@ them contradict tickets as written; those tickets were edited the same day rathe
   left shadowed. **04 and 07 are unblocked on this axis.**
 - **The preview is a time-limited signed link**, with the thinnest possible page around it. Streaming
   bytes back through a synchronous render response is the version that fails on the day.
+
+  **Overtaken 2026-09-05 by [10](issues/10-the-preview-is-reachable-without-a-domain.md), which was
+  written to reconcile this line with the tunnel.** *There is no link.* The preview is retrieved as
+  bytes over the tunnel by its published descriptor, on its own signed route, which is neither a link
+  nor the synchronous render response this line rejected. The object-store link is dead against
+  ADR-0018 decision 5; the forwarded-port link needs a browser-facing hole in a boundary with one
+  door. The rejection above still stands — the render response does not carry the bytes.
 - **The operator on the 9th is the project's own operator**, nobody else. No third-party
   authentication is budgeted.
 - **There is no public ingress and no domain**: the service is reached through an SSH tunnel, so
