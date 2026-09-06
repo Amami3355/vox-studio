@@ -3,6 +3,7 @@ import { repositoryAssetLibrary } from '../src/assets/library';
 import {
   type LocalAssetLibrary,
   PLACEHOLDER_ASSET_URI,
+  assetRequirementId,
   createAssetResolver,
   resolveSceneAssets,
 } from '../src/assets/resolver';
@@ -65,6 +66,33 @@ describe('Asset Resolver', () => {
         subject: 'The same city viewed from another angle',
       }),
     ).toEqual(ready);
+  });
+
+  it('prefers an accepted project asset over repository media for the same identity', () => {
+    const projectUri = 'data:image/png;base64,cHJvamVjdA==';
+    const resolver = createAssetResolver({
+      projectLibrary: libraryOf([
+        {
+          requirement: housingRequirement,
+          ref: { status: 'ready', uri: projectUri },
+        },
+      ]),
+      library: repositoryAssetLibrary,
+    });
+
+    expect(resolver.resolve(housingRequirement)).toEqual({ status: 'ready', uri: projectUri });
+  });
+
+  it('publishes the requirement id used by placeholder findings and generation work', () => {
+    const resolver = createAssetResolver();
+    const resolved = resolver.resolve(housingRequirement);
+
+    expect(resolved).toMatchObject({
+      pendingRequirementId: assetRequirementId(housingRequirement),
+    });
+    expect(assetRequirementId({ ...housingRequirement, subject: 'different wording' })).toBe(
+      assetRequirementId(housingRequirement),
+    );
   });
 
   /**

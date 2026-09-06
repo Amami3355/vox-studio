@@ -58,13 +58,19 @@ export type LocalAssetLibrary = {
 };
 
 export type AssetResolverOptions = {
+  /** Accepted, Run/project-owned material. It has precedence over repository stand-ins. */
+  projectLibrary?: LocalAssetLibrary;
+  /** Canonical repository-controlled material. Kept as `library` for compatibility. */
   library?: LocalAssetLibrary;
 };
 
 /** Capability-neutral: any scene needing a picture degrades to the same plate. */
 export const PLACEHOLDER_ASSET_URI = 'asset://placeholder/image';
 
-export const createAssetResolver = ({ library }: AssetResolverOptions = {}): AssetResolver => {
+export const createAssetResolver = ({
+  projectLibrary,
+  library,
+}: AssetResolverOptions = {}): AssetResolver => {
   /**
    * Explicit resolver state, scoped to one project resolution. Not module-global and not
    * React state — a second resolver starts with a second, empty cache.
@@ -76,17 +82,33 @@ export const createAssetResolver = ({ library }: AssetResolverOptions = {}): Ass
       const identityKey = requirement.identityKey;
 
       if (identityKey === undefined) {
-        return fromEntry(findBySubject(library, requirement), requirement, library);
+        return fromLibraries([projectLibrary, library], requirement, (candidate) =>
+          findBySubject(candidate, requirement),
+        );
       }
 
       const cached = identityCache.get(identityKey);
       if (cached) return cached;
 
-      const resolved = fromEntry(findByIdentity(library, identityKey), requirement, library);
+      const resolved = fromLibraries([projectLibrary, library], requirement, (candidate) =>
+        findByIdentity(candidate, identityKey),
+      );
       identityCache.set(identityKey, resolved);
       return resolved;
     },
   };
+};
+
+const fromLibraries = (
+  libraries: (LocalAssetLibrary | undefined)[],
+  requirement: AssetRequirement,
+  find: (library: LocalAssetLibrary | undefined) => LocalAssetEntry | undefined,
+): AssetRef => {
+  for (const library of libraries) {
+    const entry = find(library);
+    if (entry && library) return fromEntry(entry, requirement, library);
+  }
+  return placeholderFor(requirement);
 };
 
 const findByIdentity = (
@@ -133,7 +155,7 @@ const fromEntry = (
 const placeholderFor = (requirement: AssetRequirement): AssetRef => ({
   status: 'placeholder',
   uri: PLACEHOLDER_ASSET_URI,
-  pendingRequirementId: requirementId(requirement),
+  pendingRequirementId: assetRequirementId(requirement),
 });
 
 const failedFor = (
@@ -143,7 +165,7 @@ const failedFor = (
 ): AssetRef => ({
   status: 'failed',
   uri,
-  requirementId: requirementId(requirement),
+  requirementId: assetRequirementId(requirement),
   reason,
 });
 
@@ -173,7 +195,7 @@ const normalize = (value: string): string => value.trim().toLowerCase();
  * Derived from the identity when there is one, so every requirement sharing that
  * identity names the same pending asset, and from the semantic tuple otherwise.
  */
-const requirementId = (requirement: AssetRequirement): string => {
+export const assetRequirementId = (requirement: AssetRequirement): string => {
   const identity =
     requirement.identityKey === undefined
       ? [
