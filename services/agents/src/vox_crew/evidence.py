@@ -79,7 +79,7 @@ SYSTEM = "system"
 # What the assertion sheet expects a Run to have discovered. Restated here rather than derived
 # from what this Run happened to read, because an expectation taken from the observation is not
 # an expectation.
-CATEGORIES = ("catalog", "checks", "language", "operating", "plan", "protocol")
+CATEGORIES = ("catalog", "checks", "design", "language", "operating", "plan", "protocol")
 
 # The two structural facts that put a prefix cache out of reach, held in one sentence because
 # the bundle publishes them twice — once as `prefixCache.reason` and once in the non-claims. Two

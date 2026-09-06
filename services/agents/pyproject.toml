@@ -22,9 +22,9 @@ dependencies = []
 # every test that does not exercise the live author runs without it. The constraint below is the
 # only place the exercised version is written: its floor is the version the crew has actually
 # been run against, because a floor lower than the evidence is a guess published as a
-# requirement, and its ceiling excludes the next major because `LlmAgent` and `InMemoryRunner`
-# are the crew's only contact with the framework and are exactly what a major version is free to
-# reshape. Exercised on Python 3.14.4.
+# requirement, and its ceiling excludes the next major because `LlmAgent`, `Runner.run_async`,
+# and the injected session interface are the crew's only contacts with the framework and are
+# exactly what a major version is free to reshape. Exercised on Python 3.14.4.
 agents = ["google-adk>=2.7.1,<3"]
 dev = ["pytest>=8"]
 

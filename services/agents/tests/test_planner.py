@@ -57,7 +57,7 @@ from vox_crew.planner import (
 from vox_crew.refusals import Refusal
 from vox_crew.teaching_surface import AUTHOR, TeachingSurface
 
-CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "protocol")
+CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "design", "protocol")
 
 # The two plans the deixis rule was measured on, read from where the compiler's own suite
 # reads them.
@@ -299,24 +299,39 @@ def test_a_contract_that_publishes_no_audience_is_taught_whole() -> None:
         assert category_part(older, category) in text
 
 
-def test_the_split_moved_nothing_inside_a_category_the_author_still_reads() -> None:
-    """The catalog is byte-identical before and after, asserted across the change itself.
+def test_the_role_split_only_adds_generated_catalog_projections() -> None:
+    """The canonical catalog survives the deliberate ADR-0017 successor unchanged.
 
-    `older` is built from a different index and a different `protocol` body than `SURFACE` is,
-    so this compares two contracts rather than one fixture with itself. ADR-0017 governs the
-    catalog and nothing here narrows, tiers or defers it.
+    Catalog v6 appends three generated documents: the tier definitions and role projections the
+    role split needs, and the closed visual vocabulary an Art Director selects from.  Removing
+    those additions must recover the frozen v4 contract exactly; language, plan and checks remain
+    byte-identical.  The retired whole-author prefix length is intentionally not compared across
+    the new role regime.
+
+    Every addition is derived from something the design system already decided, which is what
+    makes removing them recover the old document rather than approximate it.
     """
     older = an_older_teaching_surface()
     text = instructions(SURFACE)
 
-    for untouched in ("language", "plan", "catalog", "checks"):
+    for untouched in ("language", "plan", "checks"):
         assert category_part(older, untouched) == category_part(SURFACE, untouched)
         assert category_part(SURFACE, untouched) in text
+    old_catalog = (older.projections["catalog"].data or {})["contract"]
+    current_catalog = dict((SURFACE.projections["catalog"].data or {})["contract"])
+    current_catalog.pop("capabilityTiers")
+    current_catalog.pop("roleProjections")
+    current_catalog.pop("visualVocabulary")
+    assert current_catalog["manifestVersion"] == 5
+    current_catalog["manifestVersion"] = old_catalog["manifestVersion"]
+    assert current_catalog == old_catalog
+    # The palettes those roles resolve to are published, and not here: an author's projection
+    # names a colour role and never its value.
+    assert "palettes" not in (SURFACE.projections["catalog"].data or {})["contract"]
+    assert category_part(SURFACE, "catalog") in text
     # And the one that did move is gone from the prefix rather than reworded inside it.
     assert category_part(older, "protocol") not in text
-    assert len(text) == OLDER_PREFIX_CHARS - len(category_part(older, "protocol")) + len(
-        category_part(SURFACE, "operating")
-    )
+    assert category_part(SURFACE, "operating") in text
 
 
 def test_a_new_category_addressed_to_the_author_is_taught_with_no_edit() -> None:
@@ -1063,9 +1078,9 @@ def test_the_live_author_binds_the_draft_review_onto_the_agent_it_builds() -> No
     assert held is tool
 
     # What the framework makes of it, which is what the model is actually shown. Built directly
-    # rather than through the agent's own `canonical_tools`, which is a coroutine: awaiting one
-    # needs an event loop, and an event loop on Windows opens a socket pair that this suite's
-    # network sentinel refuses — correctly, and for a reason worth more than this assertion.
+    # rather than through the agent's own `canonical_tools`, which is a coroutine and would test
+    # more framework behavior than this declaration assertion needs. The network sentinel permits
+    # only asyncio's private wake-up pair; arbitrary loopback remains closed.
     declared = FunctionTool(func=held)
 
     assert declared.name == "review_draft"
@@ -1079,6 +1094,63 @@ def test_the_live_author_offered_no_tool_builds_an_agent_holding_none() -> None:
     agent = AdkPlanAuthor(model="gemini-3.1-flash-lite").agent(instructions(SURFACE))
 
     assert list(agent.tools) == []
+
+
+def test_the_live_author_streams_asynchronously_through_an_injected_session(
+    monkeypatch,
+) -> None:
+    """The hosted seam uses ADK's async runner and a caller-owned session implementation."""
+    import asyncio
+    import json
+    from types import SimpleNamespace
+
+    pytest.importorskip("google.adk")
+    import google.adk.runners
+
+    seen: dict[str, object] = {}
+
+    class SessionService:
+        def __init__(self) -> None:
+            self.created = 0
+
+        async def create_session(self, *, app_name, user_id, state=None, session_id=None):
+            self.created += 1
+            seen["created"] = (app_name, user_id, state, session_id)
+            return SimpleNamespace(id="session-recorded-1")
+
+    class Runner:
+        def __init__(self, *, agent, app_name, session_service) -> None:
+            seen["runner"] = (agent.name, app_name, session_service)
+
+        async def run_async(self, *, user_id, session_id, new_message):
+            seen["run"] = (user_id, session_id, new_message.parts[0].text)
+            yield SimpleNamespace(
+                is_final_response=lambda: True,
+                content=SimpleNamespace(
+                    parts=[SimpleNamespace(text=json.dumps({"beats": [], "sections": []}))]
+                ),
+            )
+
+    monkeypatch.setattr(google.adk.runners, "Runner", Runner)
+    sessions = SessionService()
+    author = AdkPlanAuthor(
+        model="gemini-3.1-flash-lite", session_service=sessions, name="async_producer"
+    )
+
+    async def ask_inside_a_running_loop():
+        return await author.author_async("instructions", {"id": "brief-1", "text": "Explain it."})
+
+    answer = asyncio.run(ask_inside_a_running_loop())
+
+    assert answer == {"beats": [], "sections": []}
+    assert sessions.created == 1
+    assert seen["runner"] == ("async_producer", "vox-crew", sessions)
+    assert seen["run"] == (
+        "async_producer",
+        "session-recorded-1",
+        '{"id":"brief-1","text":"Explain it."}',
+    )
+    assert author.session_id == "session-recorded-1"
 
 
 def test_the_live_author_says_it_reviews_drafts_and_the_scripted_ones_do_not() -> None:

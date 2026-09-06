@@ -22,6 +22,7 @@ def test_reads_a_recorded_contract_index() -> None:
         "catalog",
         "checks",
         "operating",
+        "design",
         "protocol",
     ]
 

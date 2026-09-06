@@ -1229,13 +1229,25 @@ class AdkPlanAuthor(PlanAuthor):
         model: str = "gemini-3.6-flash",
         name: str = "producer",
         app_name: str = "vox-crew",
+        session_service: Any | None = None,
+        session_id: str | None = None,
     ) -> None:
         from google.adk.agents import LlmAgent  # noqa: PLC0415
+        from google.adk.sessions import InMemorySessionService  # noqa: PLC0415
 
         self._llm_agent = LlmAgent
         self._model = model
         self._name = name
         self._app_name = app_name
+        self._session_service = (
+            session_service if session_service is not None else InMemorySessionService()
+        )
+        self._session_id = session_id
+
+    @property
+    def session_id(self) -> str | None:
+        """The ADK session carrying this author's turns, for durable caller recovery."""
+        return self._session_id
 
     def agent(self, instructions: str, check: Callable[..., Any] | None = None) -> Any:
         """The agent that would be asked, built but not run.
@@ -1266,6 +1278,16 @@ class AdkPlanAuthor(PlanAuthor):
     ) -> Mapping[str, Any]:
         return self._ask(instructions, brief, check)
 
+    async def author_async(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """The hosted authoring seam: no nested event loop and no synchronous runner."""
+        return await self._ask_async(instructions, brief, check)
+
     def repair(
         self,
         instructions: str,
@@ -1284,6 +1306,18 @@ class AdkPlanAuthor(PlanAuthor):
         """
         return self._ask(instructions, {"brief": brief, "plan": plan}, check)
 
+    async def repair_async(
+        self,
+        instructions: str,
+        brief: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        refusal: Refusal,
+        *,
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """Async repair over the same persistent session as the authoring turn."""
+        return await self._ask_async(instructions, {"brief": brief, "plan": plan}, check)
+
     def _ask(
         self,
         instructions: str,
@@ -1301,28 +1335,47 @@ class AdkPlanAuthor(PlanAuthor):
         """
         import asyncio  # noqa: PLC0415
 
-        from google.adk.runners import InMemoryRunner  # noqa: PLC0415
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self._ask_async(instructions, message, check))
+        raise RuntimeError(
+            "The synchronous PlanAuthor adapter cannot run inside an event loop; "
+            "use author_async or repair_async from a hosted caller."
+        )
+
+    async def _ask_async(
+        self,
+        instructions: str,
+        message: Mapping[str, Any],
+        check: Callable[[str], Mapping[str, Any]] | None = None,
+    ) -> Mapping[str, Any]:
+        """Read only ADK's final response while preserving every event in its session."""
+        from google.adk.runners import Runner  # noqa: PLC0415
         from google.genai import types  # noqa: PLC0415
 
-        runner = InMemoryRunner(
-            agent=self.agent(instructions, check), app_name=self._app_name
+        if self._session_id is None:
+            session = await self._session_service.create_session(
+                app_name=self._app_name, user_id=self._name
+            )
+            self._session_id = session.id
+        runner = Runner(
+            agent=self.agent(instructions, check),
+            app_name=self._app_name,
+            session_service=self._session_service,
         )
-        session = asyncio.run(
-            runner.session_service.create_session(app_name=self._app_name, user_id=self._name)
-        )
-        answered = [
-            part.text
-            for event in runner.run(
+        answered: list[str] = []
+        async for event in runner.run_async(
                 user_id=self._name,
-                session_id=session.id,
+                session_id=self._session_id,
                 new_message=types.Content(
                     role="user", parts=[types.Part(text=message_text(message))]
                 ),
-            )
-            if event.is_final_response() and event.content
-            for part in (event.content.parts or ())
-            if part.text
-        ]
+            ):
+            if event.is_final_response() and event.content:
+                answered.extend(
+                    part.text for part in (event.content.parts or ()) if part.text
+                )
         return _plan_from(("".join(answered)).strip())
 
 

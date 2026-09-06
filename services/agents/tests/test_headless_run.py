@@ -101,7 +101,7 @@ def test_one_command_converges_on_the_brief_and_leaves_a_bundle_behind(
     # Thirteen commands: the seven of discovery, then the six a Run takes to a rendered
     # preview. Discovery asks for every category the index publishes, including the ones no
     # prompt carries — what the crew reads and what it teaches are different counts.
-    assert len(written[COMMANDS].decode("utf-8").splitlines()) == 13
+    assert len(written[COMMANDS].decode("utf-8").splitlines()) == 14
 
 
 def test_says_so_when_the_work_root_is_not_there(tmp_path) -> None:

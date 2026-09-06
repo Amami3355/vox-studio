@@ -15,7 +15,7 @@ from vox_crew.client import ProductionClient
 from vox_crew.envelopes import parse_envelope
 from vox_crew.teaching_surface import DiscoveryRefused, read_teaching_surface
 
-CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "protocol")
+CATEGORIES = ("language", "plan", "catalog", "checks", "operating", "design", "protocol")
 
 
 def projection(category: str, contract: dict | None = None) -> str:
@@ -93,7 +93,13 @@ def test_reads_the_audience_the_index_published_beside_each_category() -> None:
         "checks",
         "operating",
     )
-    assert surface.addressed_to("client") == ("catalog", "checks", "operating", "protocol")
+    assert surface.addressed_to("client") == (
+        "catalog",
+        "checks",
+        "operating",
+        "design",
+        "protocol",
+    )
 
 
 def test_an_index_that_names_no_audience_leaves_every_category_readable() -> None:

@@ -351,7 +351,13 @@ def test_the_record_names_the_withheld_category_and_the_repeat_inside_it() -> No
     rendered = render_prefix_census(take_census(cache_prefix(SURFACE)))
 
     assert "## What the contract publishes elsewhere" in rendered
-    assert "| protocol | 23,313 |" in rendered
+    # 36,092 since the protocol category published the generated-image lifecycle; it was
+    # 23,313 while `run.image.*` was unpublished. These are the withheld categories' own
+    # sizes, not the author prefix ADR-0019 retired measurements of.
+    assert "| protocol | 36,092 |" in rendered
+    # And the design category, which is withheld for a stronger reason than protocol is: it
+    # publishes raw colour, and an author that could read one could write one.
+    assert "| design | 270 |" in rendered
     assert "`protocol.schemas.preflightReport.properties`" in rendered
     assert "5,146" in rendered
 

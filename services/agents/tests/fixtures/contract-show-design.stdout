@@ -1,0 +1,1 @@
+{"protocolVersion":1,"command":"contract.show","outcome":"succeeded","run":null,"data":{"category":"design","contractVersion":1,"contract":{"palettes":{"editorial-cold":{"neutral":"#FF5A1F","positive":"#3DD68C","negative":"#FF4D4D"},"editorial-paper":{"neutral":"#C23C0A","positive":"#157F4A","negative":"#C0342B"}}}},"artifacts":[],"error":null,"next":[]}
