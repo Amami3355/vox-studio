@@ -54,6 +54,51 @@ The Brief's file name is not a flag. A bootstrapped work root is the launcher an
 `request.json` and nothing else, and that invariant is what the proofs' initial-inventory
 assertion reads.
 
+### Running the whole crew
+
+`--crew` runs the production crew instead of the single plan author: research, narrative and
+art direction, visual planning, asset resolution, production. The phases are the Director's and
+their order is not a model's to change; what each of them *costs* is decided by one document.
+
+```
+python -m vox_crew --work-root C:\vox-proof-workroots\crew --crew --recordings recordings.json
+python -m vox_crew --work-root C:\vox-proof-workroots\crew --crew --recordings recordings.json
+```
+
+**Nothing is live until a policy says so.** With no `--policy`, every phase is recorded and no
+grant is held, so a crew invocation spends nothing — a default that reached a provider would
+make spending the accident and saving the deliberate act. `--policy policy.json` names the
+document that changes that, one entry per phase:
+
+```json
+{
+  "schemaVersion": 1,
+  "research": { "mode": "live", "grantId": "…" },
+  "models": { "mode": "live", "grantId": "…" },
+  "images": { "mode": "recorded", "grantId": null },
+  "recording": { "mode": "recorded", "grantId": null }
+}
+```
+
+A live phase without its grant pauses the Run before the provider is reached rather than
+warning after it. `--recordings` supplies the dossier, narrative, visual bible and plan that any
+phase the policy left recorded replays instead of paying for; it is required whenever one is.
+
+`--brief-kind` states what kind of Brief this is, and it is the invocation's to state rather
+than the work root's: a factual Brief is researched, a fictional one and declared test data make
+no research call at all, and a work root that could assert its own kind could spend a research
+call by being copied.
+
+`--images` decides what happens to a generated candidate. The default, `pause`, stops the Run
+and publishes the candidate's digest for a human to look at — which is the decision the product
+exists to keep human. `accept` and `reject` are that decision taken in advance, for a rehearsal
+or an unattended run.
+
+A crew Run checkpoints itself into `evidence\crew-state`, so the next invocation resumes rather
+than repeating research, model calls, image generation or a recording it already paid for. Its
+own bundle — phase events, validated role outputs, production envelopes, artifact digests —
+lands in `evidence\crew` beside the Run's.
+
 ## How it is put together
 
 **`client.py` is the deployment seam** (ADR-0015), not the transport. One interface, two
@@ -124,6 +169,11 @@ category the planner teaches and a capability the catalog gains is one the model
 The crew's own prose is one short preamble.
 
 Three things about it are worth knowing before changing it.
+
+The live author has an asynchronous hosted seam backed by ADK's `Runner.run_async`; its session
+implementation and resume id are injectable. The existing synchronous `PlanAuthor` methods remain
+only as the CLI compatibility adapter and refuse to nest themselves inside an already-running event
+loop.
 
 *A prompt is scanned before it is sent.* `scan_for_leaks` is the leak-scan discipline the
 proofs apply to a work root, applied to the text of a prompt, and `author_plan` runs it as a
