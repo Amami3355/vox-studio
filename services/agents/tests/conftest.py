@@ -11,6 +11,7 @@ import json
 import socket
 import sys
 from base64 import b64encode
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -53,6 +54,9 @@ class NetworkEgressAttempted(RuntimeError):
 
 _ADMITTED: set[tuple[str, int]] = set()
 """Endpoints a test started itself, and may therefore talk to. See `admit_endpoint`."""
+
+_CREATING_SOCKETPAIR: ContextVar[bool] = ContextVar("creating_socketpair", default=False)
+"""True only while the standard library builds an event loop's private wake-up pair."""
 
 
 def admitted_endpoints() -> frozenset[tuple[str, int]]:
@@ -98,6 +102,7 @@ def network_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
     original_connect = socket.socket.connect
     original_create_connection = socket.create_connection
     original_getaddrinfo = socket.getaddrinfo
+    original_socketpair = socket.socketpair
 
     def refuse(*args: Any, **kwargs: Any) -> Any:
         raise NetworkEgressAttempted(
@@ -105,9 +110,24 @@ def network_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     def connect(self: socket.socket, address: Any, *args: Any, **kwargs: Any) -> Any:
+        if _CREATING_SOCKETPAIR.get():
+            return original_connect(self, address, *args, **kwargs)
         if _admitted(address):
             return original_connect(self, address, *args, **kwargs)
         return refuse()
+
+    def socketpair(*args: Any, **kwargs: Any) -> Any:
+        """Allow only the stdlib's connected pair, which cannot address an external peer.
+
+        Windows implements ``socketpair`` with a transient loopback listener and therefore
+        passes through the patched ``connect`` above.  The ContextVar opens that one call rather
+        than admitting loopback generally; child tasks do not exist until the pair is complete.
+        """
+        token = _CREATING_SOCKETPAIR.set(True)
+        try:
+            return original_socketpair(*args, **kwargs)
+        finally:
+            _CREATING_SOCKETPAIR.reset(token)
 
     def create_connection(address: Any, *args: Any, **kwargs: Any) -> Any:
         if _admitted(address):
@@ -126,6 +146,7 @@ def network_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
     monkeypatch.setattr(socket, "create_connection", create_connection)
     monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    monkeypatch.setattr(socket, "socketpair", socketpair)
 
 
 @pytest.fixture

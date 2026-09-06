@@ -11,6 +11,7 @@ what it claimed.
 
 from __future__ import annotations
 
+import asyncio
 import socket
 
 import pytest
@@ -61,3 +62,8 @@ def test_an_endpoint_a_test_opened_itself_is_reachable_and_only_that_one(
 def test_no_admission_outlives_the_test_that_opened_it() -> None:
     """A hole left open would silently admit every later test in the session."""
     assert admitted_endpoints() == frozenset()
+
+
+def test_an_asyncio_wakeup_pair_is_not_mistaken_for_network_egress() -> None:
+    """The async crew must be testable while arbitrary loopback remains closed."""
+    assert asyncio.run(asyncio.sleep(0, result="awake")) == "awake"
