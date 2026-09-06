@@ -41,6 +41,25 @@ REQUEST = {"protocolVersion": 1, "brief": {"id": "crew-tracer-bullet-v1", "text"
 PLAN = {"beats": [{"id": "b1", "text": "One beat."}], "sections": []}
 DECISION = {"protocolVersion": 1, "reason": "The catalog cannot serve this Brief."}
 GRANT = {"protocolVersion": 1, "grantId": "g1", "runId": RUN_ID, "grant": "ab"}
+IMAGE_REQUEST = {
+    "protocolVersion": 1,
+    "requirementId": "req_ccb9f349",
+    "identityKey": "req_ccb9f349",
+    "prompt": "A constrained image prompt.",
+    "aspectRatio": "16:9",
+    "outputMimeType": "image/png",
+    "seed": 7,
+    "requestSha256": "ab" * 32,
+}
+IMAGE_GRANT = {
+    "protocolVersion": 1,
+    "grantId": "image-grant-1",
+    "runId": RUN_ID,
+    "requestSha256": "ab" * 32,
+    "issuedAt": "2026-09-06T12:00:00Z",
+    "expiresAt": "2026-09-06T13:00:00Z",
+    "grant": "signed",
+}
 BODY = json.dumps({"ok": False, "errors": [{"means": "m", "repair": "r"}]}).encode("utf-8")
 ARTIFACT_PATH = f"artifacts/validation/{'3f' * 32}/report.json"
 
@@ -228,6 +247,27 @@ def test_declines_with_a_decision_object(harness: ClientHarness) -> None:
     harness.client.decline(run_id, DECISION)
 
     assert harness.staged(run_id, "decision.json") == DECISION
+
+
+def test_carries_image_requests_and_authorisation_as_objects(harness: ClientHarness) -> None:
+    run_id = harness.open_run()
+
+    harness.client.image_start(run_id, IMAGE_REQUEST, IMAGE_GRANT)
+
+    assert harness.staged(run_id, "image-request.json") == IMAGE_REQUEST
+    assert harness.staged(run_id, "image-authorisation.json") == IMAGE_GRANT
+
+
+def test_carries_image_acceptance_and_rejection_as_objects(harness: ClientHarness) -> None:
+    run_id = harness.open_run()
+    acceptance = {"protocolVersion": 1, "jobId": "job-1", "candidateSha256": "cd" * 32}
+    rejection = {"protocolVersion": 1, "jobId": "job-2"}
+
+    harness.client.image_accept(run_id, acceptance)
+    harness.client.image_reject(run_id, rejection)
+
+    assert harness.staged(run_id, "image-acceptance.json") == acceptance
+    assert harness.staged(run_id, "image-rejection.json") == rejection
 
 
 # -- the read-back direction, which is the one the cloud phase turns on ----------------------

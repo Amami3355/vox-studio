@@ -212,6 +212,16 @@ class StubProductionService:
             return store.decline(run_id, payload).raw, 0
         if command == "run.record":
             return store.record(run_id, replacement_authorisation=payload).raw, 0
+        if command == "run.image.start":
+            return store.image_start(
+                run_id, payload["request"], authorisation=payload.get("authorization")
+            ).raw, 0
+        if command == "run.image.status":
+            return store.image_status(run_id, payload["jobId"]).raw, 0
+        if command == "run.image.accept":
+            return store.image_accept(run_id, payload).raw, 0
+        if command == "run.image.reject":
+            return store.image_reject(run_id, payload).raw, 0
         if command in ("run.status", "run.preflight", "run.compile", "run.render"):
             return getattr(store, command.split(".")[1])(run_id).raw, 0
         return _failed_envelope(None, "UNKNOWN_COMMAND", f"{command} is not served."), 1

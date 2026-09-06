@@ -118,6 +118,27 @@ class ProductionClient(ABC):
     def render(self, run_id: str) -> ResultEnvelope:
         """Renders the narrated preview."""
 
+    def image_start(
+        self,
+        run_id: str,
+        request: Mapping[str, Any],
+        authorisation: Mapping[str, Any] | None = None,
+    ) -> ResultEnvelope:
+        """Starts or resumes one identity-bound generated-image job."""
+        raise NotImplementedError
+
+    def image_status(self, run_id: str, job_id: str) -> ResultEnvelope:
+        """Observes one existing image job without dispatching another."""
+        raise NotImplementedError
+
+    def image_accept(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        """Accepts candidate bytes by their exact published digest."""
+        raise NotImplementedError
+
+    def image_reject(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        """Rejects an inspectable candidate while preserving fallback behavior."""
+        raise NotImplementedError
+
     @abstractmethod
     def decline(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
         """Ends a Run by naming the editorial need the catalog cannot serve."""

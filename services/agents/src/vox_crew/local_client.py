@@ -130,11 +130,61 @@ class LocalProductionClient(ProductionClient):
     def render(self, run_id: str) -> ResultEnvelope:
         return self._run_command("render", run_id)
 
+    def image_start(
+        self,
+        run_id: str,
+        request: Mapping[str, Any],
+        authorisation: Mapping[str, Any] | None = None,
+    ) -> ResultEnvelope:
+        directory = self._directory(run_id)
+        staged_request = self._stage(directory, "image-request.json", request)
+        argv = [
+            "production",
+            "run",
+            "image-start",
+            "--run",
+            directory,
+            "--request",
+            staged_request,
+        ]
+        if authorisation is not None:
+            staged_grant = self._stage(directory, "image-authorisation.json", authorisation)
+            argv += ["--authorisation", staged_grant]
+        return self._invoke(argv)
+
+    def image_status(self, run_id: str, job_id: str) -> ResultEnvelope:
+        return self._invoke(
+            [
+                "production",
+                "run",
+                "image-status",
+                "--run",
+                self._directory(run_id),
+                "--job",
+                job_id,
+            ]
+        )
+
+    def image_accept(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        return self._image_decision("image-accept", run_id, "image-acceptance.json", decision)
+
+    def image_reject(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        return self._image_decision("image-reject", run_id, "image-rejection.json", decision)
+
     def decline(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
         directory = self._directory(run_id)
         staged = self._stage(directory, "decision.json", decision)
         return self._invoke(
             ["production", "run", "decline", "--run", directory, "--decision", staged]
+        )
+
+    def _image_decision(
+        self, verb: str, run_id: str, name: str, decision: Mapping[str, Any]
+    ) -> ResultEnvelope:
+        directory = self._directory(run_id)
+        staged = self._stage(directory, name, decision)
+        return self._invoke(
+            ["production", "run", verb, "--run", directory, "--decision", staged]
         )
 
     def fetch_artifact(self, run_id: str, artifact: ArtifactDescriptor) -> Artifact:

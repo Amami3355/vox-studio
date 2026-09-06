@@ -121,6 +121,29 @@ class InMemoryProductionClient(ProductionClient):
         self._require(run_id)
         return _envelope("run.render", run_id=run_id, stage="rendered")
 
+    def image_start(
+        self,
+        run_id: str,
+        request: Mapping[str, Any],
+        authorisation: Mapping[str, Any] | None = None,
+    ) -> ResultEnvelope:
+        self._stage(run_id, "image-request.json", request)
+        if authorisation is not None:
+            self._stage(run_id, "image-authorisation.json", authorisation)
+        return _envelope("run.image.start", run_id=run_id, stage="compiled")
+
+    def image_status(self, run_id: str, job_id: str) -> ResultEnvelope:
+        self._require(run_id)
+        return _envelope("run.image.status", run_id=run_id, stage="compiled")
+
+    def image_accept(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        self._stage(run_id, "image-acceptance.json", decision)
+        return _envelope("run.image.accept", run_id=run_id, stage="compiled")
+
+    def image_reject(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        self._stage(run_id, "image-rejection.json", decision)
+        return _envelope("run.image.reject", run_id=run_id, stage="compiled")
+
     def decline(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
         self._stage(run_id, "decision.json", decision)
         return _envelope("run.decline", run_id=run_id, stage="declined")

@@ -134,6 +134,26 @@ class HttpProductionClient(ProductionClient):
     def render(self, run_id: str) -> ResultEnvelope:
         return self._command("run.render", run_id=run_id)
 
+    def image_start(
+        self,
+        run_id: str,
+        request: Mapping[str, Any],
+        authorisation: Mapping[str, Any] | None = None,
+    ) -> ResultEnvelope:
+        payload: dict[str, Any] = {"request": dict(request)}
+        if authorisation is not None:
+            payload["authorization"] = dict(authorisation)
+        return self._command("run.image.start", run_id=run_id, payload=payload)
+
+    def image_status(self, run_id: str, job_id: str) -> ResultEnvelope:
+        return self._command("run.image.status", run_id=run_id, payload={"jobId": job_id})
+
+    def image_accept(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        return self._command("run.image.accept", run_id=run_id, payload=dict(decision))
+
+    def image_reject(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
+        return self._command("run.image.reject", run_id=run_id, payload=dict(decision))
+
     def decline(self, run_id: str, decision: Mapping[str, Any]) -> ResultEnvelope:
         return self._command("run.decline", run_id=run_id, payload=dict(decision))
 
