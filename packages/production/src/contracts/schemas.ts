@@ -19,6 +19,7 @@ export const contractCategorySchema = z.enum([
   'catalog',
   'checks',
   'operating',
+  'design',
   'protocol',
 ]);
 
@@ -48,6 +49,10 @@ export const commandIdSchema = z.enum([
   'run.record',
   'run.compile',
   'run.render',
+  'run.image.start',
+  'run.image.status',
+  'run.image.accept',
+  'run.image.reject',
 ]);
 
 export const runStageSchema = z.enum([
@@ -108,6 +113,43 @@ export const replacementGrantSchema = z
   })
   .strict();
 
+export const imageGenerationRequestSchema = z
+  .object({
+    protocolVersion: z.literal(PROTOCOL_VERSION),
+    requirementId: z.string().regex(/^req_[0-9a-f]{8}$/),
+    identityKey: nonEmpty,
+    prompt: nonEmpty.max(4_000),
+    aspectRatio: z.enum(['1:1', '3:4', '4:3', '9:16', '16:9']),
+    outputMimeType: z.literal('image/png'),
+    seed: z.number().int().min(0).max(0x7fffffff),
+    requestSha256: sha256,
+  })
+  .strict();
+
+export const imageGenerationGrantSchema = z
+  .object({
+    protocolVersion: z.literal(PROTOCOL_VERSION),
+    grantId: nonEmpty,
+    runId: nonEmpty,
+    requestSha256: sha256,
+    issuedAt: z.iso.datetime({ offset: true }),
+    expiresAt: z.iso.datetime({ offset: true }),
+    grant: nonEmpty,
+  })
+  .strict();
+
+export const imageAcceptanceSchema = z
+  .object({
+    protocolVersion: z.literal(PROTOCOL_VERSION),
+    jobId: nonEmpty,
+    candidateSha256: sha256,
+  })
+  .strict();
+
+export const imageRejectionSchema = z
+  .object({ protocolVersion: z.literal(PROTOCOL_VERSION), jobId: nonEmpty })
+  .strict();
+
 export const artifactDescriptorSchema = z
   .object({
     kind: nonEmpty,
@@ -116,11 +158,64 @@ export const artifactDescriptorSchema = z
   })
   .strict();
 
+export const imageCandidateSchema = z
+  .object({
+    id: nonEmpty,
+    requirementId: z.string().regex(/^req_[0-9a-f]{8}$/),
+    identityKey: nonEmpty,
+    promptSha256: sha256,
+    artifact: artifactDescriptorSchema,
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .strict();
+
+export const imageJobSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    id: nonEmpty,
+    requirementId: z.string().regex(/^req_[0-9a-f]{8}$/),
+    identityKey: nonEmpty,
+    requestSha256: sha256,
+    providerMode: z.enum(['recorded', 'live']),
+    status: z.enum(['dispatching', 'candidate', 'accepted', 'rejected', 'failed', 'uncertain']),
+    candidate: imageCandidateSchema.nullable(),
+    failure: nonEmpty.nullable(),
+  })
+  .strict()
+  .superRefine((job, context) => {
+    const hasCandidate = ['candidate', 'accepted', 'rejected'].includes(job.status);
+    if (hasCandidate !== (job.candidate !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['candidate'],
+        message: 'Candidate states and candidate metadata must agree.',
+      });
+    }
+    const hasFailure = ['failed', 'uncertain'].includes(job.status);
+    if (hasFailure !== (job.failure !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['failure'],
+        message: 'Failed states and their safe failure summary must agree.',
+      });
+    }
+  });
+
 export const compilerSummarySchema = z
   .object({
     ok: z.boolean(),
     errorCount: z.number().int().nonnegative(),
     warningCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const assetWorkItemSchema = z
+  .object({
+    requirementId: z.string().regex(/^req_[0-9a-f]{8}$/),
+    sectionId: nonEmpty,
+    sceneId: nonEmpty.nullable(),
+    field: nonEmpty,
   })
   .strict();
 
@@ -278,8 +373,23 @@ export const commandDataSchemas = {
       maxNewTakes: z.number().int().nonnegative(),
     })
     .strict(),
-  'run.compile': z.object({ report: compilerSummarySchema }).strict(),
+  'run.compile': z
+    .object({ report: compilerSummarySchema, assetWorklist: z.array(assetWorkItemSchema) })
+    .strict(),
   'run.render': z.object({ preview: artifactDescriptorSchema }).strict(),
+  'run.image.start': z.union([
+    z
+      .object({
+        disposition: z.enum(['created', 'reused']),
+        providerMode: z.enum(['recorded', 'live']),
+        job: imageJobSchema,
+      })
+      .strict(),
+    z.object({ reason: z.literal('IMAGE_AUTHORIZATION_REQUIRED') }).strict(),
+  ]),
+  'run.image.status': z.object({ job: imageJobSchema }).strict(),
+  'run.image.accept': z.object({ job: imageJobSchema }).strict(),
+  'run.image.reject': z.object({ job: imageJobSchema }).strict(),
 } as const;
 
 export const resultEnvelopeSchema = z
@@ -308,6 +418,12 @@ export type CommandOutcome = z.infer<typeof commandOutcomeSchema>;
 export type ProductionRequest = z.infer<typeof productionRequestSchema>;
 export type Decline = z.infer<typeof declineSchema>;
 export type ReplacementGrant = z.infer<typeof replacementGrantSchema>;
+export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;
+export type ImageGenerationGrant = z.infer<typeof imageGenerationGrantSchema>;
+export type ImageAcceptance = z.infer<typeof imageAcceptanceSchema>;
+export type ImageRejection = z.infer<typeof imageRejectionSchema>;
+export type ImageCandidate = z.infer<typeof imageCandidateSchema>;
+export type ImageJob = z.infer<typeof imageJobSchema>;
 export type ArtifactDescriptor = z.infer<typeof artifactDescriptorSchema>;
 export type ResultEnvelope = z.infer<typeof resultEnvelopeSchema>;
 export type PreflightReport = z.infer<typeof preflightReportSchema>;

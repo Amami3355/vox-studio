@@ -20,7 +20,7 @@ const passingObservations = (): NorthbridgeObservations => ({
   },
   leakScan: { pass: true, violations: [] },
   contracts: {
-    categories: ['language', 'plan', 'catalog', 'checks', 'operating', 'protocol'],
+    categories: ['language', 'plan', 'catalog', 'checks', 'operating', 'design', 'protocol'],
     allCommandsObserved: true,
     agentDiscoveryObserved: true,
   },

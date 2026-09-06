@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildContractProjections } from '../src/contracts/generate';
 import catalog from '../src/contracts/generated/catalog.json';
 import checks from '../src/contracts/generated/checks.json';
+import design from '../src/contracts/generated/design.json';
 import index from '../src/contracts/generated/index.json';
 import language from '../src/contracts/generated/language.json';
 import operating from '../src/contracts/generated/operating.json';
@@ -36,9 +37,9 @@ const fresh = () =>
   });
 
 describe('production contract projections', () => {
-  it('generates all six versioned categories and the compact index', () => {
+  it('generates all seven versioned categories and the compact index', () => {
     const projections = fresh();
-    const committed = { language, plan, catalog, checks, operating, protocol };
+    const committed = { language, plan, catalog, checks, operating, design, protocol };
 
     expect(Object.keys(projections.categories)).toEqual(Object.keys(committed));
     expect(projections.index).toEqual(index);
@@ -47,13 +48,14 @@ describe('production contract projections', () => {
     }
   });
 
-  it('publishes the same six categories, in the same order, under the same ids', () => {
+  it('publishes the same seven categories, in the same order, under the same ids', () => {
     expect(index.categories.map(({ id }) => id)).toEqual([
       'language',
       'plan',
       'catalog',
       'checks',
       'operating',
+      'design',
       'protocol',
     ]);
   });
@@ -73,7 +75,7 @@ describe('production contract projections', () => {
 
     for (const category of index.categories) expect(category.audience.length).toBeGreaterThan(0);
     expect(addressed('author')).toEqual(['language', 'plan', 'catalog', 'checks', 'operating']);
-    expect(addressed('client')).toEqual(['catalog', 'checks', 'operating', 'protocol']);
+    expect(addressed('client')).toEqual(['catalog', 'checks', 'operating', 'design', 'protocol']);
   });
 
   /**
@@ -125,7 +127,7 @@ describe('production contract projections', () => {
     }
   });
 
-  it('publishes the checks as an exact view of catalog v4, and the catalog without them', () => {
+  it('lifts the checks and the palettes out of the catalog and publishes the rest of it', () => {
     const source = sourceCatalog();
 
     // Two unrelated 4s sit near each other here and mean different things. This one is the
@@ -133,12 +135,81 @@ describe('production contract projections', () => {
     // `contractVersion` in `protocol.ts` is separately at 4 after ticket 28, and versions how the
     // category is *published*. They moved to the same digit by coincidence and nothing keeps them
     // in step; a reader who assumed one tracked the other would be wrong in both directions.
-    expect(catalog.contract.manifestVersion).toBe(4);
+    expect(catalog.contract.manifestVersion).toBe(5);
     expect(checks.contract).toEqual(source.checks);
+    expect(design.contract).toEqual({ palettes: source.palettes });
     expect(Object.hasOwn(catalog.contract, 'checks')).toBe(false);
-    // Subtraction that went exactly far enough: the catalog is the source less the checks,
-    // every capability, action, anchor form and semantic time rule still published.
-    expect({ ...catalog.contract, checks: source.checks }).toEqual(source);
+    // The palettes are raw colour and the catalog is addressed to authors, so the one thing
+    // asserted about them here is that an author's projection does not carry them.
+    expect(Object.hasOwn(catalog.contract, 'palettes')).toBe(false);
+    // Subtraction that went exactly far enough: the catalog is the source less the two lifted
+    // documents, every capability, action, anchor form and semantic time rule still published.
+    const {
+      capabilityTiers: _tiers,
+      roleProjections: _roles,
+      ...canonicalCatalog
+    } = catalog.contract;
+    expect({
+      ...canonicalCatalog,
+      checks: source.checks,
+      palettes: source.palettes,
+    }).toEqual(source);
+  });
+
+  it('publishes byte-identical capability tiers and the role allowed to consume each tier', () => {
+    const source = sourceCatalog();
+    const capabilities = source.capabilities as Record<string, unknown>[];
+    const tiers = catalog.contract.capabilityTiers;
+
+    expect(tiers).toEqual({
+      selection: {
+        fields: [
+          'id',
+          'name',
+          'family',
+          'summary',
+          'useWhen',
+          'avoidWhen',
+          'supportedCompositions',
+          'requiresAssets',
+          'recommendedDurationFrames',
+        ],
+      },
+      authoring: {
+        fields: [
+          'supportsEvents',
+          'occupiesRegions',
+          'capacityByComposition',
+          'seriesField',
+          'minDurationFrames',
+          'propsSchema',
+          'softConstraints',
+          'layouts',
+          'actions',
+          'examples',
+        ],
+      },
+    });
+    expect(catalog.contract.roleProjections).toEqual({
+      visualStructurer: { tiers: ['selection'], capabilitySelection: 'all' },
+      sceneAuthor: { tiers: ['selection', 'authoring'], capabilitySelection: 'selected' },
+      planRepair: { tiers: ['selection', 'authoring'], capabilitySelection: 'implicated' },
+    });
+
+    const fields = [...tiers.selection.fields, ...tiers.authoring.fields];
+    expect(new Set(fields).size).toBe(fields.length);
+    expect(new Set(fields)).toEqual(
+      new Set(capabilities.flatMap((capability) => Object.keys(capability))),
+    );
+    for (const capability of capabilities) {
+      expect(
+        Object.fromEntries(
+          fields
+            .filter((field) => Object.hasOwn(capability, field))
+            .map((field) => [field, capability[field]]),
+        ),
+      ).toEqual(capability);
+    }
   });
 
   it('parses CONTEXT.md into unique non-empty glossary entries', () => {

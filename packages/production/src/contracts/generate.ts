@@ -4,6 +4,11 @@ import {
   artifactDescriptorSchema,
   commandDataSchemas,
   declineSchema,
+  imageAcceptanceSchema,
+  imageGenerationGrantSchema,
+  imageGenerationRequestSchema,
+  imageJobSchema,
+  imageRejectionSchema,
   preflightReportSchema,
   productionRequestSchema,
   replacementGrantSchema,
@@ -11,6 +16,18 @@ import {
 } from './schemas';
 
 type JsonObject = Record<string, unknown>;
+
+const VISUAL_SELECTION_FIELDS = [
+  'id',
+  'name',
+  'family',
+  'summary',
+  'useWhen',
+  'avoidWhen',
+  'supportedCompositions',
+  'requiresAssets',
+  'recommendedDurationFrames',
+] as const;
 
 export type GlossaryEntry = {
   term: string;
@@ -62,6 +79,43 @@ const assertObject = (value: unknown, name: string): JsonObject => {
 const schemaOf = (schema: z.ZodType): JsonObject =>
   z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as JsonObject;
 
+const catalogProjectionMetadata = (catalog: JsonObject): JsonObject => {
+  if (!Array.isArray(catalog.capabilities) || catalog.capabilities.length === 0) {
+    throw new Error('catalog.capabilities must be a non-empty array.');
+  }
+  const capabilities = catalog.capabilities.map((value, index) =>
+    assertObject(value, `catalog.capabilities[${index}]`),
+  );
+  for (const field of VISUAL_SELECTION_FIELDS) {
+    if (capabilities.some((capability) => !Object.hasOwn(capability, field))) {
+      throw new Error(`Every capability must publish the selection-tier field "${field}".`);
+    }
+  }
+
+  const allFields = [...new Set(capabilities.flatMap((capability) => Object.keys(capability)))];
+  const authoringFields = allFields.filter(
+    (field) => !(VISUAL_SELECTION_FIELDS as readonly string[]).includes(field),
+  );
+
+  return {
+    capabilityTiers: {
+      selection: { fields: [...VISUAL_SELECTION_FIELDS] },
+      authoring: { fields: authoringFields },
+    },
+    roleProjections: {
+      visualStructurer: { tiers: ['selection'], capabilitySelection: 'all' },
+      sceneAuthor: {
+        tiers: ['selection', 'authoring'],
+        capabilitySelection: 'selected',
+      },
+      planRepair: {
+        tiers: ['selection', 'authoring'],
+        capabilitySelection: 'implicated',
+      },
+    },
+  };
+};
+
 export type GeneratedCategory = {
   category: (typeof CONTRACT_CATEGORIES)[number]['id'];
   contractVersion: number;
@@ -86,7 +140,31 @@ export const buildContractProjections = (inputs: {
    * the video package's catalog moves. What a consumer reads is the decision: each document in
    * one place, so reading the whole contract does not mean reading the checks twice.
    */
-  const { checks: _checksHaveTheirOwnCategory, ...catalogWithoutChecks } = catalog;
+  const {
+    checks: _checksHaveTheirOwnCategory,
+    palettes: _palettesAreAddressedToClients,
+    ...catalogWithoutChecks
+  } = catalog;
+  const catalogMetadata = catalogProjectionMetadata(catalog);
+
+  /**
+   * The palettes are lifted the same way the checks are, and for a stronger reason: they are
+   * raw colour. The catalog is addressed to authors, and an author that could read a hex value
+   * could write one — so what a theme resolves its roles to is published to clients only, where
+   * the deterministic image tool that has to compose against it lives.
+   */
+  const palettes = assertObject(catalog.palettes, 'catalog.palettes');
+  for (const [theme, roles] of Object.entries(palettes)) {
+    const resolved = assertObject(roles, `catalog.palettes.${theme}`);
+    if (Object.keys(resolved).length === 0) {
+      throw new Error(`catalog.palettes.${theme} resolves no colour role.`);
+    }
+    for (const [role, color] of Object.entries(resolved)) {
+      if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) {
+        throw new Error(`catalog.palettes.${theme}.${role} must be a #rrggbb colour.`);
+      }
+    }
+  }
 
   const protocol = {
     ...PRODUCTION_CONTRACT,
@@ -94,6 +172,11 @@ export const buildContractProjections = (inputs: {
       request: schemaOf(productionRequestSchema),
       decline: schemaOf(declineSchema),
       replacementGrant: schemaOf(replacementGrantSchema),
+      imageGenerationRequest: schemaOf(imageGenerationRequestSchema),
+      imageGenerationGrant: schemaOf(imageGenerationGrantSchema),
+      imageAcceptance: schemaOf(imageAcceptanceSchema),
+      imageRejection: schemaOf(imageRejectionSchema),
+      imageJob: schemaOf(imageJobSchema),
       artifactDescriptor: schemaOf(artifactDescriptorSchema),
       preflightReport: schemaOf(preflightReportSchema),
       resultEnvelope: schemaOf(resultEnvelopeSchema),
@@ -106,9 +189,10 @@ export const buildContractProjections = (inputs: {
   const rawContracts: Record<string, JsonObject> = {
     language: { entries: parseGlossary(inputs.contextMarkdown) },
     plan,
-    catalog: catalogWithoutChecks,
+    catalog: { ...catalogWithoutChecks, ...catalogMetadata },
     checks,
     operating: OPERATING_CONTRACT as unknown as JsonObject,
+    design: { palettes },
     protocol,
   };
 

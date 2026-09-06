@@ -1,5 +1,6 @@
 import catalog from './generated/catalog.json';
 import checks from './generated/checks.json';
+import design from './generated/design.json';
 import index from './generated/index.json';
 import language from './generated/language.json';
 import operating from './generated/operating.json';
@@ -18,6 +19,7 @@ const categories: Record<ContractCategory, Record<string, unknown>> = {
   catalog,
   checks,
   operating,
+  design,
   protocol,
 };
 

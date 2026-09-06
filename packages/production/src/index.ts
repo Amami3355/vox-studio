@@ -13,6 +13,7 @@ export * from './render/assets';
 export * from './render/remotion';
 export * from './commands/dispatch';
 export * from './commands/payload-surface';
+export * from './image/google';
 export * from './ipc/authentication';
 export * from './ipc/boundary';
 export * from './ipc/framing';

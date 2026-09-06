@@ -20,6 +20,7 @@ const RECORDED = [
   'contract-index.stdout',
   'contract-show-catalog.stdout',
   'contract-show-checks.stdout',
+  'contract-show-design.stdout',
   'contract-show-language.stdout',
   'contract-show-operating.stdout',
   'contract-show-plan.stdout',

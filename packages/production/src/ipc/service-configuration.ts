@@ -4,7 +4,8 @@ import { createElevenLabsAdapter } from '@vox/voice';
 import { type JsonValue, canonicalJson } from '../canonical-json';
 import { ProductionCommandService } from '../commands/service';
 import type { NetworkAdapter } from '../commands/service';
-import type { ReplacementGrant } from '../contracts/schemas';
+import type { ImageGenerationGrant, ReplacementGrant } from '../contracts/schemas';
+import { createGoogleImageAdapter } from '../image/google';
 import { DurationCalibrationStore } from '../preflight/calibration';
 import { createRemotionRenderAdapter } from '../render/remotion';
 
@@ -114,6 +115,24 @@ const replacementGrantVerifier =
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   };
 
+const imageGrantVerifier =
+  (grantKey: string) =>
+  (grant: ImageGenerationGrant): boolean => {
+    const unsigned = {
+      protocolVersion: grant.protocolVersion,
+      grantId: grant.grantId,
+      runId: grant.runId,
+      requestSha256: grant.requestSha256,
+      issuedAt: grant.issuedAt,
+      expiresAt: grant.expiresAt,
+    };
+    const expected = createHmac('sha256', grantKey)
+      .update(canonicalJson(unsigned as unknown as JsonValue))
+      .digest();
+    const actual = Buffer.from(grant.grant, 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  };
+
 /**
  * The construction both entry points perform, moved here unchanged so that neither topology can
  * drift from the other by editing its own copy. What differs between them is the transport bound
@@ -130,6 +149,8 @@ export const createConfiguredProductionService = (
     network: deniedNetworkAdapter,
     synthesizer: createElevenLabsAdapter({ apiKey: configuration.apiKey }),
     verifyReplacementGrant: replacementGrantVerifier(configuration.grantKey),
+    imageGenerator: createGoogleImageAdapter(),
+    verifyImageGrant: imageGrantVerifier(configuration.grantKey),
     renderer: createRemotionRenderAdapter({
       entryPoint: configuration.remotionEntryPoint,
       browserExecutable: configuration.browserExecutable,

@@ -1,14 +1,21 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
+  type AssetRequirement,
   type CompileReport,
   type CompileResult,
   type CompiledDocument,
+  type LocalAssetEntry,
+  PLACEHOLDER_ASSET_URI,
   type VideoPlan,
+  assetRequirementId,
+  assetRequirementSchema,
   compile,
   compileReportSchema,
   compiledDocumentSchema,
+  createAssetResolver,
+  repositoryAssetLibrary,
   validateVideoPlan,
   videoPlanSchema,
 } from '@vox/video';
@@ -29,12 +36,21 @@ import { type JsonValue, canonicalJson, hashCanonicalJson, sha256Bytes } from '.
 import {
   type CommandId,
   type Decline,
+  type ImageAcceptance,
+  type ImageGenerationGrant,
+  type ImageGenerationRequest,
+  type ImageJob,
+  type ImageRejection,
   PROTOCOL_VERSION,
   type ProductionRequest,
   type ReplacementGrant,
   type ResultEnvelope,
   type RunStage,
   declineSchema,
+  imageAcceptanceSchema,
+  imageGenerationGrantSchema,
+  imageGenerationRequestSchema,
+  imageRejectionSchema,
   productionRequestSchema,
   replacementGrantSchema,
   resultEnvelopeSchema,
@@ -48,8 +64,11 @@ import { buildPreflightReport } from '../preflight/preflight';
 import { assetResolutionView, verifyServiceReadableAssets } from '../render/assets';
 import { type RenderAdapter, assertMp4 } from '../render/remotion';
 import {
+  acceptedAssetSetIdentity,
   beatShapeIdentity,
   compileInputIdentity,
+  imageGenerationRequestIdentity,
+  imageJobIdOf,
   planIdentity,
   preflightInputIdentity,
   recordingInputIdentity,
@@ -58,6 +77,7 @@ import {
 } from '../run-store/identities';
 import { RUN_PATHS } from '../run-store/paths';
 import {
+  type AssetResolution,
   type RunBindings,
   type RunCheckpoint,
   RunStore,
@@ -71,6 +91,23 @@ export type NetworkAdapter = {
   request: (...args: never[]) => Promise<never>;
 };
 
+export type ImageGenerationAdapter = {
+  mode: 'recorded' | 'live';
+  generate: (request: {
+    prompt: string;
+    aspectRatio: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
+    outputMimeType: 'image/png';
+    seed: number;
+  }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png' }>;
+};
+
+export class ImageDispatchUncertain extends Error {
+  constructor(message = 'The image provider dispatch outcome is uncertain.') {
+    super(message);
+    this.name = 'ImageDispatchUncertain';
+  }
+}
+
 export type ProductionCommandServiceOptions = {
   ledgerRoot: string;
   hmacKey: string | Uint8Array;
@@ -83,6 +120,8 @@ export type ProductionCommandServiceOptions = {
   rendererVersion?: string;
   synthesizer?: SynthesisAdapter;
   verifyReplacementGrant?: (grant: ReplacementGrant) => boolean | Promise<boolean>;
+  imageGenerator?: ImageGenerationAdapter;
+  verifyImageGrant?: (grant: ImageGenerationGrant) => boolean | Promise<boolean>;
   recordingCrashAt?: (point: 'after_dispatch' | 'after_response_received') => void;
   now?: () => Date;
   createRunId?: () => string;
@@ -146,13 +185,343 @@ export class ProductionCommandService {
         ...store.artifactDescriptors(checkpoint.bindings),
       ];
       const staleStages = Object.entries(checkpoint.bindings)
-        .filter(([, binding]) => binding?.freshness.state === 'stale')
+        .filter(
+          ([, binding]) =>
+            binding !== null && 'freshness' in binding && binding.freshness.state === 'stale',
+        )
         .map(([name]) => this.stageForBinding(name));
       return this.success(
         'run.status',
         checkpoint,
         { staleStages: [...new Set(staleStages)], lastOutcome: checkpoint.lastOutcome, artifacts },
         [],
+        [],
+      );
+    });
+  }
+
+  async imageStart(input: {
+    runRoot: string;
+    request: unknown;
+    authorization?: unknown;
+  }): Promise<CommandExecution> {
+    return this.execute('run.image.start', input.runRoot, async (store) => {
+      const request = imageGenerationRequestSchema.parse(input.request);
+      let checkpoint = await store.inspect();
+      this.assertNonTerminal(checkpoint);
+      const requirement = await this.requireImageWorkItem(store, checkpoint, request);
+      const providerRequest = {
+        prompt: request.prompt,
+        aspectRatio: request.aspectRatio,
+        outputMimeType: request.outputMimeType,
+        seed: request.seed,
+      } as const;
+      if (imageGenerationRequestIdentity(providerRequest) !== request.requestSha256) {
+        throw new RunStoreError(
+          'IMAGE_REQUEST_DIGEST_MISMATCH',
+          'The image generation request does not match its digest.',
+        );
+      }
+
+      const existing = checkpoint.bindings.images.jobs.find(
+        (job) => job.identityKey === request.identityKey,
+      );
+      if (existing) {
+        return this.success(
+          'run.image.start',
+          checkpoint,
+          { disposition: 'reused', providerMode: existing.providerMode, job: existing },
+          existing.candidate ? [existing.candidate.artifact] : [],
+          [],
+        );
+      }
+
+      const generator = this.imageGenerator();
+      if (generator.mode === 'live') {
+        if (input.authorization === undefined) {
+          const next = await store.commit({
+            expectedRevision: checkpoint.revision,
+            command: 'run.image.start',
+            outcome: 'paused',
+            data: { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
+            next: [
+              {
+                command: 'run.image.start',
+                args: [
+                  '--run',
+                  '.',
+                  '--request',
+                  '<image-request.json>',
+                  '--authorisation',
+                  '<grant.json>',
+                ],
+                reason: 'A live image call requires an explicit request-bound grant.',
+              },
+            ],
+          });
+          return this.success(
+            'run.image.start',
+            next,
+            { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
+            [],
+            next.bindings.images.jobs.length === 0
+              ? [
+                  {
+                    command: 'run.image.start',
+                    args: [
+                      '--run',
+                      '.',
+                      '--request',
+                      '<image-request.json>',
+                      '--authorisation',
+                      '<grant.json>',
+                    ],
+                    reason: 'A live image call requires an explicit request-bound grant.',
+                  },
+                ]
+              : [],
+            'paused',
+          );
+        }
+        const grant = imageGenerationGrantSchema.parse(input.authorization);
+        await this.requireImageGrant(grant, checkpoint, request);
+      } else if (input.authorization !== undefined) {
+        throw new RunStoreError(
+          'IMAGE_AUTHORIZATION_NOT_APPLICABLE',
+          'Recorded image generation does not consume a live authorization grant.',
+        );
+      }
+
+      const job: ImageJob = {
+        schemaVersion: 1,
+        id: imageJobIdOf(request.identityKey, request.requestSha256),
+        requirementId: request.requirementId,
+        identityKey: request.identityKey,
+        requestSha256: request.requestSha256,
+        providerMode: generator.mode,
+        status: 'dispatching',
+        candidate: null,
+        failure: null,
+      };
+      const consumedGrantId =
+        generator.mode === 'live'
+          ? imageGenerationGrantSchema.parse(input.authorization).grantId
+          : null;
+      checkpoint = await store.commit({
+        expectedRevision: checkpoint.revision,
+        command: 'run.image.start',
+        outcome: 'succeeded',
+        bindings: {
+          ...checkpoint.bindings,
+          images: {
+            jobs: [...checkpoint.bindings.images.jobs, job],
+            consumedGrantIds: consumedGrantId
+              ? [...checkpoint.bindings.images.consumedGrantIds, consumedGrantId]
+              : checkpoint.bindings.images.consumedGrantIds,
+          },
+        },
+        data: { disposition: 'created', providerMode: generator.mode, job },
+        next: [
+          {
+            command: 'run.image.status',
+            args: ['--run', '.', '--job', job.id],
+            reason: 'Observe this job; never start a replacement implicitly.',
+          },
+        ],
+      });
+
+      try {
+        const generated = await generator.generate(providerRequest);
+        const { width, height } = this.assertGeneratedPng(generated.bytes, generated.mediaType);
+        const candidateSha256 = sha256Bytes(generated.bytes);
+        const candidatePath = RUN_PATHS.generatedImageCandidate(job.id, candidateSha256);
+        const current = await store.inspect();
+        const currentJob = this.requireImageJob(current, job.id);
+        if (currentJob.status !== 'dispatching') {
+          return this.success(
+            'run.image.start',
+            current,
+            { disposition: 'reused', providerMode: generator.mode, job: currentJob },
+            currentJob.candidate ? [currentJob.candidate.artifact] : [],
+            [],
+          );
+        }
+        const next = await store.commit({
+          expectedRevision: current.revision,
+          command: 'run.image.start',
+          outcome: 'succeeded',
+          artifacts: [
+            {
+              kind: 'generated_image_candidate',
+              path: candidatePath,
+              bytes: generated.bytes,
+            },
+          ],
+          bindings: ([artifact]) => {
+            if (!artifact) throw new Error('The generated image candidate was not published.');
+            const candidate = {
+              id: `image-candidate-${candidateSha256.slice(0, 20)}`,
+              requirementId: request.requirementId,
+              identityKey: request.identityKey,
+              promptSha256: createHash('sha256').update(request.prompt).digest('hex'),
+              artifact,
+              width,
+              height,
+            };
+            return this.replaceImageJob(current.bindings, job.id, {
+              ...currentJob,
+              status: 'candidate',
+              candidate,
+              failure: null,
+            });
+          },
+          data: null,
+          next: [],
+        });
+        const completed = this.requireImageJob(next, job.id);
+        return this.success(
+          'run.image.start',
+          next,
+          { disposition: 'created', providerMode: generator.mode, job: completed },
+          completed.candidate ? [completed.candidate.artifact] : [],
+          [
+            {
+              command: 'run.image.accept',
+              args: ['--run', '.', '--decision', '<acceptance.json>'],
+              reason: 'Inspect the candidate and bind an explicit decision to its digest.',
+            },
+          ],
+        );
+      } catch (error) {
+        const current = await store.inspect();
+        const currentJob = this.requireImageJob(current, job.id);
+        const uncertain = error instanceof ImageDispatchUncertain;
+        const ended: ImageJob = {
+          ...currentJob,
+          status: uncertain ? 'uncertain' : 'failed',
+          candidate: null,
+          failure: uncertain
+            ? 'Image dispatch outcome is uncertain; observe this job before any replacement.'
+            : 'Image generation did not produce a valid candidate.',
+        };
+        const next = await store.commit({
+          expectedRevision: current.revision,
+          command: 'run.image.start',
+          outcome: 'succeeded',
+          bindings: this.replaceImageJob(
+            this.staleAssetConsumers(
+              current.bindings,
+              uncertain ? null : 'ASSET_GENERATION_FAILED',
+            ),
+            job.id,
+            ended,
+          ),
+          data: { disposition: 'created', providerMode: generator.mode, job: ended },
+        });
+        return this.success(
+          'run.image.start',
+          next,
+          { disposition: 'created', providerMode: generator.mode, job: ended },
+          [],
+          [],
+        );
+      }
+    });
+  }
+
+  async imageStatus(input: { runRoot: string; jobId: string }): Promise<CommandExecution> {
+    return this.execute('run.image.status', input.runRoot, async (store) => {
+      const checkpoint = await store.inspect();
+      const job = this.requireImageJob(checkpoint, input.jobId);
+      return this.success(
+        'run.image.status',
+        checkpoint,
+        { job },
+        job.candidate ? [job.candidate.artifact] : [],
+        [],
+      );
+    });
+  }
+
+  async imageAccept(input: { runRoot: string; decision: unknown }): Promise<CommandExecution> {
+    return this.execute('run.image.accept', input.runRoot, async (store) => {
+      const decision = imageAcceptanceSchema.parse(input.decision);
+      const checkpoint = await store.inspect();
+      this.assertNonTerminal(checkpoint);
+      const job = this.requireImageJob(checkpoint, decision.jobId);
+      if (job.status !== 'candidate' || job.candidate === null) {
+        throw new RunStoreError(
+          'IMAGE_CANDIDATE_REQUIRED',
+          'Only an inspectable image candidate can be accepted.',
+        );
+      }
+      if (job.candidate.artifact.sha256 !== decision.candidateSha256) {
+        throw new RunStoreError(
+          'IMAGE_DIGEST_MISMATCH',
+          'Image acceptance must bind the candidate exact digest.',
+        );
+      }
+      await store.readArtifact(job.candidate.artifact);
+      const accepted: ImageJob = { ...job, status: 'accepted' };
+      const next = await store.commit({
+        expectedRevision: checkpoint.revision,
+        command: 'run.image.accept',
+        outcome: 'succeeded',
+        bindings: this.replaceImageJob(
+          this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
+          job.id,
+          accepted,
+        ),
+        data: { job: accepted },
+        next: [
+          {
+            command: 'run.compile',
+            args: ['--run', '.'],
+            reason: 'Recompile to bind the accepted image bytes.',
+          },
+        ],
+      });
+      return this.success(
+        'run.image.accept',
+        next,
+        { job: accepted },
+        [job.candidate.artifact],
+        [
+          {
+            command: 'run.compile',
+            args: ['--run', '.'],
+            reason: 'Recompile to bind the accepted image bytes.',
+          },
+        ],
+      );
+    });
+  }
+
+  async imageReject(input: { runRoot: string; decision: unknown }): Promise<CommandExecution> {
+    return this.execute('run.image.reject', input.runRoot, async (store) => {
+      const decision = imageRejectionSchema.parse(input.decision);
+      const checkpoint = await store.inspect();
+      this.assertNonTerminal(checkpoint);
+      const job = this.requireImageJob(checkpoint, decision.jobId);
+      if (job.status !== 'candidate' || job.candidate === null) {
+        throw new RunStoreError(
+          'IMAGE_CANDIDATE_REQUIRED',
+          'Only an inspectable image candidate can be rejected.',
+        );
+      }
+      const rejected: ImageJob = { ...job, status: 'rejected' };
+      const next = await store.commit({
+        expectedRevision: checkpoint.revision,
+        command: 'run.image.reject',
+        outcome: 'succeeded',
+        bindings: this.replaceImageJob(checkpoint.bindings, job.id, rejected),
+        data: { job: rejected },
+      });
+      return this.success(
+        'run.image.reject',
+        next,
+        { job: rejected },
+        [job.candidate.artifact],
         [],
       );
     });
@@ -527,6 +896,7 @@ export class ProductionCommandService {
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
         catalogManifestVersion: 4,
+        acceptedAssetSetSha256: acceptedAssetSetIdentity(checkpoint.bindings.images.jobs),
       });
       const previous = checkpoint.bindings;
       const existing = previous.compilation;
@@ -555,6 +925,7 @@ export class ProductionCommandService {
           );
         }
         const artifacts = [existing.document, existing.report];
+        const assetWorklist = this.assetWorklist(existing.assetResolutions);
         const nextActions = [
           { command: 'run.render' as const, args: ['--run', '.'], reason: 'Compilation is green.' },
         ];
@@ -568,22 +939,24 @@ export class ProductionCommandService {
             { kind: existing.report.kind, path: existing.report.path, bytes: existingReportBytes },
           ],
           bindings: previous,
-          data: { report: this.summary(report) },
+          data: { report: this.summary(report), assetWorklist },
           next: nextActions,
         });
         return this.success(
           'run.compile',
           next,
-          { report: this.summary(report) },
+          { report: this.summary(report), assetWorklist },
           artifacts,
           nextActions,
         );
       }
 
+      const resolver = await this.projectAssetResolver(store, checkpoint, plan);
       const result = this.compiler({
         plan,
         beats: verifiedTake.fold.timedBeats,
         audio: { voiceover: 'voiceover.mp3' },
+        resolver,
       });
       compileReportSchema.parse(result.report);
       const reportPath = RUN_PATHS.compileReport(compileInputSha256);
@@ -606,13 +979,13 @@ export class ProductionCommandService {
           outcome: 'needs_repair',
           stage: checkpoint.stage,
           artifacts: [{ kind: 'compile_report', path: reportPath, bytes }],
-          data: { report: this.summary(result.report) },
+          data: { report: this.summary(result.report), assetWorklist: [] },
           next: nextActions,
         });
         return this.success(
           'run.compile',
           next,
-          { report: this.summary(result.report) },
+          { report: this.summary(result.report), assetWorklist: [] },
           artifacts,
           nextActions,
           'needs_repair',
@@ -623,6 +996,7 @@ export class ProductionCommandService {
       const documentBytes = canonicalJson(result.document as unknown as JsonValue);
       const compileReportBytes = reportBytes(result.report);
       const resolutions = assetResolutionView(result.document);
+      const assetWorklist = this.assetWorklist(resolutions);
       const nextActions = [
         { command: 'run.render' as const, args: ['--run', '.'], reason: 'Compilation is green.' },
       ];
@@ -653,13 +1027,13 @@ export class ProductionCommandService {
               : null,
           };
         },
-        data: { report: this.summary(result.report) },
+        data: { report: this.summary(result.report), assetWorklist },
         next: nextActions,
       });
       return this.success(
         'run.compile',
         next,
-        { report: this.summary(result.report) },
+        { report: this.summary(result.report), assetWorklist },
         [next.bindings.compilation!.document, next.bindings.compilation!.report],
         nextActions,
       );
@@ -691,6 +1065,7 @@ export class ProductionCommandService {
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
         catalogManifestVersion: 4,
+        acceptedAssetSetSha256: acceptedAssetSetIdentity(checkpoint.bindings.images.jobs),
       });
       if (compilation.compileInputSha256 !== expectedCompileInputSha256) {
         throw new RunStoreError(
@@ -1300,6 +1675,7 @@ export class ProductionCommandService {
         ? { ...previous.compilation, freshness: stale('PLAN_CHANGED') }
         : null,
       render: previous.render ? { ...previous.render, freshness: stale('PLAN_CHANGED') } : null,
+      images: previous.images,
     };
   }
 
@@ -1317,6 +1693,252 @@ export class ProductionCommandService {
         Buffer.from(await store.readArtifact(checkpoint.request.artifact)).toString('utf8'),
       ),
     );
+  }
+
+  private imageGenerator(): ImageGenerationAdapter {
+    if (!this.options.imageGenerator) {
+      throw new RunStoreError(
+        'IMAGE_GENERATOR_NOT_CONFIGURED',
+        'No image generation adapter is configured for Production.',
+      );
+    }
+    return this.options.imageGenerator;
+  }
+
+  private requireImageJob(checkpoint: RunCheckpoint, jobId: string): ImageJob {
+    const job = checkpoint.bindings.images.jobs.find((candidate) => candidate.id === jobId);
+    if (!job) throw new RunStoreError('IMAGE_JOB_NOT_FOUND', `No image job named ${jobId} exists.`);
+    return job;
+  }
+
+  private replaceImageJob(
+    bindings: RunBindings,
+    jobId: string,
+    replacement: ImageJob,
+  ): RunBindings {
+    if (!bindings.images.jobs.some((job) => job.id === jobId)) {
+      throw new RunStoreError('IMAGE_JOB_NOT_FOUND', `No image job named ${jobId} exists.`);
+    }
+    return {
+      ...bindings,
+      images: {
+        ...bindings.images,
+        jobs: bindings.images.jobs.map((job) => (job.id === jobId ? replacement : job)),
+      },
+    };
+  }
+
+  private staleAssetConsumers(bindings: RunBindings, reason: string | null): RunBindings {
+    if (reason === null) return bindings;
+    return {
+      ...bindings,
+      compilation: bindings.compilation
+        ? { ...bindings.compilation, freshness: stale(reason) }
+        : null,
+      render: bindings.render ? { ...bindings.render, freshness: stale(reason) } : null,
+    };
+  }
+
+  private async requireImageGrant(
+    grant: ImageGenerationGrant,
+    checkpoint: RunCheckpoint,
+    request: ImageGenerationRequest,
+  ): Promise<void> {
+    if (grant.runId !== checkpoint.runId || grant.requestSha256 !== request.requestSha256) {
+      throw new RunStoreError(
+        'IMAGE_GRANT_SCOPE_MISMATCH',
+        'The image authorization does not name this Run and exact provider request.',
+      );
+    }
+    const now = this.now().getTime();
+    const issuedAt = Date.parse(grant.issuedAt);
+    const expiresAt = Date.parse(grant.expiresAt);
+    if (!Number.isFinite(now) || issuedAt > now || expiresAt <= now || expiresAt <= issuedAt) {
+      throw new RunStoreError(
+        'IMAGE_GRANT_EXPIRED',
+        'The image authorization is not currently valid.',
+      );
+    }
+    if (checkpoint.bindings.images.consumedGrantIds.includes(grant.grantId)) {
+      throw new RunStoreError('IMAGE_GRANT_REPLAYED', 'The image authorization was already used.');
+    }
+    if (!this.options.verifyImageGrant) {
+      throw new RunStoreError(
+        'IMAGE_GRANT_VERIFIER_UNAVAILABLE',
+        'The image authorization authority is unavailable.',
+      );
+    }
+    if (!(await this.options.verifyImageGrant(grant))) {
+      throw new RunStoreError(
+        'IMAGE_AUTHORIZATION_INVALID',
+        'The image authorization did not authenticate.',
+      );
+    }
+  }
+
+  private async requireImageWorkItem(
+    store: RunStore,
+    checkpoint: RunCheckpoint,
+    request: ImageGenerationRequest,
+  ): Promise<AssetRequirement> {
+    const compilation = checkpoint.bindings.compilation;
+    const planBinding = checkpoint.bindings.plan;
+    if (!compilation || !planBinding) {
+      throw new RunStoreError(
+        'IMAGE_REQUIREMENT_NOT_PUBLISHED',
+        'Generate images only for requirements published by a compilation.',
+      );
+    }
+    const pending = compilation.assetResolutions.some(
+      (resolution) =>
+        resolution.status === 'placeholder' &&
+        resolution.pendingRequirementId === request.requirementId,
+    );
+    if (!pending) {
+      throw new RunStoreError(
+        'IMAGE_REQUIREMENT_NOT_PENDING',
+        'The named requirement is not a pending placeholder in the bound compilation.',
+      );
+    }
+    const plan = videoPlanSchema.parse(
+      this.parseArtifact(await store.readArtifact(planBinding.snapshot)),
+    );
+    const requirement = this.assetRequirements(plan).find(
+      (candidate) => assetRequirementId(candidate) === request.requirementId,
+    );
+    if (!requirement) {
+      throw new RunStoreError(
+        'IMAGE_REQUIREMENT_NOT_FOUND',
+        'The bound plan does not contain the named image requirement.',
+      );
+    }
+    const expectedIdentity = requirement.identityKey ?? request.requirementId;
+    if (request.identityKey !== expectedIdentity) {
+      throw new RunStoreError(
+        'IMAGE_IDENTITY_MISMATCH',
+        'The generation request identity does not match the plan requirement.',
+      );
+    }
+    return requirement;
+  }
+
+  private assetRequirements(plan: VideoPlan): AssetRequirement[] {
+    const values: unknown[] = [];
+    for (const section of plan.sections) {
+      for (const scene of section.scenes) {
+        if (scene.props.assetRequirement !== undefined) values.push(scene.props.assetRequirement);
+      }
+      for (const element of section.persistent ?? []) {
+        if (element.assetRequirement !== undefined) values.push(element.assetRequirement);
+      }
+    }
+    return values.map((value) => assetRequirementSchema.parse(value));
+  }
+
+  private assetWorklist(resolutions: AssetResolution[]) {
+    const seen = new Set<string>();
+    return resolutions.flatMap((resolution) => {
+      const requirementId = resolution.pendingRequirementId;
+      if (
+        resolution.status !== 'placeholder' ||
+        requirementId === null ||
+        seen.has(requirementId)
+      ) {
+        return [];
+      }
+      seen.add(requirementId);
+      return [
+        {
+          requirementId,
+          sectionId: resolution.sectionId,
+          sceneId: resolution.sceneId,
+          field: resolution.field,
+        },
+      ];
+    });
+  }
+
+  private assertGeneratedPng(
+    bytes: Uint8Array,
+    mediaType: string,
+  ): { width: number; height: number } {
+    const png = Buffer.from(bytes);
+    const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    if (
+      mediaType !== 'image/png' ||
+      png.length < 24 ||
+      !png.subarray(0, 8).equals(signature) ||
+      png.toString('ascii', 12, 16) !== 'IHDR'
+    ) {
+      throw new RunStoreError(
+        'IMAGE_PROVIDER_RESPONSE_INVALID',
+        'The image provider did not return a valid PNG.',
+      );
+    }
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    if (width === 0 || height === 0) {
+      throw new RunStoreError(
+        'IMAGE_PROVIDER_RESPONSE_INVALID',
+        'The image provider returned a PNG with invalid dimensions.',
+      );
+    }
+    return { width, height };
+  }
+
+  private async projectAssetResolver(
+    store: RunStore,
+    checkpoint: RunCheckpoint,
+    plan: VideoPlan,
+  ): Promise<ReturnType<typeof createAssetResolver>> {
+    const requirements = this.assetRequirements(plan);
+    const entries: LocalAssetEntry[] = [];
+    const digestsByUri = new Map<string, string>();
+    for (const job of checkpoint.bindings.images.jobs) {
+      if (job.status !== 'accepted' && job.status !== 'failed') continue;
+      const requirement = requirements.find(
+        (candidate) => assetRequirementId(candidate) === job.requirementId,
+      );
+      if (!requirement) continue;
+      if (job.status === 'failed') {
+        entries.push({
+          requirement,
+          ref: {
+            status: 'failed',
+            uri: PLACEHOLDER_ASSET_URI,
+            requirementId: job.requirementId,
+            reason: job.failure ?? 'Image generation failed.',
+          },
+        });
+        continue;
+      }
+      if (!job.candidate) {
+        throw new RunStoreError(
+          'IMAGE_ACCEPTANCE_CORRUPTED',
+          'An accepted image job has no candidate metadata.',
+        );
+      }
+      const bytes = await store.readArtifact(job.candidate.artifact);
+      this.assertGeneratedPng(bytes, 'image/png');
+      const uri = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
+      digestsByUri.set(uri, job.candidate.artifact.sha256);
+      entries.push({ requirement, ref: { status: 'ready', uri } });
+    }
+    return createAssetResolver({
+      projectLibrary: {
+        entries,
+        verify: (ref) => {
+          const expected = digestsByUri.get(ref.uri);
+          if (!expected) return { ok: false, reason: 'Accepted image bytes are not bound.' };
+          const marker = 'data:image/png;base64,';
+          const actual = sha256Bytes(Buffer.from(ref.uri.slice(marker.length), 'base64'));
+          return actual === expected
+            ? { ok: true }
+            : { ok: false, reason: 'Accepted image digest changed.' };
+        },
+      },
+      library: repositoryAssetLibrary,
+    });
   }
 
   private summary(report: CompileReport) {

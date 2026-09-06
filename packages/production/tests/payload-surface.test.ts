@@ -72,6 +72,28 @@ describe('resolving a Run id', () => {
 });
 
 describe('materialising a payload', () => {
+  it('returns a malformed-invocation envelope when image JSON cannot be parsed', async () => {
+    fixture = await createCommandFixture();
+    await writeFile(join(fixture.root, 'broken-image-request.json'), '{', 'utf8');
+
+    const result = await dispatchProductionArgv(fixture.service, fixture.root, [
+      'production',
+      'run',
+      'image-start',
+      '--run',
+      'public/run',
+      '--request',
+      'broken-image-request.json',
+    ]);
+
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      command: 'run.image.start',
+      outcome: 'failed',
+      error: { code: 'INVALID_INVOCATION' },
+    });
+  });
+
   it('writes a plan to plan.json inside the Run, under the name the crew writes today', async () => {
     fixture = await createCommandFixture();
     const surface = surfaceFor(fixture);

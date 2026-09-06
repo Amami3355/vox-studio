@@ -1052,7 +1052,8 @@ export const runNorthbridgeProof = async (options: NorthbridgeProofOptions) => {
         run: {
           stage: checkpoint.stage,
           bindingsFresh: Object.values(checkpoint.bindings).every(
-            (binding) => binding === null || binding.freshness.state === 'fresh',
+            (binding) =>
+              binding === null || !('freshness' in binding) || binding.freshness.state === 'fresh',
           ),
           receiptChainValid: inspected !== null,
           attestationsValid: inspected !== null,

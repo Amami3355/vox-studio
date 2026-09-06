@@ -1,8 +1,8 @@
 {
   "category": "catalog",
-  "contractVersion": 4,
+  "contractVersion": 6,
   "contract": {
-    "manifestVersion": 4,
+    "manifestVersion": 5,
     "time": {
       "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
       "forms": [
@@ -30,6 +30,31 @@
         "long"
       ],
       "sceneBeatId": "scene"
+    },
+    "visualVocabulary": {
+      "themes": [
+        "editorial-cold",
+        "editorial-paper"
+      ],
+      "motionIntents": [
+        "editorialStatic",
+        "subtleDrift",
+        "pushIn",
+        "energetic",
+        "impact",
+        "cinematic"
+      ],
+      "colorRoles": [
+        "neutral",
+        "positive",
+        "negative"
+      ],
+      "treatments": [
+        "photo",
+        "cutout",
+        "illustration",
+        "duotone"
+      ]
     },
     "capabilities": [
       {
@@ -2628,6 +2653,57 @@
           }
         ]
       }
-    ]
+    ],
+    "capabilityTiers": {
+      "selection": {
+        "fields": [
+          "id",
+          "name",
+          "family",
+          "summary",
+          "useWhen",
+          "avoidWhen",
+          "supportedCompositions",
+          "requiresAssets",
+          "recommendedDurationFrames"
+        ]
+      },
+      "authoring": {
+        "fields": [
+          "supportsEvents",
+          "occupiesRegions",
+          "capacityByComposition",
+          "seriesField",
+          "minDurationFrames",
+          "propsSchema",
+          "softConstraints",
+          "layouts",
+          "actions",
+          "examples"
+        ]
+      }
+    },
+    "roleProjections": {
+      "visualStructurer": {
+        "tiers": [
+          "selection"
+        ],
+        "capabilitySelection": "all"
+      },
+      "sceneAuthor": {
+        "tiers": [
+          "selection",
+          "authoring"
+        ],
+        "capabilitySelection": "selected"
+      },
+      "planRepair": {
+        "tiers": [
+          "selection",
+          "authoring"
+        ],
+        "capabilitySelection": "implicated"
+      }
+    }
   }
 }

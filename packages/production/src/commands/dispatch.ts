@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { handleContractIndex, handleContractShow } from '../contracts/handlers';
 import {
@@ -140,6 +141,67 @@ export const dispatchProductionArgv = async (
         runRoot: absolute(cwd, parsed.get('--run') as string),
         ...(authorisation ? { replacementAuthorisationPath: absolute(cwd, authorisation) } : {}),
       });
+      break;
+    }
+    case 'image-start': {
+      const parsed = exactFlags(rest, ['--run', '--request'], ['--authorisation']);
+      if (!parsed) {
+        return malformed(
+          'run.image.start',
+          'run image-start requires --run and --request and accepts --authorisation.',
+        );
+      }
+      const authorisation = parsed.get('--authorisation');
+      let request: unknown;
+      let authorization: unknown;
+      try {
+        request = JSON.parse(
+          await readFile(absolute(cwd, parsed.get('--request') as string), 'utf8'),
+        );
+        authorization = authorisation
+          ? JSON.parse(await readFile(absolute(cwd, authorisation), 'utf8'))
+          : undefined;
+      } catch {
+        return malformed(
+          'run.image.start',
+          'run image-start requires readable JSON request and authorisation files.',
+        );
+      }
+      execution = await service.imageStart({
+        runRoot: absolute(cwd, parsed.get('--run') as string),
+        request,
+        ...(authorisation ? { authorization } : {}),
+      });
+      break;
+    }
+    case 'image-status': {
+      const parsed = exactFlags(rest, ['--run', '--job']);
+      if (!parsed)
+        return malformed('run.image.status', 'run image-status requires --run and --job.');
+      execution = await service.imageStatus({
+        runRoot: absolute(cwd, parsed.get('--run') as string),
+        jobId: parsed.get('--job') as string,
+      });
+      break;
+    }
+    case 'image-accept':
+    case 'image-reject': {
+      const commandId = verb === 'image-accept' ? 'run.image.accept' : 'run.image.reject';
+      const parsed = exactFlags(rest, ['--run', '--decision']);
+      if (!parsed) return malformed(commandId, `run ${verb} requires --run and --decision.`);
+      let decision: unknown;
+      try {
+        decision = JSON.parse(
+          await readFile(absolute(cwd, parsed.get('--decision') as string), 'utf8'),
+        );
+      } catch {
+        return malformed(commandId, `run ${verb} requires a readable JSON decision file.`);
+      }
+      const runRoot = absolute(cwd, parsed.get('--run') as string);
+      execution =
+        verb === 'image-accept'
+          ? await service.imageAccept({ runRoot, decision })
+          : await service.imageReject({ runRoot, decision });
       break;
     }
     default:

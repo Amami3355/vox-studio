@@ -28,6 +28,10 @@ export const RUN_PATHS = {
     `artifacts/compilations/${digest(compileInputSha256, 'compileInputSha256')}/report.json`,
   preview: (renderInputSha256: string) =>
     `artifacts/renders/${digest(renderInputSha256, 'renderInputSha256')}/preview.mp4`,
+  generatedImageCandidate: (jobId: string, candidateSha256: string) => {
+    if (!/^image-job-[0-9a-f]{20}$/.test(jobId)) throw new TypeError('image job id is invalid.');
+    return `artifacts/images/${jobId}/${digest(candidateSha256, 'candidateSha256')}.png`;
+  },
   receipt: (sequence: number, command: string) => {
     if (!Number.isSafeInteger(sequence) || sequence < 1)
       throw new TypeError('Receipt sequence is invalid.');

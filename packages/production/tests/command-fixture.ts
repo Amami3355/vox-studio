@@ -83,6 +83,8 @@ export const createCommandFixture = async (options?: {
   rendererVersion?: string;
   synthesizer?: ProductionCommandServiceOptions['synthesizer'];
   verifyReplacementGrant?: ProductionCommandServiceOptions['verifyReplacementGrant'];
+  imageGenerator?: ProductionCommandServiceOptions['imageGenerator'];
+  verifyImageGrant?: ProductionCommandServiceOptions['verifyImageGrant'];
   recordingCrashAt?: ProductionCommandServiceOptions['recordingCrashAt'];
   now?: ProductionCommandServiceOptions['now'];
   splitTrustedRoot?: boolean;
@@ -125,6 +127,8 @@ export const createCommandFixture = async (options?: {
     rendererVersion: options?.rendererVersion,
     synthesizer: options?.synthesizer,
     verifyReplacementGrant: options?.verifyReplacementGrant,
+    imageGenerator: options?.imageGenerator,
+    verifyImageGrant: options?.verifyImageGrant,
     recordingCrashAt: options?.recordingCrashAt,
     now: options?.now,
     createRunId: () => 'run-command-test',

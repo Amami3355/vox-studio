@@ -40,6 +40,13 @@
       ]
     },
     {
+      "id": "design",
+      "summary": "Resolved theme palettes for deterministic client-side composition.",
+      "audience": [
+        "client"
+      ]
+    },
+    {
       "id": "protocol",
       "summary": "Production commands, stages, outcomes and transport.",
       "audience": [

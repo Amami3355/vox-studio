@@ -30,6 +30,10 @@ export const CONTRACT_CATEGORIES: readonly {
   },
   {
     /**
+     * Version 6 publishes the design system's closed visual vocabulary, which the art
+     * direction an author receives has to be selectable from.
+     *
+     * Version 5 publishes generated capability-tier membership and role projections.
      * Version 4 removed the compiler checks, which the `checks` category publishes.
      *
      * The summary followed the document: two categories that both claimed the checks were the
@@ -37,7 +41,7 @@ export const CONTRACT_CATEGORIES: readonly {
      */
     id: 'catalog',
     summary: 'Scene capabilities and semantic time.',
-    contractVersion: 4,
+    contractVersion: 6,
     audience: ['author', 'client'],
   },
   {
@@ -59,12 +63,27 @@ export const CONTRACT_CATEGORIES: readonly {
   },
   {
     /**
+     * Version 1, and new: what each published theme resolves its semantic colour roles to.
+     *
+     * Addressed to clients alone, which is the whole point of it being its own category. The
+     * catalog an author reads names colour roles and never their values; a deterministic tool
+     * composing an image prompt needs the values, and it is not an author.
+     */
+    id: 'design',
+    summary: 'Resolved theme palettes for deterministic client-side composition.',
+    contractVersion: 1,
+    audience: ['client'],
+  },
+  {
+    /**
+     * Version 3 publishes the generated-image job, review and promotion lifecycle.
+     *
      * Version 2 lifted the operating rules into the `operating` category, and the summary
      * followed the document — it claimed "operating rules" while publishing them elsewhere.
      */
     id: 'protocol',
     summary: 'Production commands, stages, outcomes and transport.',
-    contractVersion: 2,
+    contractVersion: 3,
     audience: ['client'],
   },
 ];
@@ -166,6 +185,43 @@ const commands: readonly CommandContract[] = [
     syntax: 'vox production run render --run <run-dir>',
     prerequisite: 'a fresh green compilation and Compiled document',
     effect: 'Render the bound document without network or quota.',
+    readOnly: false,
+    network: 'forbidden',
+    quota: 'never',
+  },
+  {
+    id: 'run.image.start',
+    syntax:
+      'vox production run image-start --run <run-dir> --request <image-request.json> [--authorisation <grant.json>]',
+    prerequisite: 'a compiled ASSET_PLACEHOLDER work item; grant when the image provider is live',
+    effect: 'Create or resume one identity-bound image job and publish an inspectable candidate.',
+    readOnly: false,
+    network: 'record_only',
+    quota: 'may_spend',
+  },
+  {
+    id: 'run.image.status',
+    syntax: 'vox production run image-status --run <run-dir> --job <job-id>',
+    prerequisite: 'an image job belonging to the Run',
+    effect: 'Observe the existing image job without starting or retrying generation.',
+    readOnly: true,
+    network: 'forbidden',
+    quota: 'never',
+  },
+  {
+    id: 'run.image.accept',
+    syntax: 'vox production run image-accept --run <run-dir> --decision <acceptance.json>',
+    prerequisite: 'a candidate and a decision naming its exact digest',
+    effect: 'Promote the candidate for this Run and stale compilations that used a placeholder.',
+    readOnly: false,
+    network: 'forbidden',
+    quota: 'never',
+  },
+  {
+    id: 'run.image.reject',
+    syntax: 'vox production run image-reject --run <run-dir> --decision <rejection.json>',
+    prerequisite: 'an inspectable candidate',
+    effect: 'Reject the candidate while retaining the honest placeholder path.',
     readOnly: false,
     network: 'forbidden',
     quota: 'never',

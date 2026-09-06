@@ -36,3 +36,31 @@ export const compileInputIdentity = (input: JsonValue): string =>
 
 export const renderInputIdentity = (input: JsonValue): string =>
   hashCanonicalJson('render-input', input);
+
+export const imageGenerationRequestIdentity = (input: JsonValue): string =>
+  hashCanonicalJson('image-generation-request', input);
+
+export const imageJobIdOf = (identityKey: string, requestSha256: string): string =>
+  `image-job-${hashCanonicalJson('image-job', { identityKey, requestSha256 }).slice(0, 20)}`;
+
+export const acceptedAssetSetIdentity = (
+  jobs: Array<{
+    identityKey: string;
+    requirementId: string;
+    status: string;
+    providerMode: string;
+    candidate: { artifact: { sha256: string } } | null;
+  }>,
+): string =>
+  hashCanonicalJson(
+    'accepted-asset-set',
+    jobs
+      .filter(({ status }) => status === 'accepted' || status === 'failed')
+      .map(({ identityKey, requirementId, status, providerMode, candidate }) => ({
+        identityKey,
+        requirementId,
+        status,
+        providerMode,
+        candidateSha256: candidate?.artifact.sha256 ?? null,
+      })),
+  );

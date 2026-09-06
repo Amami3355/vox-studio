@@ -273,7 +273,7 @@ export const evaluateNorthbridgeAssertions = (
       'contracts.all-categories',
       // Restated rather than derived: an expectation taken from the table the harness drives
       // from would be the observation agreeing with itself.
-      ['catalog', 'checks', 'language', 'operating', 'plan', 'protocol'],
+      ['catalog', 'checks', 'design', 'language', 'operating', 'plan', 'protocol'],
       [...observed.contracts.categories].sort(),
       ['commands.jsonl'],
     ),

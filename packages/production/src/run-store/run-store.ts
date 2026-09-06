@@ -17,11 +17,13 @@ import {
   type ArtifactDescriptor,
   type CommandId,
   type CommandOutcome,
+  type ImageJob,
   PROTOCOL_VERSION,
   type ProductionRequest,
   type ResultEnvelope,
   type RunStage,
   artifactDescriptorSchema,
+  imageJobSchema,
   productionRequestSchema,
   resultEnvelopeSchema,
 } from '../contracts/schemas';
@@ -87,6 +89,10 @@ export type RunBindings = {
     assetResolutions: AssetResolution[];
     freshness: Freshness;
   } | null;
+  images: {
+    jobs: ImageJob[];
+    consumedGrantIds: string[];
+  };
 };
 
 export const EMPTY_RUN_BINDINGS: RunBindings = {
@@ -96,6 +102,7 @@ export const EMPTY_RUN_BINDINGS: RunBindings = {
   take: null,
   compilation: null,
   render: null,
+  images: { jobs: [], consumedGrantIds: [] },
 };
 
 export type RunQuota = {
@@ -291,6 +298,12 @@ const runBindingsSchema = z
       })
       .strict()
       .nullable(),
+    images: z
+      .object({
+        jobs: z.array(imageJobSchema),
+        consumedGrantIds: z.array(z.string().min(1)),
+      })
+      .strict(),
   })
   .strict();
 const quotaSchema = z
@@ -339,6 +352,9 @@ const receiptSchema = z
       'run.record',
       'run.compile',
       'run.render',
+      'run.image.start',
+      'run.image.accept',
+      'run.image.reject',
     ]),
     operationSha256: sha256Schema,
     previousReceiptSha256: sha256Schema.nullable(),

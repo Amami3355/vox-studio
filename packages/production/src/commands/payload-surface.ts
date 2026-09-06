@@ -234,6 +234,33 @@ export class ProductionPayloadSurface {
           ...(authorisation ? { replacementAuthorisationPath: authorisation } : {}),
         });
       }
+      case 'run.image.start': {
+        const runRoot = await this.runRoot(request.runId);
+        const payload = this.required(request);
+        return this.service.imageStart({
+          runRoot,
+          request: payload.request,
+          ...(payload.authorization === undefined ? {} : { authorization: payload.authorization }),
+        });
+      }
+      case 'run.image.status': {
+        const runRoot = await this.runRoot(request.runId);
+        const payload = this.required(request);
+        if (typeof payload.jobId !== 'string') {
+          throw new ProductionSurfaceError('INVALID_INPUT', 'run.image.status requires jobId.');
+        }
+        return this.service.imageStatus({ runRoot, jobId: payload.jobId });
+      }
+      case 'run.image.accept':
+        return this.service.imageAccept({
+          runRoot: await this.runRoot(request.runId),
+          decision: this.required(request),
+        });
+      case 'run.image.reject':
+        return this.service.imageReject({
+          runRoot: await this.runRoot(request.runId),
+          decision: this.required(request),
+        });
       case 'run.preflight':
       case 'run.compile':
       case 'run.render': {
