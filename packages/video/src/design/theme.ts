@@ -48,8 +48,15 @@ export type Theme = {
   radius: number[];
 };
 
-/** Semantic role an agent may pick per scene. Never a raw colour. */
-export type EmphasisRole = 'neutral' | 'positive' | 'negative';
+/**
+ * Semantic role an agent may pick per scene. Never a raw colour.
+ *
+ * The list is the runtime form of the union, so a projection that publishes the vocabulary
+ * an agent may select from reads it here rather than restating it.
+ */
+export const emphasisRoles = ['neutral', 'positive', 'negative'] as const;
+
+export type EmphasisRole = (typeof emphasisRoles)[number];
 
 export const FPS = 30;
 export const WIDTH = 1920;

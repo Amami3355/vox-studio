@@ -1,5 +1,5 @@
 {
-  "manifestVersion": 4,
+  "manifestVersion": 5,
   "time": {
     "rule": "The agent expresses semantic time; the compiler produces physical time. Write an anchor, never a frame.",
     "forms": [
@@ -278,6 +278,43 @@
         "means": "A scene clears its hard duration floor but has less time than its recommended pacing.",
         "repair": "Span more narration beats when the resulting slower presentation is preferable."
       }
+    }
+  },
+  "visualVocabulary": {
+    "themes": [
+      "editorial-cold",
+      "editorial-paper"
+    ],
+    "motionIntents": [
+      "editorialStatic",
+      "subtleDrift",
+      "pushIn",
+      "energetic",
+      "impact",
+      "cinematic"
+    ],
+    "colorRoles": [
+      "neutral",
+      "positive",
+      "negative"
+    ],
+    "treatments": [
+      "photo",
+      "cutout",
+      "illustration",
+      "duotone"
+    ]
+  },
+  "palettes": {
+    "editorial-cold": {
+      "neutral": "#FF5A1F",
+      "positive": "#3DD68C",
+      "negative": "#FF4D4D"
+    },
+    "editorial-paper": {
+      "neutral": "#C23C0A",
+      "positive": "#157F4A",
+      "negative": "#C0342B"
     }
   },
   "capabilities": [

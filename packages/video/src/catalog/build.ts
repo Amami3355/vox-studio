@@ -11,8 +11,11 @@
  */
 import { z } from 'zod';
 import { ANCHOR_GRAMMAR } from '../core/anchor-grammar';
+import { assetRequirementSchema } from '../core/assets';
 import { COMPILER_CHECKS } from '../core/compiler-checks';
 import type { SceneCapability, SceneExample, SceneMeta, SoftConstraints } from '../core/types';
+import { motionProfileIds } from '../design/motion';
+import { emphasisColor, emphasisRoles, themes } from '../design/theme';
 import { registry } from '../scenes/registry';
 import { videoPlanSchema } from './plan-shape';
 import { STRUCTURAL_PLAN_EXAMPLES, type StructuralPlanExample } from './structural-examples';
@@ -47,9 +50,42 @@ export type CatalogEntry = SceneMeta & {
   examples: SceneExample[];
 };
 
+/**
+ * The closed vocabulary an art-directing agent selects from.
+ *
+ * It sits beside `capabilities` for the same reason `time` does: it is a property of the
+ * design system rather than of any one capability, and an agent that may only choose
+ * published values has to be able to read what is published. Every list here is the
+ * runtime form of a decision made elsewhere in the design system — a theme registry, the
+ * motion profiles, the emphasis roles, the treatments an `AssetRequirement` accepts — so
+ * this is a projection of those decisions and never a second place to make them.
+ *
+ * Raw colours, fonts, easing values and dimensions are deliberately absent. What an agent
+ * gets is the name of an intent; what that name resolves to stays with the compiler.
+ */
+export type VisualVocabulary = {
+  themes: string[];
+  motionIntents: string[];
+  colorRoles: string[];
+  treatments: string[];
+};
+
+/**
+ * What each published theme resolves its semantic colour roles to.
+ *
+ * Raw colour, and deliberately not part of what an author is taught: the contract projection
+ * addresses it to clients only, so a deterministic tool composing an image prompt can reach it
+ * while no authoring prompt carries a hex value an agent could then write into a plan.
+ */
+export type ThemePalettes = Record<string, Record<string, string>>;
+
 export type Catalog = {
-  /** Bumped by hand when the shape of this file changes, not on every regeneration. */
-  manifestVersion: 4;
+  /**
+   * Bumped by hand when the shape of this file changes, not on every regeneration.
+   *
+   * 5 published `visualVocabulary` and `palettes`.
+   */
+  manifestVersion: 5;
   /**
    * Rule 3's vocabulary, which is not a property of any one capability.
    *
@@ -62,6 +98,8 @@ export type Catalog = {
   time: typeof ANCHOR_GRAMMAR;
   /** Every error or warning a code-blind author can receive from the compiler. */
   checks: typeof COMPILER_CHECKS;
+  visualVocabulary: VisualVocabulary;
+  palettes: ThemePalettes;
   capabilities: CatalogEntry[];
 };
 
@@ -180,10 +218,41 @@ export const buildCatalogEntry = (capability: SceneCapability): CatalogEntry => 
   };
 };
 
+/**
+ * Read out of the design system rather than listed here.
+ *
+ * `treatments` comes off the `AssetRequirement` schema because that is the enum an author's
+ * requirement is actually held to: a vocabulary published wider than the schema accepts
+ * would teach a choice the compiler then refuses.
+ */
+const buildVisualVocabulary = (): VisualVocabulary => {
+  const treatment = assetRequirementSchema.shape.treatment.unwrap();
+  return {
+    themes: Object.keys(themes),
+    motionIntents: [...motionProfileIds],
+    colorRoles: [...emphasisRoles],
+    treatments: [...treatment.options],
+  };
+};
+
+/**
+ * Resolved through `emphasisColor`, which is what a scene resolves a role through, so the
+ * colour a generated image is composed against is the colour the compiler would have painted.
+ */
+const buildPalettes = (): ThemePalettes =>
+  Object.fromEntries(
+    Object.entries(themes).map(([id, theme]) => [
+      id,
+      Object.fromEntries(emphasisRoles.map((role) => [role, emphasisColor(theme, role)])),
+    ]),
+  );
+
 export const buildCatalog = (): Catalog => ({
-  manifestVersion: 4,
+  manifestVersion: 5,
   time: ANCHOR_GRAMMAR,
   checks: COMPILER_CHECKS,
+  visualVocabulary: buildVisualVocabulary(),
+  palettes: buildPalettes(),
   capabilities: registry.map(buildCatalogEntry),
 });
 
