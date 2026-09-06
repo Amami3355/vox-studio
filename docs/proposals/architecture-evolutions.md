@@ -357,3 +357,23 @@ agent makes and starts being a fact the plan implies.
   demo is a bad time.
 - **Image snapshot tests.** §9.4 asks for them. Worth adding once tokens stabilise.
 - **Multiple themes.** The `Theme` type supports them; only `editorial-cold` exists.
+
+---
+
+## The ADK Visual Planner uses generated role-specific catalog projections
+
+**Frozen doc:** one Visual Planner receives the catalog and writes the VideoPlan.
+**Decision:** the ADK crew splits visual planning into a Visual Structurer over the complete compact
+selection tier and a Scene Author over the full specifications of only the selected capabilities.
+The projections are byte-identical selections of the canonical published contract, not summaries.
+This deliberately supersedes ADR-0017's whole-catalog-author half while retaining an identical
+prefix per role. See ADR-0019.
+
+## A human-accepted generated asset may remain scoped to one Run
+
+**Frozen doc / ADR-0005:** generated assets are committed so a fresh clone reproduces the render.
+**Decision:** Production may retain a candidate inside one Run and, after an operator binds its exact
+digest, expose it there as `AssetRef.ready`. The evidence bundle and digest make that Run
+reproducible; the asset is not part of the canonical repository library until a separate reviewed
+commit promotes it. Placeholders remain renderable and generation never runs inside rendering. See
+ADR-0020.
