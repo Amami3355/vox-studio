@@ -380,3 +380,176 @@ def test_naming_an_unpublished_capability_stays_a_violation_and_never_widens_the
 
     with pytest.raises(ContractViolation, match="map_route"):
         asyncio.run(planner.plan(*inputs()))
+
+
+class Repair:
+    """A repair role that answers with a prepared set of fills, counting its turns."""
+
+    def __init__(self, *answers: dict[str, Any]) -> None:
+        self.answers = list(answers)
+        self.turns = 0
+        self.specifications: tuple[dict[str, Any], ...] = ()
+        self.refusals: list[Any] = []
+        self.tool_names: tuple[str, ...] = ()
+
+    async def repair(self, plan, refusal, specifications, tools):
+        self.turns += 1
+        self.specifications = specifications
+        self.refusals.append(refusal)
+        self.tool_names = tools.names
+        return self.answers.pop(0)
+
+
+def red(_value: dict[str, Any]) -> dict[str, Any]:
+    return {"ok": False, "errors": [{"code": "PROPS_INVALID"}], "warnings": []}
+
+
+def refuses_once() -> Any:
+    """Red for the first call of each kind, green after — one repairable refusal."""
+    seen: dict[int, int] = {}
+
+    def validator(_value: dict[str, Any]) -> dict[str, Any]:
+        seen[0] = seen.get(0, 0) + 1
+        return red(_value) if seen[0] == 1 else green(_value)
+
+    return validator
+
+
+def planner_with(repair: Repair | None, *, validate_scene: Any, budget: int = 1) -> SplitVisualPlanner:
+    return SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer(),
+        SceneAuthor(),
+        validate_scene=validate_scene,
+        validate_plan=green,
+        repair=repair,
+        repair_budget=budget,
+    )
+
+
+def test_a_refused_plan_reaches_repair_with_only_the_implicated_specifications() -> None:
+    """spec.md:53 — repair is reached only after a structured refusal, and reads only what it names."""
+    repair = Repair(SceneAuthor().answer)
+    planner = planner_with(repair, validate_scene=refuses_once())
+
+    plan = asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 1
+    assert planner.repairs_spent == 1
+    # The one capability the refused scene used, and nothing else in the catalog.
+    assert tuple(item["id"] for item in repair.specifications) == ("typographic_statement",)
+    # The planRepair projection is the authoring tier, so a repair can see propsSchema.
+    assert "propsSchema" in repair.specifications[0]
+    refusal = repair.refusals[0]
+    assert refusal.findings[0]["sceneId"] == "claim"
+    assert refusal.findings[0]["report"]["errors"] == [{"code": "PROPS_INVALID"}]
+    assert plan["sections"][0]["scenes"][0]["props"]["statement"] == "The baselines diverged."
+
+
+def test_a_green_plan_never_reaches_the_repair_role() -> None:
+    """Repair is conditional. A plan the validator accepts costs no repair turn."""
+    repair = Repair()
+    planner = planner_with(repair, validate_scene=green)
+
+    asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 0
+    assert planner.repairs_spent == 0
+
+
+def test_repair_is_bounded_and_exhaustion_stops_rather_than_looping() -> None:
+    """spec.md:245-248 — bounded, and never an unbounded loop.
+
+    The repair here always answers with the same fills, so nothing improves. The budget, not the
+    validator, is what ends the Run.
+    """
+    author_answer = SceneAuthor().answer
+    repair = Repair(author_answer, author_answer, author_answer)
+    planner = planner_with(repair, validate_scene=red, budget=2)
+
+    with pytest.raises(ContractViolation, match="refused"):
+        asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 2
+    assert planner.repairs_spent == 2
+
+
+def test_without_a_repair_role_a_refusal_still_ends_the_run_exactly_as_before() -> None:
+    """The property the crew had before repair existed survives: a refusal is terminal."""
+    planner = planner_with(None, validate_scene=red)
+
+    with pytest.raises(ContractViolation, match="refused"):
+        asyncio.run(planner.plan(*inputs()))
+
+
+def test_a_zero_budget_is_a_crew_with_repair_switched_off() -> None:
+    repair = Repair(SceneAuthor().answer)
+    planner = planner_with(repair, validate_scene=red, budget=0)
+
+    with pytest.raises(ContractViolation, match="refused"):
+        asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 0
+
+
+def test_one_repair_turn_sees_every_refusal_at_once() -> None:
+    """A turn per bad scene is how a bounded budget becomes an unbounded one."""
+    structure_two = {
+        "beats": [{"id": "b1", "text": "The baselines diverged."}],
+        "sections": [
+            {
+                "id": "opening",
+                "spansBeats": ["b1"],
+                "scenes": [
+                    {"id": "claim", "component": "typographic_statement", "spansBeats": ["b1"]},
+                    {"id": "second", "component": "typographic_statement", "spansBeats": ["b1"]},
+                ],
+            }
+        ],
+    }
+    fills_two = {
+        "scenes": [
+            {
+                "id": "claim",
+                "props": {"statement": "The baselines diverged."},
+                "layout": "cut",
+                "motionProfile": "editorialStatic",
+                "events": [{"at": "b1.start", "action": "revealStatement"}],
+            },
+            {
+                "id": "second",
+                "props": {"statement": "And kept diverging."},
+                "layout": "cut",
+                "motionProfile": "editorialStatic",
+                "events": [{"at": "b1.start", "action": "revealStatement"}],
+            },
+        ]
+    }
+    repair = Repair(fills_two)
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer(structure_two),
+        SceneAuthor(fills_two),
+        validate_scene=red,
+        validate_plan=green,
+        repair=repair,
+        repair_budget=1,
+    )
+
+    with pytest.raises(ContractViolation):
+        asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 1
+    assert [finding["sceneId"] for finding in repair.refusals[0].findings] == ["claim", "second"]
+
+
+def test_a_negative_repair_budget_is_refused_at_construction() -> None:
+    with pytest.raises(ContractViolation, match="negative"):
+        SplitVisualPlanner(
+            PublishedCatalog.from_mapping(catalog_contract()),
+            Structurer(),
+            SceneAuthor(),
+            validate_scene=green,
+            validate_plan=green,
+            repair_budget=-1,
+        )

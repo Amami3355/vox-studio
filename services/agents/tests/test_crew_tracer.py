@@ -12,6 +12,8 @@ from vox_crew.client import Artifact, ProductionClient
 from vox_crew.crew import ProductionCrew, UnservableBrief
 from vox_crew.crew_contract import (
     Brief,
+    CrewPhase,
+    CrewRole,
     CrewTerminal,
     Declined,
     OperatorPolicy,
@@ -436,3 +438,52 @@ def test_unservable_brief_publishes_decline_without_take_or_image_spend() -> Non
     assert b'"command":"run.decline"' in bundle.files[PRODUCTION_COMMANDS]
     assert b'run.record' not in bundle.files[PRODUCTION_COMMANDS]
     assert b'run.image.start' not in bundle.files[PRODUCTION_COMMANDS]
+
+
+def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
+    """A Run that repaired and a Run that did not both end with a plan; the count separates them."""
+
+    class RepairingPlanner:
+        mode = ProviderMode.RECORDED
+        repairs_spent = 2
+
+        async def plan(self, brief, dossier, narrative, visual_bible):
+            return PLAN
+
+    client = TracerProductionClient()
+    subject = ProductionCrew(
+        RecordedResearchAdapter(DOSSIER),
+        RecordedCreativeAdapter(NARRATIVE, BIBLE, PLAN),
+        ClientProductionAdapter(
+            client,
+            REQUEST,
+            recording_mode=ProviderMode.RECORDED,
+            palettes={"editorial-cold": {"ground": "#0d121a", "accent": "#ff5a1f"}},
+            image_decider=lambda candidate: True,
+        ),
+        visual_planner=RepairingPlanner(),
+        visual_vocabulary=VisualVocabulary(
+            themes=frozenset({"editorial-cold"}),
+            motion_intents=frozenset({"measured"}),
+            color_roles=frozenset({"ground", "accent"}),
+            treatments=frozenset({"documentary", "glossy"}),
+        ),
+    )
+
+    updates = collect(subject)
+
+    repair_event = next(
+        item
+        for item in updates
+        if getattr(item, "role", None) is CrewRole.PLAN_REPAIR_AGENT
+    )
+    assert repair_event.counts["repairs"] == 2
+    assert repair_event.phase is CrewPhase.VISUAL_PLANNING
+
+
+def test_a_plan_that_needed_no_repair_emits_no_repair_event() -> None:
+    updates = collect(crew(TracerProductionClient()))
+
+    assert not any(
+        getattr(item, "role", None) is CrewRole.PLAN_REPAIR_AGENT for item in updates
+    )

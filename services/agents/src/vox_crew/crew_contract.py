@@ -75,6 +75,7 @@ class CrewRole(str, Enum):
     NARRATIVE_AGENT = "narrative_agent"
     ART_DIRECTOR_AGENT = "art_director_agent"
     VISUAL_PLANNER = "visual_planner"
+    PLAN_REPAIR_AGENT = "plan_repair_agent"
     ASSET_RESOLVER = "asset_resolver"
     IMAGE_CREATOR_AGENT = "image_creator_agent"
 
@@ -102,7 +103,12 @@ PHASE_ROLES: dict[CrewPhase, frozenset[CrewRole]] = {
     CrewPhase.RESEARCH: frozenset({CrewRole.RESEARCH_AGENT, CrewRole.DIRECTOR}),
     CrewPhase.NARRATIVE: frozenset({CrewRole.NARRATIVE_AGENT}),
     CrewPhase.ART_DIRECTION: frozenset({CrewRole.ART_DIRECTOR_AGENT}),
-    CrewPhase.VISUAL_PLANNING: frozenset({CrewRole.VISUAL_PLANNER, CrewRole.DIRECTOR}),
+    # Repair reports inside visual planning rather than in a phase of its own: it is conditional,
+    # it produces no separate artifact, and a phase that most Runs never enter would make the
+    # ordinary event sequence the exception.
+    CrewPhase.VISUAL_PLANNING: frozenset(
+        {CrewRole.VISUAL_PLANNER, CrewRole.PLAN_REPAIR_AGENT, CrewRole.DIRECTOR}
+    ),
     CrewPhase.ASSET_RESOLUTION: frozenset({CrewRole.ASSET_RESOLVER, CrewRole.DIRECTOR}),
     CrewPhase.IMAGE_CREATION: frozenset({CrewRole.IMAGE_CREATOR_AGENT, CrewRole.DIRECTOR}),
     CrewPhase.PRODUCTION: frozenset({CrewRole.DIRECTOR}),

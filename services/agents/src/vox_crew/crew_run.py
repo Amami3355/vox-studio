@@ -192,6 +192,7 @@ def build_crew(
     if live_models:
         from .adk_roles import (  # noqa: PLC0415
             AdkCreativeAdapter,
+            AdkPlanRepair,
             AdkSceneAuthor,
             AdkVisualStructurer,
         )
@@ -201,6 +202,7 @@ def build_crew(
         )
         structurer = AdkVisualStructurer() if model is None else AdkVisualStructurer(model=model)
         scene_author = AdkSceneAuthor() if model is None else AdkSceneAuthor(model=model)
+        repair = AdkPlanRepair() if model is None else AdkPlanRepair(model=model)
         planner: Any = SplitVisualPlanner(
             catalog,
             structurer,
@@ -208,6 +210,7 @@ def build_crew(
             validate_scene=_scene_validator(),
             validate_plan=_plan_validator(),
             mode=ProviderMode.LIVE,
+            repair=repair,
         )
     else:
         assert recordings is not None

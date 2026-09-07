@@ -481,13 +481,25 @@ class ProductionCrew:
                 )
                 yield failed("VISUAL_PLANNING_FAILED", "Visual planning could not complete.")
                 return
+            # What repair cost, from the planner that spent it. A Run that repaired and a Run
+            # that did not both end with a plan, and only the count tells them apart.
+            repairs = getattr(self._visual_planner, "repairs_spent", 0)
+            if repairs:
+                yield event(
+                    CrewPhase.VISUAL_PLANNING,
+                    CrewRole.PLAN_REPAIR_AGENT,
+                    PhaseStatus.COMPLETED,
+                    self._visual_planner.mode,
+                    "A refused VideoPlan was repaired within its budget.",
+                    counts={"repairs": repairs},
+                )
             planned = event(
                 CrewPhase.VISUAL_PLANNING,
                 CrewRole.VISUAL_PLANNER,
                 PhaseStatus.COMPLETED,
                 self._visual_planner.mode,
                 "A VideoPlan draft is ready for Production validation.",
-                counts={"beats": len(narrative.beats)},
+                counts={"beats": len(narrative.beats), "repairs": repairs},
             )
             await save(videoPlan=dict(plan))
             yield planned

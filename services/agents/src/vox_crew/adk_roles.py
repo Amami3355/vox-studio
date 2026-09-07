@@ -264,6 +264,58 @@ class AdkSceneAuthor:
         )
 
 
+class AdkPlanRepair:
+    """The third visual role: repairs a refused plan from the findings that refused it.
+
+    It is given the full specifications of exactly the capabilities the refusal implicates —
+    ADR-0019's `planRepair` projection — and never the whole catalog. Its authority is narrower
+    than the Scene Author's in one further way: it may not re-select. A repair that could change a
+    scene's `component` would be structuring, which is a decision the Structurer already made and
+    which no finding gives it grounds to revisit.
+    """
+
+    def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
+        self.role = AdkJsonRole(
+            "PlanRepairAgent",
+            "Repairs the refused portion of a VideoPlan from published findings.",
+            model=model,
+            session_service=session_service,
+        )
+
+    async def repair(
+        self,
+        plan: Mapping[str, Any],
+        refusal: Any,
+        specifications: tuple[dict[str, Any], ...],
+        tools: VisualCatalogTools,
+    ) -> Mapping[str, Any]:
+        def getSceneSpec(capability_id: str) -> dict[str, Any]:
+            """Read the full specification of a capability this refusal implicates."""
+            return tools.get_scene_spec(capability_id)
+
+        def validateScene(instance: Mapping[str, Any]) -> Mapping[str, Any]:
+            """Validate one repaired SceneInstance and return structured findings."""
+            return tools.validate_scene(instance)
+
+        def validateVideoPlan(candidate: Mapping[str, Any]) -> Mapping[str, Any]:
+            """Validate the repaired VideoPlan and return structured findings."""
+            return tools.validate_video_plan(candidate)
+
+        return await self.role.ask(
+            "Return only JSON with a scenes array holding every scene of the supplied plan, "
+            "repaired where the findings name it and unchanged everywhere else. Each entry may "
+            "contain only id, props, layout, motionProfile, events. Do not add, remove, reorder "
+            "or re-select scenes, and never change a scene's component. Repair only what the "
+            "findings name.",
+            {
+                "plan": dict(plan),
+                "findings": [dict(finding) for finding in refusal.findings],
+                "specifications": list(specifications),
+            },
+            tools=(getSceneSpec, validateScene, validateVideoPlan),
+        )
+
+
 def create_adk_director(
     crew: Any,
     *,
@@ -310,6 +362,7 @@ __all__ = [
     "CREW_MODEL",
     "AdkCreativeAdapter",
     "AdkJsonRole",
+    "AdkPlanRepair",
     "AdkSceneAuthor",
     "AdkVisualStructurer",
     "create_adk_director",

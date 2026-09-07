@@ -303,6 +303,36 @@ class SceneAuthor(Protocol):
     ) -> Mapping[str, Any]: ...
 
 
+PLAN_REPAIR_BUDGET = 1
+"""How many repair turns one Run may spend on a refused plan.
+
+One, and named rather than inlined so the number is arguable. The spec requires repair to be
+"conditional and bounded" and to never trigger an unbounded loop (spec.md:245-248); a budget of
+one buys the case that motivates repair at all — an author that mis-shaped a fill and can now see
+the finding — without acquiring a loop that bargains with a validator. Raising it is a spend
+decision, not a tuning knob: every turn is a model call no operator separately authorised.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class PlanRefusal:
+    """What a validator refused, and which published capabilities it implicates."""
+
+    findings: tuple[JsonObject, ...]
+    capability_ids: tuple[str, ...]
+    summary: str
+
+
+class PlanRepairAgent(Protocol):
+    async def repair(
+        self,
+        plan: Mapping[str, Any],
+        refusal: PlanRefusal,
+        specifications: tuple[JsonObject, ...],
+        tools: VisualCatalogTools,
+    ) -> Mapping[str, Any]: ...
+
+
 class SplitVisualPlanner:
     """Structure first, then fill only the scenes and capabilities already selected."""
 
@@ -315,13 +345,21 @@ class SplitVisualPlanner:
         validate_scene: Validator,
         validate_plan: Validator,
         mode: ProviderMode = ProviderMode.RECORDED,
+        repair: PlanRepairAgent | None = None,
+        repair_budget: int = PLAN_REPAIR_BUDGET,
     ) -> None:
+        if repair_budget < 0:
+            raise ContractViolation("A plan repair budget cannot be negative.")
         self._catalog = catalog
         self._structurer = structurer
         self._scene_author = scene_author
         self._validate_scene = validate_scene
         self._validate_plan = validate_plan
         self.mode = mode
+        self._repair = repair
+        self._repair_budget = repair_budget
+        #: Readable after a Run, so evidence can say what repair cost and not merely that it ran.
+        self.repairs_spent = 0
 
     async def plan(
         self,
@@ -347,12 +385,88 @@ class SplitVisualPlanner:
         )
         fills = await self._scene_author.author(deepcopy(structure), specifications, tools)
         plan = self._assemble(structure, fills)
+        return await self._repaired(plan, structure, tools)
 
+    async def _repaired(
+        self, plan: JsonObject, structure: JsonObject, tools: VisualCatalogTools
+    ) -> JsonObject:
+        """Validate, and give a refused plan a bounded number of chances to come back green.
+
+        Reached only from a structured refusal, per spec.md:53 — a green plan never sees the
+        repair role, and neither does an `UnservableBrief`, which is a Brief the catalog cannot
+        serve rather than a plan that is wrong.
+
+        Exhaustion **stops**; it does not Decline. The spec allows either (spec.md:248) and
+        stopping is the honest one: a plan that stayed refused says the crew could not author this
+        Brief, while a Decline says the catalog cannot express it — a claim only the Structurer is
+        placed to make, and one it makes through `unservable`.
+        """
+        self.repairs_spent = 0
+        while True:
+            refusal = self._refusal(plan, tools)
+            if refusal is None:
+                return plan
+            if self._repair is None or self.repairs_spent >= self._repair_budget:
+                raise ContractViolation(refusal.summary)
+            self.repairs_spent += 1
+            # `implicated`, never the whole catalog: ADR-0019 gives a repair the full
+            # specifications of exactly the capabilities the refusal names.
+            specifications = (
+                self._catalog.for_role("planRepair", refusal.capability_ids)
+                if refusal.capability_ids
+                else ()
+            )
+            fills = await self._repair.repair(deepcopy(plan), refusal, specifications, tools)
+            plan = self._assemble(structure, fills)
+
+    def _refusal(self, plan: JsonObject, tools: VisualCatalogTools) -> PlanRefusal | None:
+        """Every refusal in one pass, so one repair turn sees the whole problem.
+
+        Stopping at the first would spend a turn per bad scene, which is how a bounded budget
+        becomes an unbounded one in practice.
+        """
+        findings: list[JsonObject] = []
+        implicated: list[str] = []
         for section in plan["sections"]:
             for scene in section["scenes"]:
-                _require_green(tools.validate_scene(scene), f'SceneInstance {scene["id"]}')
-        _require_green(tools.validate_video_plan(plan), "VideoPlan")
-        return plan
+                report = tools.validate_scene(scene)
+                if _green(report):
+                    continue
+                findings.append(
+                    {
+                        "where": "sceneInstance",
+                        "sceneId": scene["id"],
+                        "component": scene["component"],
+                        "report": deepcopy(dict(report)) if isinstance(report, Mapping) else {},
+                    }
+                )
+                if scene["component"] not in implicated:
+                    implicated.append(scene["component"])
+
+        plan_report = tools.validate_video_plan(plan)
+        if not _green(plan_report):
+            findings.append(
+                {
+                    "where": "videoPlan",
+                    "report": (
+                        deepcopy(dict(plan_report)) if isinstance(plan_report, Mapping) else {}
+                    ),
+                }
+            )
+            # A plan-level refusal names no single scene, so every component in the plan is
+            # implicated — still a named set, never a widening to the whole catalog.
+            for capability_id in _selected_capabilities(plan):
+                if capability_id not in implicated:
+                    implicated.append(capability_id)
+
+        if not findings:
+            return None
+        refused = ", ".join(str(finding.get("sceneId", "the VideoPlan")) for finding in findings)
+        return PlanRefusal(
+            findings=tuple(findings),
+            capability_ids=tuple(implicated),
+            summary=f"The published validator refused {refused}.",
+        )
 
     @staticmethod
     def _refuse_if_unservable(value: Any) -> None:
@@ -490,6 +604,10 @@ def _selected_capabilities(structure: Mapping[str, Any]) -> tuple[str, ...]:
             if scene["component"] not in result:
                 result.append(scene["component"])
     return tuple(result)
+
+
+def _green(report: Mapping[str, Any]) -> bool:
+    return isinstance(report, Mapping) and report.get("ok") is True
 
 
 def _require_green(report: Mapping[str, Any], what: str) -> None:
