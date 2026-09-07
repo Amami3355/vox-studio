@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { sanitizeBoundaryText } from '../src/ipc/sanitize';
 
@@ -7,6 +8,25 @@ import { sanitizeBoundaryText } from '../src/ipc/sanitize';
  * mounted inside the container.
  */
 describe('sanitising a container-shaped path', () => {
+  it('preserves the published VideoPlan contract through the response boundary', () => {
+    const contract = JSON.parse(
+      readFileSync(new URL('../src/contracts/generated/plan.json', import.meta.url), 'utf8'),
+    );
+    const envelope = JSON.stringify({ outcome: 'succeeded', data: contract });
+
+    expect(sanitizeBoundaryText(envelope)).toBe(envelope);
+  });
+
+  it('preserves public URL schemes alongside private Windows paths', () => {
+    const urls = ['https://json-schema.org/draft/2020-12/schema', 'http://example.com/a/b'];
+    const envelope = JSON.stringify({ urls, diagnostic: 'C:/Users/builder/private.txt' });
+
+    expect(JSON.parse(sanitizeBoundaryText(envelope))).toEqual({
+      urls,
+      diagnostic: '<redacted-path>',
+    });
+  });
+
   it('redacts an absolute POSIX path out of the image', () => {
     const sanitized = sanitizeBoundaryText(
       "Cannot find module '/app/packages/production/src/commands/service.ts'",
