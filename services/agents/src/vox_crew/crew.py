@@ -35,6 +35,7 @@ from .crew_contract import (
     TerminalResult,
     VisualBible,
     VisualVocabulary,
+    crew_failure,
 )
 from .crew_state import CrewStateStore, InMemoryCrewStateStore
 from .image_generation import ImageJob
@@ -71,7 +72,9 @@ class CreativeAdapter(Protocol):
 
     async def narrate(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]: ...
 
-    async def art_direct(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]: ...
+    async def art_direct(
+        self, brief: Brief, dossier: ResearchDossier, vocabulary: VisualVocabulary
+    ) -> Mapping[str, Any]: ...
 
     async def plan(
         self,
@@ -209,7 +212,7 @@ class ProductionCrew:
             ).result
 
         def failed(code: str, summary: str) -> CrewTerminal:
-            return terminal(Failed(run_id=None, summary=summary, code=code, retryable=False))
+            return terminal(crew_failure(code, summary))
 
         stored_research = checkpoint.get("research")
         dossier = (
@@ -333,7 +336,7 @@ class ProductionCrew:
             try:
                 narrative_value, bible_value = await asyncio.gather(
                     self._creative.narrate(brief, dossier),
-                    self._creative.art_direct(brief, dossier),
+                    self._creative.art_direct(brief, dossier, self._visual_vocabulary),
                 )
                 narrative = Narrative.from_mapping(narrative_value, dossier)
             except ContractViolation:
@@ -651,11 +654,9 @@ class ProductionCrew:
         access: ProviderAccess, adapter_mode: ProviderMode, action: str, brief_id: str
     ) -> Paused | Failed | None:
         if access.mode is not adapter_mode:
-            return Failed(
-                run_id=None,
-                summary="Provider configuration does not match operator policy.",
-                code="PROVIDER_MODE_MISMATCH",
-                retryable=False,
+            return crew_failure(
+                "PROVIDER_MODE_MISMATCH",
+                "Provider configuration does not match operator policy.",
             )
         try:
             access.require_authorized(action)

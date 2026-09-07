@@ -29,6 +29,8 @@ from .crew_contract import (
     ResearchDossier,
     TerminalResult,
     VisualBible,
+    VisualVocabulary,
+    crew_failure,
 )
 from .envelopes import ArtifactDescriptor, MalformedEnvelope, ResultEnvelope
 from .image_generation import (
@@ -67,7 +69,9 @@ class RecordedCreativeAdapter:
         await asyncio.sleep(0)
         return deepcopy(self.narrative_recording)
 
-    async def art_direct(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]:
+    async def art_direct(
+        self, brief: Brief, dossier: ResearchDossier, vocabulary: VisualVocabulary
+    ) -> Mapping[str, Any]:
         self.art_direction_calls += 1
         await asyncio.sleep(0)
         return deepcopy(self.visual_bible_recording)
@@ -116,11 +120,9 @@ class ClientProductionAdapter:
     ) -> TerminalResult | ProductionExecution:
         requested_brief = self._request.get("brief")
         if not isinstance(requested_brief, Mapping) or requested_brief.get("id") != brief.id:
-            return Failed(
-                run_id=None,
-                summary="Production configuration names a different Brief.",
-                code="PRODUCTION_BRIEF_MISMATCH",
-                retryable=False,
+            return crew_failure(
+                "PRODUCTION_BRIEF_MISMATCH",
+                "Production configuration names a different Brief.",
             )
         opened = await asyncio.to_thread(self._client.init, self._request)
         if not opened.succeeded or opened.run is None:
@@ -171,11 +173,9 @@ class ClientProductionAdapter:
         requested_brief = self._request.get("brief")
         if not isinstance(requested_brief, Mapping) or requested_brief.get("id") != brief.id:
             return ProductionExecution(
-                terminal=Failed(
-                    run_id=None,
-                    summary="Production configuration names a different Brief.",
-                    code="PRODUCTION_BRIEF_MISMATCH",
-                    retryable=False,
+                terminal=crew_failure(
+                    "PRODUCTION_BRIEF_MISMATCH",
+                    "Production configuration names a different Brief.",
                 ),
                 state={},
                 requirement_count=0,
@@ -237,11 +237,10 @@ class ClientProductionAdapter:
                 )
             if not self._palettes:
                 return ProductionExecution(
-                    terminal=Failed(
+                    terminal=crew_failure(
+                        "IMAGE_PALETTE_MISSING",
+                        "No trusted palette is configured for image generation.",
                         run_id=run_id,
-                        summary="No trusted palette is configured for image generation.",
-                        code="IMAGE_PALETTE_MISSING",
-                        retryable=False,
                     ),
                     state=state,
                     requirement_count=len(worklist),
@@ -424,6 +423,9 @@ class ClientProductionAdapter:
                     resume_id=run.run_id or brief.id,
                 )
             code = run.refusal.error.code if run.refusal.error is not None else "PRODUCTION_STOPPED"
+            # Production's own refusal code, passed through rather than translated. It is not
+            # the crew's to classify, so `retryable` is left unclaimed at False — see
+            # `RETRYABLE_FAILURES`, which deliberately holds only codes the crew authored.
             return Failed(
                 run_id=run.run_id,
                 summary="Production stopped before the preview was ready.",
@@ -432,11 +434,10 @@ class ClientProductionAdapter:
             )
         preview = run.artifact("preview")
         if run.run_id is None or preview is None:
-            return Failed(
+            return crew_failure(
+                "PREVIEW_MISSING",
+                "Production published no preview artifact.",
                 run_id=run.run_id,
-                summary="Production published no preview artifact.",
-                code="PREVIEW_MISSING",
-                retryable=False,
             )
         return Rendered(
             run_id=run.run_id,
@@ -459,6 +460,7 @@ class ClientProductionAdapter:
                 reason=envelope.next[0].reason if envelope.next else "Production requires operator action.",
                 resume_id=run_id,
             )
+        # Production's refusal code again, and unclaimed for the same reason as above.
         return Failed(
             run_id=run_id,
             summary="Production stopped before the preview was ready.",

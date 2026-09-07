@@ -112,11 +112,13 @@ class RecordedCreative:
         self.both_started = asyncio.Event()
         self.overlapped = False
         self.plan_calls = 0
+        self.art_direction_vocabulary: Any = None
 
     async def narrate(self, brief: Brief, dossier: Any) -> dict[str, Any]:
         return await self._parallel("narrative", self.narrative)
 
-    async def art_direct(self, brief: Brief, dossier: Any) -> dict[str, Any]:
+    async def art_direct(self, brief: Brief, dossier: Any, vocabulary: Any) -> dict[str, Any]:
+        self.art_direction_vocabulary = vocabulary
         return await self._parallel("art", BIBLE)
 
     async def _parallel(self, name: str, result: dict[str, Any]) -> dict[str, Any]:
@@ -238,6 +240,37 @@ def test_malformed_model_output_fails_at_the_narrative_phase_before_production()
     assert updates[-1].to_mapping()["outcome"] == "failed"
     assert updates[-1].result.code == "NARRATIVE_CONTRACT_INVALID"
     assert production.calls == 0
+    # A model answering unparseably is the most retryable failure the crew has, and the
+    # checkpoint means a second invocation resumes rather than repaying research.
+    assert updates[-1].result.retryable is True
+
+
+def test_the_art_director_is_handed_the_vocabulary_it_is_told_to_obey() -> None:
+    """Its instruction has always named a closed vocabulary; the payload has to carry one.
+
+    Without this the role guesses a theme name and `VisualBible.from_mapping` rejects the guess,
+    which is safe and costs a Run that had already paid for research and two model calls.
+    """
+    creative = RecordedCreative()
+    crew = ProductionCrew(
+        RecordedResearch(), creative, RecordedProduction(), visual_vocabulary=VOCABULARY
+    )
+
+    asyncio.run(
+        collect(
+            crew,
+            Brief.from_mapping({"id": "brief-1", "text": "Explain it.", "kind": "factual"}),
+            recorded_policy(),
+        )
+    )
+
+    assert creative.art_direction_vocabulary is VOCABULARY
+    assert creative.art_direction_vocabulary.to_mapping() == {
+        "themes": ["editorial-cold"],
+        "motionIntents": ["measured"],
+        "colorRoles": ["accent", "ground"],
+        "treatments": ["documentary", "glossy"],
+    }
 
 
 def test_a_live_provider_without_a_grant_is_not_reached() -> None:

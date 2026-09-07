@@ -522,6 +522,21 @@ class VisualVocabulary:
     color_roles: frozenset[str]
     treatments: frozenset[str]
 
+    def to_mapping(self) -> dict[str, list[str]]:
+        """The closed vocabulary as an Art Director is shown it.
+
+        Sorted, and not incidentally. These are sets, and a set's iteration order is not stable
+        across processes — serialising one unsorted would put a different prompt in front of the
+        same role on every run, which is exactly the prefix identity ADR-0019 requires to hold
+        inside a role. Sorting is what makes the payload a function of the catalog alone.
+        """
+        return {
+            "themes": sorted(self.themes),
+            "motionIntents": sorted(self.motion_intents),
+            "colorRoles": sorted(self.color_roles),
+            "treatments": sorted(self.treatments),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class VisualBible:
@@ -790,6 +805,66 @@ class Failed:
     summary: str
     code: str
     retryable: bool
+
+
+# Whether invoking the same Brief again may plausibly reach a different outcome.
+#
+# **This is advice to an operator, never permission for the crew to loop.** The Director keeps
+# control of spend and no paid call is replayed automatically; what this answers is the question
+# an operator asks on reading a failure, which is whether running it again is worth anything.
+#
+# The line it draws is between a failure whose cause is nondeterministic — a provider that
+# answered malformed, a transport that dropped mid-command — and one whose cause is a fact about
+# the invocation that will still be true on the next attempt. A configuration naming the wrong
+# Brief does not improve by being run twice; a model returning unparseable JSON very well may.
+#
+# Retrying is cheap precisely because the crew checkpoints every completed phase: a retried Run
+# resumes and repays only the phase that failed, not the research and creative work before it.
+#
+# Codes Production authored are deliberately absent. `recorded.py` passes a refusal's own error
+# code through to the terminal, and a code the crew did not write is not the crew's to classify —
+# those report `False`, which here means "not claimed" rather than "known to be permanent".
+RETRYABLE_FAILURES: Mapping[str, bool] = {
+    # Nondeterministic: a provider or model answered, and answered badly.
+    "RESEARCH_CONTRACT_INVALID": True,
+    "RESEARCH_FAILED": True,
+    "NARRATIVE_CONTRACT_INVALID": True,
+    "CREATIVE_PHASE_FAILED": True,
+    "VISUAL_BIBLE_CONTRACT_INVALID": True,
+    "VIDEO_PLAN_CONTRACT_INVALID": True,
+    "VISUAL_PLANNING_FAILED": True,
+    # The transport, not the Run. A tunnel that died under a synchronous render surfaces here,
+    # and the Run it was carrying is still on the other side to be resumed.
+    "PRODUCTION_FAILED": True,
+    # Facts about the invocation. Something has to change before another attempt means anything.
+    "PRODUCTION_CONTRACT_INVALID": False,
+    "PROVIDER_MODE_MISMATCH": False,
+    "DECLINE_UNAVAILABLE": False,
+    "PRODUCTION_BRIEF_MISMATCH": False,
+    "IMAGE_PALETTE_MISSING": False,
+    "PREVIEW_MISSING": False,
+}
+
+
+class UnclassifiedFailure(ContractViolation):
+    """A crew failure code that the retry table does not classify.
+
+    Raised rather than defaulted. A new code reaching an operator with a silent `retryable=False`
+    is the defect this table exists to prevent, and the cheapest moment to notice it is the one
+    where the code is introduced.
+    """
+
+
+def crew_failure(code: str, summary: str, *, run_id: str | None = None) -> Failed:
+    """Build a `Failed` whose `retryable` is read from the table rather than asserted at the site.
+
+    Every call site used to write `retryable=False` by hand, so the field carried no information
+    and was wrong wherever the cause was a model or a socket. Reading it from one table means a
+    code is classified once, next to the codes it has to be consistent with.
+    """
+    if code not in RETRYABLE_FAILURES:
+        raise UnclassifiedFailure(f'Failure code "{code}" is not classified as retryable or not.')
+    return Failed(run_id=run_id, summary=summary, code=code, retryable=RETRYABLE_FAILURES[code])
 
 
 TerminalResult = Rendered | Declined | Paused | Failed

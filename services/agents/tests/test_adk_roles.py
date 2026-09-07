@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from vox_crew.adk_roles import AdkCreativeAdapter, AdkJsonRole, AdkSceneAuthor, create_adk_director
+from vox_crew.crew_contract import Brief, ResearchDossier, VisualVocabulary
 from vox_crew.visual_planner import VisualCatalogTools
 
 
@@ -69,3 +70,47 @@ def test_director_is_a_resumable_custom_adk_workflow_with_named_children() -> No
         "SceneAuthor",
         "ImageCreatorAgent",
     ]
+
+
+def test_the_art_director_payload_carries_the_closed_vocabulary_its_instruction_names() -> None:
+    """The instruction says "the closed vocabulary in visualVocabulary". It has to be there.
+
+    This is the regression test for a role being told to obey a list it could not read: the
+    payload held only the Brief and the dossier, so the model guessed a theme name and a wrong
+    guess ended the Run at the contract gate.
+    """
+    roles = AdkCreativeAdapter(model="test-model")
+    seen: dict[str, object] = {}
+
+    async def ask(instruction, payload, *, tools=()):
+        seen["instruction"] = instruction
+        seen["payload"] = payload
+        return {"schemaVersion": 1}
+
+    roles.art_director_agent.ask = ask
+    vocabulary = VisualVocabulary(
+        themes=frozenset({"editorial-cold"}),
+        motion_intents=frozenset({"pushIn", "editorialStatic"}),
+        color_roles=frozenset({"neutral"}),
+        treatments=frozenset({"photo"}),
+    )
+    brief = Brief.from_mapping({"id": "brief-1", "text": "Explain it.", "kind": "factual"})
+    dossier = ResearchDossier.from_mapping(
+        {
+            "schemaVersion": 1,
+            "mode": "not_required",
+            "sources": [],
+            "claims": [],
+            "statistics": [],
+            "quotations": [],
+            "contradictions": [],
+            "visualOpportunities": [],
+        }
+    )
+
+    asyncio.run(roles.art_direct(brief, dossier, vocabulary))
+
+    payload = seen["payload"]
+    assert payload["visualVocabulary"] == vocabulary.to_mapping()
+    assert payload["visualVocabulary"]["motionIntents"] == ["editorialStatic", "pushIn"]
+    assert "visualVocabulary" in seen["instruction"]

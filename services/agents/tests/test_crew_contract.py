@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from vox_crew.crew_contract import (
+    RETRYABLE_FAILURES,
     ArtifactHandle,
     Brief,
     ContractViolation,
@@ -18,6 +19,8 @@ from vox_crew.crew_contract import (
     ProviderMode,
     ResearchDossier,
     Rendered,
+    UnclassifiedFailure,
+    crew_failure,
     Narrative,
     VisualBible,
     VisualVocabulary,
@@ -323,3 +326,71 @@ def test_a_malformed_creative_artifact_fails_at_its_owning_contract() -> None:
                 treatments=frozenset({"documentary"}),
             ),
         )
+
+
+def test_a_failure_caused_by_a_model_or_a_socket_says_it_is_worth_running_again() -> None:
+    """`retryable` used to be hardcoded False everywhere, so it carried no information.
+
+    The line it draws is between a nondeterministic cause and a fact about the invocation. A
+    model returning unparseable JSON may parse next time; a transport that died mid-command left
+    a Run on the other side that resuming can still reach.
+    """
+    assert crew_failure("NARRATIVE_CONTRACT_INVALID", "rejected").retryable is True
+    assert crew_failure("CREATIVE_PHASE_FAILED", "could not complete").retryable is True
+    assert crew_failure("PRODUCTION_FAILED", "could not complete").retryable is True
+
+
+def test_a_failure_that_will_be_just_as_true_next_time_says_so() -> None:
+    """Something has to change before another attempt means anything."""
+    assert crew_failure("PROVIDER_MODE_MISMATCH", "mismatch").retryable is False
+    assert crew_failure("PRODUCTION_BRIEF_MISMATCH", "mismatch").retryable is False
+    assert crew_failure("DECLINE_UNAVAILABLE", "unavailable").retryable is False
+
+
+def test_an_unclassified_code_is_refused_rather_than_quietly_called_permanent() -> None:
+    """The defect this table exists to prevent is a new code defaulting to False in silence."""
+    with pytest.raises(UnclassifiedFailure, match="TOTALLY_NEW_CODE"):
+        crew_failure("TOTALLY_NEW_CODE", "something happened")
+
+
+def test_the_table_classifies_every_code_the_crew_itself_can_emit() -> None:
+    """Read out of the source rather than restated, because this one is a completeness claim.
+
+    A restated list would pass while a newly added `failed("...")` went unclassified, which is
+    the opposite of what this asserts. `crew_failure` raises at runtime; this fails the build.
+    """
+    import re
+    from pathlib import Path
+
+    import vox_crew.crew as crew_module
+    import vox_crew.recorded as recorded_module
+
+    emitted: set[str] = set()
+    for module in (crew_module, recorded_module):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        emitted.update(re.findall(r'crew_failure\(\s*"([A-Z_]+)"', source))
+        emitted.update(re.findall(r'failed\(\s*"([A-Z_]+)"', source))
+
+    assert emitted, "no failure codes were found; the scan itself is broken."
+    assert emitted <= set(RETRYABLE_FAILURES)
+
+
+def test_the_visual_vocabulary_serialises_in_a_stable_order() -> None:
+    """It is built from sets, and a set's order is not stable across processes.
+
+    An unsorted payload would put a different prompt in front of the same role on every run,
+    which is the prefix identity ADR-0019 requires to hold inside a role.
+    """
+    vocabulary = VisualVocabulary(
+        themes=frozenset({"editorial-paper", "editorial-cold"}),
+        motion_intents=frozenset({"pushIn", "editorialStatic"}),
+        color_roles=frozenset({"positive", "neutral"}),
+        treatments=frozenset({"duotone", "cutout"}),
+    )
+
+    assert vocabulary.to_mapping() == {
+        "themes": ["editorial-cold", "editorial-paper"],
+        "motionIntents": ["editorialStatic", "pushIn"],
+        "colorRoles": ["neutral", "positive"],
+        "treatments": ["cutout", "duotone"],
+    }

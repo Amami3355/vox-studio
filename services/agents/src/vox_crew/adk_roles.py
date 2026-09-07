@@ -14,6 +14,7 @@ from .crew_contract import (
     ProviderMode,
     ResearchDossier,
     VisualBible,
+    VisualVocabulary,
     OperatorPolicy,
 )
 from .visual_planner import VisualCatalogTools
@@ -139,13 +140,28 @@ class AdkCreativeAdapter:
         )
 
     async def art_direct(
-        self, brief: Brief, dossier: ResearchDossier
+        self, brief: Brief, dossier: ResearchDossier, vocabulary: VisualVocabulary
     ) -> Mapping[str, Any]:
+        """The vocabulary is supplied, not assumed.
+
+        The instruction has always said "the supplied closed vocabulary" and the payload never
+        carried one, so the role was asked to obey a list it could not read and had to guess
+        `editorial-cold` from the Brief. `VisualBible.from_mapping` caught a wrong guess at the
+        gate, which made it safe and not cheap: a rejected bible ends the Run having paid for
+        research and two model calls. Sending the four published lists costs a few hundred
+        characters and removes the guess.
+        """
         return await self.art_director_agent.ask(
-            "Return only VisualBible JSON using only the supplied closed vocabulary: "
+            "Return only VisualBible JSON using only the closed vocabulary in visualVocabulary: "
             "schemaVersion, theme, motionIntent, colorRoles, treatments, motifs, "
-            "forbiddenTreatments. Do not add provider prompts or raw style values.",
-            {"brief": brief.to_mapping(), "researchDossier": dossier.to_mapping()},
+            "forbiddenTreatments. theme must be one of visualVocabulary.themes; motionIntent, "
+            "colorRoles, treatments and forbiddenTreatments may name only values published in "
+            "the matching visualVocabulary list. Do not add provider prompts or raw style values.",
+            {
+                "brief": brief.to_mapping(),
+                "researchDossier": dossier.to_mapping(),
+                "visualVocabulary": vocabulary.to_mapping(),
+            },
         )
 
     async def plan(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]:
