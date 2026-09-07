@@ -14,18 +14,22 @@ The map records decisions and delivery priorities; it does not claim implementat
 - Use wayfinder, grilling and domain-modeling; use research/find-docs for external facts. Keep the glossary in `CONTEXT.md` and the six architectural rules. The frozen architecture is background; later accepted ADRs and current code establish the actual boundary.
 - This update records the user's instruction to prioritize a visible result. Remaining decisions stay open only for their actual unresolved scope; do not repeat the completed rules/deployment investigation or require a voice migration before the first video. Concrete delivery milestones and their exit evidence live in the route. Host and access recommendations are not silently accepted decisions.
 - Proposed release envelope: authenticated, controlled hackathon access, real provider calls, durable work, bounded spending, browser refresh/restart recovery, and playable/downloadable output. Whether arbitrary public self-service is required is still a user question.
-- Repo baseline: `f36fa82`, pushed on `feat/adk-production-crew`. Prior handoff reports 549 agent tests passed, one skipped; these were not re-run or independently established by this planning effort.
-- Last cloud observation, from handoff session 8: `vox-service` in `studio-prod-7f3a/europe-west1-c` reported `TERMINATED`. This map update did not recheck or start it; current health and release-image validation remain implementation work.
+- Current HEAD: `9808524` on `feat/adk-production-crew`; launch planning is committed, while the first milestone's implementation is still uncommitted. Current test and image evidence lives in [the implementation record](proofs/cloud-path-progress-2026-09-07.md).
+- Latest cloud observation, session 11: Production and crew are running; signed contracts/status succeed before and after crew restart, and isolation checks pass. The first milestone is complete. Exact digests and the historical receipt compatibility issue are in [the implementation record](proofs/cloud-path-progress-2026-09-07.md).
 - This is a new effort beyond the earlier cloud-phase scope cut: hosting the crew and adding a browser-facing Studio are now explicitly requested. The earlier operator-only tunnel architecture is not automatically sufficient.
 - Open tickets are discovered under `issues/`, by `Status`, `Assignee` and `Blocked by`, per `docs/agents/issue-tracker.md`. Blocking references are local ticket numbers; narration uses titles.
 - The delivery milestones and evidence pointers live in [The shortest route to a visible result](route.md). It is the delivery view, not a second decision ledger. Each accepted answer belongs only in its ticket; unchecked milestones are not completed work.
 
 ## Decisions so far
 
+- [How does the hosted crew reach Production and the browser safely?](issues/03-connect-the-hosted-crew-without-breaking-production-isolation.md): approved crew VM and 10 GB data disk deployed; signed contracts/status and persistence verified, restricted SSH and separate IAM/registry boundaries exercised. ADR-0022 accepted. Browser admission and audience stay in tickets 04/07.
+
 - [Which supported ADK deployment path fits this crew by tomorrow?](issues/01-choose-the-supported-adk-deployment-path.md): verified deployment CLIs and their limits; project-specific hosting recommendation with evidence and a two-hour alternative proof.
 - [What result comes first for the September 9 hackathon?](issues/02-name-the-demo-and-release-envelope.md): deadline and rules established; real video and Studio first, ElevenLabs retained for initial delivery and voice compliance work placed last.
 
 ## Not yet specified
+
+- [Historical receipt compatibility](issues/08-diagnose-historical-run-receipt-compatibility.md): both September 5 Runs fail current receipt-schema validation. Preserve their data and diagnose before claiming their recovery; a fresh zero-quota Run passed the connectivity proof.
 
 - Presentation refinements that emerge when the chosen hero Brief is watched with its real narration and visuals.
 - Additional release risks exposed by the first full hosted run; turn each into a decision only when its concrete failure is known.

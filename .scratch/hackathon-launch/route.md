@@ -1,6 +1,6 @@
 # The shortest route to a visible result
 
-Updated 2026-09-07 against `f36fa82`, after reading the event rules and receiving the user's delivery-priority correction. The accepted order is recorded in [What result comes first for the September 9 hackathon?](issues/02-name-the-demo-and-release-envelope.md); unresolved implementation choices remain recommendations. This update changed planning documents only.
+Updated 2026-09-07 through session 11 deployment evidence. The accepted order is recorded in [What result comes first for the September 9 hackathon?](issues/02-name-the-demo-and-release-envelope.md); unresolved implementation choices remain recommendations.
 
 ## The product to finish
 
@@ -16,8 +16,8 @@ The distinctive story is already in the architecture: sourced research, speciali
 
 | Part | Evidence in this checkout | Remaining delivery gap |
 | --- | --- | --- |
-| Production | Existing container, deployment scripts, persistent Run store and September 5 remote render proof; VM last observed stopped | Start under the existing deployment procedure, verify deployed revision and prove the new crew/image path |
-| ADK crew | Async deterministic Director, research/creative roles, generated-image workflow, checkpoint adapters | Deployment assembly/entry point, service lifecycle and a real full hosted acceptance run |
+| Production | Running pinned image, persistent Run store, deployed smoke checks and signed cloud-to-cloud proof | First hosted creative/image/video run; historical receipt compatibility tracked separately |
+| ADK crew | Deployed operator entry point, async Director, research/creative roles, checkpoint adapters, persistent disk and supervised bridge | Live provider configuration and a real full hosted acceptance run |
 | Browser Studio | Internal Component Studio only | End-user workspace, authenticated application API, durable status and authorized media delivery |
 | Recovery | Crew file/ADK session adapters and authoritative Production checkpoints | Durable execution ownership, submission deduplication and reconciliation of an interrupted command |
 | Research integration | Existing Parallel Task API adapter | Add a real Search call whose sources feed the research dossier |
@@ -27,7 +27,11 @@ The distinctive story is already in the architecture: sourced research, speciali
 
 Sources: [crew assembly](../../services/agents/src/vox_crew/crew_run.py), [ADK Director](../../services/agents/src/vox_crew/adk_roles.py), [checkpoint stores](../../services/agents/src/vox_crew/crew_state.py), [internal Component Studio](../../apps/component-studio/src/App.tsx), [remote proof](../cloud-phase/issues/09-a-brief-goes-in-at-a-url-and-a-preview-comes-out.md), [deployment record](../../deploy/README.md).
 
-The handoff session's read-only cloud check returned `TERMINATED` for `vox-service` in `studio-prod-7f3a/europe-west1-c`. This update did not recheck or start the VM. The currently installed image and service health still need inspection. The handoff's passing tests establish useful regression evidence, not a deployed end-to-end product. The older cloud hosting ticket's claim that ADK cannot host this crew predates the custom Director and async seams; use the completed deployment research instead.
+Session 11 verified Production and crew running in `studio-prod-7f3a/europe-west1-c`, with signed
+contracts/status before and after crew restart. [The proof](proofs/cloud-path-progress-2026-09-07.md)
+records deployed digests and limitations. This establishes the first milestone, not a complete
+browser-to-video product. The older cloud hosting ticket's claim that ADK cannot host this crew
+predates the custom Director and async seams; use the completed deployment research instead.
 
 ## The boundary to establish first
 
@@ -45,7 +49,7 @@ flowchart LR
 
 This shows responsibilities, not a requirement for seven separately deployed services. Keep the number of moving parts small. The browser owns no model, research, synthesis, image-provider or Production signing credential. The application constructs operator policy; an incoming Brief must not carry arbitrary spending grants or credentials. The agent receives public contracts and artifacts, never the Production implementation or disk.
 
-The researched hosting recommendation belongs to [Which supported ADK deployment path fits this crew by tomorrow?](issues/01-choose-the-supported-adk-deployment-path.md), with the complete [deployment evidence](research/adk-deployment.md). A deployment CLI packages and launches an agent; the product still needs the application boundary shown above. The human topology decision remains open.
+The researched hosting recommendation belongs to [Which supported ADK deployment path fits this crew by tomorrow?](issues/01-choose-the-supported-adk-deployment-path.md), with the complete [deployment evidence](research/adk-deployment.md). A deployment CLI packages and launches an agent; the product still needs the application boundary shown above. The separate crew VM is deployed and proved in ticket 03; later Studio access choices and browser runtime proof remain open.
 
 Google's supported Python shortcut for Cloud Run is `adk deploy cloud_run`; managed Agent Runtime is available through `adk deploy agent_engine`. The newer `agents-cli` also provides deployment scaffolding and `agents-cli deploy`; Agent Starter Pack now points new work there. [ADK Cloud Run documentation](https://adk.dev/deploy/cloud-run/), [Agents CLI deployment guide](https://adk.dev/deploy/agent-runtime/agents-cli/), [Agent Starter Pack status](https://github.com/GoogleCloudPlatform/agent-starter-pack). These are verified tool choices, not commands ready to deploy the current checkout unchanged.
 
@@ -58,18 +62,29 @@ Browser media is another missing contract: the public outcome carries an artifac
 
 ## Delivery milestones
 
-These are observable implementation outcomes, not additional decision tickets. All are pending. Attach evidence before marking a milestone complete; an earlier test report or a screen showing fixture data cannot satisfy a live-run milestone. Use a single-implementer baseline until staffing is known; no parallel engineering capacity is assumed.
+Implementation update 2026-09-07 session 11: the separate crew VM and 10 GB data disk are
+deployed. Signed contracts/status succeed before and after crew restart, with the same marker
+and response hashes; SSH/IAM isolation checks pass. The first milestone is complete. See
+[current evidence](proofs/cloud-path-progress-2026-09-07.md) and
+[ticket 03](issues/03-connect-the-hosted-crew-without-breaking-production-isolation.md).
+Both historical Runs refuse current receipt-schema validation; [ticket 08](issues/08-diagnose-historical-run-receipt-compatibility.md)
+tracks compatibility independently of the new zero-quota connectivity Run.
+
+These are observable implementation outcomes, not additional decision tickets. Only the first is complete. Attach evidence before marking a milestone complete; an earlier test report or a screen showing fixture data cannot satisfy a live-run milestone. Use a single-implementer baseline until staffing is known; no parallel engineering capacity is assumed.
 
 | Done | Milestone | Work | Exit evidence |
 | --- | --- | --- | --- |
-| [ ] | Cloud path answers | Check Production revision/health; assemble hosted crew and authenticated private connection; establish durable storage and operator policy | Signed cloud-to-cloud contract/status round trip, with deployed revisions and no developer laptop tunnel |
+| [x] | Cloud path answers | Production and crew deployed; private signed connection, persistent disk and separate operator policy verified | [Signed round trip before/after restart, deployed digests and isolation refusals](proofs/cloud-path-progress-2026-09-07.md) |
 | [ ] | First real video to watch | Connect Parallel Search to research; verify Google Cloud inference/image access; run one factual Brief through creative work, image approval, existing ElevenLabs narration and render | Playable MP4 delivered to the user, source evidence, Run identifier, actual provider usage and human review of narration/visuals |
 | [ ] | Studio produces that result | Add durable submit/status execution, Brief form, real progress, sources, image approval and authorized playback/download; connect the smallest screen before polishing it | Fresh browser completes the hosted path and reconnects to the same work after refresh |
 | [ ] | Product holds up in rehearsal | Verify duplicate admission, restart and uncertain-render reconciliation; enforce spending/concurrency limits; improve visible states and composition | Second complete run, focused recovery checks, no duplicated paid dispatch, usable failure states and saved backup demonstration |
 | [ ] | Final voice work | Address the deferred ElevenLabs compliance gap after the visible product; prove replacement audio and actual-word timing before integrating any provider change | Fresh end-to-end run with verified synchronization and provider evidence, or an explicitly unresolved submission blocker; the earlier ElevenLabs video alone cannot close this milestone |
 | [ ] | Submission ready | Freeze the final revision; recheck access and requirements; capture the final English demo and publish the required source/license/instructions | Tested hosted URL, public repository, final video and completed submission before cutoff |
 
-Start with the cloud round trip, timeboxed to two hours; then spend effort on producing the first real video. If connectivity fails, use the fallback in the existing deployment research or isolate the concrete blocker. Do not restart a broad hosting comparison. A local diagnostic preview can show progress but does not complete the hosted-video milestone.
+The cloud round trip is complete. Next, produce the first real video: integrate Parallel Search,
+verify provider access and run the factual Brief under bounded operator policy. Do not restart
+a broad hosting comparison. A local diagnostic preview can show progress but does not complete
+the hosted-video milestone.
 
 Prepare the Studio shell when useful, but do not postpone the first MP4 until the whole application is ready. One workspace, polling, native playback and a single image-approval action are the baseline recommendation. SceneInstance editing is outside this delivery sequence.
 
