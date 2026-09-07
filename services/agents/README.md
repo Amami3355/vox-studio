@@ -182,13 +182,18 @@ code-blind by convention in this phase, and a prompt is the easiest place to los
 What the interface publishes about itself is deliberately not scanned for — a contract it hands
 out is not a leak.
 
-*What comes back is read in the compiler's own words.* `review` reports findings whose codes,
+*What comes back is read in the compiler's own words.* The legacy `review` reports findings whose codes,
 `means` and `repair` come from the published checks contract, so the crew names a defect the
 way the interface names it. It covers what the instructions are responsible for teaching —
 physical time, capability, action and anchor names, semantic asset requirements — and is not a
-second compiler. Findings do not stop a plan being submitted: the compiler is the only
-authority on a plan, and a crew that refused on its own reading would put its opinion above the
-interface's. They travel with the Run for the repair loop and the evidence bundle to read.
+second compiler. Those interpretive findings do not stop a plan being submitted; they travel with
+the Run for the repair loop and the evidence bundle to read.
+
+The role-split Visual Planner's `validateScene` and `validateVideoPlan` tools have one narrower
+authority recorded in ADR-0021: they evaluate the exact published JSON Schemas and may return a
+draft to bounded repair, or stop before a Run when repair is unavailable or exhausted. Their green
+result still says `deferredTo: run.validate`. Production alone accepts a plan and decides anchors,
+durations, capacities, assets, and every other compiler semantic.
 
 *`PlanAuthor` is the model seam.* One interface, a live implementation (`AdkPlanAuthor`) and a
 scripted one in the tests, and nothing above it knows which it holds — `client.py`'s rule

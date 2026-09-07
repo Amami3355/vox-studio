@@ -377,3 +377,11 @@ digest, expose it there as `AssetRef.ready`. The evidence bundle and digest make
 reproducible; the asset is not part of the canonical repository library until a separate reviewed
 commit promotes it. Placeholders remain renderable and generation never runs inside rendering. See
 ADR-0020.
+
+## Published shape may refuse a draft before a Run
+
+**Earlier crew rule:** author-side review was advisory because an incomplete reading of compiler
+semantics cannot outrank Production. **Decision:** the role-split Visual Planner may stop or repair
+a draft that fails the exact VideoPlan or SceneCapability-props JSON Schema Production published.
+Green still defers every compiler semantic to `run.validate`, and Production remains the only
+authority that can accept a plan. See ADR-0021.

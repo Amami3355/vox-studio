@@ -128,6 +128,7 @@ def test_the_research_agent_plans_the_inquiry_and_the_tool_executes_it() -> None
     assert role.calls == 1
     assert agent.inquiry == ("What were the two forecasts?", "Who published them?")
     assert tool.inquiry == agent.inquiry
+    assert agent.trace().inquiry == agent.inquiry
     # The evidence is the tool's, unchanged: the agent plans, it does not author claims.
     assert dossier == DOSSIER
 
@@ -180,11 +181,23 @@ def test_a_bad_plan_degrades_to_the_bare_brief_rather_than_failing_the_phase(ans
 
 
 def test_a_planning_failure_still_researches() -> None:
+    from vox_crew.adk_roles import RoleUnavailable
+
     tool = RecordedResearchAdapter(DOSSIER)
-    agent = research_agent(PlanningRole(raises=RuntimeError("no model")), tool)
+    agent = research_agent(PlanningRole(raises=RoleUnavailable("no model")), tool)
 
     assert asyncio.run(agent.research(factual_brief())) == DOSSIER
     assert tool.calls == 1
+
+
+def test_an_unexpected_programming_error_is_not_silently_degraded() -> None:
+    tool = RecordedResearchAdapter(DOSSIER)
+    agent = research_agent(PlanningRole(raises=AssertionError("broken adapter")), tool)
+
+    with pytest.raises(AssertionError, match="broken adapter"):
+        asyncio.run(agent.research(factual_brief()))
+
+    assert tool.calls == 0
 
 
 def test_the_inquiry_is_deduplicated_and_capped() -> None:

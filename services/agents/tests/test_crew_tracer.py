@@ -6,7 +6,10 @@ import asyncio
 import hashlib
 import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from vox_crew.client import Artifact, ProductionClient
 from vox_crew.crew import ProductionCrew, UnservableBrief
@@ -26,14 +29,17 @@ from vox_crew.crew_evidence import (
     CREW_EVENTS,
     CREW_STATE,
     PRODUCTION_COMMANDS,
+    TOOL_CALLS,
     assemble_crew_evidence,
 )
-from vox_crew.envelopes import ArtifactDescriptor, ResultEnvelope, parse_envelope
+from vox_crew.envelopes import ArtifactDescriptor, MalformedEnvelope, ResultEnvelope, parse_envelope
 from vox_crew.evidence import PASS, verify
 from vox_crew.image_generation import AssetRequirement
 from vox_crew.recorded import ClientProductionAdapter, RecordedCreativeAdapter, RecordedResearchAdapter
+from vox_crew.visual_planner import PublishedCatalog, PublishedShapeValidators, SplitVisualPlanner
 
 
+FIXTURES = Path(__file__).parent / "fixtures"
 PNG = bytes.fromhex("89504e470d0a1a0a0000000d494844520000000100000001")
 PNG_SHA = hashlib.sha256(PNG).hexdigest()
 REQUIREMENT = {
@@ -283,9 +289,14 @@ def policy() -> OperatorPolicy:
     )
 
 
-def crew(client: ProductionClient, state=None, decision=lambda candidate: True) -> ProductionCrew:
+def crew(
+    client: ProductionClient,
+    state=None,
+    decision=lambda candidate: True,
+    research=None,
+) -> ProductionCrew:
     return ProductionCrew(
-        RecordedResearchAdapter(DOSSIER),
+        research if research is not None else RecordedResearchAdapter(DOSSIER),
         RecordedCreativeAdapter(NARRATIVE, BIBLE, PLAN),
         ClientProductionAdapter(
             client,
@@ -351,6 +362,22 @@ def test_recorded_whole_crew_accepts_one_digest_and_returns_a_preview_containing
     assert b'"command":"run.image.accept"' in bundle.files[PRODUCTION_COMMANDS]
 
 
+def test_a_planned_research_inquiry_reaches_the_checkpoint_and_safe_tool_evidence() -> None:
+    class InquiringResearch(RecordedResearchAdapter):
+        async def research(self, brief):
+            return await super().research(brief, ("Which operator published the timetable?",))
+
+    client = TracerProductionClient()
+    state = InMemoryCrewStateStore()
+    updates = collect(crew(client, state, research=InquiringResearch(DOSSIER)))
+
+    bundle = evidence(updates, state)
+
+    assert b'"researchInquiry":["Which operator published the timetable?"]' in bundle.files[CREW_STATE]
+    assert b'"tool":"planInquiry"' in bundle.files[TOOL_CALLS]
+    assert b'"questions":["Which operator published the timetable?"]' in bundle.files[TOOL_CALLS]
+
+
 def test_recorded_failure_compiles_and_renders_the_honest_placeholder() -> None:
     client = TracerProductionClient(image_fails=True)
     state = InMemoryCrewStateStore()
@@ -404,6 +431,7 @@ def test_human_decision_pause_resumes_the_same_job_without_another_provider_star
 def test_unservable_brief_publishes_decline_without_take_or_image_spend() -> None:
     class UnservablePlanner:
         mode = ProviderMode.RECORDED
+        repairs_spent = 0
 
         async def plan(self, brief, dossier, narrative, visual_bible):
             raise UnservableBrief(
@@ -492,7 +520,8 @@ def test_a_declined_requirement_spends_nothing_and_still_renders() -> None:
     client = TracerProductionClient()
     creator = Creator(needs=False)
 
-    updates = collect(crew_with_creator(client, creator))
+    state = InMemoryCrewStateStore()
+    updates = collect(crew_with_creator(client, creator, state))
 
     assert creator.asked  # it was consulted
     assert client.calls.count("image-start") == 0
@@ -505,6 +534,10 @@ def test_a_declined_requirement_spends_nothing_and_still_renders() -> None:
         if getattr(item, "phase", None) and item.phase.value == "image_creation"
     )
     assert image_event.counts["jobs"] == 0
+    assert image_event.counts["declined"] == 1
+    bundle = evidence(updates, state)
+    assert b'"needsImage":false' in bundle.files[CREW_STATE]
+    assert b'"tool":"needsImage"' in bundle.files[TOOL_CALLS]
 
 
 def test_no_image_creator_generates_for_every_requirement_exactly_as_before() -> None:
@@ -543,11 +576,62 @@ def test_a_decline_is_remembered_so_a_resumed_run_does_not_ask_again() -> None:
     state: dict[str, Any] = {}
 
     assert asyncio.run(adapter._wants_image(state, requirement)) is False
-    assert state["declinedRequirements"] == [requirement.requirement_id]
+    assert state["imageDecisions"][requirement.requirement_id]["needsImage"] is False
 
     # The saved decline, replayed: the same state answers without consulting the role again.
     assert asyncio.run(adapter._wants_image(state, requirement)) is False
     assert len(creator.asked) == 1
+
+
+def test_a_positive_image_decision_is_also_remembered_across_resume() -> None:
+    creator = Creator(needs=True)
+    adapter = ClientProductionAdapter(
+        TracerProductionClient(),
+        REQUEST,
+        recording_mode=ProviderMode.RECORDED,
+        image_creator=creator,
+    )
+    requirement = AssetRequirement.from_mapping(
+        {
+            "type": "image",
+            "subject": "the last bus",
+            "treatment": "photo",
+            "orientation": "landscape",
+        }
+    )
+    state: dict[str, Any] = {}
+
+    assert asyncio.run(adapter._wants_image(state, requirement)) is True
+    assert asyncio.run(adapter._wants_image(state, requirement)) is True
+    assert len(creator.asked) == 1
+
+
+def test_a_saved_image_decision_cannot_claim_a_different_role() -> None:
+    creator = Creator(needs=True)
+    adapter = ClientProductionAdapter(
+        TracerProductionClient(),
+        REQUEST,
+        recording_mode=ProviderMode.RECORDED,
+        image_creator=creator,
+    )
+    requirement = AssetRequirement.from_mapping(
+        {
+            "type": "image",
+            "subject": "the last bus",
+            "treatment": "photo",
+            "orientation": "landscape",
+        }
+    )
+    state: dict[str, Any] = {
+        "imageDecisions": {
+            requirement.requirement_id: {"role": "director", "needsImage": True}
+        }
+    }
+
+    with pytest.raises(MalformedEnvelope, match="decision"):
+        asyncio.run(adapter._wants_image(state, requirement))
+
+    assert creator.asked == []
 
 
 def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
@@ -561,6 +645,7 @@ def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
             return PLAN
 
     client = TracerProductionClient()
+    state = InMemoryCrewStateStore()
     subject = ProductionCrew(
         RecordedResearchAdapter(DOSSIER),
         RecordedCreativeAdapter(NARRATIVE, BIBLE, PLAN),
@@ -578,6 +663,7 @@ def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
             color_roles=frozenset({"ground", "accent"}),
             treatments=frozenset({"documentary", "glossy"}),
         ),
+        state_store=state,
     )
 
     updates = collect(subject)
@@ -589,6 +675,7 @@ def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
     )
     assert repair_event.counts["repairs"] == 2
     assert repair_event.phase is CrewPhase.VISUAL_PLANNING
+    assert b'"tool":"repair"' in evidence(updates, state).files[TOOL_CALLS]
 
 
 def test_a_plan_that_needed_no_repair_emits_no_repair_event() -> None:
@@ -597,3 +684,99 @@ def test_a_plan_that_needed_no_repair_emits_no_repair_event() -> None:
     assert not any(
         getattr(item, "role", None) is CrewRole.PLAN_REPAIR_AGENT for item in updates
     )
+
+
+def test_a_shape_refusal_is_repaired_before_production_is_reached_once() -> None:
+    """Ticket 01's tracer: cheap local correction precedes the one authoritative Run check."""
+
+    def contract(category: str) -> Mapping[str, Any]:
+        envelope = json.loads(
+            (FIXTURES / f"contract-show-{category}.stdout").read_text("utf-8")
+        )
+        return envelope["data"]["contract"]
+
+    class Structurer:
+        async def structure(self, *_args: Any) -> Mapping[str, Any]:
+            return {
+                "beats": [{"id": "b1", "text": NARRATIVE["beats"][0]["text"]}],
+                "sections": [
+                    {
+                        "id": "station",
+                        "spansBeats": ["b1"],
+                        "scenes": [
+                            {
+                                "id": "context",
+                                "component": "image_context",
+                                "spansBeats": ["b1"],
+                            }
+                        ],
+                    }
+                ],
+            }
+
+    valid_fill = {
+        key: value
+        for key, value in PLAN["sections"][0]["scenes"][0].items()
+        if key in {"id", "props", "layout", "motionProfile", "events", "pace"}
+    }
+    invalid_fill = {
+        **valid_fill,
+        "props": {**valid_fill["props"], "headline": 42},
+    }
+
+    class SceneAuthor:
+        async def author(self, *_args: Any) -> Mapping[str, Any]:
+            return {"scenes": [invalid_fill]}
+
+    class Repair:
+        def __init__(self) -> None:
+            self.findings: tuple[Mapping[str, Any], ...] = ()
+
+        async def repair(
+            self,
+            _plan: Mapping[str, Any],
+            refusal: Any,
+            _specifications: tuple[Mapping[str, Any], ...],
+            _tools: Any,
+        ) -> Mapping[str, Any]:
+            self.findings = refusal.findings
+            return {"scenes": [valid_fill]}
+
+    catalog = PublishedCatalog.from_mapping(contract("catalog"))
+    validators = PublishedShapeValidators(catalog, contract("plan"), contract("checks"))
+    repair = Repair()
+    planner = SplitVisualPlanner(
+        catalog,
+        Structurer(),
+        SceneAuthor(),
+        validate_scene=validators.validate_scene,
+        validate_plan=validators.validate_video_plan,
+        repair=repair,
+    )
+    client = TracerProductionClient()
+    subject = ProductionCrew(
+        RecordedResearchAdapter(DOSSIER),
+        RecordedCreativeAdapter(NARRATIVE, BIBLE, PLAN),
+        ClientProductionAdapter(
+            client,
+            REQUEST,
+            recording_mode=ProviderMode.RECORDED,
+            palettes={"editorial-cold": {"ground": "#0d121a", "accent": "#ff5a1f"}},
+            image_decider=lambda candidate: True,
+        ),
+        visual_vocabulary=VisualVocabulary(
+            themes=frozenset({"editorial-cold"}),
+            motion_intents=frozenset({"measured"}),
+            color_roles=frozenset({"ground", "accent"}),
+            treatments=frozenset({"documentary", "glossy"}),
+        ),
+        visual_planner=planner,
+    )
+
+    updates = collect(subject)
+
+    assert isinstance(updates[-1].result, Rendered)
+    assert planner.repairs_spent == 1
+    assert repair.findings[0]["report"]["findings"][0]["path"] == "/props/headline"
+    assert client.calls.count("init") == 1
+    assert client.calls.count("validate") == 1

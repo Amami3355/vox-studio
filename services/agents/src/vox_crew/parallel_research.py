@@ -16,7 +16,14 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from .crew_contract import Brief, BriefKind, ContractViolation, ProviderMode, ResearchDossier
+from .crew_contract import (
+    Brief,
+    BriefKind,
+    ContractViolation,
+    ProviderMode,
+    ResearchDossier,
+    ResearchTrace,
+)
 
 
 class ParallelUnavailable(RuntimeError):
@@ -167,6 +174,10 @@ class ParallelResearchAdapter:
         self._transport = transport if transport is not None else UrllibParallelTransport()
         self._key_source = key_source
         self._processor = processor
+        self.inquiry: tuple[str, ...] = ()
+
+    def trace(self) -> ResearchTrace:
+        return ResearchTrace(self.inquiry)
 
     async def research(
         self, brief: Brief, inquiry: Sequence[str] = ()
@@ -183,6 +194,7 @@ class ParallelResearchAdapter:
         if not api_key:
             raise ParallelUnavailable("PARALLEL_API_KEY is required for live research.")
         questions = tuple(question for question in inquiry if question.strip())
+        self.inquiry = questions
         payload = {
             "input": (
                 brief.text

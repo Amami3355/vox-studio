@@ -13,6 +13,7 @@ from .crew_contract import (
     Narrative,
     ProviderMode,
     ResearchDossier,
+    ResearchTrace,
     VisualBible,
     VisualVocabulary,
     OperatorPolicy,
@@ -23,9 +24,13 @@ from .visual_planner import VisualCatalogTools
 #:
 #: Named once because a bundle has to be able to say which model authored a Run, and a
 #: pin repeated at each role is one an upgrade can move by fours and leave by ones. The
-#: reasoning for pinning an exact name rather than an alias is on `AdkProducer` in
+#: reasoning for pinning an exact name rather than an alias is on `AdkPlanAuthor` in
 #: `planner.py`, which reads this constant.
 CREW_MODEL = "gemini-3.6-flash"
+
+
+class RoleUnavailable(RuntimeError):
+    """A model-role turn failed before producing an answer its caller can parse."""
 
 
 def _json_answer(text: str, what: str) -> Mapping[str, Any]:
@@ -80,36 +85,39 @@ class AdkJsonRole:
         *,
         tools: Sequence[Callable[..., Any]] = (),
     ) -> Mapping[str, Any]:
-        from google.adk.runners import Runner  # noqa: PLC0415
-        from google.genai import types  # noqa: PLC0415
+        try:
+            from google.adk.runners import Runner  # noqa: PLC0415
+            from google.genai import types  # noqa: PLC0415
 
-        if self.session_id is None:
-            session = await self.session_service.create_session(
-                app_name=self.app_name, user_id=self.name
-            )
-            self.session_id = session.id
-        runner = Runner(
-            agent=self.agent(instruction, tools),
-            app_name=self.app_name,
-            session_service=self.session_service,
-        )
-        answered: list[str] = []
-        async for event in runner.run_async(
-            user_id=self.name,
-            session_id=self.session_id,
-            new_message=types.Content(
-                role="user",
-                parts=[
-                    types.Part(
-                        text=json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-                    )
-                ],
-            ),
-        ):
-            if event.is_final_response() and event.content:
-                answered.extend(
-                    part.text for part in (event.content.parts or ()) if part.text
+            if self.session_id is None:
+                session = await self.session_service.create_session(
+                    app_name=self.app_name, user_id=self.name
                 )
+                self.session_id = session.id
+            runner = Runner(
+                agent=self.agent(instruction, tools),
+                app_name=self.app_name,
+                session_service=self.session_service,
+            )
+            answered: list[str] = []
+            async for event in runner.run_async(
+                user_id=self.name,
+                session_id=self.session_id,
+                new_message=types.Content(
+                    role="user",
+                    parts=[
+                        types.Part(
+                            text=json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                        )
+                    ],
+                ),
+            ):
+                if event.is_final_response() and event.content:
+                    answered.extend(
+                        part.text for part in (event.content.parts or ()) if part.text
+                    )
+        except Exception as error:
+            raise RoleUnavailable(f"{self.name} did not complete its model turn.") from error
         return _json_answer("".join(answered).strip(), self.name)
 
 
@@ -169,7 +177,11 @@ class AdkResearchAgent:
 
     async def research(self, brief: Brief) -> Mapping[str, Any]:
         self.inquiry = await self._plan_inquiry(brief)
+        self.trace()  # Validate safe evidence before the same questions reach the provider tool.
         return await self._tool.research(brief, self.inquiry)
+
+    def trace(self) -> ResearchTrace:
+        return ResearchTrace(self.inquiry, planned=True)
 
     async def _plan_inquiry(self, brief: Brief) -> tuple[str, ...]:
         """Plan the questions, and treat a failure to plan as a reason to ask the Brief plainly.
@@ -188,7 +200,7 @@ class AdkResearchAgent:
                 f"{MAX_PLANNED_QUESTIONS}. Do not answer them.",
                 {"brief": brief.to_mapping()},
             )
-        except Exception:
+        except (ContractViolation, RoleUnavailable):
             return ()
         if not isinstance(answer, Mapping):
             return ()
@@ -199,13 +211,19 @@ class AdkResearchAgent:
         for question in questions:
             if isinstance(question, str) and question.strip() and question not in planned:
                 planned.append(question.strip())
-        return tuple(planned[:MAX_PLANNED_QUESTIONS])
+        try:
+            return ResearchTrace(
+                tuple(planned[:MAX_PLANNED_QUESTIONS]), planned=True
+            ).inquiry
+        except ContractViolation:
+            return ()
 
 
 class AdkCreativeAdapter:
     """Independent Narrative and Art Director ADK agents, joined by `ProductionCrew`."""
 
     mode = ProviderMode.LIVE
+    repairs_spent = 0
 
     def __init__(
         self,
@@ -313,6 +331,31 @@ class AdkVisualStructurer:
         )
 
 
+def _adk_visual_tools(
+    tools: VisualCatalogTools, *, include_search: bool
+) -> tuple[Callable[..., Any], ...]:
+    """Bind the role-neutral ADK wrappers for one role's allowed catalog tools."""
+
+    def searchScenes(intent: str = "") -> list[dict[str, Any]]:
+        """Search compact published SceneCapabilities by editorial intent."""
+        return list(tools.search_scenes(intent))
+
+    def getSceneSpec(capability_id: str) -> dict[str, Any]:
+        """Read one full SceneCapability specification available to this role."""
+        return tools.get_scene_spec(capability_id)
+
+    def validateScene(instance: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Validate one SceneInstance and return structured findings."""
+        return tools.validate_scene(instance)
+
+    def validateVideoPlan(plan: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Validate one VideoPlan and return structured findings."""
+        return tools.validate_video_plan(plan)
+
+    shared = (getSceneSpec, validateScene, validateVideoPlan)
+    return (searchScenes, *shared) if include_search else shared
+
+
 class AdkSceneAuthor:
     def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
         self.role = AdkJsonRole(
@@ -328,28 +371,12 @@ class AdkSceneAuthor:
         specifications: tuple[dict[str, Any], ...],
         tools: VisualCatalogTools,
     ) -> Mapping[str, Any]:
-        def searchScenes(intent: str = "") -> list[dict[str, Any]]:
-            """Search compact published SceneCapabilities by editorial intent."""
-            return list(tools.search_scenes(intent))
-
-        def getSceneSpec(capability_id: str) -> dict[str, Any]:
-            """Read the full selected SceneCapability specification."""
-            return tools.get_scene_spec(capability_id)
-
-        def validateScene(instance: Mapping[str, Any]) -> Mapping[str, Any]:
-            """Validate one authored SceneInstance and return structured findings."""
-            return tools.validate_scene(instance)
-
-        def validateVideoPlan(plan: Mapping[str, Any]) -> Mapping[str, Any]:
-            """Validate the assembled VideoPlan and return structured findings."""
-            return tools.validate_video_plan(plan)
-
         return await self.role.ask(
             "Return only JSON with a scenes array. Fill each existing scene id exactly once. "
             "Each fill may contain only id, props, layout, motionProfile, events. Do not add, "
             "remove, or select scenes. Use the four offered catalog tools when needed.",
             {"structure": dict(structure), "specifications": list(specifications)},
-            tools=(searchScenes, getSceneSpec, validateScene, validateVideoPlan),
+            tools=_adk_visual_tools(tools, include_search=True),
         )
 
 
@@ -378,18 +405,6 @@ class AdkPlanRepair:
         specifications: tuple[dict[str, Any], ...],
         tools: VisualCatalogTools,
     ) -> Mapping[str, Any]:
-        def getSceneSpec(capability_id: str) -> dict[str, Any]:
-            """Read the full specification of a capability this refusal implicates."""
-            return tools.get_scene_spec(capability_id)
-
-        def validateScene(instance: Mapping[str, Any]) -> Mapping[str, Any]:
-            """Validate one repaired SceneInstance and return structured findings."""
-            return tools.validate_scene(instance)
-
-        def validateVideoPlan(candidate: Mapping[str, Any]) -> Mapping[str, Any]:
-            """Validate the repaired VideoPlan and return structured findings."""
-            return tools.validate_video_plan(candidate)
-
         return await self.role.ask(
             "Return only JSON with a scenes array holding every scene of the supplied plan, "
             "repaired where the findings name it and unchanged everywhere else. Each entry may "
@@ -401,7 +416,7 @@ class AdkPlanRepair:
                 "findings": [dict(finding) for finding in refusal.findings],
                 "specifications": list(specifications),
             },
-            tools=(getSceneSpec, validateScene, validateVideoPlan),
+            tools=_adk_visual_tools(tools, include_search=False),
         )
 
 
@@ -427,13 +442,10 @@ class AdkImageCreator:
             model=model,
             session_service=session_service,
         )
-        #: Every decision made, so a bundle can show what was skipped and not only what was made.
-        self.decisions: list[dict[str, Any]] = []
-
     async def needs_image(self, requirement: Any) -> bool:
         try:
             answer = await self.role.ask(
-                "Return only JSON: {\"needsImage\": true|false, \"reason\": \"...\"}. The supplied "
+                "Return only JSON: {\"needsImage\": true|false}. The supplied "
                 "requirement is one unresolved visual slot in a factual explainer. Answer false "
                 "only when the scene reads at least as well without a generated image — a decorative "
                 "backdrop, a subject a caption already carries, an abstraction a photograph would "
@@ -441,18 +453,9 @@ class AdkImageCreator:
                 "prompt, describe an image, or judge any other requirement.",
                 {"assetRequirement": requirement.to_mapping()},
             )
-        except Exception:
+        except (ContractViolation, RoleUnavailable):
             return True
         needed = True if not isinstance(answer, Mapping) else answer.get("needsImage") is not False
-        self.decisions.append(
-            {
-                "requirementId": requirement.requirement_id,
-                "needsImage": needed,
-                "reason": (
-                    str(answer.get("reason", ""))[:200] if isinstance(answer, Mapping) else ""
-                ),
-            }
-        )
         return needed
 
 

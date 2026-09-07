@@ -6,7 +6,7 @@ satisfy the published `propsSchema`, and a VideoPlan that does not satisfy the p
 VideoPlan JSON Schema, come back as structured findings the author can act on in the turn that
 produced them. Everything the compiler decides stays with the compiler and stays deferred.
 
-Today `_deferred_validation` in `crew_run.py` answers `{"ok": true, "findings": [],
+Before this ticket `_deferred_validation` in `crew_run.py` answered `{"ok": true, "findings": [],
 "deferredTo": "run.validate"}` for both `validate_scene` and `validate_video_plan`. The
 reasoning written at it is sound and should be preserved: Production is the authority, it
 validates inside a Run, and the Director opens one only after planning, so at the moment the
@@ -69,11 +69,12 @@ Something in the spirit of
 with the existing `subject` retained. An author reading `ok: true` must still be able to see that
 semantic validation has not happened.
 
-**The schemas come from the contract, never from a crew-held copy.** The VideoPlan schema is read
+**The schemas and finding vocabulary come from the contract, never from a crew-held copy.** The VideoPlan schema is read
 out of the `plan` projection the crew already fetches during discovery; `propsSchema` is read out
-of the authoring tier the role already receives. A second copy of either — hand-maintained,
-vendored, or "simplified" — is the failure this ticket must not introduce, and is the reason
-ADR-0019 requires projections to be generated selections rather than summaries.
+of the authoring tier the role already receives; `INVALID_PROPS` and `MALFORMED_PLAN` are resolved
+through the published `checks` projection. A second copy of any of them — hand-maintained, vendored,
+or "simplified" — is the failure this ticket must not introduce, and is the reason ADR-0019
+requires projections to be generated selections rather than summaries.
 
 ## Implementation Decisions
 
@@ -88,19 +89,21 @@ ADR-0019 requires projections to be generated selections rather than summaries.
   draft explicitly rather than to a library default, and a test should assert the draft the
   contract publishes is the draft the crew validates under — the two are edited by different
   people in different languages.
-- **A shape finding is a finding, not an exception.** `ContractViolation` is for a value that
+- **A props-shape finding is a finding, not an exception.** `ContractViolation` is for a value that
   failed its own contract gate; a prop that does not satisfy `propsSchema` is a correctable
-  authoring answer and belongs in `findings` so the author can read it. `_require_green` at the
-  end of `SplitVisualPlanner.plan` should keep raising, because by then the author has had its
-  chance.
+  authoring answer and belongs in `findings` so the author can read it. The bounded repair gate at
+  the end of `SplitVisualPlanner.plan` keeps raising after the author and repair role have spent
+  their chances. The tool first checks the generic SceneInstance shape selected from the published
+  VideoPlan schema, so a missing or malformed identity is a published `MALFORMED_PLAN` finding;
+  an unpublished component is the published `UNKNOWN_CAPABILITY` finding. Malformed published
+  schemas or missing published check definitions remain configuration `ContractViolation`s.
 - **`planRepair` stays out of scope here and gets named as the follow-up.** This ticket makes the
   author's own answer checkable. Wiring a repair role over the `planRepair` projection is a
   separate ticket that this one unblocks, and it should not be smuggled in — a repair loop has a
   budget question attached to it, and budget is `converge`'s subject, not the planner's.
-- **The deferral's docstring is the specification of the boundary and must be updated rather than
-  deleted.** It currently argues that nothing can be checked. It should argue what is checked here
-  and what is not, and keep the sentence about a pre-check that guessed being a second compiler,
-  because that sentence is still the reason semantics stay deferred.
+- **The validator's docstring is the specification of the boundary.** It argues what is checked
+  here and what is not; ADR-0021 records why exact published shape may stop a draft while compiler
+  semantics stay deferred.
 
 ## Testing Decisions
 
@@ -119,14 +122,34 @@ ADR-0019 requires projections to be generated selections rather than summaries.
 **Blocked by:** None. It touches `crew_run.py`, `visual_planner.py` and `pyproject.toml`, and no
 contract, agent instruction, prompt or recorded fixture.
 
-**Status:** open
+**Status:** done
 
-- [ ] `validate_scene` validates a SceneInstance's props against the published `propsSchema`
-- [ ] `validate_video_plan` validates the plan against the `plan` category's published schema
-- [ ] Both keep reporting `deferredTo: run.validate`, and a green shape answer cannot be mistaken for a Production verdict
-- [ ] Both read their schemas out of the published contract, with no crew-held copy of either
-- [ ] The JSON Schema draft the crew validates under is pinned to the one the contract emits, and a test asserts they agree
-- [ ] The validator dependency is pinned with its exercised version as the floor, in the style `google-adk` already uses
-- [ ] `_deferred_validation`'s docstring states what is checked locally and what is not, and keeps the reason semantics stay deferred
-- [ ] A shape failure is a finding the author can read, never a raised `ContractViolation`
-- [ ] The existing assertions that semantic validation is deferred still pass, unedited
+## What was built, and what was decided
+
+`PublishedShapeValidators` explicitly uses `Draft202012Validator` over the schemas Production
+published. A SceneInstance check resolves the named capability through the `sceneAuthor`
+projection and validates only `props`; a VideoPlan check uses the `plan` projection's `schema`.
+No schema or emitted check code is copied into crew source.
+
+Shape failures return the compiler's published `INVALID_PROPS` or `MALFORMED_PLAN` vocabulary together with
+the SceneInstance id where applicable, a JSON Pointer `path`, the refusing schema `keyword`, and
+the validator's message. Green and red reports both say `checked: shape` and retain
+`deferredTo: run.validate`; anchors, duration, capacity, assets, and every other semantic judgment
+remain Production's.
+
+The runtime dependency is `jsonschema>=4.26.0,<5`: 4.26.0 is the version exercised on Python
+3.14.4. The acceptance tracer begins with an invalid `image_context` headline, gives the resulting
+`/props/headline` finding to the existing one-turn Plan Repair Agent, and proves that only the
+corrected plan reaches one Production `init` and one Production `validate`.
+
+Verified by the complete agent suite after review hardening: 543 passed, 1 skipped.
+
+- [x] `validate_scene` validates a SceneInstance's props against the published `propsSchema`
+- [x] `validate_video_plan` validates the plan against the `plan` category's published schema
+- [x] Both keep reporting `deferredTo: run.validate`, and a green shape answer cannot be mistaken for a Production verdict
+- [x] Both read their schemas and emitted finding codes out of the published contract, with no crew-held copy
+- [x] The JSON Schema draft the crew validates under is pinned to the one the contract emits, and a test asserts they agree
+- [x] The validator dependency is pinned with its exercised version as the floor, in the style `google-adk` already uses
+- [x] `PublishedShapeValidators` and ADR-0021 state what is checked locally and what remains deferred
+- [x] Every tool-facing SceneInstance shape failure is a finding the author can read, never a raised `ContractViolation`
+- [x] The existing assertions that semantic validation is deferred still pass, unedited

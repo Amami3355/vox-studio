@@ -32,6 +32,7 @@ from .crew_contract import (
     Rendered,
     ResearchDossier,
     ResearchMode,
+    ResearchTrace,
     TerminalResult,
     UnservableBrief,
     VisualBible,
@@ -64,9 +65,12 @@ class ResearchAdapter(Protocol):
 
     async def research(self, brief: Brief) -> Mapping[str, Any]: ...
 
+    def trace(self) -> ResearchTrace: ...
+
 
 class CreativeAdapter(Protocol):
     mode: ProviderMode
+    repairs_spent: int
 
     async def narrate(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]: ...
 
@@ -85,6 +89,7 @@ class CreativeAdapter(Protocol):
 
 class VisualPlannerAdapter(Protocol):
     mode: ProviderMode
+    repairs_spent: int
 
     async def plan(
         self,
@@ -142,6 +147,8 @@ class ProductionCrew:
                 "policy": policy.to_mapping(),
                 "sequence": 0,
                 "research": None,
+                "researchInquiry": None,
+                "researchPlanningAttempted": False,
                 "narrative": None,
                 "visualBible": None,
                 "videoPlan": None,
@@ -241,6 +248,9 @@ class ProductionCrew:
             )
             try:
                 dossier = ResearchDossier.from_mapping(await self._research.research(brief))
+                research_trace = self._research.trace()
+                if not isinstance(research_trace, ResearchTrace):
+                    raise ContractViolation("Research returned malformed execution evidence.")
             except ContractViolation:
                 yield event(
                     CrewPhase.RESEARCH,
@@ -267,9 +277,17 @@ class ProductionCrew:
                 PhaseStatus.COMPLETED,
                 self._research.mode,
                 "The Research dossier is ready.",
-                counts={"sources": len(dossier.sources), "claims": len(dossier.claims)},
+                counts={
+                    "sources": len(dossier.sources),
+                    "claims": len(dossier.claims),
+                    "questions": len(research_trace.inquiry),
+                },
             )
-            await save(research=dossier.to_mapping())
+            await save(
+                research=dossier.to_mapping(),
+                researchInquiry=list(research_trace.inquiry),
+                researchPlanningAttempted=research_trace.planned,
+            )
             yield completed_research
         elif brief.kind is not BriefKind.FACTUAL and dossier is None:
             dossier = ResearchDossier(
@@ -483,7 +501,7 @@ class ProductionCrew:
                 return
             # What repair cost, from the planner that spent it. A Run that repaired and a Run
             # that did not both end with a plan, and only the count tells them apart.
-            repairs = getattr(self._visual_planner, "repairs_spent", 0)
+            repairs = self._visual_planner.repairs_spent
             if repairs:
                 yield event(
                     CrewPhase.VISUAL_PLANNING,
@@ -559,6 +577,9 @@ class ProductionCrew:
                 produced = await self._production.produce(brief, policy, plan)  # type: ignore[call-arg]
             execution = produced if isinstance(produced, ProductionExecution) else None
             result = execution.terminal if execution is not None else produced
+            image_decisions = (
+                self._image_decision_counts(execution.state) if execution is not None else {}
+            )
             checked = checked_result(result)
         except ContractViolation:
             yield event(
@@ -624,6 +645,7 @@ class ProductionCrew:
                     "candidates": candidate_count,
                     "accepted": accepted_count,
                     "failed": failed_count,
+                    **image_decisions,
                 },
                 artifacts=tuple(
                     job.candidate.artifact for job in execution.jobs if job.candidate is not None
@@ -661,6 +683,27 @@ class ProductionCrew:
         if retrieval_completed is not None:
             yield retrieval_completed
         yield terminal_update
+
+    @staticmethod
+    def _image_decision_counts(state: Mapping[str, Any]) -> dict[str, int]:
+        raw = state.get("imageDecisions", {})
+        if not isinstance(raw, Mapping):
+            raise ContractViolation("Production returned malformed Image Creator decisions.")
+        requested = 0
+        declined = 0
+        for requirement_id, decision in raw.items():
+            if (
+                not isinstance(requirement_id, str)
+                or not isinstance(decision, Mapping)
+                or decision.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
+            ):
+                raise ContractViolation("Production returned malformed Image Creator decisions.")
+            needs_image = decision.get("needsImage")
+            if not isinstance(needs_image, bool):
+                raise ContractViolation("Production returned malformed Image Creator decisions.")
+            requested += int(needs_image)
+            declined += int(not needs_image)
+        return {"requested": requested, "declined": declined}
 
     @staticmethod
     def _authorization_failure(

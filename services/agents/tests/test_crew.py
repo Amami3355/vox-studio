@@ -13,6 +13,7 @@ from vox_crew.crew_contract import (
     OperatorPolicy,
     ProviderMode,
     Rendered,
+    ResearchTrace,
     VisualVocabulary,
 )
 from vox_crew.crew_state import InMemoryCrewStateStore
@@ -102,9 +103,13 @@ class RecordedResearch:
         self.calls += 1
         return DOSSIER
 
+    def trace(self) -> ResearchTrace:
+        return ResearchTrace()
+
 
 class RecordedCreative:
     mode = ProviderMode.RECORDED
+    repairs_spent = 0
 
     def __init__(self, *, narrative: dict[str, Any] = NARRATIVE) -> None:
         self.narrative = narrative
@@ -190,7 +195,7 @@ def test_a_recorded_factual_brief_crosses_the_async_crew_seam_to_a_preview() -> 
         ("artifact_retrieval", "completed"),
     ]
     assert [update.sequence for update in updates] == list(range(1, len(updates) + 1))
-    assert events[1].counts == {"sources": 1, "claims": 1}
+    assert events[1].counts == {"sources": 1, "claims": 1, "questions": 0}
     assert creative.overlapped is True
     assert research.calls == creative.plan_calls == production.calls == 1
     assert isinstance(terminal, CrewTerminal)

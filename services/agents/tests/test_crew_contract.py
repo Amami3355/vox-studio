@@ -18,6 +18,7 @@ from vox_crew.crew_contract import (
     PhaseStatus,
     ProviderMode,
     ResearchDossier,
+    ResearchTrace,
     Rendered,
     UnclassifiedFailure,
     crew_failure,
@@ -25,6 +26,16 @@ from vox_crew.crew_contract import (
     VisualBible,
     VisualVocabulary,
 )
+
+
+def test_research_trace_requires_an_immutable_safe_question_sequence() -> None:
+    assert ResearchTrace(("Which source establishes the date?",), planned=True).planned
+
+    with pytest.raises(ContractViolation, match="immutable"):
+        ResearchTrace(["Which source establishes the date?"])  # type: ignore[arg-type]
+
+    with pytest.raises(ContractViolation, match="repeat"):
+        ResearchTrace(("Which date?", "Which date?"))
 
 
 def test_a_caller_can_validate_the_ordered_progress_and_rendered_terminal_contract() -> None:

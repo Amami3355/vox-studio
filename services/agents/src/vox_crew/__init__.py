@@ -91,6 +91,7 @@ from .crew_contract import (
     ResearchContradiction,
     ResearchDossier,
     ResearchMode,
+    ResearchTrace,
     ResearchSource,
     SourcedClaim,
     SourcedQuotation,
@@ -220,7 +221,9 @@ from .crew_state import (
 from .refusals import Refusal, read_refusal
 from .teaching_surface import DiscoveryRefused, TeachingSurface, read_teaching_surface
 from .visual_planner import (
+    CatalogProjectionRole,
     PublishedCatalog,
+    PublishedShapeValidators,
     SceneAuthor,
     SplitVisualPlanner,
     VisualCatalogTools,
@@ -282,6 +285,7 @@ __all__ = [
     "ProviderMode",
     "Rendered",
     "ResearchAdapter",
+    "ResearchTrace",
     "ResearchContradiction",
     "ResearchDossier",
     "ResearchMode",
@@ -298,7 +302,9 @@ __all__ = [
     "VisualPlannerAdapter",
     "VisualStructurer",
     "VisualVocabulary",
+    "CatalogProjectionRole",
     "PublishedCatalog",
+    "PublishedShapeValidators",
     "SceneAuthor",
     "SplitVisualPlanner",
     "UrllibParallelTransport",

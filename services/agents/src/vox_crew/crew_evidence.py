@@ -15,7 +15,15 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any
 
-from .crew_contract import Brief, CrewEvent, CrewTerminal, OperatorPolicy, Rendered
+from .crew_contract import (
+    DISCLOSURE,
+    Brief,
+    CrewEvent,
+    CrewRole,
+    CrewTerminal,
+    OperatorPolicy,
+    Rendered,
+)
 from .evidence import (
     ASSERTIONS,
     ENVIRONMENT,
@@ -64,10 +72,13 @@ def assemble_crew_evidence(
     ):
         raise ValueError("Crew Production command evidence is malformed.")
 
+    research_inquiry, research_planned = _research_trace(checkpoint)
     state = {
         "schemaVersion": 1,
         "brief": brief.to_mapping(),
         "research": deepcopy(checkpoint.get("research")),
+        "researchInquiry": research_inquiry,
+        "researchPlanningAttempted": research_planned,
         "narrative": deepcopy(checkpoint.get("narrative")),
         "visualBible": deepcopy(checkpoint.get("visualBible")),
         "videoPlan": deepcopy(checkpoint.get("videoPlan")),
@@ -89,7 +100,13 @@ def assemble_crew_evidence(
             )
         },
     }
-    tools = _tool_calls(mappings, command_records, brief.id)
+    tools = _tool_calls(
+        mappings,
+        command_records,
+        brief.id,
+        state,
+        model_mode=policy.models.mode.value,
+    )
     assertions = _assertions(mappings, state, command_records)
     verdict = machine_verdict(assertions)
     timestamp = executed_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -126,6 +143,9 @@ def _tool_calls(
     events: Sequence[Mapping[str, Any]],
     commands: Sequence[Mapping[str, Any]],
     brief_id: str,
+    state: Mapping[str, Any],
+    *,
+    model_mode: str,
 ) -> list[dict[str, Any]]:
     calls: list[dict[str, Any]] = []
     for item in events:
@@ -134,17 +154,63 @@ def _tool_calls(
         phase = item.get("phase")
         if phase not in {"research", "narrative", "art_direction", "visual_planning"}:
             continue
+        role = item.get("role")
+        if phase == "research":
+            inquiry = state.get("researchInquiry")
+            questions = list(inquiry) if isinstance(inquiry, list) else []
+            if state.get("researchPlanningAttempted") is True:
+                calls.append(
+                    {
+                        "role": role,
+                        "tool": "planInquiry",
+                        "providerMode": model_mode,
+                        "safeArguments": {"briefId": brief_id},
+                        "result": {"questionCount": len(questions)},
+                    }
+                )
+            calls.append(
+                {
+                    "role": role,
+                    "tool": "research",
+                    "providerMode": item.get("providerMode"),
+                    "safeArguments": {"briefId": brief_id, "questions": questions},
+                }
+            )
+            continue
+        tool = (
+            "repair"
+            if role == CrewRole.PLAN_REPAIR_AGENT.value
+            else {
+                "narrative": "narrate",
+                "art_direction": "art_direct",
+                "visual_planning": "plan",
+            }[str(phase)]
+        )
         calls.append(
             {
-                "role": item.get("role"),
-                "tool": {
-                    "research": "research",
-                    "narrative": "narrate",
-                    "art_direction": "art_direct",
-                    "visual_planning": "plan",
-                }[str(phase)],
+                "role": role,
+                "tool": tool,
                 "providerMode": item.get("providerMode"),
-                "safeArguments": {"briefId": brief_id},
+                "safeArguments": {
+                    "briefId": brief_id,
+                    **(
+                        {"repairs": item.get("counts", {}).get("repairs")}
+                        if tool == "repair" and isinstance(item.get("counts"), Mapping)
+                        else {}
+                    ),
+                },
+            }
+        )
+
+    production = state.get("production")
+    for requirement_id, decision in _image_decisions(production):
+        calls.append(
+            {
+                "role": decision["role"],
+                "tool": "needsImage",
+                "providerMode": model_mode,
+                "safeArguments": {"requirementId": requirement_id},
+                "result": {"needsImage": decision["needsImage"]},
             }
         )
     calls.extend(
@@ -161,6 +227,45 @@ def _tool_calls(
         for item in commands
     )
     return calls
+
+
+def _research_trace(checkpoint: Mapping[str, Any]) -> tuple[list[str] | None, bool]:
+    inquiry = checkpoint.get("researchInquiry")
+    planned = checkpoint.get("researchPlanningAttempted", False)
+    if not isinstance(planned, bool):
+        raise ValueError("Crew research planning evidence is malformed.")
+    if inquiry is None:
+        return None, planned
+    if not isinstance(inquiry, list) or any(
+        not isinstance(question, str) or not question.strip() for question in inquiry
+    ):
+        raise ValueError("Crew research inquiry evidence is malformed.")
+    if len(inquiry) != len(set(inquiry)):
+        raise ValueError("Crew research inquiry evidence repeats a question.")
+    if any(DISCLOSURE.search(question) for question in inquiry):
+        raise EvidenceLeaked("Crew research inquiry evidence contains a path or secret.")
+    return list(inquiry), planned
+
+
+def _image_decisions(
+    production: Any,
+) -> list[tuple[str, Mapping[str, Any]]]:
+    if not isinstance(production, Mapping):
+        return []
+    decisions = production.get("imageDecisions", {})
+    if not isinstance(decisions, Mapping):
+        raise ValueError("Crew Image Creator decision evidence is malformed.")
+    checked: list[tuple[str, Mapping[str, Any]]] = []
+    for requirement_id, decision in decisions.items():
+        if (
+            not isinstance(requirement_id, str)
+            or not isinstance(decision, Mapping)
+            or decision.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
+            or not isinstance(decision.get("needsImage"), bool)
+        ):
+            raise ValueError("Crew Image Creator decision evidence is malformed.")
+        checked.append((requirement_id, decision))
+    return sorted(checked, key=lambda item: item[0])
 
 
 def _assertions(

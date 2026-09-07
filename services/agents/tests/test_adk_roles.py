@@ -4,8 +4,19 @@ from __future__ import annotations
 
 import asyncio
 
-from vox_crew.adk_roles import AdkCreativeAdapter, AdkJsonRole, AdkSceneAuthor, create_adk_director
+import pytest
+
+from vox_crew.adk_roles import (
+    AdkCreativeAdapter,
+    AdkImageCreator,
+    AdkJsonRole,
+    AdkPlanRepair,
+    AdkSceneAuthor,
+    RoleUnavailable,
+    create_adk_director,
+)
 from vox_crew.crew_contract import Brief, ResearchDossier, VisualVocabulary
+from vox_crew.image_generation import AssetRequirement
 from vox_crew.visual_planner import VisualCatalogTools
 
 
@@ -38,6 +49,26 @@ def test_scene_author_offers_exactly_the_four_catalog_tools() -> None:
     asyncio.run(author.author({"beats": [], "sections": []}, (), tools))
 
     assert seen == ["searchScenes", "getSceneSpec", "validateScene", "validateVideoPlan"]
+
+
+def test_plan_repair_reuses_the_visual_tools_without_acquiring_search() -> None:
+    repair = AdkPlanRepair(model="test-model")
+    seen: list[str] = []
+
+    async def ask(instruction, payload, *, tools=()):
+        seen.extend(tool.__name__ for tool in tools)
+        return {"scenes": []}
+
+    repair.role.ask = ask
+    tools = VisualCatalogTools.__new__(VisualCatalogTools)
+    tools.get_scene_spec = lambda capability_id: {}
+    tools.validate_scene = lambda instance: {"ok": True}
+    tools.validate_video_plan = lambda plan: {"ok": True}
+    refusal = type("Refusal", (), {"findings": ()})()
+
+    asyncio.run(repair.repair({}, refusal, (), tools))
+
+    assert seen == ["getSceneSpec", "validateScene", "validateVideoPlan"]
 
 
 def test_director_is_a_resumable_custom_adk_workflow_with_named_children() -> None:
@@ -114,3 +145,28 @@ def test_the_art_director_payload_carries_the_closed_vocabulary_its_instruction_
     assert payload["visualVocabulary"] == vocabulary.to_mapping()
     assert payload["visualVocabulary"]["motionIntents"] == ["editorialStatic", "pushIn"]
     assert "visualVocabulary" in seen["instruction"]
+
+
+def test_image_creator_degrades_role_failures_but_does_not_swallow_programming_errors() -> None:
+    requirement = AssetRequirement.from_mapping(
+        {
+            "type": "image",
+            "subject": "the last bus",
+            "treatment": "photo",
+            "orientation": "landscape",
+        }
+    )
+
+    async def unavailable(*_args, **_kwargs):
+        raise RoleUnavailable("provider failed")
+
+    creator = AdkImageCreator.__new__(AdkImageCreator)
+    creator.role = type("Role", (), {"ask": unavailable})()
+    assert asyncio.run(creator.needs_image(requirement)) is True
+
+    async def broken(*_args, **_kwargs):
+        raise AssertionError("broken adapter")
+
+    creator.role = type("Role", (), {"ask": broken})()
+    with pytest.raises(AssertionError, match="broken adapter"):
+        asyncio.run(creator.needs_image(requirement))

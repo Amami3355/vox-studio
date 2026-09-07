@@ -70,7 +70,9 @@ implements it; an unreadable answer means *yes*, because a Run that silently ski
 image would produce a film with a hole no finding names.
 
 - **Asked once per requirement per Run.** Only where a requirement has no job yet, and declines
-  are recorded in the checkpoint, so a resumed Run does not spend a model call re-deciding.
+  and approvals are both recorded in the checkpoint, so a resumed Run does not spend a model call
+  re-deciding. The decision reaches crew-state and tool-call evidence, and the phase outcome counts
+  both requested and declined requirements.
 - **Recorded runs do not install it.** A rehearsal that asked a model whether to skip work would
   stop replaying the recording it exists to replay.
 

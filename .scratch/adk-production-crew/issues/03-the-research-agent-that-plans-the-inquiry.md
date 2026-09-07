@@ -78,6 +78,9 @@ loses the framing that produced it.
   values could produce a sourced-looking statement no source made.
 - **A bad plan degrades, it does not fail.** A malformed or failed planning turn falls back to the
   bare Brief — the previous behaviour — rather than costing the Run a phase that has not spent yet.
+- **The inquiry is evidence, not transient role state.** Its safe question list and count reach the
+  crew checkpoint, phase event, and tool-call evidence; the bundle distinguishes planning the
+  inquiry from executing it through the research provider.
 - The agent is installed only when the model roles are live: planning is itself a model call, and
   a run pinning recorded models has said it does not want one.
 

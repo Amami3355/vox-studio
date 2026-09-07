@@ -10,10 +10,10 @@ name = "vox-crew"
 version = "0.1.0"
 description = "The Vox Studio agent crew: drives the Agent production interface from a Brief to a narrated preview."
 requires-python = ">=3.11"
-# The tracer bullet reaches the production boundary with the standard library alone. Adding a
-# dependency here would mean a bare `pytest` run needs a network install, which is exactly the
-# bar the crew's tests are held to.
-dependencies = []
+# JSON Schema shape checks happen before a Run exists, against the draft-2020-12 schemas the
+# Production contract publishes. The floor is the version exercised by the crew and the ceiling
+# excludes the next major, whose validator and error APIs may change. Exercised on Python 3.14.4.
+dependencies = ["jsonschema>=4.26.0,<5"]
 
 [project.optional-dependencies]
 # The ADK framework and the model client, landed with the first agent that thinks (the

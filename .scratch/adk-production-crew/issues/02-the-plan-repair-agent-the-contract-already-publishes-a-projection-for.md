@@ -52,11 +52,11 @@ holding a bill.
 
 ## Blocked by
 
-**Built ahead of 01, which is still open.** The concern below stands and is the first thing
-to re-read when 01 lands: repair currently consumes the refusals the planner's own validators
-produce, and 01 will make those richer. The seam is shaped for that — `PlanRefusal.findings`
-carries whatever the validator returned, so better findings need no change here — but a repair
-turn is only as useful as the evidence it reads, and today that evidence is thin.
+**Built ahead of 01, then rechecked when 01 landed.** The seam held without a repair change:
+`PlanRefusal.findings` carries the local schema report, including its JSON Pointer path and schema
+keyword, through to the repair role. Ticket 01's acceptance tracer begins with a refused
+`/props/headline`, repairs it within the one-turn budget, and proves only the corrected plan reaches
+Production.
 
 The original argument, unchanged:
 
@@ -80,6 +80,9 @@ for a plan that is wrong, not for a Brief that cannot be served.
 `SplitVisualPlanner` validates into `_refusal`, which collects **every** refusal in one pass and
 names the capabilities they implicate; a refused plan then reaches `AdkPlanRepair` with the
 `planRepair` projection of exactly those capabilities. `PLAN_REPAIR_BUDGET = 1`.
+SceneInstance findings implicate their named SceneCapability. A plan-level shape finding names no
+SceneCapability and contributes none; it never widens repair to every capability merely because
+they occur elsewhere in the VideoPlan.
 
 The three open questions, decided:
 

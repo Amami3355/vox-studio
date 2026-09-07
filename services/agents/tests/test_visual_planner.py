@@ -19,7 +19,9 @@ from vox_crew.crew_contract import (
     VisualVocabulary,
 )
 from vox_crew.visual_planner import (
+    CatalogProjectionRole,
     PublishedCatalog,
+    PublishedShapeValidators,
     SplitVisualPlanner,
     VisualCatalogTools,
     trusted_palettes,
@@ -33,6 +35,199 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def catalog_contract() -> dict[str, Any]:
     envelope = json.loads((FIXTURES / "contract-show-catalog.stdout").read_text("utf-8"))
     return envelope["data"]["contract"]
+
+
+def plan_contract() -> dict[str, Any]:
+    envelope = json.loads((FIXTURES / "contract-show-plan.stdout").read_text("utf-8"))
+    return envelope["data"]["contract"]
+
+
+def checks_contract() -> dict[str, Any]:
+    envelope = json.loads((FIXTURES / "contract-show-checks.stdout").read_text("utf-8"))
+    return envelope["data"]["contract"]
+
+
+def published_tools() -> VisualCatalogTools:
+    catalog = PublishedCatalog.from_mapping(catalog_contract())
+    validators = PublishedShapeValidators(catalog, plan_contract(), checks_contract())
+    return VisualCatalogTools(
+        catalog,
+        frozenset({"typographic_statement"}),
+        validators.validate_scene,
+        validators.validate_video_plan,
+    )
+
+
+def test_a_scene_prop_refused_by_the_published_schema_is_an_actionable_finding() -> None:
+    report = published_tools().validate_scene(
+        {
+            "id": "claim",
+            "component": "typographic_statement",
+            "props": {"statement": 42},
+        }
+    )
+
+    assert report["ok"] is False
+    assert report["checked"] == "shape"
+    assert report["deferredTo"] == "run.validate"
+    assert report["subject"] == "sceneInstance"
+    assert report["findings"] == [
+        {
+            "code": "INVALID_PROPS",
+            "sceneId": "claim",
+            "path": "/props/statement",
+            "keyword": "type",
+            "message": "42 is not of type 'string'",
+        }
+    ]
+
+
+def test_a_scene_accepted_by_its_schema_still_defers_semantic_validation() -> None:
+    report = published_tools().validate_scene(
+        {
+            "id": "claim",
+            "component": "typographic_statement",
+            "props": {"statement": "The baselines diverged."},
+        }
+    )
+
+    assert report == {
+        "ok": True,
+        "checked": "shape",
+        "findings": [],
+        "deferredTo": "run.validate",
+        "subject": "sceneInstance",
+    }
+
+
+def test_a_video_plan_missing_a_required_top_level_field_is_an_actionable_finding() -> None:
+    report = published_tools().validate_video_plan(
+        {"beats": [{"id": "b1", "text": "The baselines diverged."}]}
+    )
+
+    assert report["ok"] is False
+    assert report["checked"] == "shape"
+    assert report["deferredTo"] == "run.validate"
+    assert report["subject"] == "videoPlan"
+    assert report["findings"] == [
+        {
+            "code": "MALFORMED_PLAN",
+            "path": "/sections",
+            "keyword": "required",
+            "message": "'sections' is a required property",
+        }
+    ]
+
+
+def test_a_green_video_plan_still_defers_semantic_validation() -> None:
+    report = published_tools().validate_video_plan(
+        {
+            "beats": [{"id": "b1", "text": "The baselines diverged."}],
+            "sections": [
+                {
+                    "id": "opening",
+                    "spansBeats": ["b1"],
+                    "scenes": [
+                        {
+                            "id": "claim",
+                            "component": "typographic_statement",
+                            "props": {"statement": "The baselines diverged."},
+                            "spansBeats": ["b1"],
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert report == {
+        "ok": True,
+        "checked": "shape",
+        "findings": [],
+        "deferredTo": "run.validate",
+        "subject": "videoPlan",
+    }
+
+
+def test_the_validator_draft_is_the_draft_the_contract_publishes() -> None:
+    assert PublishedShapeValidators.draft == plan_contract()["schema"]["$schema"]
+
+
+@pytest.mark.parametrize(
+    ("published_name", "validate", "value"),
+    [
+        (
+            "INVALID_PROPS",
+            "scene",
+            {"id": "claim", "component": "typographic_statement", "props": {"statement": 42}},
+        ),
+        (
+            "MALFORMED_PLAN",
+            "plan",
+            {"beats": [{"id": "b1", "text": "The baselines diverged."}]},
+        ),
+        (
+            "UNKNOWN_CAPABILITY",
+            "scene",
+            {
+                "id": "claim",
+                "component": "invented",
+                "props": {},
+                "spansBeats": ["b1"],
+            },
+        ),
+    ],
+)
+def test_shape_findings_use_the_code_the_checks_contract_publishes(
+    published_name: str, validate: str, value: dict[str, Any]
+) -> None:
+    checks = checks_contract()
+    checks["errors"][published_name]["code"] = f"PUBLISHED_{published_name}"
+    catalog = PublishedCatalog.from_mapping(catalog_contract())
+    validators = PublishedShapeValidators(catalog, plan_contract(), checks)
+
+    report = (
+        validators.validate_scene(value)
+        if validate == "scene"
+        else validators.validate_video_plan(value)
+    )
+
+    assert report["findings"][0]["code"] == f"PUBLISHED_{published_name}"
+
+
+@pytest.mark.parametrize(
+    ("scene", "code", "path"),
+    [
+        ({"id": "claim", "props": {}, "spansBeats": ["b1"]}, "MALFORMED_PLAN", "/component"),
+        (
+            {"component": "typographic_statement", "props": {}, "spansBeats": ["b1"]},
+            "MALFORMED_PLAN",
+            "/id",
+        ),
+        (
+            {"id": 7, "component": "typographic_statement", "props": {}, "spansBeats": ["b1"]},
+            "MALFORMED_PLAN",
+            "/id",
+        ),
+        (
+            {"id": "claim", "component": "invented", "props": {}, "spansBeats": ["b1"]},
+            "UNKNOWN_CAPABILITY",
+            "/component",
+        ),
+    ],
+)
+def test_every_scene_tool_shape_failure_is_a_readable_finding(
+    scene: dict[str, Any], code: str, path: str
+) -> None:
+    validators = PublishedShapeValidators(
+        PublishedCatalog.from_mapping(catalog_contract()), plan_contract(), checks_contract()
+    )
+
+    report = validators.validate_scene(scene)
+
+    assert report["ok"] is False
+    assert report["findings"][0]["code"] == code
+    assert report["findings"][0]["path"] == path
 
 
 def inputs() -> tuple[Brief, ResearchDossier, Narrative, VisualBible]:
@@ -148,12 +343,12 @@ def test_the_contract_tiers_reconstruct_every_capability_by_byte_identical_selec
     contract = catalog_contract()
     catalog = PublishedCatalog.from_mapping(contract)
 
-    compact = catalog.for_role("visualStructurer")
+    compact = catalog.for_role(CatalogProjectionRole.VISUAL_STRUCTURER)
     assert len(compact) == len(contract["capabilities"])
     assert set(compact[0]) == set(contract["capabilityTiers"]["selection"]["fields"])
     assert "propsSchema" not in compact[0]
 
-    full = catalog.for_role("sceneAuthor", ["typographic_statement"])
+    full = catalog.for_role(CatalogProjectionRole.SCENE_AUTHOR, ["typographic_statement"])
     canonical = next(item for item in contract["capabilities"] if item["id"] == "typographic_statement")
     assert full == (canonical,)
 
@@ -444,6 +639,25 @@ def test_a_refused_plan_reaches_repair_with_only_the_implicated_specifications()
     assert refusal.findings[0]["sceneId"] == "claim"
     assert refusal.findings[0]["report"]["errors"] == [{"code": "PROPS_INVALID"}]
     assert plan["sections"][0]["scenes"][0]["props"]["statement"] == "The baselines diverged."
+
+
+def test_a_plan_level_refusal_does_not_invent_implicated_capabilities() -> None:
+    """A VideoPlan finding names no SceneCapability, so ADR-0019 widens the repair to none."""
+    repair = Repair(SceneAuthor().answer)
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer(),
+        SceneAuthor(),
+        validate_scene=green,
+        validate_plan=refuses_once(),
+        repair=repair,
+    )
+
+    asyncio.run(planner.plan(*inputs()))
+
+    assert repair.turns == 1
+    assert repair.refusals[0].capability_ids == ()
+    assert repair.specifications == ()
 
 
 def test_a_green_plan_never_reaches_the_repair_role() -> None:

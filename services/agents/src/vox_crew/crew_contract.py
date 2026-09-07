@@ -99,6 +99,29 @@ class EvidenceSupport(str, Enum):
     CONTRADICTED = "contradicted"
 
 
+@dataclass(frozen=True, slots=True)
+class ResearchTrace:
+    """The safe, provider-neutral question plan used for one research call."""
+
+    inquiry: tuple[str, ...] = ()
+    planned: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.planned, bool):
+            raise ContractViolation("A research trace must say whether planning was attempted.")
+        if not isinstance(self.inquiry, tuple):
+            raise ContractViolation("A research inquiry must be an immutable question sequence.")
+        if len(self.inquiry) != len(set(self.inquiry)):
+            raise ContractViolation("A research inquiry must not repeat questions.")
+        for question in self.inquiry:
+            if not isinstance(question, str) or not question.strip():
+                raise ContractViolation("A research inquiry must contain non-empty questions.")
+            if DISCLOSURE.search(question):
+                raise ContractViolation(
+                    "A research inquiry must not contain credentials, paths, or implementation details."
+                )
+
+
 PHASE_ROLES: dict[CrewPhase, frozenset[CrewRole]] = {
     CrewPhase.RESEARCH: frozenset({CrewRole.RESEARCH_AGENT, CrewRole.DIRECTOR}),
     CrewPhase.NARRATIVE: frozenset({CrewRole.NARRATIVE_AGENT}),

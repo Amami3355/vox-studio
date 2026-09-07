@@ -26,6 +26,7 @@ from .crew_contract import (
     ContractViolation,
     OperatorPolicy,
     ProviderMode,
+    ResearchTrace,
 )
 from .crew_state import CrewStateStore, FileCrewStateStore
 from .image_generation import ImageCandidate
@@ -35,7 +36,13 @@ from .recorded import (
     RecordedResearchAdapter,
 )
 from .teaching_surface import TeachingSurface
-from .visual_planner import PublishedCatalog, SplitVisualPlanner, trusted_palettes, visual_vocabulary
+from .visual_planner import (
+    PublishedCatalog,
+    PublishedShapeValidators,
+    SplitVisualPlanner,
+    trusted_palettes,
+    visual_vocabulary,
+)
 
 CHECKPOINTS = "crew-state"
 """Where a resumable crew keeps its checkpoints, relative to the evidence directory."""
@@ -142,7 +149,9 @@ def build_crew(
     """
     try:
         catalog_contract = surface.contract("catalog")
+        checks_contract = surface.contract("checks")
         design_contract = surface.contract("design")
+        plan_contract = surface.contract("plan")
     except KeyError as unpublished:
         raise CrewNotConfigured(
             f"production published no {unpublished} projection; this crew needs it."
@@ -152,6 +161,7 @@ def build_crew(
         vocabulary = visual_vocabulary(catalog_contract)
         palettes = trusted_palettes(design_contract)
         catalog = PublishedCatalog.from_mapping(catalog_contract)
+        shape_validators = PublishedShapeValidators(catalog, plan_contract, checks_contract)
     except ContractViolation as refused:
         raise CrewNotConfigured(f"the published contract cannot direct a crew: {refused}") from None
 
@@ -222,8 +232,8 @@ def build_crew(
             catalog,
             structurer,
             scene_author,
-            validate_scene=_scene_validator(),
-            validate_plan=_plan_validator(),
+            validate_scene=shape_validators.validate_scene,
+            validate_plan=shape_validators.validate_video_plan,
             mode=ProviderMode.LIVE,
             repair=repair,
         )
@@ -273,45 +283,8 @@ class _NoResearch:
             "A Brief that is not factual is not researched; no provider should have been asked."
         )
 
-
-def _deferred_validation(what: str) -> Mapping[str, Any]:
-    """A pre-check that reports what it did not do, rather than a green it did not earn.
-
-    **Production is the only validator, and it validates inside a Run.** `run.validate` takes a
-    Run, and the Director opens one only after the plan is authored — so at the moment the Visual
-    Planner would like an answer, there is nobody who can give it one. What the planner does hold
-    is the structure it enforces itself: Beats preserved verbatim, only selected capabilities,
-    scenes filled exactly where slots were opened. Those raise where they fail, before this.
-
-    So this reports `ok` and names the authority it deferred to, and a plan the compiler refuses
-    comes back as a refusal terminal from the phase that could actually ask. The alternative — a
-    pre-check that guessed — would be a second compiler, which is the thing the six rules exist to
-    prevent.
-    """
-    return {
-        "ok": True,
-        "findings": [],
-        "deferredTo": "run.validate",
-        "subject": what,
-    }
-
-
-def _scene_validator() -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
-    """One SceneInstance, deferred to the Run the Director opens after planning."""
-
-    def validate(scene: Mapping[str, Any]) -> Mapping[str, Any]:
-        return _deferred_validation("sceneInstance")
-
-    return validate
-
-
-def _plan_validator() -> Callable[[Mapping[str, Any]], Mapping[str, Any]]:
-    """The whole VideoPlan, deferred the same way and refused by Production if it is wrong."""
-
-    def validate(plan: Mapping[str, Any]) -> Mapping[str, Any]:
-        return _deferred_validation("videoPlan")
-
-    return validate
+    def trace(self) -> ResearchTrace:
+        return ResearchTrace()
 
 
 __all__ = [

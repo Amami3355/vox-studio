@@ -19,6 +19,7 @@ from .crew import ProductionExecution
 from .crew_contract import (
     ArtifactHandle,
     Brief,
+    CrewRole,
     Declined,
     Failed,
     Narrative,
@@ -27,6 +28,7 @@ from .crew_contract import (
     ProviderMode,
     Rendered,
     ResearchDossier,
+    ResearchTrace,
     TerminalResult,
     VisualBible,
     VisualVocabulary,
@@ -58,6 +60,9 @@ class RecordedResearchAdapter:
         self.inquiry = tuple(inquiry)
         return deepcopy(self.recording)
 
+    def trace(self) -> ResearchTrace:
+        return ResearchTrace(self.inquiry, planned=bool(self.inquiry))
+
 
 @dataclass(slots=True)
 class RecordedCreativeAdapter:
@@ -68,6 +73,7 @@ class RecordedCreativeAdapter:
     narrative_calls: int = field(default=0, init=False)
     art_direction_calls: int = field(default=0, init=False)
     plan_calls: int = field(default=0, init=False)
+    repairs_spent: int = field(default=0, init=False)
 
     async def narrate(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]:
         self.narrative_calls += 1
@@ -153,16 +159,29 @@ class ClientProductionAdapter:
         """
         if self._image_creator is None:
             return True
-        declined = state.setdefault("declinedRequirements", [])
-        if not isinstance(declined, list):
-            raise MalformedEnvelope("The saved image decline list is malformed.")
-        if requirement.requirement_id in declined:
-            return False
-        if await self._image_creator.needs_image(requirement):
-            return True
-        declined.append(requirement.requirement_id)
-        state["declinedRequirements"] = declined
-        return False
+        decisions = state.setdefault("imageDecisions", {})
+        if not isinstance(decisions, Mapping):
+            raise MalformedEnvelope("The saved Image Creator decisions are malformed.")
+        existing = decisions.get(requirement.requirement_id)
+        if existing is not None:
+            if (
+                not isinstance(existing, Mapping)
+                or existing.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
+                or not isinstance(existing.get("needsImage"), bool)
+            ):
+                raise MalformedEnvelope("A saved Image Creator decision is malformed.")
+            return existing["needsImage"]
+        needed = await self._image_creator.needs_image(requirement)
+        if not isinstance(needed, bool):
+            raise MalformedEnvelope("The Image Creator returned a non-boolean decision.")
+        state["imageDecisions"] = {
+            **decisions,
+            requirement.requirement_id: {
+                "role": CrewRole.IMAGE_CREATOR_AGENT.value,
+                "needsImage": needed,
+            },
+        }
+        return needed
 
     async def decline(
         self, brief: Brief, summary: str, unmet_need: str, catalog_gap: str
