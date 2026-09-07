@@ -19,6 +19,14 @@ from .crew_contract import (
 )
 from .visual_planner import VisualCatalogTools
 
+#: The one model every crew role is pinned to.
+#:
+#: Named once because a bundle has to be able to say which model authored a Run, and a
+#: pin repeated at each role is one an upgrade can move by fours and leave by ones. The
+#: reasoning for pinning an exact name rather than an alias is on `AdkProducer` in
+#: `planner.py`, which reads this constant.
+CREW_MODEL = "gemini-3.6-flash"
+
 
 def _json_answer(text: str, what: str) -> Mapping[str, Any]:
     fenced = re.search(r"```(?:json)?\s*(.+?)```", text, re.DOTALL)
@@ -40,7 +48,7 @@ class AdkJsonRole:
         name: str,
         description: str,
         *,
-        model: str = "gemini-3.6-flash",
+        model: str = CREW_MODEL,
         app_name: str = "vox-production-crew",
         session_service: Any | None = None,
         session_id: str | None = None,
@@ -113,7 +121,7 @@ class AdkCreativeAdapter:
     def __init__(
         self,
         *,
-        model: str = "gemini-3.6-flash",
+        model: str = CREW_MODEL,
         session_service: Any | None = None,
     ) -> None:
         self.narrative_agent = AdkJsonRole(
@@ -164,12 +172,26 @@ class AdkCreativeAdapter:
             },
         )
 
-    async def plan(self, *args: Any, **kwargs: Any) -> Mapping[str, Any]:
+    async def plan(
+        self,
+        brief: Brief,
+        dossier: ResearchDossier,
+        narrative: Narrative,
+        visual_bible: VisualBible,
+    ) -> Mapping[str, Any]:
+        """Refuses the fallback `ProductionCrew` allows, deliberately.
+
+        A crew built without a `visual_planner` uses its creative adapter as one, which is how
+        the recorded adapters plan. For the live roles that fallback would hand one generalist
+        agent the whole catalog — exactly what ADR-0019 supersedes — so this says no instead of
+        quietly doing it. The signature matches `CreativeAdapter.plan` rather than absorbing
+        anything, so a caller that gets here got here the one way it can.
+        """
         raise ContractViolation("Live visual planning requires the role-scoped SplitVisualPlanner.")
 
 
 class AdkVisualStructurer:
-    def __init__(self, *, model: str = "gemini-3.6-flash", session_service: Any | None = None) -> None:
+    def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
         self.role = AdkJsonRole(
             "VisualStructurer",
             "Selects scene capabilities and semantic structure without authoring props.",
@@ -200,7 +222,7 @@ class AdkVisualStructurer:
 
 
 class AdkSceneAuthor:
-    def __init__(self, *, model: str = "gemini-3.6-flash", session_service: Any | None = None) -> None:
+    def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
         self.role = AdkJsonRole(
             "SceneAuthor",
             "Fills existing scene slots from selected full capability specifications.",
@@ -282,6 +304,7 @@ def create_adk_director(
 
 
 __all__ = [
+    "CREW_MODEL",
     "AdkCreativeAdapter",
     "AdkJsonRole",
     "AdkSceneAuthor",

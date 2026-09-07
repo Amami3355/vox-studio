@@ -38,7 +38,7 @@ from .crew_contract import (
     crew_failure,
 )
 from .crew_state import CrewStateStore, InMemoryCrewStateStore
-from .image_generation import ImageJob
+from .image_generation import ImageJob, ImageJobStatus
 
 
 class UnservableBrief(Exception):
@@ -49,6 +49,13 @@ class UnservableBrief(Exception):
         self.summary = summary
         self.unmet_need = unmet_need
         self.catalog_gap = catalog_gap
+
+
+#: Said in two places — the Run that never reached image work, and the Run whose
+#: worklist turned out empty. One string because it is one fact about a Run, and an
+#: operator comparing two Runs should not have to decide whether a wording difference
+#: meant a difference.
+NO_IMAGE_PROVIDER_CALL = "No image-generation provider call was made."
 
 
 @dataclass(frozen=True, slots=True)
@@ -509,7 +516,7 @@ class ProductionCrew:
                 CrewRole.IMAGE_CREATOR_AGENT,
                 PhaseStatus.SKIPPED,
                 policy.images.mode,
-                "No image-generation provider call was made.",
+                NO_IMAGE_PROVIDER_CALL,
                 counts={"providerCalls": 0},
             )
 
@@ -585,8 +592,11 @@ class ProductionCrew:
                 counts={"requirements": execution.requirement_count},
             )
             candidate_count = sum(job.candidate is not None for job in execution.jobs)
-            accepted_count = sum(job.status.value == "accepted" for job in execution.jobs)
-            failed_count = sum(job.status.value in {"failed", "uncertain"} for job in execution.jobs)
+            accepted_count = sum(job.status is ImageJobStatus.ACCEPTED for job in execution.jobs)
+            failed_count = sum(
+                job.status in {ImageJobStatus.FAILED, ImageJobStatus.UNCERTAIN}
+                for job in execution.jobs
+            )
             image_status = (
                 PhaseStatus.PAUSED
                 if isinstance(result, Paused)
@@ -604,7 +614,7 @@ class ProductionCrew:
                     if image_status is PhaseStatus.PAUSED
                     else "Image work reached explicit job outcomes."
                     if execution.jobs
-                    else "No image-generation provider call was made."
+                    else NO_IMAGE_PROVIDER_CALL
                 ),
                 counts={
                     "jobs": len(execution.jobs),

@@ -7,7 +7,7 @@ import type { CompileReport, SceneInstance, SceneMeta } from '../core/types';
  * stays in context permanently, then fills parameters from the full spec of the one
  * capability it picked.
  */
-import { type CatalogEntry, buildCatalog } from './build';
+import { CATALOG_MANIFEST_VERSION, type CatalogEntry, buildCatalog } from './build';
 import { type VideoPlan, validateScene, validateVideoPlan } from './validate';
 
 export type CapabilityIndexEntry = Pick<
@@ -73,6 +73,7 @@ export const validateSceneTool = (instance: SceneInstance): CompileReport =>
 export const validateVideoPlanTool = (plan: VideoPlan): CompileReport => validateVideoPlan(plan);
 
 export { validateScene, validateVideoPlan };
+export { CATALOG_MANIFEST_VERSION };
 export type { VideoPlan };
 
 const STOP_WORDS = new Set([

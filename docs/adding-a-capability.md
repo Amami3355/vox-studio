@@ -232,6 +232,22 @@ bullets, and one of them was already wrong the day it was written — it said "e
 together. That is rule 1 arriving on schedule: a second home for a fact drifts from the
 first, and a checklist that has drifted is worse than one you have to open.
 
+**There is a second gate, in another package, and it fails later than the first.**
+`catalogProjectionMetadata` in `packages/production/src/contracts/generate.ts` throws unless
+*every* capability publishes *every* selection-tier field. The field list is
+`VISUAL_SELECTION_FIELDS` in that file — read it there, and for why the tier exists at all read
+[ADR-0019](adr/0019-the-visual-planner-uses-role-specific-catalog-projections.md).
+
+It matters here because of where it fires. The selection tier is what the Visual Structurer
+chooses from, so a capability that omits one of those fields is not merely under-documented: it
+is invisible to the role that would have picked it, and the contract refuses to generate rather
+than publish a projection with a hole in it. `pnpm catalog` runs the two halves in order — the
+`@vox/video` manifest, then the `@vox/production` contracts — and this gate is in the second, so
+a capability can pass `catalog-contract.test.ts` and the whole unit suite and still stop the
+command in its second half. If `pnpm catalog` or `pnpm catalog:check` fails with *"Every
+capability must publish the selection-tier field"*, the named field is missing from your
+`meta.ts`.
+
 ## Changing a capability that already exists
 
 This is the harder path, not the easy one.

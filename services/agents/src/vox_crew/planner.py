@@ -65,6 +65,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .adk_roles import CREW_MODEL
 from .client import ProductionClient
 from .context import Ask
 from .envelopes import ResultEnvelope
@@ -1226,7 +1227,7 @@ class AdkPlanAuthor(PlanAuthor):
     def __init__(
         self,
         *,
-        model: str = "gemini-3.6-flash",
+        model: str = CREW_MODEL,
         name: str = "producer",
         app_name: str = "vox-crew",
         session_service: Any | None = None,

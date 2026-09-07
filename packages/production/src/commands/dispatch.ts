@@ -151,15 +151,18 @@ export const dispatchProductionArgv = async (
           'run image-start requires --run and --request and accepts --authorisation.',
         );
       }
-      const authorisation = parsed.get('--authorisation');
+      // `authorisation` is the flag's spelling and `authorization` the wire field's, so the
+      // path and the parsed grant differed here by one letter in one scope. Named for what
+      // each one is instead.
+      const grantPath = parsed.get('--authorisation');
       let request: unknown;
-      let authorization: unknown;
+      let grant: unknown;
       try {
         request = JSON.parse(
           await readFile(absolute(cwd, parsed.get('--request') as string), 'utf8'),
         );
-        authorization = authorisation
-          ? JSON.parse(await readFile(absolute(cwd, authorisation), 'utf8'))
+        grant = grantPath
+          ? JSON.parse(await readFile(absolute(cwd, grantPath), 'utf8'))
           : undefined;
       } catch {
         return malformed(
@@ -170,7 +173,7 @@ export const dispatchProductionArgv = async (
       execution = await service.imageStart({
         runRoot: absolute(cwd, parsed.get('--run') as string),
         request,
-        ...(authorisation ? { authorization } : {}),
+        ...(grantPath ? { authorization: grant } : {}),
       });
       break;
     }

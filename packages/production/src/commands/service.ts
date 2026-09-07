@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   type AssetRequirement,
+  CATALOG_MANIFEST_VERSION,
   type CompileReport,
   type CompileResult,
   type CompiledDocument,
@@ -237,53 +238,43 @@ export class ProductionCommandService {
       }
 
       const generator = this.imageGenerator();
+      // Parsed once, in the live branch below, and read again where the spend is recorded.
+      let grant: ReturnType<typeof imageGenerationGrantSchema.parse> | null = null;
       if (generator.mode === 'live') {
         if (input.authorization === undefined) {
+          // One object: the checkpoint's next step and the reply's are the same instruction,
+          // and an operator following one of two drifting copies follows the wrong one.
+          const authorise = [
+            {
+              command: 'run.image.start' as const,
+              args: [
+                '--run',
+                '.',
+                '--request',
+                '<image-request.json>',
+                '--authorisation',
+                '<grant.json>',
+              ],
+              reason: 'A live image call requires an explicit request-bound grant.',
+            },
+          ];
           const next = await store.commit({
             expectedRevision: checkpoint.revision,
             command: 'run.image.start',
             outcome: 'paused',
             data: { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
-            next: [
-              {
-                command: 'run.image.start',
-                args: [
-                  '--run',
-                  '.',
-                  '--request',
-                  '<image-request.json>',
-                  '--authorisation',
-                  '<grant.json>',
-                ],
-                reason: 'A live image call requires an explicit request-bound grant.',
-              },
-            ],
+            next: authorise,
           });
           return this.success(
             'run.image.start',
             next,
             { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
             [],
-            next.bindings.images.jobs.length === 0
-              ? [
-                  {
-                    command: 'run.image.start',
-                    args: [
-                      '--run',
-                      '.',
-                      '--request',
-                      '<image-request.json>',
-                      '--authorisation',
-                      '<grant.json>',
-                    ],
-                    reason: 'A live image call requires an explicit request-bound grant.',
-                  },
-                ]
-              : [],
+            next.bindings.images.jobs.length === 0 ? authorise : [],
             'paused',
           );
         }
-        const grant = imageGenerationGrantSchema.parse(input.authorization);
+        grant = imageGenerationGrantSchema.parse(input.authorization);
         await this.requireImageGrant(grant, checkpoint, request);
       } else if (input.authorization !== undefined) {
         throw new RunStoreError(
@@ -303,10 +294,9 @@ export class ProductionCommandService {
         candidate: null,
         failure: null,
       };
-      const consumedGrantId =
-        generator.mode === 'live'
-          ? imageGenerationGrantSchema.parse(input.authorization).grantId
-          : null;
+      // The grant parsed above, not a second parse of the same input: parsing twice let the
+      // spend check and the record of what was spent disagree about which grant that was.
+      const consumedGrantId = grant?.grantId ?? null;
       checkpoint = await store.commit({
         expectedRevision: checkpoint.revision,
         command: 'run.image.start',
@@ -463,6 +453,14 @@ export class ProductionCommandService {
       }
       await store.readArtifact(job.candidate.artifact);
       const accepted: ImageJob = { ...job, status: 'accepted' };
+      // One object, because the checkpoint and the reply have to name the same next step.
+      const recompile = [
+        {
+          command: 'run.compile' as const,
+          args: ['--run', '.'],
+          reason: 'Recompile to bind the accepted image bytes.',
+        },
+      ];
       const next = await store.commit({
         expectedRevision: checkpoint.revision,
         command: 'run.image.accept',
@@ -473,26 +471,14 @@ export class ProductionCommandService {
           accepted,
         ),
         data: { job: accepted },
-        next: [
-          {
-            command: 'run.compile',
-            args: ['--run', '.'],
-            reason: 'Recompile to bind the accepted image bytes.',
-          },
-        ],
+        next: recompile,
       });
       return this.success(
         'run.image.accept',
         next,
         { job: accepted },
         [job.candidate.artifact],
-        [
-          {
-            command: 'run.compile',
-            args: ['--run', '.'],
-            reason: 'Recompile to bind the accepted image bytes.',
-          },
-        ],
+        recompile,
       );
     });
   }
@@ -559,7 +545,7 @@ export class ProductionCommandService {
       const report = validateVideoPlan(raw as VideoPlan);
       const validationInputSha256 = validationInputIdentity({
         planSha256,
-        catalogManifestVersion: 4,
+        catalogManifestVersion: CATALOG_MANIFEST_VERSION,
         videoPlanContractVersion: 1,
       });
 
@@ -895,7 +881,7 @@ export class ProductionCommandService {
         takeSha256: take.takeSha256,
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
-        catalogManifestVersion: 4,
+        catalogManifestVersion: CATALOG_MANIFEST_VERSION,
         acceptedAssetSetSha256: acceptedAssetSetIdentity(checkpoint.bindings.images.jobs),
       });
       const previous = checkpoint.bindings;
@@ -1064,7 +1050,7 @@ export class ProductionCommandService {
         takeSha256: take.takeSha256,
         beatShapeSha256: take.beatShapeSha256,
         compilerVersion: this.options.compilerVersion ?? '1',
-        catalogManifestVersion: 4,
+        catalogManifestVersion: CATALOG_MANIFEST_VERSION,
         acceptedAssetSetSha256: acceptedAssetSetIdentity(checkpoint.bindings.images.jobs),
       });
       if (compilation.compileInputSha256 !== expectedCompileInputSha256) {
@@ -1589,7 +1575,7 @@ export class ProductionCommandService {
     }
     const validationInputSha256 = validationInputIdentity({
       planSha256: bindings.planBinding.planSha256,
-      catalogManifestVersion: 4,
+      catalogManifestVersion: CATALOG_MANIFEST_VERSION,
       videoPlanContractVersion: 1,
     });
     const expectedValidation = compileReportSchema.parse(validateVideoPlan(plan));

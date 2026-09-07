@@ -79,13 +79,20 @@ export type VisualVocabulary = {
  */
 export type ThemePalettes = Record<string, Record<string, string>>;
 
+/**
+ * Bumped by hand when the shape of the catalog changes, not on every regeneration.
+ *
+ * 5 published `visualVocabulary` and `palettes`.
+ *
+ * It is a named constant rather than a literal at each use because it is not only the
+ * manifest's own field: a compilation's identity is taken over the catalog shape it was
+ * validated against, so every identity site has to move when this moves. A literal per
+ * site made that a change you could half-make, and once was.
+ */
+export const CATALOG_MANIFEST_VERSION = 5;
+
 export type Catalog = {
-  /**
-   * Bumped by hand when the shape of this file changes, not on every regeneration.
-   *
-   * 5 published `visualVocabulary` and `palettes`.
-   */
-  manifestVersion: 5;
+  manifestVersion: typeof CATALOG_MANIFEST_VERSION;
   /**
    * Rule 3's vocabulary, which is not a property of any one capability.
    *
@@ -248,7 +255,7 @@ const buildPalettes = (): ThemePalettes =>
   );
 
 export const buildCatalog = (): Catalog => ({
-  manifestVersion: 5,
+  manifestVersion: CATALOG_MANIFEST_VERSION,
   time: ANCHOR_GRAMMAR,
   checks: COMPILER_CHECKS,
   visualVocabulary: buildVisualVocabulary(),
