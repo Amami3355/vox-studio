@@ -113,6 +113,95 @@ class AdkJsonRole:
         return _json_answer("".join(answered).strip(), self.name)
 
 
+MAX_PLANNED_QUESTIONS = 8
+"""How many questions one inquiry may carry.
+
+A ceiling rather than a target. The Brief still travels with the questions, so a thin plan costs
+nothing; an unbounded one turns a single metered Task Run into a long one, and length is the part
+of a provider's bill the crew controls.
+"""
+
+
+class AdkResearchAgent:
+    """The role half of research: plans the inquiry, then executes it through the tool.
+
+    The spec splits research into an agent and one provider-neutral tool (spec.md:197). The tool
+    owns authentication, request formatting, polling, retry behaviour and Parallel's response
+    shapes; this owns the one editorial decision in the phase — *what to ask* — which US31 wants
+    made by the crew rather than inherited from whatever a vendor decomposes a Brief into.
+
+    It deliberately does **not** interpret the dossier that comes back. The tool validates the
+    provider's answer against the published dossier schema and this returns it unchanged: a model
+    permitted to rewrite claims, sources or support values could produce a sourced-looking
+    statement no source made, which is the one failure the whole dossier contract exists to
+    prevent. Planning the inquiry is the agent's judgement; the evidence is not.
+
+    The no-call path never reaches here: `ProductionCrew.run` decides research is not required
+    from the Brief kind before it touches this adapter, so a fictional or test-data Brief costs
+    zero calls, including zero planning calls.
+    """
+
+    def __init__(
+        self,
+        tool: Any,
+        *,
+        model: str = CREW_MODEL,
+        session_service: Any | None = None,
+    ) -> None:
+        self._tool = tool
+        self.role = AdkJsonRole(
+            "ResearchAgent",
+            "Decides which questions a factual Brief needs answered before research runs.",
+            model=model,
+            session_service=session_service,
+        )
+        #: The last inquiry planned, so evidence can record what was asked and not only answered.
+        self.inquiry: tuple[str, ...] = ()
+
+    @property
+    def mode(self) -> ProviderMode:
+        """The tool's mode, not the agent's.
+
+        Crew code must never branch on which adapter it holds, so the phase's provider mode stays
+        a property of the thing that reaches a provider.
+        """
+        return self._tool.mode
+
+    async def research(self, brief: Brief) -> Mapping[str, Any]:
+        self.inquiry = await self._plan_inquiry(brief)
+        return await self._tool.research(brief, self.inquiry)
+
+    async def _plan_inquiry(self, brief: Brief) -> tuple[str, ...]:
+        """Plan the questions, and treat a failure to plan as a reason to ask the Brief plainly.
+
+        A planning turn that answers badly must not cost the Run its research. The provider
+        accepts a bare Brief perfectly well — that is what it received before this role existed —
+        so a malformed plan degrades to the previous behaviour instead of failing a phase that
+        has not yet spent anything.
+        """
+        try:
+            answer = await self.role.ask(
+                "Return only JSON: {\"questions\": [...]}. Each question must be answerable from "
+                "public sources, must be specific enough that a wrong answer would be visibly "
+                "wrong, and must serve the supplied Brief. Ask for the evidence a short factual "
+                f"explainer needs — figures, dates, named parties, disagreements. At most "
+                f"{MAX_PLANNED_QUESTIONS}. Do not answer them.",
+                {"brief": brief.to_mapping()},
+            )
+        except Exception:
+            return ()
+        if not isinstance(answer, Mapping):
+            return ()
+        questions = answer.get("questions")
+        if not isinstance(questions, Sequence) or isinstance(questions, (str, bytes)):
+            return ()
+        planned: list[str] = []
+        for question in questions:
+            if isinstance(question, str) and question.strip() and question not in planned:
+                planned.append(question.strip())
+        return tuple(planned[:MAX_PLANNED_QUESTIONS])
+
+
 class AdkCreativeAdapter:
     """Independent Narrative and Art Director ADK agents, joined by `ProductionCrew`."""
 
@@ -360,9 +449,11 @@ def create_adk_director(
 
 __all__ = [
     "CREW_MODEL",
+    "MAX_PLANNED_QUESTIONS",
     "AdkCreativeAdapter",
     "AdkJsonRole",
     "AdkPlanRepair",
+    "AdkResearchAgent",
     "AdkSceneAuthor",
     "AdkVisualStructurer",
     "create_adk_director",

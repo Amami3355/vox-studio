@@ -49,8 +49,13 @@ class RecordedResearchAdapter:
     mode: ProviderMode = field(default=ProviderMode.RECORDED, init=False)
     calls: int = field(default=0, init=False)
 
-    async def research(self, brief: Brief) -> Mapping[str, Any]:
+    #: The inquiry the Research Agent planned, kept so a rehearsal can assert what was asked
+    #: without a provider. A recorded run answers the same dossier either way.
+    inquiry: tuple[str, ...] = field(default=(), init=False)
+
+    async def research(self, brief: Brief, inquiry: Sequence[str] = ()) -> Mapping[str, Any]:
         self.calls += 1
+        self.inquiry = tuple(inquiry)
         return deepcopy(self.recording)
 
 

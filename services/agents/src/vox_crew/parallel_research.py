@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -168,14 +168,29 @@ class ParallelResearchAdapter:
         self._key_source = key_source
         self._processor = processor
 
-    async def research(self, brief: Brief) -> Mapping[str, Any]:
+    async def research(
+        self, brief: Brief, inquiry: Sequence[str] = ()
+    ) -> Mapping[str, Any]:
+        """Execute an inquiry. `inquiry` is the Research Agent's plan; empty means the Brief alone.
+
+        The questions are appended to the Brief rather than replacing it. A provider given only
+        the questions loses the editorial framing that decided them, and the dossier comes back
+        answering a decomposition of a Brief nobody sent.
+        """
         if brief.kind is not BriefKind.FACTUAL:
             raise ContractViolation("Parallel research accepts factual Briefs only.")
         api_key = self._key_source()
         if not api_key:
             raise ParallelUnavailable("PARALLEL_API_KEY is required for live research.")
+        questions = tuple(question for question in inquiry if question.strip())
         payload = {
-            "input": brief.text,
+            "input": (
+                brief.text
+                if not questions
+                else brief.text
+                + "\n\nAnswer each of these questions with sourced evidence:\n"
+                + "\n".join(f"- {question}" for question in questions)
+            ),
             "processor": self._processor,
             "task_spec": {
                 "output_schema": {"type": "json", "json_schema": RESEARCH_DOSSIER_SCHEMA}

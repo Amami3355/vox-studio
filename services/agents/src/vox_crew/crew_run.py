@@ -185,6 +185,17 @@ def build_crew(
         from .parallel_research import ParallelResearchAdapter  # noqa: PLC0415
 
         research = ParallelResearchAdapter()
+        if live_models:
+            # The agent half of research. Only when the model roles are live: planning an inquiry
+            # is itself a model call, and a run that asked for live research while pinning
+            # recorded models has said it does not want one.
+            from .adk_roles import AdkResearchAgent  # noqa: PLC0415
+
+            research = (
+                AdkResearchAgent(research)
+                if model is None
+                else AdkResearchAgent(research, model=model)
+            )
     else:
         assert recordings is not None
         research = RecordedResearchAdapter(recordings["researchDossier"])
