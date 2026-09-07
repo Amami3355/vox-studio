@@ -440,6 +440,116 @@ def test_unservable_brief_publishes_decline_without_take_or_image_spend() -> Non
     assert b'run.image.start' not in bundle.files[PRODUCTION_COMMANDS]
 
 
+class Creator:
+    """An Image Creator that answers from a fixed verdict, and records what it was asked."""
+
+    def __init__(self, needs: bool) -> None:
+        self.needs = needs
+        self.asked: list[str] = []
+
+    async def needs_image(self, requirement) -> bool:
+        self.asked.append(requirement.requirement_id)
+        return self.needs
+
+
+def crew_with_creator(client: ProductionClient, creator, state=None) -> ProductionCrew:
+    return ProductionCrew(
+        RecordedResearchAdapter(DOSSIER),
+        RecordedCreativeAdapter(NARRATIVE, BIBLE, PLAN),
+        ClientProductionAdapter(
+            client,
+            REQUEST,
+            recording_mode=ProviderMode.RECORDED,
+            palettes={"editorial-cold": {"ground": "#0d121a", "accent": "#ff5a1f"}},
+            image_decider=lambda candidate: True,
+            image_creator=creator,
+        ),
+        visual_vocabulary=VisualVocabulary(
+            themes=frozenset({"editorial-cold"}),
+            motion_intents=frozenset({"measured"}),
+            color_roles=frozenset({"ground", "accent"}),
+            treatments=frozenset({"documentary", "glossy"}),
+        ),
+        state_store=state,
+    )
+
+
+def test_the_image_creator_is_asked_about_each_requirement_and_can_ask_for_generation() -> None:
+    """spec.md:255 — the agent interprets one bounded task and may request generation."""
+    client = TracerProductionClient()
+    creator = Creator(needs=True)
+
+    updates = collect(crew_with_creator(client, creator))
+
+    assert len(creator.asked) == 1
+    assert client.calls.count("image-start") == 1
+    terminal = updates[-1]
+    assert isinstance(terminal.result, Rendered)
+
+
+def test_a_declined_requirement_spends_nothing_and_still_renders() -> None:
+    """The one judgement the role owns: this placeholder does not need a generated image."""
+    client = TracerProductionClient()
+    creator = Creator(needs=False)
+
+    updates = collect(crew_with_creator(client, creator))
+
+    assert creator.asked  # it was consulted
+    assert client.calls.count("image-start") == 0
+    assert client.calls.count("image-accept") == 0
+    terminal = updates[-1]
+    assert isinstance(terminal.result, Rendered)
+    image_event = next(
+        item
+        for item in updates
+        if getattr(item, "phase", None) and item.phase.value == "image_creation"
+    )
+    assert image_event.counts["jobs"] == 0
+
+
+def test_no_image_creator_generates_for_every_requirement_exactly_as_before() -> None:
+    """The property a recorded rehearsal depends on: the worklist is the work."""
+    client = TracerProductionClient()
+
+    collect(crew(client))
+
+    assert client.calls.count("image-start") == 1
+
+
+def test_a_decline_is_remembered_so_a_resumed_run_does_not_ask_again() -> None:
+    """Re-asking per resume would spend a model call to reach a decision already made.
+
+    Exercised against the adapter's own production state rather than through two whole Runs: a
+    completed Run replays its stored terminal and never re-enters the worklist, so a second
+    `run` would prove nothing about what the checkpoint remembers.
+    """
+    from vox_crew.image_generation import AssetRequirement
+
+    creator = Creator(needs=False)
+    adapter = ClientProductionAdapter(
+        TracerProductionClient(),
+        REQUEST,
+        recording_mode=ProviderMode.RECORDED,
+        image_creator=creator,
+    )
+    requirement = AssetRequirement.from_mapping(
+        {
+            "type": "image",
+            "subject": "the last bus",
+            "treatment": "photo",
+            "orientation": "landscape",
+        }
+    )
+    state: dict[str, Any] = {}
+
+    assert asyncio.run(adapter._wants_image(state, requirement)) is False
+    assert state["declinedRequirements"] == [requirement.requirement_id]
+
+    # The saved decline, replayed: the same state answers without consulting the role again.
+    assert asyncio.run(adapter._wants_image(state, requirement)) is False
+    assert len(creator.asked) == 1
+
+
 def test_a_repaired_plan_reports_what_repair_cost_in_the_crew_events() -> None:
     """A Run that repaired and a Run that did not both end with a plan; the count separates them."""
 

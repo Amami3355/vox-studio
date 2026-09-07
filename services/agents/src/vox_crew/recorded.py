@@ -12,7 +12,7 @@ import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from .client import ProductionClient
 from .crew import ProductionExecution
@@ -92,6 +92,24 @@ class RecordedCreativeAdapter:
         return deepcopy(self.plan_recording)
 
 
+class ImageCreator(Protocol):
+    """The agent half of image creation: one bounded unresolved visual task at a time.
+
+    Its whole authority is the question `needs_image` asks. Everything else the spec assigns
+    elsewhere and this seam deliberately withholds: the worklist is the compiler's
+    `ASSET_PLACEHOLDER` findings and there is no second list (spec.md:252); the prompt is derived
+    deterministically and it may not add style prose (spec.md:258-261); cache, library,
+    placeholder, acceptance and failure decisions "do not belong to a model" (spec.md:250); and
+    identity equivalence is `identityKey`'s to state, "not permission for the generator to guess"
+    (spec.md:263).
+
+    So it is passed one requirement, and answers whether that requirement wants a generated image
+    at all. It never sees the others, and cannot reach a provider.
+    """
+
+    async def needs_image(self, requirement: AssetRequirement) -> bool: ...
+
+
 class ClientProductionAdapter:
     """Async crew adapter over the existing payload-shaped Production client seam."""
 
@@ -106,6 +124,7 @@ class ClientProductionAdapter:
         palettes: Mapping[str, Mapping[str, str]] | None = None,
         image_decider: Callable[[ImageCandidate], bool | Awaitable[bool]] | None = None,
         image_authorisations: Mapping[str, Mapping[str, Any]] | None = None,
+        image_creator: ImageCreator | None = None,
     ) -> None:
         self._client = client
         self._request = deepcopy(request)
@@ -113,12 +132,37 @@ class ClientProductionAdapter:
         self._palettes = deepcopy(palettes or {})
         self._image_decider = image_decider
         self._image_authorisations = deepcopy(image_authorisations or {})
+        self._image_creator = image_creator
 
     def set_image_decider(
         self, decision: Callable[[ImageCandidate], bool | Awaitable[bool]]
     ) -> None:
         """Installs the operator's future decisions; it never decides a candidate itself."""
         self._image_decider = decision
+
+    async def _wants_image(self, state: dict[str, Any], requirement: AssetRequirement) -> bool:
+        """Ask the Image Creator about one requirement, once per Run.
+
+        Asked only where `existing_id is None` — a requirement that already has a job is past
+        this question, and a resumed Run must not re-ask one it has already answered or it would
+        spend a model call per resume to reach a decision it already made. Declines are recorded
+        in the checkpoint for the same reason.
+
+        With no Image Creator installed, every requirement wants an image, which is what the
+        worklist meant before this role existed.
+        """
+        if self._image_creator is None:
+            return True
+        declined = state.setdefault("declinedRequirements", [])
+        if not isinstance(declined, list):
+            raise MalformedEnvelope("The saved image decline list is malformed.")
+        if requirement.requirement_id in declined:
+            return False
+        if await self._image_creator.needs_image(requirement):
+            return True
+        declined.append(requirement.requirement_id)
+        state["declinedRequirements"] = declined
+        return False
 
     async def decline(
         self, brief: Brief, summary: str, unmet_need: str, catalog_gap: str
@@ -258,6 +302,8 @@ class ClientProductionAdapter:
                 self._palettes,
             )
             existing_id = job_ids.get(requirement_id)
+            if existing_id is None and not await self._wants_image(state, requirement):
+                continue
             if existing_id is None:
                 authorisation = (
                     self._image_authorisations.get(policy.images.grant_id)

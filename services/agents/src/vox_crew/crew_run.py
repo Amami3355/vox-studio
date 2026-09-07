@@ -203,6 +203,7 @@ def build_crew(
     if live_models:
         from .adk_roles import (  # noqa: PLC0415
             AdkCreativeAdapter,
+            AdkImageCreator,
             AdkPlanRepair,
             AdkSceneAuthor,
             AdkVisualStructurer,
@@ -214,6 +215,9 @@ def build_crew(
         structurer = AdkVisualStructurer() if model is None else AdkVisualStructurer(model=model)
         scene_author = AdkSceneAuthor() if model is None else AdkSceneAuthor(model=model)
         repair = AdkPlanRepair() if model is None else AdkPlanRepair(model=model)
+        image_creator: Any = (
+            AdkImageCreator() if model is None else AdkImageCreator(model=model)
+        )
         planner: Any = SplitVisualPlanner(
             catalog,
             structurer,
@@ -229,6 +233,10 @@ def build_crew(
             recordings["narrative"], recordings["visualBible"], recordings["videoPlan"]
         )
         planner = creative
+        # A recorded Run generates for every requirement in the worklist, as it always has. The
+        # Image Creator is a model call, and a rehearsal that asked one whether to skip work would
+        # stop replaying the recording it exists to replay.
+        image_creator = None
 
     return ProductionCrew(
         research,
@@ -239,6 +247,7 @@ def build_crew(
             recording_mode=policy.recording.mode,
             palettes=palettes,
             image_decider=image_decider,
+            image_creator=image_creator,
         ),
         visual_vocabulary=vocabulary,
         visual_planner=planner,

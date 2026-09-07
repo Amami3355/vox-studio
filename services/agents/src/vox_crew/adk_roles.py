@@ -405,6 +405,57 @@ class AdkPlanRepair:
         )
 
 
+class AdkImageCreator:
+    """Interprets one unresolved visual task and answers whether it wants a generated image.
+
+    This is the whole of the role, and the narrowness is the design rather than a first cut — the
+    reasoning is on the `ImageCreator` protocol in `recorded.py`. What is left to a model here is
+    one judgement: a placeholder can be a genuine editorial need for an image, or it can be
+    something a scene will carry perfectly well without one, and generating for the second spends
+    money to make a film slightly worse.
+
+    It answers about one requirement, sees no other, derives no prompt and reaches no provider.
+    An unreadable answer means yes: the safe direction is the behaviour the worklist had before
+    this role existed, because a Run that silently skipped a needed image would produce a film
+    with a hole in it that no finding names.
+    """
+
+    def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
+        self.role = AdkJsonRole(
+            "ImageCreatorAgent",
+            "Judges whether one unresolved visual requirement needs a generated image.",
+            model=model,
+            session_service=session_service,
+        )
+        #: Every decision made, so a bundle can show what was skipped and not only what was made.
+        self.decisions: list[dict[str, Any]] = []
+
+    async def needs_image(self, requirement: Any) -> bool:
+        try:
+            answer = await self.role.ask(
+                "Return only JSON: {\"needsImage\": true|false, \"reason\": \"...\"}. The supplied "
+                "requirement is one unresolved visual slot in a factual explainer. Answer false "
+                "only when the scene reads at least as well without a generated image — a decorative "
+                "backdrop, a subject a caption already carries, an abstraction a photograph would "
+                "misrepresent. Answer true whenever the slot carries information. Do not write a "
+                "prompt, describe an image, or judge any other requirement.",
+                {"assetRequirement": requirement.to_mapping()},
+            )
+        except Exception:
+            return True
+        needed = True if not isinstance(answer, Mapping) else answer.get("needsImage") is not False
+        self.decisions.append(
+            {
+                "requirementId": requirement.requirement_id,
+                "needsImage": needed,
+                "reason": (
+                    str(answer.get("reason", ""))[:200] if isinstance(answer, Mapping) else ""
+                ),
+            }
+        )
+        return needed
+
+
 def create_adk_director(
     crew: Any,
     *,
@@ -451,6 +502,7 @@ __all__ = [
     "CREW_MODEL",
     "MAX_PLANNED_QUESTIONS",
     "AdkCreativeAdapter",
+    "AdkImageCreator",
     "AdkJsonRole",
     "AdkPlanRepair",
     "AdkResearchAgent",
