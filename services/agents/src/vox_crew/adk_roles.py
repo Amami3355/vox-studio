@@ -210,7 +210,10 @@ class AdkVisualStructurer:
         return await self.role.ask(
             "Return only visual-structure JSON. Preserve Narrative Beats verbatim. Select only "
             "published component IDs and write section/scene ids and spansBeats. Scene objects "
-            "must contain exactly id, component, spansBeats; never write props.",
+            "must contain exactly id, component, spansBeats; never write props. If no published "
+            "component can honestly carry the story, do not substitute a loose fit and do not "
+            "name an unpublished component: answer instead with a single unservable object "
+            "holding summary, unmetNeed and catalogGap, and nothing else.",
             {
                 "brief": brief.to_mapping(),
                 "researchDossier": dossier.to_mapping(),

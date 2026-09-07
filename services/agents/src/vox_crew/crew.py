@@ -33,22 +33,13 @@ from .crew_contract import (
     ResearchDossier,
     ResearchMode,
     TerminalResult,
+    UnservableBrief,
     VisualBible,
     VisualVocabulary,
     crew_failure,
 )
 from .crew_state import CrewStateStore, InMemoryCrewStateStore
 from .image_generation import ImageJob, ImageJobStatus
-
-
-class UnservableBrief(Exception):
-    """The catalog cannot truthfully express an editorial need."""
-
-    def __init__(self, summary: str, unmet_need: str, catalog_gap: str) -> None:
-        super().__init__(summary)
-        self.summary = summary
-        self.unmet_need = unmet_need
-        self.catalog_gap = catalog_gap
 
 
 #: Said in two places — the Run that never reached image work, and the Run whose

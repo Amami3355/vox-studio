@@ -14,6 +14,7 @@ from vox_crew.crew_contract import (
     ContractViolation,
     Narrative,
     ResearchDossier,
+    UnservableBrief,
     VisualBible,
     VisualVocabulary,
 )
@@ -302,3 +303,80 @@ def test_a_palette_that_is_not_one_is_refused(damage: dict[str, Any], expected: 
     """A composed prompt is only deterministic if what it composes against is exact."""
     with pytest.raises(ContractViolation, match=expected):
         trusted_palettes(damage)
+
+
+def test_a_structurer_with_no_honest_capability_raises_a_refusal_not_a_contract_violation() -> None:
+    """US51: a missing suitable SceneCapability becomes a finding, so US19's Decline is reachable.
+
+    The distinction is the whole point. `ContractViolation` ends the Run `failed`; `UnservableBrief`
+    is what `ProductionCrew.run` catches to publish a structured Decline. Before the finding
+    existed, a role that could not serve the Brief had no way to say so that was not a malformed
+    answer, and an honest refusal arrived as a defect.
+    """
+    structurer = Structurer(
+        {
+            "unservable": {
+                "summary": "The catalog cannot show the required geographic route.",
+                "unmetNeed": "A geographic route across three cities",
+                "catalogGap": "No published SceneCapability represents a map.",
+            }
+        }
+    )
+    author = SceneAuthor()
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        structurer,
+        author,
+        validate_scene=green,
+        validate_plan=green,
+    )
+
+    with pytest.raises(UnservableBrief) as refusal:
+        asyncio.run(planner.plan(*inputs()))
+
+    assert refusal.value.unmet_need == "A geographic route across three cities"
+    assert refusal.value.catalog_gap == "No published SceneCapability represents a map."
+    # The refusal stops the crew before it pays the Scene Author for a plan it just refused.
+    assert author.specifications == ()
+
+
+def test_a_refusal_is_read_as_strictly_as_a_structure() -> None:
+    """A finding is a published shape, not free text: an under-filled one is still a violation."""
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer({"unservable": {"summary": "No map.", "unmetNeed": "A route"}}),
+        SceneAuthor(),
+        validate_scene=green,
+        validate_plan=green,
+    )
+
+    with pytest.raises(ContractViolation, match="catalogGap"):
+        asyncio.run(planner.plan(*inputs()))
+
+
+def test_naming_an_unpublished_capability_stays_a_violation_and_never_widens_the_projection() -> None:
+    """ADR-0019: an unavailable selection is a finding, not permission to widen the role's view.
+
+    So the refusal above is the way to say it, and inventing an id remains what it always was.
+    """
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer(
+            {
+                "beats": [{"id": "b1", "text": "The baselines diverged."}],
+                "sections": [
+                    {
+                        "id": "opening",
+                        "spansBeats": ["b1"],
+                        "scenes": [{"id": "claim", "component": "map_route", "spansBeats": ["b1"]}],
+                    }
+                ],
+            }
+        ),
+        SceneAuthor(),
+        validate_scene=green,
+        validate_plan=green,
+    )
+
+    with pytest.raises(ContractViolation, match="map_route"):
+        asyncio.run(planner.plan(*inputs()))

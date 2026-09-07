@@ -19,6 +19,7 @@ from .crew_contract import (
     Narrative,
     ProviderMode,
     ResearchDossier,
+    UnservableBrief,
     VisualBible,
     VisualVocabulary,
 )
@@ -353,9 +354,38 @@ class SplitVisualPlanner:
         _require_green(tools.validate_video_plan(plan), "VideoPlan")
         return plan
 
+    @staticmethod
+    def _refuse_if_unservable(value: Any) -> None:
+        """The Structurer's third answer: no published capability serves the need.
+
+        ADR-0019 requires an unavailable selection to become a finding rather than
+        permission to widen the role's view, and the spec asks for "a missing suitable
+        SceneCapability to become a finding" (US51) so the Run can Decline (US19). Without
+        this the only way to say it was an invented capability id, which the projection
+        rejects as a ContractViolation — turning an honest refusal into a failed Run.
+
+        Read strictly, and before the Beats are checked: a role refusing the whole Brief
+        has no sections to preserve them in, and demanding a well-formed structure
+        alongside the refusal would ask it to author the thing it just said it cannot.
+        """
+        if value is None:
+            return
+        finding = _object(value, "visual structure.unservable")
+        _strict(
+            finding,
+            {"summary", "unmetNeed", "catalogGap"},
+            "visual structure.unservable",
+        )
+        raise UnservableBrief(
+            _name(finding.get("summary"), "visual structure.unservable.summary"),
+            _name(finding.get("unmetNeed"), "visual structure.unservable.unmetNeed"),
+            _name(finding.get("catalogGap"), "visual structure.unservable.catalogGap"),
+        )
+
     def _structure(self, value: Mapping[str, Any], narrative: Narrative) -> JsonObject:
         value = _object(value, "visual structure")
-        _strict(value, {"beats", "sections"}, "visual structure")
+        _strict(value, {"beats", "sections", "unservable"}, "visual structure")
+        self._refuse_if_unservable(value.get("unservable"))
         expected_beats = [{"id": beat.id, "text": beat.text} for beat in narrative.beats]
         if value.get("beats") != expected_beats:
             raise ContractViolation("Visual structure must preserve Narrative Beats verbatim.")

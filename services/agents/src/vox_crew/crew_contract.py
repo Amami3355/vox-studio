@@ -28,6 +28,23 @@ class ContractViolation(ValueError):
     """An untrusted value does not satisfy the crew's published contract."""
 
 
+class UnservableBrief(Exception):
+    """The catalog cannot truthfully express an editorial need.
+
+    Not a ContractViolation. A role that says "nothing published serves this" has obeyed its
+    contract, and the Run's honest end is a Decline rather than a failure — CONTEXT.md is
+    explicit that refusing an unservable Brief is correct production behaviour. It lives here
+    rather than beside the state machine because the roles that raise it may not import the
+    orchestrator that catches it.
+    """
+
+    def __init__(self, summary: str, unmet_need: str, catalog_gap: str) -> None:
+        super().__init__(summary)
+        self.summary = summary
+        self.unmet_need = unmet_need
+        self.catalog_gap = catalog_gap
+
+
 class BriefKind(str, Enum):
     FACTUAL = "factual"
     FICTIONAL = "fictional"
