@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import os
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -245,56 +244,15 @@ class RecordedImageAdapter:
         return GeneratedImage(bytes(self.image_bytes), self.media_type)
 
 
-class GoogleImagenAdapter:
-    """Live Google Gen AI adapter. Provider names and response types stop at this boundary."""
-
-    mode = ProviderMode.LIVE
-
-    def __init__(
-        self,
-        *,
-        key_source: Callable[[], str | None] = lambda: os.environ.get("GOOGLE_API_KEY"),
-        client_factory: Callable[..., Any] | None = None,
-        model: str = "imagen-3.0-generate-002",
-    ) -> None:
-        self._key_source = key_source
-        self._client_factory = client_factory
-        self._model = model
-        self.calls = 0
-
-    async def generate(self, request: GenerationRequest) -> GeneratedImage:
-        key = self._key_source()
-        if not key:
-            raise ContractViolation("GOOGLE_API_KEY is required for live image generation.")
-        from google import genai  # noqa: PLC0415
-        from google.genai import types  # noqa: PLC0415
-
-        factory = self._client_factory or genai.Client
-        client = factory(api_key=key)
-        self.calls += 1
-        try:
-            response = await client.aio.models.generate_images(
-                model=self._model,
-                prompt=request.prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    include_rai_reason=True,
-                    output_mime_type=request.output_mime_type,
-                    aspect_ratio=request.aspect_ratio,
-                    seed=request.seed,
-                ),
-            )
-            images = getattr(response, "generated_images", None)
-            if not isinstance(images, Sequence) or len(images) != 1:
-                raise ContractViolation("The image provider returned no single candidate.")
-            image = getattr(images[0], "image", None)
-            data = getattr(image, "image_bytes", None)
-            media_type = getattr(image, "mime_type", None)
-            if not isinstance(data, bytes) or not isinstance(media_type, str):
-                raise ContractViolation("The image provider returned malformed candidate bytes.")
-            return GeneratedImage(data, media_type)
-        finally:
-            client.close()
+#: There is deliberately no live image adapter on this side of the seam.
+#:
+#: ADR-0007: the Production service alone owns credentials, and only its `record` operation
+#: may use outbound network or quota. A `GoogleImagenAdapter` lived here, read `GOOGLE_API_KEY`
+#: and called the provider from inside the agent-readable environment. Nothing constructed it
+#: outside its own test — `ProductionCrew` reaches image generation through
+#: `ProductionAdapter.produce` — so it bought nothing and stood ready to break the isolation
+#: guarantee the architecture rests on. The live call lives in `packages/production/src/image/
+#: google.ts`, which is also where its model pin belongs.
 
 
 class ImageJobStatus(str, Enum):
@@ -593,7 +551,10 @@ class ImageJobCoordinator:
             generated = await self._adapter.generate(request)
             width, height = _image_dimensions(generated.bytes, generated.media_type)
             digest = hashlib.sha256(generated.bytes).hexdigest()
-            candidate_id = "image-candidate:" + digest[:20]
+            # Separator and digest length match the Production service, which is the
+            # authority for a candidate id (`service.ts`, `image-candidate-${sha.slice(0, 20)}`).
+            # A colon here minted ids no Run could ever contain.
+            candidate_id = "image-candidate-" + digest[:20]
             candidate = ImageCandidate(
                 id=candidate_id,
                 identity_key=requirement.identity,
@@ -676,7 +637,6 @@ __all__ = [
     "AssetRequirement",
     "GeneratedImage",
     "GenerationRequest",
-    "GoogleImagenAdapter",
     "ImageCandidate",
     "ImageGenerationAdapter",
     "ImageGrant",

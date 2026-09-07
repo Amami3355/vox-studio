@@ -6,7 +6,6 @@ import asyncio
 import base64
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -14,7 +13,6 @@ import pytest
 from vox_crew.crew_contract import OperatorPolicy, ProviderMode, VisualBible, VisualVocabulary
 from vox_crew.image_generation import (
     AssetRequirement,
-    GoogleImagenAdapter,
     ImageGrant,
     ImageGrantLedger,
     ImageJobCoordinator,
@@ -116,61 +114,11 @@ def test_recorded_generation_returns_a_candidate_then_accepts_only_its_exact_dig
         ImageJob.from_mapping({**accepted.to_mapping(), "providerRunId": "private"})
 
 
-class FakeModels:
-    def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
-
-    async def generate_images(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        image = SimpleNamespace(image_bytes=PNG, mime_type="image/png")
-        return SimpleNamespace(generated_images=[SimpleNamespace(image=image)])
-
-
-class FakeClient:
-    def __init__(self, models: FakeModels) -> None:
-        self.aio = SimpleNamespace(models=models)
-        self.closed = False
-
-    def close(self) -> None:
-        self.closed = True
-
-
-def test_live_and_recorded_adapters_cross_the_same_candidate_contract() -> None:
-    models = FakeModels()
-    clients: list[FakeClient] = []
-
-    def factory(*, api_key: str) -> FakeClient:
-        assert api_key == "google-test-key"
-        client = FakeClient(models)
-        clients.append(client)
-        return client
-
-    live = GoogleImagenAdapter(key_source=lambda: "google-test-key", client_factory=factory)
-    recorded = RecordedImageAdapter(PNG, "image/png")
-    request = derive_generation_request(requirement(), "16:9", bible(), PALETTE)
-    now = datetime(2026, 9, 6, tzinfo=UTC)
-    grant = ImageGrant("image-grant-1", request.request_sha256, now + timedelta(minutes=5))
-
-    live_job = asyncio.run(
-        ImageJobCoordinator(
-            live,
-            InMemoryImageJobStore(),
-            grants=ImageGrantLedger([grant], now=lambda: now),
-        ).start(requirement(), request, policy("live", "image-grant-1").images)
-    )
-    recorded_job = asyncio.run(
-        ImageJobCoordinator(recorded, InMemoryImageJobStore()).start(
-            requirement(), request, policy("recorded").images
-        )
-    )
-
-    assert set(live_job.to_mapping()) == set(recorded_job.to_mapping())
-    assert live_job.provider_mode is ProviderMode.LIVE
-    assert recorded_job.provider_mode is ProviderMode.RECORDED
-    assert models.calls[0]["prompt"] == request.prompt
-    assert models.calls[0]["config"].number_of_images == 1
-    assert models.calls[0]["config"].aspect_ratio == "16:9"
-    assert clients[0].closed is True
+# The live-versus-recorded candidate-contract test that stood here went with
+# `GoogleImagenAdapter`. ADR-0007 puts the provider call and its credentials on the Production
+# service, so the two adapters it compared no longer live on the same side of the seam; the
+# live half is covered by `packages/production/tests/google-image.test.ts`. What remains below
+# is the half that is still this side's to keep: the coordinator's fail-closed spend rules.
 
 
 @pytest.mark.parametrize("case", ["missing", "expired", "mismatched", "consumed"])
