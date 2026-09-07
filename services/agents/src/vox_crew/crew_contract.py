@@ -9,7 +9,7 @@ instances therefore represent values that have already crossed their owning sche
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -78,6 +78,34 @@ class CrewRole(str, Enum):
     PLAN_REPAIR_AGENT = "plan_repair_agent"
     ASSET_RESOLVER = "asset_resolver"
     IMAGE_CREATOR_AGENT = "image_creator_agent"
+
+
+def read_image_decisions(
+    value: Any, malformed: Callable[[str], Exception], what: str
+) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    """Every saved Image Creator decision in `value`, in requirement-id order.
+
+    One reader because the checkpoint, the crew's counts and the evidence bundle each read the
+    same `imageDecisions` map and each has to agree about what a well-formed entry is. Three
+    hand-written copies of the shape drift apart on the first field added to a decision, and the
+    one that drifts is the one that stops noticing a malformed entry.
+
+    The caller supplies its own exception: this is an envelope fault in the checkpoint, a
+    contract fault when Production returns it, and an evidence fault in a bundle.
+    """
+    if not isinstance(value, Mapping):
+        raise malformed(what)
+    decisions: list[tuple[str, Mapping[str, Any]]] = []
+    for requirement_id, decision in value.items():
+        if (
+            not isinstance(requirement_id, str)
+            or not isinstance(decision, Mapping)
+            or decision.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
+            or not isinstance(decision.get("needsImage"), bool)
+        ):
+            raise malformed(what)
+        decisions.append((requirement_id, decision))
+    return tuple(sorted(decisions, key=lambda item: item[0]))
 
 
 class PhaseStatus(str, Enum):

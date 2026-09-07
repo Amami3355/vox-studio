@@ -21,6 +21,16 @@ acceptance was also rejected: anchors, durations, regions, capacities, assets, a
 semantic checks still belong to Production. If local and Production shape evaluation ever
 disagree, Production's refusal wins and the mismatch is a contract-compatibility defect.
 
+**"Makes no rule the interface did not publish" is the clause that is easiest to lose.** The
+first implementation of `validateScene` selected three property subschemas out of the published
+SceneInstance schema and then wrote its own `required` and `additionalProperties` around them.
+Selecting is what ADR-0019 asks for; authoring the constraints around the selection is a second
+copy, and because a hand-written copy is written to be permissive, it was *weaker* than the
+schema it came from — a scene Production refuses read green locally, which is the failure this
+decision exists to prevent, arriving by the door marked "projection". The scene check now uses
+the published SceneInstance subschema as published. A projection of a schema may narrow *which*
+schema is evaluated; it may not restate what that schema requires.
+
 This decision also deliberately replaces the crew's zero-runtime-dependency constraint.
 Implementing even a partial JSON Schema evaluator locally would create the second compiler this
 decision avoids, so the crew takes `jsonschema` as a bounded runtime dependency instead. Its

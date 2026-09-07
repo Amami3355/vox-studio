@@ -68,6 +68,24 @@ def _purpose_digest(purpose: str, value: Mapping[str, Any]) -> str:
     return _canonical_digest({"protocolVersion": 1, "purpose": purpose, "value": value})
 
 
+class ImageCreator(Protocol):
+    """The agent half of image creation: one bounded unresolved visual task at a time.
+
+    Its whole authority is the question `needs_image` asks. Everything else the spec assigns
+    elsewhere and this seam deliberately withholds: the worklist is the compiler's
+    `ASSET_PLACEHOLDER` findings and there is no second list (spec.md:252); the prompt is derived
+    deterministically and it may not add style prose (spec.md:258-261); cache, library,
+    placeholder, acceptance and failure decisions "do not belong to a model" (spec.md:250); and
+    identity equivalence is `identityKey`'s to state, "not permission for the generator to guess"
+    (spec.md:263).
+
+    So it is passed one requirement, and answers whether that requirement wants a generated image
+    at all. It never sees the others, and cannot reach a provider.
+    """
+
+    async def needs_image(self, requirement: AssetRequirement) -> bool: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AssetRequirement:
     type: str

@@ -108,3 +108,27 @@ one is raised, not after.
 - [x] No path can loop without consuming budget
 - [x] Repair tests begin from a structured refusal, per spec.md:346
 - [x] The crew's "every ContractViolation is terminal" property is either preserved or its replacement is stated as deliberately as the original was
+
+## Comments
+
+**2026-09-07 — the projection was right and the second door onto it was open.**
+
+*"It receives the planRepair projection — the implicated capabilities' full specifications, and no
+others."* The payload was correct. The tools were not: `AdkPlanRepair` was handed the Scene
+Author's `VisualCatalogTools`, whose `getSceneSpec` is fail-closed to every capability the
+Structurer selected. A repair could therefore read a non-implicated specification by asking for it
+by name — the projection scoped the payload and the tool ignored it. `VisualCatalogTools` now has
+`restricted_to`, and the repair turn is given tools narrowed to `refusal.capability_ids`.
+
+*"The repair role receives the refused plan, structured findings, published check meanings, and
+the full specifications."* The payload carried `plan`, `findings` and `specifications`; the
+meanings were missing, so the role saw `INVALID_PROPS` and had to know what that meant. The
+`checks` projection publishes `means` and `repair` text for each code. `PublishedShapeValidators`
+now resolves them (`meanings_for`), `PlanRefusal` carries them, and the payload has
+`checkMeanings`.
+
+*"Accepted structure is retained where possible."* This was ticked with nothing enforcing it. The
+instruction asked for it, and an instruction is not a guarantee — `_assemble` accepted a wholesale
+re-fill of every scene, including scenes no finding named, which spends the one repair turn
+discarding authoring work that was already right. `_retaining` now restores every scene the
+refusal did not name, and `test_repair_retains_the_scenes_no_finding_named` holds it.

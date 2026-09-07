@@ -3,6 +3,14 @@
 Authentication, endpoints, blocking result retrieval and provider response shapes stop here.  The
 Director receives only a schema-validated ``ResearchDossier`` mapping.  No call is retried: a lost
 create response may already represent metered work and must be reconciled by an operator.
+
+**Why this provider call is crew-side and the image one is not.** ADR-0007 puts production
+source, runtimes, dependencies and credentials in the Production service, and that is why the
+agent-side image adapter was deleted: a generated image is a Run artifact, produced by the
+compiler's own asset loop and requested through published Production commands. Research is not
+production. Its product is a dossier the crew reads before a Run exists — there is no Run to own
+it, and Production publishes no research command to request it through. The credential here is
+the crew's own provider credential for its own phase, and it never reaches a Run.
 """
 
 from __future__ import annotations

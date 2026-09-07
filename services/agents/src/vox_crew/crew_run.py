@@ -201,11 +201,7 @@ def build_crew(
             # recorded models has said it does not want one.
             from .adk_roles import AdkResearchAgent  # noqa: PLC0415
 
-            research = (
-                AdkResearchAgent(research)
-                if model is None
-                else AdkResearchAgent(research, model=model)
-            )
+            research = AdkResearchAgent(research, **({} if model is None else {"model": model}))
     else:
         assert recordings is not None
         research = RecordedResearchAdapter(recordings["researchDossier"])
@@ -219,14 +215,22 @@ def build_crew(
             AdkVisualStructurer,
         )
 
-        creative: Any = (
-            AdkCreativeAdapter() if model is None else AdkCreativeAdapter(model=model)
-        )
-        structurer = AdkVisualStructurer() if model is None else AdkVisualStructurer(model=model)
-        scene_author = AdkSceneAuthor() if model is None else AdkSceneAuthor(model=model)
-        repair = AdkPlanRepair() if model is None else AdkPlanRepair(model=model)
+        # One place decides what an unset `--model` means, so a role added later cannot pick a
+        # different default by writing the conditional a sixth time.
+        pinned = {} if model is None else {"model": model}
+        creative: Any = AdkCreativeAdapter(**pinned)
+        structurer = AdkVisualStructurer(**pinned)
+        scene_author = AdkSceneAuthor(**pinned)
+        repair = AdkPlanRepair(**pinned)
+        # Two operator fields name this role's authority, and both have to allow it.
+        #
+        # `policy.models` because asking is a model call, like every other role here.
+        # `policy.images` because what it decides is image spend: a decline is a generation the
+        # Run does not pay for, and an operator who authorised image generation did not thereby
+        # authorise a model to withhold it. With image access anything but live there is nothing
+        # to spend or save, and the worklist keeps the meaning it had before the role existed.
         image_creator: Any = (
-            AdkImageCreator() if model is None else AdkImageCreator(model=model)
+            AdkImageCreator(**pinned) if policy.images.mode is ProviderMode.LIVE else None
         )
         planner: Any = SplitVisualPlanner(
             catalog,
@@ -236,6 +240,7 @@ def build_crew(
             validate_plan=shape_validators.validate_video_plan,
             mode=ProviderMode.LIVE,
             repair=repair,
+            check_meanings=shape_validators.meanings_for,
         )
     else:
         assert recordings is not None

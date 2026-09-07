@@ -18,8 +18,10 @@ dependencies = ["jsonschema>=4.26.0,<5"]
 [project.optional-dependencies]
 # The ADK framework and the model client, landed with the first agent that thinks (the
 # planner). Still optional rather than required: only `AdkPlanAuthor` imports it, and it does so
-# when one is built rather than at module load, so a bare `pytest` needs no network install and
-# every test that does not exercise the live author runs without it. The constraint below is the
+# when one is built rather than at module load, so no ADK install is needed to run the suite and
+# every test that does not exercise the live author runs without it. (`jsonschema` above is a
+# different matter: it is a hard dependency, imported at package load, and the suite needs it.)
+# The constraint below is the
 # only place the exercised version is written: its floor is the version the crew has actually
 # been run against, because a floor lower than the evidence is a guess published as a
 # requirement, and its ceiling excludes the next major because `LlmAgent`, `Runner.run_async`,

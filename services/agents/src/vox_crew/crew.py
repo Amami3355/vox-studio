@@ -38,6 +38,7 @@ from .crew_contract import (
     VisualBible,
     VisualVocabulary,
     crew_failure,
+    read_image_decisions,
 )
 from .crew_state import CrewStateStore, InMemoryCrewStateStore
 from .image_generation import ImageJob, ImageJobStatus
@@ -69,8 +70,14 @@ class ResearchAdapter(Protocol):
 
 
 class CreativeAdapter(Protocol):
+    """Narration and art direction. `plan` is here only for the planner fallback below.
+
+    `repairs_spent` is not: repair is the visual planner's budget, and only
+    `VisualPlannerAdapter` is ever asked for it. Requiring it here made every creative adapter
+    carry a planning field to satisfy a protocol, including the live one whose `plan` refuses.
+    """
+
     mode: ProviderMode
-    repairs_spent: int
 
     async def narrate(self, brief: Brief, dossier: ResearchDossier) -> Mapping[str, Any]: ...
 
@@ -686,24 +693,13 @@ class ProductionCrew:
 
     @staticmethod
     def _image_decision_counts(state: Mapping[str, Any]) -> dict[str, int]:
-        raw = state.get("imageDecisions", {})
-        if not isinstance(raw, Mapping):
-            raise ContractViolation("Production returned malformed Image Creator decisions.")
-        requested = 0
-        declined = 0
-        for requirement_id, decision in raw.items():
-            if (
-                not isinstance(requirement_id, str)
-                or not isinstance(decision, Mapping)
-                or decision.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
-            ):
-                raise ContractViolation("Production returned malformed Image Creator decisions.")
-            needs_image = decision.get("needsImage")
-            if not isinstance(needs_image, bool):
-                raise ContractViolation("Production returned malformed Image Creator decisions.")
-            requested += int(needs_image)
-            declined += int(not needs_image)
-        return {"requested": requested, "declined": declined}
+        decisions = read_image_decisions(
+            state.get("imageDecisions", {}),
+            ContractViolation,
+            "Production returned malformed Image Creator decisions.",
+        )
+        requested = sum(1 for _, decision in decisions if decision["needsImage"])
+        return {"requested": requested, "declined": len(decisions) - requested}
 
     @staticmethod
     def _authorization_failure(

@@ -153,3 +153,29 @@ Verified by the complete agent suite after review hardening: 543 passed, 1 skipp
 - [x] `PublishedShapeValidators` and ADR-0021 state what is checked locally and what remains deferred
 - [x] Every tool-facing SceneInstance shape failure is a finding the author can read, never a raised `ContractViolation`
 - [x] The existing assertions that semantic validation is deferred still pass, unedited
+
+## Comments
+
+**2026-09-07 — the crew-held copy this ticket forbids had crept back in, in miniature.**
+
+*"Both read their schemas and emitted finding codes out of the published contract, with no
+crew-held copy."* `_published_scene_tool_schema` selected the `id`, `component` and `props`
+subschemas out of the published SceneInstance schema — correct — and then wrote its own object
+constraints around them: `required = ("id", "component", "props")` where the contract publishes
+`["id", "component", "props", "spansBeats"]`, and `additionalProperties: True` where the contract
+publishes `false`. Selecting the properties and authoring the rules is still a second copy, and
+this one was *weaker* than the published schema, which is the dangerous direction: a scene the
+compiler refuses read green locally.
+
+It is now `_published_scene_instance_schema`, which walks to the SceneInstance subschema and
+returns it as published. Nothing is selected and nothing is restated. Assembled scenes carry
+exactly the eight published properties, so `additionalProperties: false` costs nothing, and
+`spansBeats` — which `_assemble` always sets — is now required here as the contract requires it.
+`test_the_scene_check_is_the_published_sceneinstance_schema_and_not_a_weaker_copy` pins both
+constraints against the contract so the miniature copy cannot return.
+
+*"The JSON Schema draft the crew validates under is pinned to the one the contract emits."* The
+guard covered the VideoPlan schema only; every `propsSchema` was handed to `Draft202012Validator`
+whatever draft it declared. The check now lives in `_validator`, which every published schema
+passes through: a schema declaring a different draft is a `ContractViolation`, and an embedded
+subschema that declares none inherits the contract's pinned draft.

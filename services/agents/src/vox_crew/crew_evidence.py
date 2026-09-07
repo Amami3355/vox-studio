@@ -23,6 +23,7 @@ from .crew_contract import (
     CrewTerminal,
     OperatorPolicy,
     Rendered,
+    read_image_decisions,
 )
 from .evidence import (
     ASSERTIONS,
@@ -252,20 +253,13 @@ def _image_decisions(
 ) -> list[tuple[str, Mapping[str, Any]]]:
     if not isinstance(production, Mapping):
         return []
-    decisions = production.get("imageDecisions", {})
-    if not isinstance(decisions, Mapping):
-        raise ValueError("Crew Image Creator decision evidence is malformed.")
-    checked: list[tuple[str, Mapping[str, Any]]] = []
-    for requirement_id, decision in decisions.items():
-        if (
-            not isinstance(requirement_id, str)
-            or not isinstance(decision, Mapping)
-            or decision.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
-            or not isinstance(decision.get("needsImage"), bool)
-        ):
-            raise ValueError("Crew Image Creator decision evidence is malformed.")
-        checked.append((requirement_id, decision))
-    return sorted(checked, key=lambda item: item[0])
+    return list(
+        read_image_decisions(
+            production.get("imageDecisions", {}),
+            ValueError,
+            "Crew Image Creator decision evidence is malformed.",
+        )
+    )
 
 
 def _assertions(

@@ -12,7 +12,7 @@ import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any
 
 from .client import ProductionClient
 from .crew import ProductionExecution
@@ -33,10 +33,12 @@ from .crew_contract import (
     VisualBible,
     VisualVocabulary,
     crew_failure,
+    read_image_decisions,
 )
 from .envelopes import ArtifactDescriptor, MalformedEnvelope, ResultEnvelope
 from .image_generation import (
     AssetRequirement,
+    ImageCreator,
     ImageCandidate,
     ImageJob,
     ImageJobStatus,
@@ -98,24 +100,6 @@ class RecordedCreativeAdapter:
         return deepcopy(self.plan_recording)
 
 
-class ImageCreator(Protocol):
-    """The agent half of image creation: one bounded unresolved visual task at a time.
-
-    Its whole authority is the question `needs_image` asks. Everything else the spec assigns
-    elsewhere and this seam deliberately withholds: the worklist is the compiler's
-    `ASSET_PLACEHOLDER` findings and there is no second list (spec.md:252); the prompt is derived
-    deterministically and it may not add style prose (spec.md:258-261); cache, library,
-    placeholder, acceptance and failure decisions "do not belong to a model" (spec.md:250); and
-    identity equivalence is `identityKey`'s to state, "not permission for the generator to guess"
-    (spec.md:263).
-
-    So it is passed one requirement, and answers whether that requirement wants a generated image
-    at all. It never sees the others, and cannot reach a provider.
-    """
-
-    async def needs_image(self, requirement: AssetRequirement) -> bool: ...
-
-
 class ClientProductionAdapter:
     """Async crew adapter over the existing payload-shaped Production client seam."""
 
@@ -160,17 +144,14 @@ class ClientProductionAdapter:
         if self._image_creator is None:
             return True
         decisions = state.setdefault("imageDecisions", {})
-        if not isinstance(decisions, Mapping):
-            raise MalformedEnvelope("The saved Image Creator decisions are malformed.")
-        existing = decisions.get(requirement.requirement_id)
+        saved = dict(
+            read_image_decisions(
+                decisions, MalformedEnvelope, "The saved Image Creator decisions are malformed."
+            )
+        )
+        existing = saved.get(requirement.requirement_id)
         if existing is not None:
-            if (
-                not isinstance(existing, Mapping)
-                or existing.get("role") != CrewRole.IMAGE_CREATOR_AGENT.value
-                or not isinstance(existing.get("needsImage"), bool)
-            ):
-                raise MalformedEnvelope("A saved Image Creator decision is malformed.")
-            return existing["needsImage"]
+            return bool(existing["needsImage"])
         needed = await self._image_creator.needs_image(requirement)
         if not isinstance(needed, bool):
             raise MalformedEnvelope("The Image Creator returned a non-boolean decision.")

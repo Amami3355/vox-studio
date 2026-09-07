@@ -84,3 +84,21 @@ image would produce a film with a hole no finding names.
 - [x] Cache, library, placeholder, acceptance and failure decisions stay outside the model
 - [x] Any authority to spend, or to decline to spend, is named by something an operator sets
 - [x] The provider call and its credentials stay on the Production service
+
+## Comments
+
+**2026-09-07 — two boxes above were ticked before they held; both now do.**
+
+*"It interprets exactly one bounded task per invocation, never the worklist."* `AdkImageCreator`
+held one `AdkJsonRole`, and `AdkJsonRole.ask` cached its session id after the first call. The
+payload was one requirement; the *context* was every requirement judged before it, so requirement
+*N* was decided in a conversation holding 1..*N-1*. `AdkJsonRole` now takes `remembers_turns`, and
+the Image Creator is built with `remembers_turns=False`, so each judgement opens its own session.
+The roles whose turns are meant to build on one another keep the shared session they had.
+
+*"Any authority to spend, or to decline to spend, is named by something an operator sets."* The
+role was installed on `live_models` alone. That is an operator field, but it is the wrong one:
+what this role decides is image spend, and an operator who authorised image generation had no
+field that said a model could withhold it. It is now installed only when `policy.images` is live
+as well — asking is a model call, and what it decides is image money, so both fields have to
+allow it.

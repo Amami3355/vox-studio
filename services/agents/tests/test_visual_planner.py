@@ -64,6 +64,7 @@ def test_a_scene_prop_refused_by_the_published_schema_is_an_actionable_finding()
             "id": "claim",
             "component": "typographic_statement",
             "props": {"statement": 42},
+            "spansBeats": ["b1"],
         }
     )
 
@@ -88,6 +89,7 @@ def test_a_scene_accepted_by_its_schema_still_defers_semantic_validation() -> No
             "id": "claim",
             "component": "typographic_statement",
             "props": {"statement": "The baselines diverged."},
+            "spansBeats": ["b1"],
         }
     )
 
@@ -159,7 +161,12 @@ def test_the_validator_draft_is_the_draft_the_contract_publishes() -> None:
         (
             "INVALID_PROPS",
             "scene",
-            {"id": "claim", "component": "typographic_statement", "props": {"statement": 42}},
+            {
+                "id": "claim",
+                "component": "typographic_statement",
+                "props": {"statement": 42},
+                "spansBeats": ["b1"],
+            },
         ),
         (
             "MALFORMED_PLAN",
@@ -193,6 +200,52 @@ def test_shape_findings_use_the_code_the_checks_contract_publishes(
     )
 
     assert report["findings"][0]["code"] == f"PUBLISHED_{published_name}"
+
+
+def test_the_scene_check_is_the_published_sceneinstance_schema_and_not_a_weaker_copy() -> None:
+    """The crew must not accept a scene the published schema refuses.
+
+    Selecting a few properties and writing a local `required`/`additionalProperties` around them
+    is the second, more permissive copy ticket 01 forbids, and it reads as green here while
+    Production refuses the same scene inside the Run.
+    """
+    scene = plan_contract()["schema"]["properties"]["sections"]["items"]["properties"]["scenes"][
+        "items"
+    ]
+    validators = PublishedShapeValidators(
+        PublishedCatalog.from_mapping(catalog_contract()), plan_contract(), checks_contract()
+    )
+
+    missing_published_required = validators.validate_scene(
+        {"id": "claim", "component": "typographic_statement", "props": {"statement": "A claim."}}
+    )
+    unpublished_field = validators.validate_scene(
+        {
+            "id": "claim",
+            "component": "typographic_statement",
+            "props": {"statement": "A claim."},
+            "spansBeats": ["b1"],
+            "invented": True,
+        }
+    )
+
+    assert scene["required"] == ["id", "component", "props", "spansBeats"]
+    assert scene["additionalProperties"] is False
+    assert missing_published_required["ok"] is False
+    assert missing_published_required["findings"][0]["code"] == "MALFORMED_PLAN"
+    assert missing_published_required["findings"][0]["path"] == "/spansBeats"
+    assert unpublished_field["ok"] is False
+    assert unpublished_field["findings"][0]["code"] == "MALFORMED_PLAN"
+
+
+def test_a_published_schema_declaring_another_draft_is_a_contract_violation() -> None:
+    contract = plan_contract()
+    contract["schema"] = {**contract["schema"], "$schema": "https://json-schema.org/draft-07/schema"}
+
+    with pytest.raises(ContractViolation):
+        PublishedShapeValidators(
+            PublishedCatalog.from_mapping(catalog_contract()), contract, checks_contract()
+        )
 
 
 @pytest.mark.parametrize(
@@ -658,6 +711,61 @@ def test_a_plan_level_refusal_does_not_invent_implicated_capabilities() -> None:
     assert repair.turns == 1
     assert repair.refusals[0].capability_ids == ()
     assert repair.specifications == ()
+
+
+def test_repair_retains_the_scenes_no_finding_named() -> None:
+    """spec.md:346 — "accepted structure is retained where possible".
+
+    The repair here answers with a wholesale re-fill of both scenes, which is what a role free
+    to rewrite the plan does. The scene no finding named keeps the author's work; the refused one
+    takes the repair.
+    """
+    two_scenes = {
+        "beats": [{"id": "b1", "text": "The baselines diverged."}],
+        "sections": [
+            {
+                "id": "opening",
+                "spansBeats": ["b1"],
+                "scenes": [
+                    {"id": "claim", "component": "typographic_statement", "spansBeats": ["b1"]},
+                    {"id": "kept", "component": "typographic_statement", "spansBeats": ["b1"]},
+                ],
+            }
+        ],
+    }
+    authored = {
+        "scenes": [
+            {"id": "claim", "props": {"statement": "Refused."}},
+            {"id": "kept", "props": {"statement": "The author's own sentence."}},
+        ]
+    }
+    rewritten = {
+        "scenes": [
+            {"id": "claim", "props": {"statement": "Repaired."}},
+            {"id": "kept", "props": {"statement": "A rewrite nothing asked for."}},
+        ]
+    }
+
+    def refuses_claim_once(instance: dict[str, Any]) -> dict[str, Any]:
+        first = instance["id"] == "claim" and instance["props"]["statement"] == "Refused."
+        return red(instance) if first else green(instance)
+
+    repair = Repair(rewritten)
+    planner = SplitVisualPlanner(
+        PublishedCatalog.from_mapping(catalog_contract()),
+        Structurer(two_scenes),
+        SceneAuthor(authored),
+        validate_scene=refuses_claim_once,
+        validate_plan=green,
+        repair=repair,
+    )
+
+    plan = asyncio.run(planner.plan(*inputs()))
+
+    scenes = {scene["id"]: scene for scene in plan["sections"][0]["scenes"]}
+    assert repair.turns == 1
+    assert scenes["claim"]["props"]["statement"] == "Repaired."
+    assert scenes["kept"]["props"]["statement"] == "The author's own sentence."
 
 
 def test_a_green_plan_never_reaches_the_repair_role() -> None:

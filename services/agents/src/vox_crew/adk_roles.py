@@ -18,7 +18,8 @@ from .crew_contract import (
     VisualVocabulary,
     OperatorPolicy,
 )
-from .visual_planner import VisualCatalogTools
+from .image_generation import AssetRequirement
+from .visual_planner import JsonObject, PlanRefusal, VisualCatalogTools
 
 #: The one model every crew role is pinned to.
 #:
@@ -46,7 +47,16 @@ def _json_answer(text: str, what: str) -> Mapping[str, Any]:
 
 
 class AdkJsonRole:
-    """One persistent ADK `LlmAgent`; provider output is normalized to a JSON object."""
+    """One ADK `LlmAgent`; provider output is normalized to a JSON object.
+
+    A role remembers its turns by default: the Narrative and Art Director agents are asked one
+    question each, and the Scene Author's turns are meant to build on one another.
+
+    `remembers_turns=False` gives each `ask` its own session. A role whose whole contract is that
+    it judges one bounded task and sees no other cannot share a session between judgements — the
+    payload would be bounded while the context accumulated every previous task, which is the
+    isolation claim broken in the only place it is load-bearing.
+    """
 
     def __init__(
         self,
@@ -57,6 +67,7 @@ class AdkJsonRole:
         app_name: str = "vox-production-crew",
         session_service: Any | None = None,
         session_id: str | None = None,
+        remembers_turns: bool = True,
     ) -> None:
         from google.adk.agents import LlmAgent  # noqa: PLC0415
         from google.adk.sessions import InMemorySessionService  # noqa: PLC0415
@@ -67,6 +78,7 @@ class AdkJsonRole:
         self.app_name = app_name
         self.session_service = session_service or InMemorySessionService()
         self.session_id = session_id
+        self.remembers_turns = remembers_turns
         self._agent_type = LlmAgent
 
     def agent(self, instruction: str, tools: Sequence[Callable[..., Any]] = ()) -> Any:
@@ -88,29 +100,28 @@ class AdkJsonRole:
         try:
             from google.adk.runners import Runner  # noqa: PLC0415
             from google.genai import types  # noqa: PLC0415
+        except ImportError as error:
+            raise RoleUnavailable(f"{self.name} has no model framework installed.") from error
 
-            if self.session_id is None:
-                session = await self.session_service.create_session(
-                    app_name=self.app_name, user_id=self.name
-                )
-                self.session_id = session.id
-            runner = Runner(
-                agent=self.agent(instruction, tools),
-                app_name=self.app_name,
-                session_service=self.session_service,
-            )
-            answered: list[str] = []
+        session_id = await self._session_for_turn()
+        # Built outside the guard below: a framework object this crew constructs wrongly is a bug
+        # in crew code, and degrading it to `RoleUnavailable` would hide it behind a role that
+        # silently answers its safe default on every Run.
+        runner = Runner(
+            agent=self.agent(instruction, tools),
+            app_name=self.app_name,
+            session_service=self.session_service,
+        )
+        message = types.Content(
+            role="user",
+            parts=[types.Part(text=json.dumps(payload, ensure_ascii=False, separators=(",", ":")))],
+        )
+        answered: list[str] = []
+        try:
             async for event in runner.run_async(
                 user_id=self.name,
-                session_id=self.session_id,
-                new_message=types.Content(
-                    role="user",
-                    parts=[
-                        types.Part(
-                            text=json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-                        )
-                    ],
-                ),
+                session_id=session_id,
+                new_message=message,
             ):
                 if event.is_final_response() and event.content:
                     answered.extend(
@@ -119,6 +130,23 @@ class AdkJsonRole:
         except Exception as error:
             raise RoleUnavailable(f"{self.name} did not complete its model turn.") from error
         return _json_answer("".join(answered).strip(), self.name)
+
+    async def _session_for_turn(self) -> str:
+        """The session this turn runs in, created fresh when the role must not remember."""
+        try:
+            if not self.remembers_turns:
+                session = await self.session_service.create_session(
+                    app_name=self.app_name, user_id=self.name
+                )
+                return str(session.id)
+            if self.session_id is None:
+                session = await self.session_service.create_session(
+                    app_name=self.app_name, user_id=self.name
+                )
+                self.session_id = session.id
+            return str(self.session_id)
+        except Exception as error:
+            raise RoleUnavailable(f"{self.name} could not open a model session.") from error
 
 
 MAX_PLANNED_QUESTIONS = 8
@@ -176,9 +204,19 @@ class AdkResearchAgent:
         return self._tool.mode
 
     async def research(self, brief: Brief) -> Mapping[str, Any]:
-        self.inquiry = await self._plan_inquiry(brief)
-        self.trace()  # Validate safe evidence before the same questions reach the provider tool.
+        self.inquiry = self._safe_inquiry(await self._plan_inquiry(brief))
         return await self._tool.research(brief, self.inquiry)
+
+    @staticmethod
+    def _safe_inquiry(inquiry: tuple[str, ...]) -> tuple[str, ...]:
+        """The questions, refused here if they carry anything a provider must not be told.
+
+        `ResearchTrace` is the gate that knows what a safe question is, and it is the same gate
+        the evidence bundle passes the inquiry through later. Checking here means a question
+        that would be refused as evidence is refused *before* it is asked, rather than after a
+        provider has already seen it.
+        """
+        return ResearchTrace(inquiry, planned=True).inquiry
 
     def trace(self) -> ResearchTrace:
         return ResearchTrace(self.inquiry, planned=True)
@@ -212,9 +250,7 @@ class AdkResearchAgent:
             if isinstance(question, str) and question.strip() and question not in planned:
                 planned.append(question.strip())
         try:
-            return ResearchTrace(
-                tuple(planned[:MAX_PLANNED_QUESTIONS]), planned=True
-            ).inquiry
+            return self._safe_inquiry(tuple(planned[:MAX_PLANNED_QUESTIONS]))
         except ContractViolation:
             return ()
 
@@ -223,7 +259,6 @@ class AdkCreativeAdapter:
     """Independent Narrative and Art Director ADK agents, joined by `ProductionCrew`."""
 
     mode = ProviderMode.LIVE
-    repairs_spent = 0
 
     def __init__(
         self,
@@ -401,8 +436,8 @@ class AdkPlanRepair:
     async def repair(
         self,
         plan: Mapping[str, Any],
-        refusal: Any,
-        specifications: tuple[dict[str, Any], ...],
+        refusal: PlanRefusal,
+        specifications: tuple[JsonObject, ...],
         tools: VisualCatalogTools,
     ) -> Mapping[str, Any]:
         return await self.role.ask(
@@ -410,10 +445,12 @@ class AdkPlanRepair:
             "repaired where the findings name it and unchanged everywhere else. Each entry may "
             "contain only id, props, layout, motionProfile, events. Do not add, remove, reorder "
             "or re-select scenes, and never change a scene's component. Repair only what the "
-            "findings name.",
+            "findings name, and return every other scene exactly as it was supplied. "
+            "checkMeanings explains the code each finding carries.",
             {
                 "plan": dict(plan),
                 "findings": [dict(finding) for finding in refusal.findings],
+                "checkMeanings": dict(refusal.check_meanings),
                 "specifications": list(specifications),
             },
             tools=_adk_visual_tools(tools, include_search=False),
@@ -424,7 +461,7 @@ class AdkImageCreator:
     """Interprets one unresolved visual task and answers whether it wants a generated image.
 
     This is the whole of the role, and the narrowness is the design rather than a first cut — the
-    reasoning is on the `ImageCreator` protocol in `recorded.py`. What is left to a model here is
+    reasoning is on the `ImageCreator` protocol in `image_generation.py`. What is left to a model here is
     one judgement: a placeholder can be a genuine editorial need for an image, or it can be
     something a scene will carry perfectly well without one, and generating for the second spends
     money to make a film slightly worse.
@@ -433,6 +470,11 @@ class AdkImageCreator:
     An unreadable answer means yes: the safe direction is the behaviour the worklist had before
     this role existed, because a Run that silently skipped a needed image would produce a film
     with a hole in it that no finding names.
+
+    "Sees no other" is the session, not only the payload. The role is built with
+    `remembers_turns=False` so requirement *N* is judged in a session that holds requirements
+    1..*N-1*'s questions and answers — an isolation that a shared session would leave true of the
+    message and false of the context the model actually reads.
     """
 
     def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
@@ -441,8 +483,10 @@ class AdkImageCreator:
             "Judges whether one unresolved visual requirement needs a generated image.",
             model=model,
             session_service=session_service,
+            remembers_turns=False,
         )
-    async def needs_image(self, requirement: Any) -> bool:
+
+    async def needs_image(self, requirement: AssetRequirement) -> bool:
         try:
             answer = await self.role.ask(
                 "Return only JSON: {\"needsImage\": true|false}. The supplied "
@@ -455,8 +499,8 @@ class AdkImageCreator:
             )
         except (ContractViolation, RoleUnavailable):
             return True
-        needed = True if not isinstance(answer, Mapping) else answer.get("needsImage") is not False
-        return needed
+        # Anything but an explicit `false` is a yes; `ask` has already refused a non-object.
+        return answer.get("needsImage") is not False
 
 
 def create_adk_director(

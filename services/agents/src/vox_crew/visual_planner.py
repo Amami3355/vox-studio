@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, NotRequired, Protocol, TypedDict
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
@@ -32,6 +32,32 @@ from .crew_contract import (
 JsonObject = dict[str, Any]
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")
 Validator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
+CheckMeanings = Callable[[Sequence[str]], JsonObject]
+
+
+class ShapeFinding(TypedDict):
+    """One published-shape refusal, in the vocabulary the compiler's own findings use."""
+
+    code: str
+    path: str
+    keyword: str
+    message: NotRequired[str]
+    sceneId: NotRequired[str]
+
+
+class ShapeReport(TypedDict):
+    """What a local shape check decided, and what it deliberately did not decide.
+
+    ADR-0021 states this envelope; naming it here means the four modules that pass one around
+    are reading the same five keys rather than each remembering them. `deferredTo` is the half
+    that matters most: a green `ok` is not a Production verdict.
+    """
+
+    ok: bool
+    checked: str
+    findings: list[ShapeFinding]
+    deferredTo: str
+    subject: str
 
 
 class CatalogProjectionRole(str, Enum):
@@ -215,7 +241,7 @@ class PublishedShapeValidators:
             )
         self._plan_validator = self._validator(plan_schema, "plan.schema")
         self._scene_validator = self._validator(
-            _published_scene_tool_schema(plan_schema), "plan.schema SceneInstance tool projection"
+            _published_scene_instance_schema(plan_schema), "plan.schema SceneInstance"
         )
         published_errors = _object(
             _object(checks_contract, "checks contract").get("errors"), "checks.errors"
@@ -225,8 +251,26 @@ class PublishedShapeValidators:
         self._unknown_capability_code = _published_check_code(
             published_errors, "UNKNOWN_CAPABILITY"
         )
+        #: What each emitted code means, as the `checks` projection publishes it. Read here for
+        #: the same reason the codes are: a crew-written gloss of a compiler finding is a second
+        #: account of the compiler's own vocabulary.
+        self._check_meanings: JsonObject = {
+            str(entry["code"]): deepcopy(dict(entry))
+            for entry in (
+                _object(published_errors.get(name), f"checks.errors.{name}")
+                for name in ("INVALID_PROPS", "MALFORMED_PLAN", "UNKNOWN_CAPABILITY")
+            )
+        }
 
-    def validate_scene(self, instance: Mapping[str, Any]) -> Mapping[str, Any]:
+    def meanings_for(self, codes: Sequence[str]) -> JsonObject:
+        """The published `checks` record for each code named, and nothing for codes it does not."""
+        return {
+            code: deepcopy(self._check_meanings[code])
+            for code in dict.fromkeys(codes)
+            if code in self._check_meanings
+        }
+
+    def validate_scene(self, instance: Mapping[str, Any]) -> ShapeReport:
         shape = self._report(
             "sceneInstance",
             self._scene_validator.iter_errors(instance),
@@ -261,15 +305,27 @@ class PublishedShapeValidators:
             scene_id=scene_id,
         )
 
-    def validate_video_plan(self, plan: Mapping[str, Any]) -> Mapping[str, Any]:
+    def validate_video_plan(self, plan: Mapping[str, Any]) -> ShapeReport:
         return self._report(
             "videoPlan",
             self._plan_validator.iter_errors(plan),
             code=self._malformed_plan_code,
         )
 
-    @staticmethod
-    def _validator(schema: Mapping[str, Any], what: str) -> Draft202012Validator:
+    @classmethod
+    def _validator(cls, schema: Mapping[str, Any], what: str) -> Draft202012Validator:
+        """Every published schema is evaluated under the pinned draft, or not at all.
+
+        A schema that declares a different draft is a configuration fault rather than an
+        authoring one: evaluating it under 2020-12 anyway would silently apply the wrong
+        keyword semantics. An embedded subschema declares nothing and inherits the draft of the
+        contract that carries it, which is the pinned one.
+        """
+        declared = schema.get("$schema")
+        if declared is not None and declared != cls.draft:
+            raise ContractViolation(
+                f"The published {what} declares {declared}; this crew evaluates {cls.draft}."
+            )
         try:
             Draft202012Validator.check_schema(schema)
         except SchemaError as invalid:
@@ -284,7 +340,7 @@ class PublishedShapeValidators:
         code: str,
         path_prefix: tuple[str, ...] = (),
         scene_id: str | None = None,
-    ) -> Mapping[str, Any]:
+    ) -> ShapeReport:
         ordered = sorted(
             errors,
             key=lambda error: (
@@ -304,11 +360,11 @@ class PublishedShapeValidators:
         return PublishedShapeValidators._finding_report(subject, findings)
 
     @staticmethod
-    def _finding_report(subject: str, findings: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    def _finding_report(subject: str, findings: Sequence[ShapeFinding]) -> ShapeReport:
         return {
             "ok": not findings,
             "checked": "shape",
-            "findings": [deepcopy(dict(finding)) for finding in findings],
+            "findings": [deepcopy(dict(finding)) for finding in findings],  # type: ignore[misc]
             "deferredTo": "run.validate",
             "subject": subject,
         }
@@ -320,9 +376,9 @@ def _shape_finding(
     code: str,
     path_prefix: tuple[str, ...],
     scene_id: str | None,
-) -> JsonObject:
+) -> ShapeFinding:
     path = (*path_prefix, *error.absolute_path, *_missing_required_path(error))
-    finding: JsonObject = {
+    finding: ShapeFinding = {
         "code": code,
         "path": "".join(f"/{_json_pointer_token(part)}" for part in path),
         "keyword": str(error.validator),
@@ -339,29 +395,23 @@ def _published_check_code(errors: Mapping[str, Any], name: str) -> str:
     return _name(check.get("code"), f"checks.errors.{name}.code")
 
 
-def _published_scene_tool_schema(plan_schema: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Project the fields `validateScene` receives from the published SceneInstance schema."""
+def _published_scene_instance_schema(plan_schema: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Locate the SceneInstance subschema inside the published VideoPlan schema.
+
+    This walks to the subschema and returns it as published. It selects nothing and restates
+    nothing: `required`, `additionalProperties` and every property constraint are the contract's
+    own. An earlier version named the three fields it cared about and wrote its own `required`
+    and `additionalProperties` around them, which made a scene the published schema refuses pass
+    here — the second, weaker copy ADR-0019 and ticket 01 both forbid.
+    """
     plan_properties = _object(plan_schema.get("properties"), "plan.schema.properties")
     sections = _object(plan_properties.get("sections"), "plan.schema.properties.sections")
     section = _object(sections.get("items"), "plan.schema sections.items")
     section_properties = _object(section.get("properties"), "plan.schema section.properties")
     scenes = _object(section_properties.get("scenes"), "plan.schema section.properties.scenes")
     scene = _object(scenes.get("items"), "plan.schema scenes.items")
-    properties = _object(scene.get("properties"), "plan.schema SceneInstance.properties")
-    fields = ("id", "component", "props")
-    selected = {
-        field: deepcopy(_object(properties.get(field), f"plan.schema SceneInstance.{field}"))
-        for field in fields
-    }
-    return {
-        "$schema": plan_schema.get("$schema"),
-        "type": "object",
-        "properties": selected,
-        "required": list(fields),
-        # The Scene Author may pass an assembled instance. Other fields belong to the full plan
-        # validator; rejecting them here would make this focused projection a second schema copy.
-        "additionalProperties": True,
-    }
+    _object(scene.get("properties"), "plan.schema SceneInstance.properties")
+    return deepcopy(dict(scene))
 
 
 def _json_pointer_token(value: Any) -> str:
@@ -465,6 +515,21 @@ class VisualCatalogTools:
         self._validate_scene = validate_scene
         self._validate_plan = validate_plan
 
+    def restricted_to(self, capability_ids: Sequence[str]) -> VisualCatalogTools:
+        """The same tools over a narrower set of readable specifications.
+
+        `getSceneSpec` is the second door onto a specification, and a role given the `planRepair`
+        payload for the implicated capabilities can otherwise read every capability the
+        Structurer selected by asking for it by name. ADR-0019 scopes a projection to a role's
+        need, which the payload cannot enforce on its own.
+        """
+        return VisualCatalogTools(
+            self._catalog,
+            frozenset(capability_ids) & self._allowed_spec_ids,
+            self._validate_scene,
+            self._validate_plan,
+        )
+
     def search_scenes(self, intent: str = "") -> tuple[JsonObject, ...]:
         compact = self._catalog.for_role(CatalogProjectionRole.VISUAL_STRUCTURER)
         terms = _tokens(intent)
@@ -521,11 +586,18 @@ decision, not a tuning knob: every turn is a model call no operator separately a
 
 @dataclass(frozen=True, slots=True)
 class PlanRefusal:
-    """What a validator refused, and which published capabilities it implicates."""
+    """What a validator refused, and which published capabilities it implicates.
+
+    `check_meanings` carries the published `checks` record for each code the findings name.
+    A finding says `INVALID_PROPS`; what that code means and what repairing it involves is text
+    the contract publishes, and spec.md:246 gives the repair role the meanings alongside the
+    findings rather than the bare codes it would otherwise have to know by heart.
+    """
 
     findings: tuple[JsonObject, ...]
     capability_ids: tuple[str, ...]
     summary: str
+    check_meanings: JsonObject
 
 
 class PlanRepairAgent(Protocol):
@@ -552,6 +624,7 @@ class SplitVisualPlanner:
         mode: ProviderMode = ProviderMode.RECORDED,
         repair: PlanRepairAgent | None = None,
         repair_budget: int = PLAN_REPAIR_BUDGET,
+        check_meanings: CheckMeanings = lambda _codes: {},
     ) -> None:
         if repair_budget < 0:
             raise ContractViolation("A plan repair budget cannot be negative.")
@@ -560,6 +633,7 @@ class SplitVisualPlanner:
         self._scene_author = scene_author
         self._validate_scene = validate_scene
         self._validate_plan = validate_plan
+        self._check_meanings = check_meanings
         self.mode = mode
         self._repair = repair
         self._repair_budget = repair_budget
@@ -621,8 +695,13 @@ class SplitVisualPlanner:
                 if refusal.capability_ids
                 else ()
             )
-            fills = await self._repair.repair(deepcopy(plan), refusal, specifications, tools)
-            plan = self._assemble(structure, fills)
+            fills = await self._repair.repair(
+                deepcopy(plan),
+                refusal,
+                specifications,
+                tools.restricted_to(refusal.capability_ids),
+            )
+            plan = _retaining(plan, self._assemble(structure, fills), _refused_scene_ids(refusal))
 
     def _refusal(self, plan: JsonObject, tools: VisualCatalogTools) -> PlanRefusal | None:
         """Every refusal in one pass, so one repair turn sees the whole problem.
@@ -642,7 +721,7 @@ class SplitVisualPlanner:
                         "where": "sceneInstance",
                         "sceneId": scene["id"],
                         "component": scene["component"],
-                        "report": deepcopy(dict(report)) if isinstance(report, Mapping) else {},
+                        "report": deepcopy(dict(report)),
                     }
                 )
                 if scene["component"] not in implicated:
@@ -653,9 +732,7 @@ class SplitVisualPlanner:
             findings.append(
                 {
                     "where": "videoPlan",
-                    "report": (
-                        deepcopy(dict(plan_report)) if isinstance(plan_report, Mapping) else {}
-                    ),
+                    "report": deepcopy(dict(plan_report)),
                 }
             )
             # No SceneCapability is implicated by a plan-level finding. Simultaneous scene
@@ -668,6 +745,7 @@ class SplitVisualPlanner:
             findings=tuple(findings),
             capability_ids=tuple(implicated),
             summary=f"The published validator refused {refused}.",
+            check_meanings=self._check_meanings(_refused_codes(findings)),
         )
 
     @staticmethod
@@ -797,6 +875,58 @@ class SplitVisualPlanner:
                 for scene in section["scenes"]
             ]
         return plan
+
+
+def _refused_scene_ids(refusal: PlanRefusal) -> frozenset[str]:
+    """The scenes a refusal actually names; every other scene is accepted structure."""
+    return frozenset(
+        str(finding["sceneId"])
+        for finding in refusal.findings
+        if finding.get("where") == "sceneInstance" and isinstance(finding.get("sceneId"), str)
+    )
+
+
+def _retaining(
+    accepted: JsonObject, repaired: JsonObject, refused_ids: frozenset[str]
+) -> JsonObject:
+    """The repaired plan, with every scene no finding named restored to what it was.
+
+    spec.md:346 asks that "accepted structure is retained where possible". The instruction says
+    so too, and an instruction is not a guarantee: a repair role is free to re-fill the whole
+    plan, and a wholesale rewrite passing shape checks would silently discard authoring work no
+    finding objected to — spending the one repair turn on scenes that were already right.
+
+    Only scene bodies are restored. A plan-level finding is repaired at the plan level, and the
+    scenes it did not name stay as the author left them.
+    """
+    plan = deepcopy(repaired)
+    accepted_scenes = {
+        scene["id"]: scene
+        for section in accepted["sections"]
+        for scene in section["scenes"]
+    }
+    for section in plan["sections"]:
+        section["scenes"] = [
+            scene
+            if scene["id"] in refused_ids or scene["id"] not in accepted_scenes
+            else deepcopy(accepted_scenes[scene["id"]])
+            for scene in section["scenes"]
+        ]
+    return plan
+
+
+def _refused_codes(findings: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
+    """Every published check code the refusal names, in the order it first names them."""
+    codes: list[str] = []
+    for finding in findings:
+        report = finding.get("report")
+        if not isinstance(report, Mapping):
+            continue
+        for entry in report.get("findings") or ():
+            code = entry.get("code") if isinstance(entry, Mapping) else None
+            if isinstance(code, str) and code not in codes:
+                codes.append(code)
+    return tuple(codes)
 
 
 def _selected_capabilities(structure: Mapping[str, Any]) -> tuple[str, ...]:

@@ -92,3 +92,18 @@ loses the framing that produced it.
 - [x] A call that may have been paid for is still never retried
 - [x] The role acquires no view on catalog serviceability
 - [x] Whatever the role spends is authorised by something an operator sets
+
+## Comments
+
+**2026-09-07 — review cleanups; no acceptance box moved.**
+
+`research` called `self.trace()` for its exception and threw the value away, and `_plan_inquiry`
+built a `ResearchTrace` only to unwrap `.inquiry`. Both are now `_safe_inquiry`, which says what
+the check is: the questions pass the same gate the evidence bundle will apply, *before* a provider
+sees them rather than after.
+
+The ADR-0007 question a reviewer will reach for — why this provider call is crew-side when the
+agent-side image adapter was deleted for reaching a provider — is now answered in the
+`parallel_research` module docstring. A generated image is a Run artifact and Production publishes
+a command to request it; a dossier is read before a Run exists and Production publishes no command
+for it. Different provider classes, not an inconsistency.
