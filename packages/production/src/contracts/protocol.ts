@@ -194,7 +194,8 @@ const commands: readonly CommandContract[] = [
     syntax:
       'vox production run image-start --run <run-dir> --request <image-request.json> [--authorisation <grant.json>]',
     prerequisite: 'a compiled ASSET_PLACEHOLDER work item; grant when the image provider is live',
-    effect: 'Create or resume one identity-bound image job and publish an inspectable candidate.',
+    effect:
+      'Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. A separate operator recovery policy permits retryOf naming the latest confirmed HTTP 429 job with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs count toward the effective image ceiling.',
     readOnly: false,
     network: 'record_only',
     quota: 'may_spend',
@@ -220,8 +221,9 @@ const commands: readonly CommandContract[] = [
   {
     id: 'run.image.reject',
     syntax: 'vox production run image-reject --run <run-dir> --decision <rejection.json>',
-    prerequisite: 'an inspectable candidate',
-    effect: 'Reject the candidate while retaining the honest placeholder path.',
+    prerequisite: 'an inspectable candidate, or an accepted image with candidateSha256 and reason',
+    effect:
+      'Reject a pending candidate or withdraw exact accepted bytes with a reason. Preserve jobs, grants and quota; stale compilation and render bindings. Recompile before correcting the requirement.',
     readOnly: false,
     network: 'forbidden',
     quota: 'never',

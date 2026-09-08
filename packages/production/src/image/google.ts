@@ -1,14 +1,19 @@
 import {
+  BlockedReason,
+  FinishReason,
   type GenerateContentParameters,
   GoogleGenAI,
   type GoogleGenAIOptions,
 } from '@google/genai';
 import type { ImageGenerationAdapter } from '../commands/service';
+import { ImageDispatchUncertain, ImageGenerationFailure } from './failure';
 
 type GoogleImageClient = {
   models: {
     generateContent(input: GenerateContentParameters): Promise<{
+      promptFeedback?: { blockReason?: string };
       candidates?: Array<{
+        finishReason?: string;
         content?: {
           parts?: Array<{
             thought?: boolean;
@@ -64,16 +69,36 @@ export const createGoogleImageAdapter = (
           httpOptions: { timeout: 180_000, retryOptions: { attempts: 1 } },
         });
     }
-    const response = await client.models.generateContent({
-      model: options.model ?? 'gemini-2.5-flash-image',
-      contents: request.prompt,
-      config: {
-        candidateCount: 1,
-        responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: { aspectRatio: request.aspectRatio },
-        seed: request.seed,
-      },
-    });
+    let response: Awaited<ReturnType<GoogleImageClient['models']['generateContent']>>;
+    try {
+      response = await client.models.generateContent({
+        model: options.model ?? 'gemini-2.5-flash-image',
+        contents: request.prompt,
+        config: {
+          candidateCount: 1,
+          responseModalities: ['TEXT', 'IMAGE'],
+          imageConfig: { aspectRatio: request.aspectRatio },
+          seed: request.seed,
+        },
+      });
+    } catch (error) {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+      if (
+        typeof status === 'number' &&
+        Number.isInteger(status) &&
+        status >= 400 &&
+        status <= 599
+      ) {
+        throw new ImageGenerationFailure(
+          `Image provider returned HTTP_${status}; no retry was started.`,
+        );
+      }
+      // No HTTP response proves a completed failure. Timeout/connection errors can follow spend.
+      // Never persist SDK messages: they may contain credentials, URLs or response bodies.
+      throw new ImageDispatchUncertain(
+        'TRANSPORT_UNKNOWN: image dispatch has no confirmed HTTP outcome; no retry was started.',
+      );
+    }
     const images =
       response.candidates?.flatMap((candidate) =>
         (candidate.content?.parts ?? [])
@@ -82,7 +107,19 @@ export const createGoogleImageAdapter = (
       ) ?? [];
     const image = images[0];
     if (images.length !== 1 || !image?.data || image.mimeType !== 'image/png') {
-      throw new Error('The image provider must return exactly one PNG candidate.');
+      const known = (value: string | undefined, values: string[]) =>
+        value && values.includes(value) ? value : 'UNKNOWN';
+      const finish =
+        (response.candidates ?? [])
+          .slice(0, 4)
+          .map((candidate) => known(candidate.finishReason, Object.values(FinishReason)))
+          .join(',') || 'NONE';
+      const block = known(response.promptFeedback?.blockReason, Object.values(BlockedReason));
+      const mime = known(image?.mimeType, ['image/png', 'image/jpeg', 'image/webp']);
+      const code = images.length === 0 ? 'NO_IMAGE' : 'INVALID_IMAGE_RESPONSE';
+      throw new ImageGenerationFailure(
+        `The image provider must return exactly one PNG candidate. ${code}; images=${images.length}; mime=${mime}; finish=${finish}; block=${block}.`,
+      );
     }
     return { bytes: Buffer.from(image.data, 'base64'), mediaType: 'image/png' };
   },

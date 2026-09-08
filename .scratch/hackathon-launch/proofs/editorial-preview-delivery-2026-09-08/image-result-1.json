@@ -1,0 +1,56 @@
+{
+  "artifacts": [
+    {
+      "kind": "generated_image_candidate",
+      "path": "artifacts/images/image-job-9e7049483ab458631ff0/aad791c8c7b2843ec4397bf4bb962d9e2483701120e3e673a4c8f6edc289c58b.png",
+      "sha256": "aad791c8c7b2843ec4397bf4bb962d9e2483701120e3e673a4c8f6edc289c58b"
+    }
+  ],
+  "command": "run.image.start",
+  "data": {
+    "disposition": "created",
+    "job": {
+      "candidate": {
+        "artifact": {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-9e7049483ab458631ff0/aad791c8c7b2843ec4397bf4bb962d9e2483701120e3e673a4c8f6edc289c58b.png",
+          "sha256": "aad791c8c7b2843ec4397bf4bb962d9e2483701120e3e673a4c8f6edc289c58b"
+        },
+        "height": 768,
+        "id": "image-candidate-aad791c8c7b2843ec439",
+        "identityKey": "rocket-descent-physics",
+        "promptSha256": "510868067e11402884f6948f2a651964cec2cc21b97b53e66be55c8d0857d9da",
+        "requirementId": "req_d19c7d3e",
+        "width": 1344
+      },
+      "failure": null,
+      "id": "image-job-9e7049483ab458631ff0",
+      "identityKey": "rocket-descent-physics",
+      "providerMode": "live",
+      "requestSha256": "c6da7224abebd152d7b94909d0ab62c8a279572dce36c1ca2a709ae1df981fe7",
+      "requirementId": "req_d19c7d3e",
+      "schemaVersion": 1,
+      "status": "candidate"
+    },
+    "providerMode": "live"
+  },
+  "error": null,
+  "next": [
+    {
+      "args": [
+        "--run",
+        ".",
+        "--decision",
+        "<acceptance.json>"
+      ],
+      "command": "run.image.accept",
+      "reason": "Inspect the candidate and bind an explicit decision to its digest."
+    }
+  ],
+  "outcome": "succeeded",
+  "protocolVersion": 1,
+  "run": {
+    "id": "304aac1e-c04c-466b-b786-30ac725b8f9d",
+    "stage": "rendered"
+  }
+}

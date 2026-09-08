@@ -40,7 +40,7 @@ export const timelineMeta: SceneMeta = {
     'showing a numeric measure that moves over time → line_chart',
     'comparing discrete named categories → bar_chart',
     'showing a single figure, dated or not → stat_counter',
-    'showing ordered steps that carry no dates → diagram',
+    'showing ordered steps that carry no dates → process_steps',
   ],
   supportsEvents: true,
   requiresAssets: false,

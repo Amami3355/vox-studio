@@ -1,0 +1,9 @@
+{
+  "language": "English",
+  "durationSeconds": 50,
+  "maxGeneratedImages": 5,
+  "production": {
+    "voice": {"provider": "elevenlabs", "voiceId": "JBFqnCBsd6RMkjVDRZzb", "modelId": "eleven_multilingual_v2", "seed": 7},
+    "maxNewTakes": 1
+  }
+}

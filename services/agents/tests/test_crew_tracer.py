@@ -725,7 +725,7 @@ def test_a_shape_refusal_is_repaired_before_production_is_reached_once() -> None
     }
 
     class SceneAuthor:
-        async def author(self, *_args: Any) -> Mapping[str, Any]:
+        async def author(self, *_args: Any, context=None) -> Mapping[str, Any]:
             return {"scenes": [invalid_fill]}
 
     class Repair:

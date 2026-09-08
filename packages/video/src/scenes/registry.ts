@@ -2,7 +2,9 @@ import type { SceneCapability } from '../core/types';
 import { barChartCapability } from './BarChartScene';
 import { characterExplainerCapability } from './CharacterExplainerScene';
 import { imageContextCapability } from './ImageContextScene';
+import { imageDetailCapability } from './ImageDetailScene';
 import { lineChartCapability } from './LineChartScene';
+import { processStepsCapability } from './ProcessStepsScene';
 import { quoteCapability } from './QuoteScene';
 import { statCounterCapability } from './StatCounterScene';
 import { timelineCapability } from './TimelineScene';
@@ -17,6 +19,8 @@ export const registry: SceneCapability[] = [
   barChartCapability,
   characterExplainerCapability,
   imageContextCapability,
+  imageDetailCapability,
+  processStepsCapability,
   lineChartCapability,
   quoteCapability,
   statCounterCapability,

@@ -41,6 +41,7 @@ from .crew_contract import (
     read_image_decisions,
 )
 from .crew_state import CrewStateStore, InMemoryCrewStateStore
+from .editorial import EditorialRejected
 from .image_generation import ImageJob, ImageJobStatus
 
 
@@ -445,6 +446,22 @@ class ProductionCrew:
                     await self._visual_planner.plan(brief, dossier, narrative, visual_bible),
                     narrative,
                 )
+            except EditorialRejected:
+                reviews = list(getattr(self._visual_planner, "editorial_reviews", []))
+                yield event(
+                    CrewPhase.VISUAL_PLANNING, CrewRole.VISUAL_PLANNER,
+                    PhaseStatus.PAUSED, self._visual_planner.mode,
+                    "The visual story needs editorial revision before media production.",
+                    counts={"editorialReviews": len(reviews)},
+                )
+                update = terminal(Paused(
+                    run_id=None, summary="The visual story needs editorial revision.",
+                    reason="The bounded editorial review did not accept the plan.",
+                    resume_id=brief.id,
+                ))
+                await save(editorialReviews=reviews, terminal=update.to_mapping())
+                yield update
+                return
             except UnservableBrief as refusal:
                 yield event(
                     CrewPhase.VISUAL_PLANNING,
@@ -524,9 +541,12 @@ class ProductionCrew:
                 PhaseStatus.COMPLETED,
                 self._visual_planner.mode,
                 "A VideoPlan draft is ready for Production validation.",
-                counts={"beats": len(narrative.beats), "repairs": repairs},
+                counts={"beats": len(narrative.beats), "repairs": repairs,
+                        **({"editorialReviews": len(self._visual_planner.editorial_reviews)}
+                           if getattr(self._visual_planner, "editorial_reviews", []) else {})},
             )
-            await save(videoPlan=dict(plan))
+            await save(videoPlan=dict(plan),
+                       editorialReviews=list(getattr(self._visual_planner, "editorial_reviews", [])))
             yield planned
 
         asset_capable = bool(getattr(self._production, "asset_capable", False))

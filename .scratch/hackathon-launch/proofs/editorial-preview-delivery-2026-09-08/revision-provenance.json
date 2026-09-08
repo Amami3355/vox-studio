@@ -1,0 +1,10 @@
+{
+  "previousBriefId": "editorial-preview-reusable-rocket-2026-09-08-revision-1",
+  "previousJournalSha256": "9ae093d9b7c69277f78a51757f0811e53bf73a20df850c7b0f2ab9c58f88f2ac",
+  "inheritedDispatches": 20,
+  "inheritedGroundedDispatches": 2,
+  "reason": "Explicit operator primary-source supplement, then new crew creative preparation before any recording.",
+  "previousMediaSpending": 0,
+  "maxModelCallsIncludingInherited": 40,
+  "maxGroundedCallsIncludingInherited": 2
+}

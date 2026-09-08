@@ -5,6 +5,7 @@ import { type JsonValue, canonicalJson } from '../canonical-json';
 import { ProductionCommandService } from '../commands/service';
 import type { NetworkAdapter } from '../commands/service';
 import type { ImageGenerationGrant, ReplacementGrant } from '../contracts/schemas';
+import { AutonomousImageAuthority } from '../image/autonomous-authority';
 import { createGoogleImageAdapter } from '../image/google';
 import { DurationCalibrationStore } from '../preflight/calibration';
 import { createRemotionRenderAdapter } from '../render/remotion';
@@ -47,6 +48,7 @@ export type ProductionServiceConfiguration = {
   calibrationPath: string;
   remotionEntryPoint: string;
   browserExecutable: string | undefined;
+  autonomousImagesDirectory?: string;
 };
 
 export type Environment = Record<string, string | undefined>;
@@ -83,6 +85,9 @@ export const resolveProductionServiceConfiguration = (
     calibrationPath: resolve(required(env, 'VOX_CALIBRATION_PATH')),
     remotionEntryPoint: resolve(required(env, 'VOX_REMOTION_ENTRY')),
     browserExecutable: browserExecutable ? resolve(browserExecutable) : undefined,
+    ...(env.VOX_AUTONOMOUS_IMAGES_DIRECTORY
+      ? { autonomousImagesDirectory: resolve(env.VOX_AUTONOMOUS_IMAGES_DIRECTORY) }
+      : {}),
   };
 };
 
@@ -151,6 +156,12 @@ export const createConfiguredProductionService = (
     verifyReplacementGrant: replacementGrantVerifier(configuration.grantKey),
     imageGenerator: createGoogleImageAdapter(),
     verifyImageGrant: imageGrantVerifier(configuration.grantKey),
+    autonomousImages: configuration.autonomousImagesDirectory
+      ? new AutonomousImageAuthority(
+          configuration.autonomousImagesDirectory,
+          configuration.grantKey,
+        )
+      : undefined,
     renderer: createRemotionRenderAdapter({
       entryPoint: configuration.remotionEntryPoint,
       browserExecutable: configuration.browserExecutable,

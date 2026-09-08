@@ -32,7 +32,7 @@ Paths in the table below are relative to `packages/video/` unless they start wit
 | the component studio grid | `apps/component-studio/src/App.tsx:62` | flattens the registry |
 | the catalog checklist tests | `tests/catalog-contract.test.ts:91` | `describe.each` over the registry |
 
-Capability names are hard-coded in two places, and neither of them is on the render path:
+Capability names are also hand-written outside the render path:
 
 - `packages/video/src/catalog/structural-examples.ts:20,44` — the whole-plan examples the
   manifest publishes. A new capability does not have to appear here, but this is where you
@@ -40,6 +40,9 @@ Capability names are hard-coded in two places, and neither of them is on the ren
 - `packages/production/src/proof/northbridge.ts:82,100` and `harness.ts:869`,
   `assertions.ts:227` — the paid Northbridge proof. It describes one specific demo video,
   not the general path, and a new capability does not touch it.
+- `packages/video/tests/render/safe-area.test.ts` — the guard asserting the generated
+  composition matrix is complete. Add the new capability's declared compositions to that
+  expected list, then exercise its cases. This is a coverage assertion, not a second registry.
 
 ## Renaming the copy
 
@@ -172,6 +175,11 @@ stale registry: register a capability, skip `pnpm catalog`, and all 400-odd unit
 green while the manifest the agent reads knows nothing about it.
 
 `pnpm catalog:check` is the only gate that goes red. Run it.
+
+The Python crew also replays published contract envelopes in its tests. After changing the
+catalog, refresh those envelopes with `pnpm --filter @vox/production record:crew-fixtures`.
+`packages/production/tests/crew-fixture-freshness.test.ts` checks their bytes against the current
+handlers; refreshing is a local contract recording and makes no provider calls.
 
 ### The examples constraint that surprises people
 

@@ -25,6 +25,10 @@ coverage/
 !.scratch/cloud-phase/**/*.txt
 # Public milestone-2 evidence only; media, credentials and signed grants remain ignored.
 !.scratch/hackathon-launch/proofs/milestone-2-delivery-2026-09-08/*.json
+# Public editorial preview receipts; generated media and signed grants stay ignored.
+!.scratch/hackathon-launch/proofs/editorial-preview-delivery-2026-09-08/*.json
+# Public autonomous trial receipts; runtime state, grants and media remain ignored.
+!.scratch/hackathon-launch/proofs/autonomous-delivery-2026-09-08/*.json
 
 # The crew is a self-contained Python project; its environment, caches and build metadata
 # are local.

@@ -76,7 +76,28 @@ export const commandOutcomeSchema = z.enum([
 export const productionRequestSchema = z
   .object({
     protocolVersion: z.literal(PROTOCOL_VERSION),
-    brief: z.object({ id: nonEmpty, text: nonEmpty }).strict(),
+    brief: z
+      .object({
+        id: nonEmpty,
+        text: nonEmpty,
+        durationSeconds: z
+          .number()
+          .finite()
+          .positive()
+          .optional()
+          .describe(
+            'Estimated target duration in seconds, not authored scene timing or a word quota.',
+          ),
+        maxGeneratedImages: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'Maximum new image generation jobs in this Run, including failed attempts; reuse is free. This is not a required image or scene count.',
+          ),
+      })
+      .strict(),
     production: z
       .object({
         voice: z
@@ -123,6 +144,7 @@ export const imageGenerationRequestSchema = z
     outputMimeType: z.literal('image/png'),
     seed: z.number().int().min(0).max(0x7fffffff),
     requestSha256: sha256,
+    retryOf: nonEmpty.optional(),
   })
   .strict();
 
@@ -147,7 +169,12 @@ export const imageAcceptanceSchema = z
   .strict();
 
 export const imageRejectionSchema = z
-  .object({ protocolVersion: z.literal(PROTOCOL_VERSION), jobId: nonEmpty })
+  .object({
+    protocolVersion: z.literal(PROTOCOL_VERSION),
+    jobId: nonEmpty,
+    candidateSha256: sha256.optional(),
+    reason: nonEmpty.optional(),
+  })
   .strict();
 
 export const artifactDescriptorSchema = z
@@ -170,6 +197,20 @@ export const imageCandidateSchema = z
   })
   .strict();
 
+export const imageRecoveryPolicySchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    requestSha256: sha256,
+    runId: nonEmpty,
+    maxImageAttempts: z.number().int().min(1).max(8),
+    minimumIntervalSeconds: z.number().int().min(60).max(600),
+    retryHttpStatuses: z.tuple([z.literal(429)]),
+    authorizedAt: z.iso.datetime({ offset: true }),
+    expiresAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+export type ImageRecoveryPolicy = z.infer<typeof imageRecoveryPolicySchema>;
+
 export const imageJobSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -181,6 +222,8 @@ export const imageJobSchema = z
     status: z.enum(['dispatching', 'candidate', 'accepted', 'rejected', 'failed', 'uncertain']),
     candidate: imageCandidateSchema.nullable(),
     failure: nonEmpty.nullable(),
+    dispatchedAt: z.iso.datetime({ offset: true }).optional(),
+    retryOf: nonEmpty.optional(),
   })
   .strict()
   .superRefine((job, context) => {
@@ -360,6 +403,12 @@ export const commandDataSchemas = {
       staleStages: z.array(runStageSchema),
       lastOutcome: commandOutcomeSchema,
       artifacts: z.array(artifactDescriptorSchema),
+      imageRecoveryPolicy: imageRecoveryPolicySchema
+        .extend({
+          nextImageDispatchAt: z.iso.datetime({ offset: true }),
+          attemptsUsed: z.number().int().nonnegative(),
+        })
+        .optional(),
     })
     .strict(),
   'run.decline': declineSchema,
@@ -386,6 +435,9 @@ export const commandDataSchemas = {
       })
       .strict(),
     z.object({ reason: z.literal('IMAGE_AUTHORIZATION_REQUIRED') }).strict(),
+    z
+      .object({ reason: z.literal('IMAGE_RATE_WAIT'), notBefore: z.iso.datetime({ offset: true }) })
+      .strict(),
   ]),
   'run.image.status': z.object({ job: imageJobSchema }).strict(),
   'run.image.accept': z.object({ job: imageJobSchema }).strict(),

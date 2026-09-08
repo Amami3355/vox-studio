@@ -1097,6 +1097,454 @@
         ]
       },
       {
+        "id": "image_detail",
+        "name": "ImageDetailScene",
+        "family": "context",
+        "summary": "A large image with anchored reframing and replaceable annotations for visual explanation.",
+        "useWhen": [
+          "letting an illustration carry the explanation",
+          "moving from a whole subject to a prepared detail on a spoken word",
+          "reusing one image for several views across narration"
+        ],
+        "avoidWhen": [
+          "pairing an image with a substantial text column → image_context",
+          "showing ordered stages without dates → process_steps",
+          "articulating parts of a flattened image requires separate assets or a schematic process → process_steps"
+        ],
+        "supportsEvents": true,
+        "requiresAssets": true,
+        "occupiesRegions": [
+          "full"
+        ],
+        "supportedCompositions": [
+          "full"
+        ],
+        "minDurationFrames": 60,
+        "recommendedDurationFrames": 150,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "headline": {
+              "default": "",
+              "description": "Optional introductory title. Leave empty when the image explains on its own.",
+              "type": "string",
+              "maxLength": 120
+            },
+            "caption": {
+              "default": "",
+              "description": "Optional context or illustration disclosure, set outside the image.",
+              "type": "string",
+              "maxLength": 240
+            },
+            "assetRequirement": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "character",
+                    "map",
+                    "document"
+                  ],
+                  "description": "Semantic kind of visual material required by the scene."
+                },
+                "subject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "description": "Visual subject in natural language. Never a path or URI."
+                },
+                "treatment": {
+                  "default": "photo",
+                  "description": "Editorial treatment requested from the Asset Resolver.",
+                  "type": "string",
+                  "enum": [
+                    "photo",
+                    "cutout",
+                    "illustration",
+                    "duotone"
+                  ]
+                },
+                "orientation": {
+                  "default": "landscape",
+                  "description": "Composition the resolved asset should support.",
+                  "type": "string",
+                  "enum": [
+                    "landscape",
+                    "portrait",
+                    "square"
+                  ]
+                },
+                "identityKey": {
+                  "description": "Stable identity shared by requirements that must resolve to the same asset.",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
+              "required": [
+                "type",
+                "subject"
+              ],
+              "additionalProperties": false,
+              "description": "A deliberately composed image. Name the location of a detail in the subject only when needed. The whole image is initially contained without cropping. Never provide a path."
+            }
+          },
+          "required": [
+            "assetRequirement"
+          ],
+          "additionalProperties": false
+        },
+        "softConstraints": {
+          "headline": {
+            "recommendedMax": 50,
+            "onExceed": "The title fits down and leaves less space for the image.",
+            "onExceedCode": "TITLE_DENSITY"
+          },
+          "caption": {
+            "recommendedMax": 120,
+            "onExceed": "More caption lines leave less height for the image."
+          }
+        },
+        "layouts": [
+          {
+            "id": "plate",
+            "description": "An image occupies the remaining frame between optional title and caption, with annotations over its lower edge.",
+            "slots": [
+              "headline",
+              "image",
+              "caption"
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "id": "focus",
+            "description": "Reframe the image content toward a prepared region, or return to the whole image. Use a word anchor when the narration motivates the detail. This moves a flattened image, never its articulated parts. Confirm that the accepted image actually places the subject in that region.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "enum": [
+                    "whole",
+                    "center",
+                    "top",
+                    "bottom",
+                    "left",
+                    "right"
+                  ],
+                  "description": "Semantic region of the prepared image. Whole restores the complete uncropped view."
+                }
+              },
+              "required": [
+                "region"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "id": "annotate",
+            "description": "Replace the short explanatory note over the image. Use the word anchor that motivates the explanation; this is an annotation, not a precise identification of a depicted part.",
+            "payloadSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "description": "An explanatory note supported by the narration and image. No invented technical precision."
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "id": "clearAnnotation",
+            "description": "Remove the annotation when it has been read so the subject has room again.",
+            "payloadSchema": null
+          }
+        ],
+        "examples": [
+          {
+            "id": "example-image-detail-explain",
+            "title": "Whole subject to a prepared detail",
+            "note": "An illustrated explanation evolves within the same SceneInstance. The accepted image must have its pores at the lower edge.",
+            "component": "image_detail",
+            "layout": "plate",
+            "motionProfile": "subtleDrift",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "props": {
+              "headline": "",
+              "caption": "Illustration",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "A leaf cross-section with pores along its lower edge",
+                "treatment": "illustration",
+                "orientation": "landscape",
+                "identityKey": "leaf-cross-section"
+              }
+            },
+            "events": [
+              {
+                "at": "b2.start",
+                "action": "focus",
+                "payload": {
+                  "region": "bottom"
+                }
+              },
+              {
+                "at": "b2.start",
+                "action": "annotate",
+                "payload": {
+                  "text": "Pores regulate exchange"
+                }
+              },
+              {
+                "at": "b3.start",
+                "action": "clearAnnotation"
+              },
+              {
+                "at": "b3.start",
+                "action": "focus",
+                "payload": {
+                  "region": "whole"
+                }
+              }
+            ]
+          },
+          {
+            "id": "example-image-detail-edge",
+            "title": "Edge case — contextual copy",
+            "note": "Longer context leaves a smaller but fully contained image.",
+            "component": "image_detail",
+            "layout": "plate",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "A small opening connects the leaf with the air around it",
+              "caption": "Conceptual illustration: the relative dimensions are simplified to show the relationship.",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "A leaf cross-section with pores along its lower edge",
+                "treatment": "illustration",
+                "orientation": "landscape",
+                "identityKey": "leaf-cross-section"
+              }
+            }
+          },
+          {
+            "id": "example-image-detail-empty",
+            "title": "Empty copy — let the image speak",
+            "note": "Empty title and caption give the full plate to the subject.",
+            "component": "image_detail",
+            "layout": "plate",
+            "motionProfile": "cinematic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "",
+              "caption": "",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "A leaf cross-section with pores along its lower edge",
+                "treatment": "illustration",
+                "orientation": "landscape",
+                "identityKey": "leaf-cross-section"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "process_steps",
+        "name": "ProcessStepsScene",
+        "family": "diagram",
+        "summary": "A schematic process whose active stage and connecting path advance with narration, without invented dates.",
+        "useWhen": [
+          "explaining a sequence of states, causes or operations",
+          "showing how a process reaches its outcome on spoken-word anchors"
+        ],
+        "avoidWhen": [
+          "showing dated historical events → timeline",
+          "showing the physical appearance of an object → image_detail",
+          "comparing measured quantities → bar_chart"
+        ],
+        "supportsEvents": true,
+        "requiresAssets": false,
+        "occupiesRegions": [
+          "full"
+        ],
+        "supportedCompositions": [
+          "full"
+        ],
+        "minDurationFrames": 60,
+        "recommendedDurationFrames": 180,
+        "propsSchema": {
+          "type": "object",
+          "properties": {
+            "headline": {
+              "default": "",
+              "description": "Optional process title, not a repeated paragraph.",
+              "type": "string",
+              "maxLength": 120
+            },
+            "steps": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Name of this stage or state."
+                  },
+                  "detail": {
+                    "default": "",
+                    "description": "What changes at this stage and why it matters.",
+                    "type": "string",
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              "description": "Ordered stages. Choose their count from the explanation, not from a template quota. Only active-stage copy is shown; the path retains the sequence. Empty is a deliberate unavailable-process state."
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "additionalProperties": false
+        },
+        "softConstraints": {
+          "headline": {
+            "recommendedMax": 50,
+            "onExceed": "The process title fits down to remain within the frame.",
+            "onExceedCode": "TITLE_DENSITY"
+          },
+          "steps": {
+            "recommendedMax": 8,
+            "onEmpty": "The title and an unavailable-process label remain; no stages are invented.",
+            "onExceed": "Stage markers become smaller; only active-stage copy is displayed."
+          }
+        },
+        "layouts": [
+          {
+            "id": "path",
+            "description": "A connecting path above the active stage and its explanation. Other stages remain as markers, preserving readable copy even for long sequences.",
+            "slots": [
+              "headline",
+              "path",
+              "stage"
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "id": "advance",
+            "description": "Advance to the next authored stage, animate the connecting path and reveal that stage explanation. The first advance reveals the first stage. Use the word anchor that motivates the change; dates and numerical timings are unnecessary.",
+            "payloadSchema": null
+          }
+        ],
+        "examples": [
+          {
+            "id": "example-process-steps-driven",
+            "title": "Explain a process as it unfolds",
+            "note": "Boundary anchors illustrate progression; a real Take supports word anchors on the phrase motivating each stage.",
+            "component": "process_steps",
+            "layout": "path",
+            "motionProfile": "energetic",
+            "spansBeats": [
+              "b1",
+              "b2",
+              "b3"
+            ],
+            "props": {
+              "headline": "From input to outcome",
+              "steps": [
+                {
+                  "label": "Intake",
+                  "detail": "Material enters the system."
+                },
+                {
+                  "label": "Transformation",
+                  "detail": "The system changes the material."
+                },
+                {
+                  "label": "Output",
+                  "detail": "The transformed material leaves the system."
+                }
+              ]
+            },
+            "events": [
+              {
+                "at": "b1.start",
+                "action": "advance"
+              },
+              {
+                "at": "b2.start",
+                "action": "advance"
+              },
+              {
+                "at": "b3.start",
+                "action": "advance"
+              }
+            ]
+          },
+          {
+            "id": "example-process-steps-edge",
+            "title": "Edge case — one state",
+            "note": "A single state has a marker and explanation, with no invented connection.",
+            "component": "process_steps",
+            "layout": "path",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "",
+              "steps": [
+                {
+                  "label": "Equilibrium",
+                  "detail": "The system remains in balance."
+                }
+              ]
+            }
+          },
+          {
+            "id": "example-process-steps-empty",
+            "title": "Empty process",
+            "note": "An empty process preserves its contextual title and an unavailable-process label without inventing stages.",
+            "component": "process_steps",
+            "layout": "path",
+            "motionProfile": "editorialStatic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "No stages established",
+              "steps": []
+            }
+          }
+        ]
+      },
+      {
         "id": "line_chart",
         "name": "LineChartScene",
         "family": "data",
@@ -2106,7 +2554,7 @@
           "showing a numeric measure that moves over time → line_chart",
           "comparing discrete named categories → bar_chart",
           "showing a single figure, dated or not → stat_counter",
-          "showing ordered steps that carry no dates → diagram"
+          "showing ordered steps that carry no dates → process_steps"
         ],
         "supportsEvents": true,
         "requiresAssets": false,

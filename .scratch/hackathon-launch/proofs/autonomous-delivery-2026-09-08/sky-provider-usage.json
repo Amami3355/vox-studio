@@ -1,0 +1,531 @@
+{
+  "usage": {
+    "totalDispatchAttempts": 17,
+    "groundedSearches": 1,
+    "byRole": {
+      "Director": 4,
+      "ParallelGroundedResearch": 1,
+      "NarrativeAgent": 1,
+      "ArtDirectorAgent": 1,
+      "VisualStructurer": 1,
+      "SceneAuthor": 8,
+      "PlanRepairAgent": 1
+    },
+    "pending": [],
+    "imageGenerations": 0,
+    "narrations": 0,
+    "technicalRepairs": 1,
+    "editorialCorrections": 0,
+    "filmCorrections": 0
+  },
+  "records": [
+    {
+      "id": "fd251018-ad2c-45a4-8d24-7c3404f1bdf3",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:39:46.662854+00:00"
+    },
+    {
+      "id": "fd251018-ad2c-45a4-8d24-7c3404f1bdf3",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 524,
+        "candidates_token_count": 144,
+        "thoughts_token_count": 293,
+        "total_token_count": 961
+      },
+      "observedAt": "2026-09-08T05:39:50.233895+00:00"
+    },
+    {
+      "id": "2abe6c03-f3ef-44f4-bd1a-74b65a3143c7",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ParallelGroundedResearch",
+      "model": "gemini-3.5-flash",
+      "grounded": true,
+      "observedAt": "2026-09-08T05:39:50.386281+00:00"
+    },
+    {
+      "id": "2abe6c03-f3ef-44f4-bd1a-74b65a3143c7",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 178,
+        "candidates_token_count": 573,
+        "thoughts_token_count": 2331,
+        "total_token_count": 3082
+      },
+      "searchQueries": [
+        "\"Rayleigh scattering\" \"blue sky\" \"human eye\" \"cones\"",
+        "why is the sky blue rayleigh scattering human eye sensitivity"
+      ],
+      "sources": [
+        {
+          "id": "source-1",
+          "title": "Visible Light - NASA Science",
+          "url": "https://science.nasa.gov/ems/09_visiblelight/"
+        },
+        {
+          "id": "source-2",
+          "title": "Science Behind It: Why Sky Is Blue? ",
+          "url": "https://www.jagranjosh.com/general-knowledge/science-behind-it-why-sky-is-blue-1727710489-1"
+        },
+        {
+          "id": "source-3",
+          "title": "Why is the sky blue? | Science Questions with Surprising Answers",
+          "url": "https://www.wtamu.edu/~cbaird/sq/2013/03/28/why-is-the-sky-blue/"
+        },
+        {
+          "id": "source-4",
+          "title": "S D",
+          "url": "https://www.patarnott.com/atms749/pdf/blueSkyHumanResponse.pdf"
+        },
+        {
+          "id": "source-5",
+          "title": "Rayleigh scattering | Chemistry | Research Starters | EBSCOhost",
+          "url": "https://www.ebsco.com/research-starters/chemistry/rayleigh-scattering"
+        },
+        {
+          "id": "source-6",
+          "title": "Why isn't the sky violet?",
+          "url": "http://www.atmo.arizona.edu/students/courselinks/fall14/atmo170a1s2/lecture_notes/scattering/why_not_violet.html"
+        },
+        {
+          "id": "source-7",
+          "title": "visible light - Why is the sky not purple? - Physics Stack Exchange",
+          "url": "https://physics.stackexchange.com/questions/28895/why-is-the-sky-not-purple"
+        },
+        {
+          "id": "source-8",
+          "title": "Why Is The Sky Blue?",
+          "url": "https://www.weather.gov/fgz/SkyBlue"
+        }
+      ],
+      "supports": [
+        {
+          "claimId": "claim-1",
+          "partIndex": 0,
+          "startIndex": 0,
+          "endIndex": 171,
+          "sourceIds": [
+            "source-1",
+            "source-2"
+          ]
+        },
+        {
+          "claimId": "claim-2",
+          "partIndex": 0,
+          "startIndex": 175,
+          "endIndex": 338,
+          "sourceIds": [
+            "source-2",
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-3",
+          "partIndex": 0,
+          "startIndex": 342,
+          "endIndex": 514,
+          "sourceIds": [
+            "source-4",
+            "source-2",
+            "source-5"
+          ]
+        },
+        {
+          "claimId": "claim-4",
+          "partIndex": 0,
+          "startIndex": 518,
+          "endIndex": 726,
+          "sourceIds": [
+            "source-2",
+            "source-5"
+          ]
+        },
+        {
+          "claimId": "claim-5",
+          "partIndex": 0,
+          "startIndex": 730,
+          "endIndex": 949,
+          "sourceIds": [
+            "source-6",
+            "source-4"
+          ]
+        },
+        {
+          "claimId": "claim-6",
+          "partIndex": 0,
+          "startIndex": 953,
+          "endIndex": 1131,
+          "sourceIds": [
+            "source-4",
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-7",
+          "partIndex": 0,
+          "startIndex": 1135,
+          "endIndex": 1328,
+          "sourceIds": [
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-8",
+          "partIndex": 0,
+          "startIndex": 1332,
+          "endIndex": 1555,
+          "sourceIds": [
+            "source-4",
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-9",
+          "partIndex": 0,
+          "startIndex": 1559,
+          "endIndex": 1704,
+          "sourceIds": [
+            "source-6"
+          ]
+        },
+        {
+          "claimId": "claim-10",
+          "partIndex": 0,
+          "startIndex": 1708,
+          "endIndex": 1903,
+          "sourceIds": [
+            "source-6",
+            "source-4",
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-11",
+          "partIndex": 0,
+          "startIndex": 1907,
+          "endIndex": 2169,
+          "sourceIds": [
+            "source-7",
+            "source-2",
+            "source-8"
+          ]
+        }
+      ],
+      "answerParts": [
+        {
+          "partIndex": 0,
+          "text": "Sunlight, which contains a broad spectrum of wavelengths from red to violet, enters Earth's atmosphere where it interacts with gas molecules, primarily nitrogen and oxygen. \n\nBecause these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight through a process called Rayleigh scattering. \n\nAccording to Rayleigh's mathematical formulation, the intensity of scattered light is inversely proportional to the fourth power of its wavelength ($I \\propto 1/\\lambda^4$). \n\nAs a result of this fourth-power relationship, shorter wavelengths of light (such as blue and violet) scatter far more efficiently and in all directions compared to longer wavelengths (such as red and orange). \n\nAlthough violet light has the shortest visible wavelength and is scattered most intensely by the atmosphere, the sky does not appear violet due to the spectral composition of sunlight and the limitations of human vision. \n\nFirst, the sunlight entering Earth's atmosphere follows a thermal blackbody distribution that peaks in the visible range and inherently contains less violet light than blue light. \n\nSecond, as sunlight travels through the atmosphere, violet light undergoes greater bulk attenuation, which filters and removes a larger portion of it from the path before it reaches an observer. \n\nThird, the human retina detects color using three types of cone photoreceptors\u00e2\u20ac\u201dshort (S), medium (M), and long (L) wavelength-sensitive cones\u00e2\u20ac\u201dwhich are biologically much more sensitive to blue light than to violet light. \n\nWhen we look at the sky, the mixture of scattered light stimulates the S-cones strongly, while stimulating the M-cones and L-cones almost equally. \n\nThe brain interprets this specific combination of cone responses as an unsaturated, pale blue color (a metameric match to a mixture of pure blue and white light) rather than a pure blue or violet. \n\nAdditionally, larger atmospheric particles like dust, haze, and water vapor induce Mie scattering, which is less dependent on wavelength and scatters all colors more uniformly, further desaturating the sky's blue color toward white, particularly near the horizon."
+        }
+      ],
+      "extractionStatus": "validated",
+      "responseSha256": "2311dc8aee6cfcc9224e56159e8f62c0cd0788a638618d450e5bc4cb3c9c87c0",
+      "modelVersion": "gemini-3.5-flash",
+      "observedAt": "2026-09-08T05:40:06.180084+00:00"
+    },
+    {
+      "id": "03be6414-9c14-4dc4-9fd7-11eb8800c8e1",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:40:06.204924+00:00"
+    },
+    {
+      "id": "03be6414-9c14-4dc4-9fd7-11eb8800c8e1",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 3833,
+        "candidates_token_count": 51,
+        "thoughts_token_count": 544,
+        "total_token_count": 4428
+      },
+      "observedAt": "2026-09-08T05:40:09.929212+00:00"
+    },
+    {
+      "id": "83dbda54-3c56-42b9-a4bb-015673023d93",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "NarrativeAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:40:09.969330+00:00"
+    },
+    {
+      "id": "83dbda54-3c56-42b9-a4bb-015673023d93",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2153,
+        "candidates_token_count": 636,
+        "thoughts_token_count": 3780,
+        "total_token_count": 6569
+      },
+      "observedAt": "2026-09-08T05:40:29.430397+00:00"
+    },
+    {
+      "id": "006935b9-f498-4c66-9ae9-be59f0d29aac",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:40:29.465288+00:00"
+    },
+    {
+      "id": "006935b9-f498-4c66-9ae9-be59f0d29aac",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2824,
+        "candidates_token_count": 11,
+        "thoughts_token_count": 1896,
+        "total_token_count": 4731
+      },
+      "observedAt": "2026-09-08T05:40:38.604159+00:00"
+    },
+    {
+      "id": "b54efed3-39fa-4359-964a-9bcbdf9fc9e3",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ArtDirectorAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:40:38.636900+00:00"
+    },
+    {
+      "id": "b54efed3-39fa-4359-964a-9bcbdf9fc9e3",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2144,
+        "candidates_token_count": 172,
+        "thoughts_token_count": 920,
+        "total_token_count": 3236
+      },
+      "observedAt": "2026-09-08T05:40:44.209591+00:00"
+    },
+    {
+      "id": "4affaad3-0d20-4fb4-89a5-526b21e4fa51",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "VisualStructurer",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:40:44.260114+00:00"
+    },
+    {
+      "id": "4affaad3-0d20-4fb4-89a5-526b21e4fa51",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 4164,
+        "candidates_token_count": 617,
+        "thoughts_token_count": 2965,
+        "total_token_count": 7746
+      },
+      "observedAt": "2026-09-08T05:44:06.727683+00:00"
+    },
+    {
+      "id": "810502fd-c5fa-4a70-a9fc-002f2591aa74",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:06.790786+00:00"
+    },
+    {
+      "id": "810502fd-c5fa-4a70-a9fc-002f2591aa74",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 5921,
+        "candidates_token_count": 192,
+        "thoughts_token_count": 4077,
+        "total_token_count": 10190
+      },
+      "observedAt": "2026-09-08T05:44:24.125885+00:00"
+    },
+    {
+      "id": "dd219dc5-bed4-4019-912e-f4d171840bc6",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:24.142036+00:00"
+    },
+    {
+      "id": "dd219dc5-bed4-4019-912e-f4d171840bc6",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 10152,
+        "candidates_token_count": 204,
+        "thoughts_token_count": 53,
+        "total_token_count": 10409
+      },
+      "observedAt": "2026-09-08T05:44:25.952981+00:00"
+    },
+    {
+      "id": "f196f625-317a-4caa-ad4d-0118599866f1",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:25.975225+00:00"
+    },
+    {
+      "id": "f196f625-317a-4caa-ad4d-0118599866f1",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 10341,
+        "candidates_token_count": 244,
+        "thoughts_token_count": 377,
+        "total_token_count": 10962
+      },
+      "observedAt": "2026-09-08T05:44:28.762931+00:00"
+    },
+    {
+      "id": "b1b9310b-168a-42d6-80f6-971e0cd8d264",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:28.781235+00:00"
+    },
+    {
+      "id": "b1b9310b-168a-42d6-80f6-971e0cd8d264",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 10882,
+        "candidates_token_count": 219,
+        "thoughts_token_count": 414,
+        "total_token_count": 11515
+      },
+      "observedAt": "2026-09-08T05:44:31.703666+00:00"
+    },
+    {
+      "id": "3a167f11-12b3-4d56-8742-ce5c3bdaafa8",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:31.722426+00:00"
+    },
+    {
+      "id": "3a167f11-12b3-4d56-8742-ce5c3bdaafa8",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 11494,
+        "candidates_token_count": 214,
+        "thoughts_token_count": 284,
+        "total_token_count": 11992
+      },
+      "observedAt": "2026-09-08T05:44:34.454295+00:00"
+    },
+    {
+      "id": "43dd55f0-4ea5-4de2-a5e2-e364903306f8",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:34.472811+00:00"
+    },
+    {
+      "id": "43dd55f0-4ea5-4de2-a5e2-e364903306f8",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 11924,
+        "candidates_token_count": 275,
+        "thoughts_token_count": 445,
+        "total_token_count": 12644
+      },
+      "observedAt": "2026-09-08T05:44:37.968499+00:00"
+    },
+    {
+      "id": "d4896dab-3bdd-4847-96c0-fd82bb57396b",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:37.987705+00:00"
+    },
+    {
+      "id": "d4896dab-3bdd-4847-96c0-fd82bb57396b",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 12550,
+        "candidates_token_count": 907,
+        "thoughts_token_count": 323,
+        "total_token_count": 13780
+      },
+      "observedAt": "2026-09-08T05:44:43.220518+00:00"
+    },
+    {
+      "id": "d2dd702a-486c-4bbb-b02f-fb3c1e467d2f",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:43.233165+00:00"
+    },
+    {
+      "id": "d2dd702a-486c-4bbb-b02f-fb3c1e467d2f",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 13479,
+        "candidates_token_count": 1204,
+        "thoughts_token_count": 1623,
+        "total_token_count": 16306
+      },
+      "observedAt": "2026-09-08T05:44:54.413914+00:00"
+    },
+    {
+      "id": "eaa4483c-2f85-4963-996c-4ac441ac9ba3",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:44:54.532757+00:00"
+    },
+    {
+      "id": "eaa4483c-2f85-4963-996c-4ac441ac9ba3",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 6444,
+        "candidates_token_count": 17,
+        "thoughts_token_count": 4527,
+        "total_token_count": 10988
+      },
+      "observedAt": "2026-09-08T05:45:15.063070+00:00"
+    },
+    {
+      "id": "5f80d038-791e-4c3a-b1ea-9c67b11bd837",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "PlanRepairAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:45:15.401896+00:00"
+    },
+    {
+      "id": "5f80d038-791e-4c3a-b1ea-9c67b11bd837",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2816,
+        "candidates_token_count": 1324,
+        "thoughts_token_count": 1651,
+        "total_token_count": 5791
+      },
+      "observedAt": "2026-09-08T05:45:26.463101+00:00"
+    }
+  ]
+}

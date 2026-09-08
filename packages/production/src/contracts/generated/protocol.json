@@ -98,7 +98,7 @@
         "id": "run.image.start",
         "syntax": "vox production run image-start --run <run-dir> --request <image-request.json> [--authorisation <grant.json>]",
         "prerequisite": "a compiled ASSET_PLACEHOLDER work item; grant when the image provider is live",
-        "effect": "Create or resume one identity-bound image job and publish an inspectable candidate.",
+        "effect": "Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. A separate operator recovery policy permits retryOf naming the latest confirmed HTTP 429 job with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs count toward the effective image ceiling.",
         "readOnly": false,
         "network": "record_only",
         "quota": "may_spend"
@@ -124,8 +124,8 @@
       {
         "id": "run.image.reject",
         "syntax": "vox production run image-reject --run <run-dir> --decision <rejection.json>",
-        "prerequisite": "an inspectable candidate",
-        "effect": "Reject the candidate while retaining the honest placeholder path.",
+        "prerequisite": "an inspectable candidate, or an accepted image with candidateSha256 and reason",
+        "effect": "Reject a pending candidate or withdraw exact accepted bytes with a reason. Preserve jobs, grants and quota; stale compilation and render bindings. Recompile before correcting the requirement.",
         "readOnly": false,
         "network": "forbidden",
         "quota": "never"
@@ -207,6 +207,17 @@
               "text": {
                 "type": "string",
                 "minLength": 1
+              },
+              "durationSeconds": {
+                "description": "Estimated target duration in seconds, not authored scene timing or a word quota.",
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "maxGeneratedImages": {
+                "description": "Maximum new image generation jobs in this Run, including failed attempts; reuse is free. This is not a required image or scene count.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -397,6 +408,10 @@
           "requestSha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "retryOf": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -490,6 +505,14 @@
             "const": 1
           },
           "jobId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidateSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "reason": {
             "type": "string",
             "minLength": 1
           }
@@ -623,6 +646,15 @@
                 "type": "null"
               }
             ]
+          },
+          "dispatchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "retryOf": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -1504,6 +1536,75 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "imageRecoveryPolicy": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "const": 1
+                },
+                "requestSha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "maxImageAttempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "minimumIntervalSeconds": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 600
+                },
+                "retryHttpStatuses": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "const": 429
+                    }
+                  ]
+                },
+                "authorizedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "nextImageDispatchAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "attemptsUsed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "requestSha256",
+                "runId",
+                "maxImageAttempts",
+                "minimumIntervalSeconds",
+                "retryHttpStatuses",
+                "authorizedAt",
+                "expiresAt",
+                "nextImageDispatchAt",
+                "attemptsUsed"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -2365,6 +2466,15 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "dispatchedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "retryOf": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [
@@ -2398,6 +2508,25 @@
               },
               "required": [
                 "reason"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "const": "IMAGE_RATE_WAIT"
+                },
+                "notBefore": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                }
+              },
+              "required": [
+                "reason",
+                "notBefore"
               ],
               "additionalProperties": false
             }
@@ -2529,6 +2658,15 @@
                       "type": "null"
                     }
                   ]
+                },
+                "dispatchedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "retryOf": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "required": [
@@ -2676,6 +2814,15 @@
                       "type": "null"
                     }
                   ]
+                },
+                "dispatchedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "retryOf": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "required": [
@@ -2823,6 +2970,15 @@
                       "type": "null"
                     }
                   ]
+                },
+                "dispatchedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "retryOf": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "required": [

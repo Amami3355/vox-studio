@@ -1,0 +1,56 @@
+{
+  "artifacts": [
+    {
+      "kind": "generated_image_candidate",
+      "path": "artifacts/images/image-job-ddd8db74dab88be3e4dc/020aa654894431a2aebb23caa456bba738b77bf9d93043b98e00e729f11d3873.png",
+      "sha256": "020aa654894431a2aebb23caa456bba738b77bf9d93043b98e00e729f11d3873"
+    }
+  ],
+  "command": "run.image.start",
+  "data": {
+    "disposition": "created",
+    "job": {
+      "candidate": {
+        "artifact": {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-ddd8db74dab88be3e4dc/020aa654894431a2aebb23caa456bba738b77bf9d93043b98e00e729f11d3873.png",
+          "sha256": "020aa654894431a2aebb23caa456bba738b77bf9d93043b98e00e729f11d3873"
+        },
+        "height": 768,
+        "id": "image-candidate-020aa654894431a2aebb",
+        "identityKey": "landing-touchdown-sequence",
+        "promptSha256": "6addfb88a974fefad337e2ec592e2cdf3fedc82fbf9056967afced8c35294bf9",
+        "requirementId": "req_5b23f310",
+        "width": 1344
+      },
+      "failure": null,
+      "id": "image-job-ddd8db74dab88be3e4dc",
+      "identityKey": "landing-touchdown-sequence",
+      "providerMode": "live",
+      "requestSha256": "f4fb029c91fa7bab359640ee39dc5c22133ccc3c1c99e2637a9e274a0c3ff843",
+      "requirementId": "req_5b23f310",
+      "schemaVersion": 1,
+      "status": "candidate"
+    },
+    "providerMode": "live"
+  },
+  "error": null,
+  "next": [
+    {
+      "args": [
+        "--run",
+        ".",
+        "--decision",
+        "<acceptance.json>"
+      ],
+      "command": "run.image.accept",
+      "reason": "Inspect the candidate and bind an explicit decision to its digest."
+    }
+  ],
+  "outcome": "succeeded",
+  "protocolVersion": 1,
+  "run": {
+    "id": "304aac1e-c04c-466b-b786-30ac725b8f9d",
+    "stage": "rendered"
+  }
+}

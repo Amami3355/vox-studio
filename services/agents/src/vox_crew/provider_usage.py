@@ -5,6 +5,7 @@ credential or model reasoning. An unfinished dispatch blocks a new attempt until
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from contextvars import ContextVar
@@ -25,6 +26,8 @@ class ProviderJournal:
         self.path = path
         self.max_calls = max_calls
         self.max_grounded_calls = max_grounded_calls
+        # Concurrent creative roles share this journal's one outstanding dispatch.
+        self.model_turn_lock = asyncio.Lock()
         self.records = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
         opened = {row["id"] for row in self.records if row["status"] == "dispatched"}
         closed = {row["id"] for row in self.records if row["status"] == "responded"}
@@ -47,7 +50,7 @@ class ProviderJournal:
             os.fsync(stream.fileno())
         self.records.append(row)
 
-    def begin(self, role: str, model: str, *, grounded: bool = False) -> str:
+    def begin(self, role: str, model: str, *, grounded: bool = False, provider: str = "google-cloud") -> str:
         dispatches = [r for r in self.records if r["status"] == "dispatched"]
         completed = {r["id"] for r in self.records if r["status"] == "responded"}
         if any(r["id"] not in completed for r in dispatches):
@@ -57,7 +60,7 @@ class ProviderJournal:
         if grounded and sum(r["grounded"] for r in dispatches) >= self.max_grounded_calls:
             raise ProviderLimit("The operator grounded-research ceiling has been reached.")
         call_id = str(uuid4())
-        self.append({"id": call_id, "status": "dispatched", "provider": "google-cloud",
+        self.append({"id": call_id, "status": "dispatched", "provider": provider,
                      "role": role, "model": model, "grounded": grounded})
         return call_id
 
@@ -79,5 +82,7 @@ def finish_call(call_id: str | None, usage: Any = None, **evidence: Any) -> None
         if isinstance(value, int) and not isinstance(value, bool):
             counts[field] = value
     allowed = {key: value for key, value in evidence.items()
-               if key in {"searchQueries", "sources", "supports", "responseSha256", "modelVersion"}}
+               if key in {"searchQueries", "sources", "supports", "responseSha256", "modelVersion",
+                          "answerParts", "extractionStatus", "mediaSha256", "providerHttpStatus",
+                          "providerOutcome", "contextSha256"}}
     journal.append({"id": call_id, "status": "responded", "usage": counts, **allowed})

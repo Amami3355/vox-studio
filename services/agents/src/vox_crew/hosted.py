@@ -171,7 +171,12 @@ async def _run_attempt(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("probe", "run"))
+    parser.add_argument("command", choices=("probe", "run", "prompt"))
+    parser.add_argument("text", nargs="?")
+    parser.add_argument("--duration", type=float)
+    parser.add_argument("--language")
+    parser.add_argument("--submission-id")
+    parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--state", type=Path, default=Path("/var/lib/vox-crew"))
     parser.add_argument("--config", type=Path, default=Path("/etc/vox-crew"))
     parser.add_argument("--run-id")
@@ -187,13 +192,20 @@ def main() -> int:
         read_policy(args.config / "operator-policy.json")
         print(json.dumps(probe(client, state, args.run_id), indent=2), flush=True)
         return 0
-    if args.request is None:
+    if args.command == "prompt" and not args.text:
+        parser.error("prompt requires the original prompt text")
+    if args.command == "run" and args.request is None:
         parser.error("run requires an operator-staged --request")
     # Linux flock is released on death. It prevents concurrent attempts without silently resuming one.
     import fcntl
 
     with (state / "worker.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.command == "prompt":
+            from .autonomous_entry import submit_prompt
+            return asyncio.run(submit_prompt(client, state, args.config, args.text,
+                duration=args.duration, language=args.language, submission_id=args.submission_id,
+                prepare_only=args.prepare_only))
         request = json.loads(args.request.read_text(encoding="utf-8"))
         return asyncio.run(run_attempt(client, state, args.config, request,
                                       brief_kind=BriefKind(args.brief_kind)))

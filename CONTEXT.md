@@ -7,6 +7,23 @@ This file is the glossary. Use these terms verbatim — the synonyms listed unde
 
 ## Glossary
 
+**Editorial brief** — The Director's interpretation of an original prompt: central question,
+audience, language, angle, understanding goals and target duration. It does not replace the
+original request or confer spending authority.
+
+**Coverage review** — A judgement of whether cited evidence answers the central question,
+explains the mechanism and covers necessary nuances. Valid citations alone do not imply coverage.
+
+**Image intention** — The meaning, arrangement, visible details and intended crops of one image,
+including which explanatory elements belong to its renderer rather than to the image itself.
+
+**Media review** — An explicit judgement of identified image or audiovisual bytes against their
+intended explanatory uses. Observations name affected elements and, for a film, time ranges.
+It remains distinct from final human appreciation.
+
+**Autonomous envelope** — An operator's bounded image-spending authorization for an exact
+Production request and one Run, retained across corrections and restarts.
+
 **SceneCapability** — A *type* of scene available in the catalog (`bar_chart`,
 `image_context`, …). 8–12 exist in V1. Defined by code, generated into the manifest at
 build time, immutable at runtime. Avoid: "component", "scene type", "template".
@@ -208,9 +225,15 @@ briefs written by the user, authors plans that are scored on five measures. It m
 adding a capability. Specified in `docs/measurement-gate.md`. Avoid: "the eval", which
 suggests the model is the subject.
 
-**Brief** — One paragraph of editorial intent, written by the user, carrying no structure
-and no vocabulary from the manifest. The gate's input. Two of the ten are deliberately
-unservable. Avoid: "prompt" — a brief is not addressed to a model's instructions.
+**Brief** — Editorial intent written by the user, optionally accompanied by a target duration
+in seconds and a maximum generated-image count. Duration is an estimate; the image maximum is a
+ceiling, not a required count. It carries no scene structure or vocabulary from the manifest.
+Beat, word, scene and animation counts remain artistic decisions. Avoid: "prompt" — a Brief is
+not addressed to a model's instructions.
+
+**Editorial review** — A judgement of whether the planned visual story supports its narration
+and artistic intent. It may request revision even when the plan satisfies its technical contracts.
+Reviewing a semantic plan does not establish acceptance of generated images or the rendered film.
 
 **Agent production interface** — The complete agent-visible boundary through which a
 generalist agent authors a plan and requests the production operations that turn a Brief into

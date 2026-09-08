@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "brief": {
+    "id": "editorial-preview-reusable-rocket-2026-09-08",
+    "durationSeconds": 50,
+    "maxGeneratedImages": 5,
+    "text": "Create a visually engaging English factual explainer for curious general viewers: Why does a reusable rocket still need fuel to land? Focus on the Falcon 9 first stage. Research original sources and explain the mechanism through a coherent artistic progression of illustrations, details and schematic actions synchronized with the narration. Let the story determine the number of Beats, scenes and images. Introduce ideas with brief titles when useful, give the subject room, and end with an earned insight. Generated illustrations must be distinguishable from documentary footage, and simplified diagrams must not imply unsupported physical precision. Preserve source references for factual statements. The structured duration is an estimate and the image count is a maximum, not a required count."
+  },
+  "production": {
+    "voice": {
+      "provider": "elevenlabs",
+      "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+      "modelId": "eleven_multilingual_v2",
+      "seed": 7
+    },
+    "maxNewTakes": 1
+  }
+}

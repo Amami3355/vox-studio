@@ -79,6 +79,7 @@ class AdkJsonRole:
         self.session_service = session_service or InMemorySessionService()
         self.session_id = session_id
         self.remembers_turns = remembers_turns
+        self.answer_schema: Mapping[str, Any] | None = None
         self._agent_type = LlmAgent
 
     def agent(self, instruction: str, tools: Sequence[Callable[..., Any]] = ()) -> Any:
@@ -102,7 +103,11 @@ class AdkJsonRole:
 
             def after_model(callback_context, llm_response):
                 if pending:
-                    finish_call(pending.pop(0), llm_response.usage_metadata)
+                    content = getattr(llm_response, "content", None)
+                    parts = getattr(content, "parts", None) or ()
+                    public = [{"partIndex": i, "text": part.text} for i, part in enumerate(parts)
+                        if getattr(part, "text", None) and not getattr(part, "thought", False)]
+                    finish_call(pending.pop(0), llm_response.usage_metadata, answerParts=public)
 
             model = Gemini(
                 model=self.model,
@@ -113,7 +118,9 @@ class AdkJsonRole:
             runtime = {
                 "before_model_callback": before_model,
                 "after_model_callback": after_model,
-                "generate_content_config": types.GenerateContentConfig(max_output_tokens=8192),
+                "generate_content_config": types.GenerateContentConfig(max_output_tokens=8192,
+                    **({"response_mime_type": "application/json", "response_json_schema": self.answer_schema}
+                       if self.answer_schema is not None else {})),
             }
         return self._agent_type(
             name=self.name,
@@ -125,6 +132,21 @@ class AdkJsonRole:
         )
 
     async def ask(
+        self,
+        instruction: str,
+        payload: Mapping[str, Any],
+        *,
+        tools: Sequence[Callable[..., Any]] = (),
+    ) -> Mapping[str, Any]:
+        from .provider_usage import CURRENT
+
+        journal = CURRENT.get()
+        if journal is not None:
+            async with journal.model_turn_lock:
+                return await self._ask(instruction, payload, tools=tools)
+        return await self._ask(instruction, payload, tools=tools)
+
+    async def _ask(
         self,
         instruction: str,
         payload: Mapping[str, Any],
@@ -159,7 +181,8 @@ class AdkJsonRole:
             ):
                 if event.is_final_response() and event.content:
                     answered.extend(
-                        part.text for part in (event.content.parts or ()) if part.text
+                        part.text for part in (event.content.parts or ())
+                        if part.text and not getattr(part, "thought", False)
                     )
         except Exception as error:
             raise RoleUnavailable(f"{self.name} did not complete its model turn.") from error
@@ -267,8 +290,10 @@ class AdkResearchAgent:
             answer = await self.role.ask(
                 "Return only JSON: {\"questions\": [...]}. Each question must be answerable from "
                 "public sources, must be specific enough that a wrong answer would be visibly "
-                "wrong, and must serve the supplied Brief. Ask for the evidence a short factual "
-                f"explainer needs — figures, dates, named parties, disagreements. At most "
+                "wrong, and must serve the supplied Brief. Start from its central explanatory "
+                "question: seek the causal mechanism, useful distinctions and qualifications in "
+                "original primary sources. Ask for figures or dates only when necessary to explain "
+                "that question; numerical trivia must not displace the mechanism. At most "
                 f"{MAX_PLANNED_QUESTIONS}. Do not answer them.",
                 {"brief": brief.to_mapping()},
             )
@@ -323,10 +348,20 @@ class AdkCreativeAdapter:
             '"factual": boolean. Every factual statement must cite supporting supplied claim IDs; '
             'do not label a factual claim false to evade citations. Beat text is spoken verbatim: '
             'no stage directions, image descriptions, citation markers or production instructions. '
-            'Respect the requested spoken word count, using four or five Beats. Prefer mechanisms '
-            'supported by original sources; omit unrelated recovery history and unsupported claims. '
+            'hook describes editorial intent, not additional spoken text. Put ALL spoken text, '
+            'including the opening hook, in beats. Nothing will be added at TTS. '
+            'If evidence cannot support the explanation, return only {"insufficientEvidence": '
+            '["specific missing fact"]} instead of inventing facts. '
+            'Write for the Brief target duration in seconds, allowing natural delivery and pauses. '
+            'Choose the number and length of Beats freely from the ideas and their visual potential; '
+            'there is no quota of words, Beats, scenes or visual changes. A Beat is a coherent spoken '
+            'unit, not necessarily a paragraph. End Beats at complete sentence boundaries so the '
+            'Visual Structurer can cut between ideas; rich visual evolution can also happen inside '
+            'one Beat on word anchors. Build curiosity, explain concrete relationships, and earn the '
+            'ending with an insight. Prefer claims supported by original sources. '
             'Do not expose reasoning.',
-            {"brief": brief.to_mapping(), "researchDossier": dossier.to_mapping()},
+            {"brief": brief.to_mapping(), "researchDossier": dossier.to_mapping(),
+             **getattr(self, "editorial_context", {})},
         )
 
     async def art_direct(
@@ -350,11 +385,16 @@ class AdkCreativeAdapter:
             "string or decimal version. theme is a string. motionIntent, colorRoles, treatments, "
             "motifs and forbiddenTreatments are all arrays of strings, even for a single value. "
             "motionIntent, colorRoles and treatments must not be empty. Use exactly the listed "
-            "keys. Do not add provider prompts or raw style values.",
+            "keys. Do not add provider prompts or raw style values. Choose a coherent artistic "
+            "direction that helps explain this subject: recurring motifs, compatible treatments "
+            "and purposeful motion. Motifs should describe visible continuity that the visual "
+            "roles can carry across wide views, details and diagrams. Stillness and contrast are "
+            "creative choices, not failures; do not impose quotas of cuts or effects.",
             {
                 "brief": brief.to_mapping(),
                 "researchDossier": dossier.to_mapping(),
                 "visualVocabulary": vocabulary.to_mapping(),
+                **getattr(self, "editorial_context", {}),
             },
         )
 
@@ -392,6 +432,8 @@ class AdkVisualStructurer:
         narrative: Narrative,
         visual_bible: VisualBible,
         selection_catalog: tuple[dict[str, Any], ...],
+        *,
+        feedback: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
         return await self.role.ask(
             "Return only visual-structure JSON. Preserve Narrative Beats verbatim. Select only "
@@ -405,16 +447,24 @@ class AdkVisualStructurer:
             'have id, spansBeats (an array of beat ID strings), and scenes (an array). Every '
             'scene spansBeats is also an array of beat ID strings, never Beat objects. Do not '
             'add schemaVersion, theme, factual or claimIds. Partition the ordered beats among '
-            'the sections and scenes without duplicates. Respect the Brief image count: when '
-            'it requests exactly one illustration, select exactly one image_context scene; '
-            'use other available capabilities for the other moments. Prefer four or five '
-            'visually distinct moments and avoid invented quantitative charts.',
+            'the sections and scenes without duplicates. The upstream creative envelope is the '
+            'target duration and optional maximum generated-image count, never a required count. '
+            'Choose the number of scenes freely. Image count and scene count are different: reuse '
+            'an asset when useful, and allow several meaningful events inside a scene. Select '
+            'capabilities whose published actions can show what the narration explains. Use titles '
+            'as brief introductions to an idea; avoid holding a title while the voice explains '
+            'unpictured mechanisms. A process need not be a dated timeline or an isolated number. '
+            'Plan progression between establishing views, details, comparisons and resolutions as '
+            'the subject warrants. Respect the VisualBible. Do not invent quantitative charts. '
+            'When editorialFeedback is supplied, revise the structure to address its observations '
+            'while preserving every Narrative Beat and the catalog boundary.',
             {
                 "brief": brief.to_mapping(),
                 "researchDossier": dossier.to_mapping(),
                 "narrative": narrative.to_mapping(),
                 "visualBible": visual_bible.to_mapping(),
                 "selectionCatalog": list(selection_catalog),
+                "editorialFeedback": feedback,
             },
         )
 
@@ -458,13 +508,65 @@ class AdkSceneAuthor:
         structure: Mapping[str, Any],
         specifications: tuple[dict[str, Any], ...],
         tools: VisualCatalogTools,
+        *,
+        context: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
         return await self.role.ask(
             "Return only JSON with a scenes array. Fill each existing scene id exactly once. "
             "Each fill may contain only id, props, layout, motionProfile, events. Do not add, "
-            "remove, or select scenes. Use the four offered catalog tools when needed.",
-            {"structure": dict(structure), "specifications": list(specifications)},
+            "remove, or select scenes. Use the four offered catalog tools when needed. Make the "
+            "explanation itself visible: use published actions to reveal a relationship, advance "
+            "a process, focus a detail or change state on the word that motivates it. Read the "
+            "capability's initial state and event semantics: omit an action that merely repeats "
+            "the initial or current state. A default whole-image framing needs no focus event "
+            "until a different region is requested. Schema validation alone does not prove an "
+            "event changes anything. Read the "
+            "Beats in structure; author symbolic anchors only, in spoken order, using unique words "
+            "within each Beat. Leave time to read and understand; do not animate every word or "
+            "satisfy a quota of effects. Follow editorialContext and the VisualBible across scenes. "
+            "Describe coherent assets with deliberate orientation and framing. Reuse the same "
+            "semantic requirement and identityKey for the same image; different views need distinct "
+            "requirements. A flattened illustration cannot articulate its parts. Never invent "
+            "actions or pretend that camera drift demonstrates a mechanism. Keep physical time, "
+            "asset paths and provider prompts out of the plan.",
+            {"structure": dict(structure), "specifications": list(specifications),
+             "editorialContext": dict(context or {})},
             tools=_adk_visual_tools(tools, include_search=True),
+        )
+
+
+class AdkEditorialReviewer:
+    """Reviews the authored plan against its narration, not a generic pacing recipe."""
+
+    def __init__(self, *, model: str = CREW_MODEL, session_service: Any | None = None) -> None:
+        self.role = AdkJsonRole(
+            "EditorialReviewer", "Reviews visual storytelling before production spends on media.",
+            model=model, session_service=session_service,
+        )
+
+    async def review(
+        self, plan: Mapping[str, Any], context: Mapping[str, Any],
+        specifications: tuple[dict[str, Any], ...],
+    ) -> Mapping[str, Any]:
+        return await self.role.ask(
+            'Return only {"accepted": boolean, "observations": an array of '
+            '{"sceneId": string or null, "problem": string, "suggestion": string}}. '
+            'Accept with an empty array, or reject with concrete blocking editorial observations. '
+            'Assess whether the planned visuals explain the spoken ideas, the story develops '
+            'curiosity and resolves it, and the visual direction carries across scenes. Read '
+            'the selected specifications to understand what each event actually changes. '
+            'Notice title cards held across unrelated explanations, decorative motion mistaken '
+            'for explanation, unsupported image precision, or anchors that miss useful changes '
+            'of state. Preserve deliberate stillness and reading pauses. There is no required '
+            'number of Beats, scenes, words, images, cuts or events, nor a universal time limit '
+            'for a title or hold. The duration target is an estimate; the image maximum is a '
+            'ceiling, not a target. Recommend only remedies possible with the published vocabulary '
+            'or ask the Structurer to reconsider selection. Do not rewrite the plan or narration. '
+            'You have a semantic plan, not rendered frames, generated images or audio: do not '
+            'claim to have watched or heard the film or measured its duration. Return concise '
+            'observable problems and remedies, not private reasoning.',
+            {"plan": dict(plan), "editorialContext": dict(context),
+             "specifications": list(specifications)},
         )
 
 
@@ -602,6 +704,7 @@ __all__ = [
     "CREW_MODEL",
     "MAX_PLANNED_QUESTIONS",
     "AdkCreativeAdapter",
+    "AdkEditorialReviewer",
     "AdkImageCreator",
     "AdkJsonRole",
     "AdkPlanRepair",

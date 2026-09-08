@@ -96,6 +96,12 @@ export const staggerFrames = (profile: MotionProfile): number =>
 
 export const springConfig = (profile: MotionProfile) => motion.spring[profile.spring];
 
+/** Bounded content reframing/progression; camera bounds remain owned by CameraRig. */
+export const contentProgressAt = (frame: number, startFrame: number): number => {
+  const t = Math.max(0, Math.min(1, (frame - startFrame) / motion.duration.base));
+  return t * t * (3 - 2 * t);
+};
+
 /**
  * Reusable motion grammar for a whole graphic object that should feel alive without
  * implying articulated movement.

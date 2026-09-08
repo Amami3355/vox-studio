@@ -122,7 +122,8 @@ def brief_from(request: Mapping[str, Any], kind: BriefKind) -> Brief:
         raise CrewNotConfigured("the request carries no Brief for the crew to begin from.")
     try:
         return Brief.from_mapping(
-            {"id": brief.get("id"), "text": brief.get("text"), "kind": kind.value}
+            {"id": brief.get("id"), "text": brief.get("text"), "kind": kind.value,
+             **{key: brief[key] for key in ("durationSeconds", "maxGeneratedImages") if key in brief}}
         )
     except ContractViolation as refused:
         raise CrewNotConfigured(f"the request's Brief is not one: {refused}") from None
@@ -209,6 +210,7 @@ def build_crew(
     if live_models:
         from .adk_roles import (  # noqa: PLC0415
             AdkCreativeAdapter,
+            AdkEditorialReviewer,
             AdkImageCreator,
             AdkPlanRepair,
             AdkSceneAuthor,
@@ -241,6 +243,7 @@ def build_crew(
             mode=ProviderMode.LIVE,
             repair=repair,
             check_meanings=shape_validators.meanings_for,
+            reviewer=AdkEditorialReviewer(**pinned),
         )
     else:
         assert recordings is not None

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "research": {"mode": "live", "grantId": "editorial-preview-research"},
+  "models": {"mode": "live", "grantId": "editorial-preview-models"},
+  "images": {"mode": "live", "grantId": "editorial-preview-images"},
+  "recording": {"mode": "live", "grantId": "editorial-preview-recording"}
+}

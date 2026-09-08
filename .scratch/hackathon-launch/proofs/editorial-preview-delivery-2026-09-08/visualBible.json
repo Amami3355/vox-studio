@@ -1,0 +1,26 @@
+{
+  "colorRoles": [
+    "neutral",
+    "positive",
+    "negative"
+  ],
+  "forbiddenTreatments": [
+    "photo"
+  ],
+  "motifs": [
+    "schematic descent vector",
+    "booster structural silhouette",
+    "expanding gas plumes"
+  ],
+  "motionIntent": [
+    "subtleDrift",
+    "pushIn",
+    "editorialStatic"
+  ],
+  "schemaVersion": 1,
+  "theme": "editorial-cold",
+  "treatments": [
+    "illustration",
+    "cutout"
+  ]
+}

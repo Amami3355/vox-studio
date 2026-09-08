@@ -1,0 +1,84 @@
+{
+  "claims": [
+    {
+      "id": "claim-1",
+      "sourceIds": [
+        "source-1"
+      ],
+      "support": "uncertain",
+      "text": "* **Factual Exposition:** \n  Earth\u2019s atmosphere is too thin to decelerate a falling Falcon 9 first stage to a safe touchdown speed using aerodynamic drag alone"
+    },
+    {
+      "id": "operator-claim-force",
+      "sourceIds": [
+        "operator-nasa-mechanics"
+      ],
+      "support": "supported",
+      "text": "An object slows when its acceleration points opposite its motion; an applied force can produce that acceleration."
+    },
+    {
+      "id": "operator-claim-thrust",
+      "sourceIds": [
+        "operator-nasa-mechanics"
+      ],
+      "support": "supported",
+      "text": "A rocket produces thrust by expelling mass through a nozzle; the vehicle accelerates in the opposite direction."
+    },
+    {
+      "id": "operator-claim-propellant",
+      "sourceIds": [
+        "operator-nasa-mechanics"
+      ],
+      "support": "supported",
+      "text": "Chemical rocket combustion heats gas that expands through the nozzle. Rockets carry fuel and oxidizer, and their propulsion expels part of their onboard mass."
+    },
+    {
+      "id": "operator-claim-entry",
+      "sourceIds": [
+        "operator-nasa-falcon-sequence"
+      ],
+      "support": "supported",
+      "text": "The Falcon 9 flight sequence published by NASA shows an entry burn in which the first-stage engines restart to slow the stage."
+    },
+    {
+      "id": "operator-claim-guidance",
+      "sourceIds": [
+        "operator-nasa-falcon-sequence"
+      ],
+      "support": "supported",
+      "text": "In the published Falcon 9 descent sequence, grid fins guide the stage aerodynamically, and a final engine ignition brings it to a soft vertical landing."
+    },
+    {
+      "id": "operator-claim-landing-mechanism",
+      "sourceIds": [
+        "operator-nasa-mechanics",
+        "operator-nasa-falcon-sequence"
+      ],
+      "support": "supported",
+      "text": "In a powered vertical descent, downward exhaust provides upward thrust that can reduce the booster's downward speed. This braking uses propellant even though the vehicle is moving downward."
+    }
+  ],
+  "contradictions": [],
+  "mode": "researched",
+  "quotations": [],
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "source-1",
+      "title": "spacex - What is the terminal velocity of the Falcon 9 at sea level (on Earth)? - Space Exploration Stack Exchange",
+      "url": "https://space.stackexchange.com/questions/66743/what-is-the-terminal-velocity-of-the-falcon-9-at-sea-level-on-earth"
+    },
+    {
+      "id": "operator-nasa-mechanics",
+      "title": "NASA Basics of Space Flight \u2014 Gravity & Mechanics",
+      "url": "https://science.nasa.gov/learn/basics-of-space-flight/chapter3-2/"
+    },
+    {
+      "id": "operator-nasa-falcon-sequence",
+      "title": "NASA-hosted SpaceX Falcon 9 launch and landing sequence",
+      "url": "https://www.nasa.gov/wp-content/uploads/2020/08/falcon9_launch_and_landing.pdf"
+    }
+  ],
+  "statistics": [],
+  "visualOpportunities": []
+}

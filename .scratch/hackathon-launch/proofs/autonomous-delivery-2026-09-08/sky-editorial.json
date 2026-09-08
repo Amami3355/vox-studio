@@ -1,0 +1,883 @@
+{
+  "editorialBrief": {
+    "angle": "An explanation of how Earth's atmosphere scatters shorter wavelengths of sunlight, known as Rayleigh scattering, and how our eyes perceive it.",
+    "audience": "General audience",
+    "centralQuestion": "Why does the sky appear blue to the human eye?",
+    "durationSeconds": 50,
+    "language": "English",
+    "schemaVersion": 2,
+    "understandingGoals": [
+      "Understand that sunlight is made up of all the colors of the rainbow, each with a different wavelength.",
+      "Learn that gas molecules in Earth's atmosphere scatter short-wavelength blue light more than other colors in all directions.",
+      "Discover why we see the sky as blue rather than violet, due to the sun emitting more blue light and our eyes being more sensitive to it."
+    ]
+  },
+  "searches": [
+    {
+      "coverage": {
+        "adequate": true,
+        "centralQuestionAnswered": true,
+        "mechanismExplained": true,
+        "nuancesCovered": true,
+        "observations": [],
+        "targetedQuestions": []
+      },
+      "dossier": {
+        "claims": [
+          {
+            "id": "claim-1",
+            "sourceIds": [
+              "source-1",
+              "source-2"
+            ],
+            "support": "supported",
+            "text": "Sunlight, which contains a broad spectrum of wavelengths from red to violet, enters Earth's atmosphere where it interacts with gas molecules, primarily nitrogen and oxygen"
+          },
+          {
+            "id": "claim-2",
+            "sourceIds": [
+              "source-2",
+              "source-3"
+            ],
+            "support": "supported",
+            "text": "Because these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight through a process called Rayleigh scattering"
+          },
+          {
+            "id": "claim-3",
+            "sourceIds": [
+              "source-4",
+              "source-2",
+              "source-5"
+            ],
+            "support": "supported",
+            "text": "According to Rayleigh's mathematical formulation, the intensity of scattered light is inversely proportional to the fourth power of its wavelength ($I \\propto 1/\\lambda^4$)"
+          },
+          {
+            "id": "claim-4",
+            "sourceIds": [
+              "source-2",
+              "source-5"
+            ],
+            "support": "supported",
+            "text": "As a result of this fourth-power relationship, shorter wavelengths of light (such as blue and violet) scatter far more efficiently and in all directions compared to longer wavelengths (such as red and orange)"
+          },
+          {
+            "id": "claim-5",
+            "sourceIds": [
+              "source-6",
+              "source-4"
+            ],
+            "support": "supported",
+            "text": "Although violet light has the shortest visible wavelength and is scattered most intensely by the atmosphere, the sky does not appear violet due to the spectral composition of sunlight and the limitations of human vision"
+          },
+          {
+            "id": "claim-6",
+            "sourceIds": [
+              "source-4",
+              "source-3"
+            ],
+            "support": "supported",
+            "text": "First, the sunlight entering Earth's atmosphere follows a thermal blackbody distribution that peaks in the visible range and inherently contains less violet light than blue light"
+          },
+          {
+            "id": "claim-7",
+            "sourceIds": [
+              "source-3"
+            ],
+            "support": "supported",
+            "text": "Second, as sunlight travels through the atmosphere, violet light undergoes greater bulk attenuation, which filters and removes a larger portion of it from the path before it reaches an observer"
+          },
+          {
+            "id": "claim-8",
+            "sourceIds": [
+              "source-4",
+              "source-3"
+            ],
+            "support": "supported",
+            "text": "Third, the human retina detects color using three types of cone photoreceptors—short (S), medium (M), and long (L) wavelength-sensitive cones—which are biologically much more sensitive to blue light than to violet light"
+          },
+          {
+            "id": "claim-9",
+            "sourceIds": [
+              "source-6"
+            ],
+            "support": "supported",
+            "text": "When we look at the sky, the mixture of scattered light stimulates the S-cones strongly, while stimulating the M-cones and L-cones almost equally"
+          },
+          {
+            "id": "claim-10",
+            "sourceIds": [
+              "source-6",
+              "source-4",
+              "source-3"
+            ],
+            "support": "supported",
+            "text": "The brain interprets this specific combination of cone responses as an unsaturated, pale blue color (a metameric match to a mixture of pure blue and white light) rather than a pure blue or violet"
+          },
+          {
+            "id": "claim-11",
+            "sourceIds": [
+              "source-7",
+              "source-2",
+              "source-8"
+            ],
+            "support": "supported",
+            "text": "Additionally, larger atmospheric particles like dust, haze, and water vapor induce Mie scattering, which is less dependent on wavelength and scatters all colors more uniformly, further desaturating the sky's blue color toward white, particularly near the horizon"
+          }
+        ],
+        "contradictions": [],
+        "mode": "researched",
+        "quotations": [],
+        "schemaVersion": 1,
+        "sources": [
+          {
+            "id": "source-1",
+            "title": "Visible Light - NASA Science",
+            "url": "https://science.nasa.gov/ems/09_visiblelight/"
+          },
+          {
+            "id": "source-2",
+            "title": "Science Behind It: Why Sky Is Blue? ",
+            "url": "https://www.jagranjosh.com/general-knowledge/science-behind-it-why-sky-is-blue-1727710489-1"
+          },
+          {
+            "id": "source-3",
+            "title": "Why is the sky blue? | Science Questions with Surprising Answers",
+            "url": "https://www.wtamu.edu/~cbaird/sq/2013/03/28/why-is-the-sky-blue/"
+          },
+          {
+            "id": "source-4",
+            "title": "S D",
+            "url": "https://www.patarnott.com/atms749/pdf/blueSkyHumanResponse.pdf"
+          },
+          {
+            "id": "source-5",
+            "title": "Rayleigh scattering | Chemistry | Research Starters | EBSCOhost",
+            "url": "https://www.ebsco.com/research-starters/chemistry/rayleigh-scattering"
+          },
+          {
+            "id": "source-6",
+            "title": "Why isn't the sky violet?",
+            "url": "http://www.atmo.arizona.edu/students/courselinks/fall14/atmo170a1s2/lecture_notes/scattering/why_not_violet.html"
+          },
+          {
+            "id": "source-7",
+            "title": "visible light - Why is the sky not purple? - Physics Stack Exchange",
+            "url": "https://physics.stackexchange.com/questions/28895/why-is-the-sky-not-purple"
+          },
+          {
+            "id": "source-8",
+            "title": "Why Is The Sky Blue?",
+            "url": "https://www.weather.gov/fgz/SkyBlue"
+          }
+        ],
+        "statistics": [],
+        "visualOpportunities": []
+      },
+      "evidence": {
+        "answerParts": [
+          {
+            "partIndex": 0,
+            "text": "Sunlight, which contains a broad spectrum of wavelengths from red to violet, enters Earth's atmosphere where it interacts with gas molecules, primarily nitrogen and oxygen. \n\nBecause these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight through a process called Rayleigh scattering. \n\nAccording to Rayleigh's mathematical formulation, the intensity of scattered light is inversely proportional to the fourth power of its wavelength ($I \\propto 1/\\lambda^4$). \n\nAs a result of this fourth-power relationship, shorter wavelengths of light (such as blue and violet) scatter far more efficiently and in all directions compared to longer wavelengths (such as red and orange). \n\nAlthough violet light has the shortest visible wavelength and is scattered most intensely by the atmosphere, the sky does not appear violet due to the spectral composition of sunlight and the limitations of human vision. \n\nFirst, the sunlight entering Earth's atmosphere follows a thermal blackbody distribution that peaks in the visible range and inherently contains less violet light than blue light. \n\nSecond, as sunlight travels through the atmosphere, violet light undergoes greater bulk attenuation, which filters and removes a larger portion of it from the path before it reaches an observer. \n\nThird, the human retina detects color using three types of cone photoreceptors—short (S), medium (M), and long (L) wavelength-sensitive cones—which are biologically much more sensitive to blue light than to violet light. \n\nWhen we look at the sky, the mixture of scattered light stimulates the S-cones strongly, while stimulating the M-cones and L-cones almost equally. \n\nThe brain interprets this specific combination of cone responses as an unsaturated, pale blue color (a metameric match to a mixture of pure blue and white light) rather than a pure blue or violet. \n\nAdditionally, larger atmospheric particles like dust, haze, and water vapor induce Mie scattering, which is less dependent on wavelength and scatters all colors more uniformly, further desaturating the sky's blue color toward white, particularly near the horizon."
+          }
+        ],
+        "extractionStatus": "validated",
+        "modelVersion": "gemini-3.5-flash",
+        "responseSha256": "2311dc8aee6cfcc9224e56159e8f62c0cd0788a638618d450e5bc4cb3c9c87c0",
+        "searchQueries": [
+          "\"Rayleigh scattering\" \"blue sky\" \"human eye\" \"cones\"",
+          "why is the sky blue rayleigh scattering human eye sensitivity"
+        ],
+        "sources": [
+          {
+            "id": "source-1",
+            "title": "Visible Light - NASA Science",
+            "url": "https://science.nasa.gov/ems/09_visiblelight/"
+          },
+          {
+            "id": "source-2",
+            "title": "Science Behind It: Why Sky Is Blue? ",
+            "url": "https://www.jagranjosh.com/general-knowledge/science-behind-it-why-sky-is-blue-1727710489-1"
+          },
+          {
+            "id": "source-3",
+            "title": "Why is the sky blue? | Science Questions with Surprising Answers",
+            "url": "https://www.wtamu.edu/~cbaird/sq/2013/03/28/why-is-the-sky-blue/"
+          },
+          {
+            "id": "source-4",
+            "title": "S D",
+            "url": "https://www.patarnott.com/atms749/pdf/blueSkyHumanResponse.pdf"
+          },
+          {
+            "id": "source-5",
+            "title": "Rayleigh scattering | Chemistry | Research Starters | EBSCOhost",
+            "url": "https://www.ebsco.com/research-starters/chemistry/rayleigh-scattering"
+          },
+          {
+            "id": "source-6",
+            "title": "Why isn't the sky violet?",
+            "url": "http://www.atmo.arizona.edu/students/courselinks/fall14/atmo170a1s2/lecture_notes/scattering/why_not_violet.html"
+          },
+          {
+            "id": "source-7",
+            "title": "visible light - Why is the sky not purple? - Physics Stack Exchange",
+            "url": "https://physics.stackexchange.com/questions/28895/why-is-the-sky-not-purple"
+          },
+          {
+            "id": "source-8",
+            "title": "Why Is The Sky Blue?",
+            "url": "https://www.weather.gov/fgz/SkyBlue"
+          }
+        ],
+        "supports": [
+          {
+            "claimId": "claim-1",
+            "endIndex": 171,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-1",
+              "source-2"
+            ],
+            "startIndex": 0
+          },
+          {
+            "claimId": "claim-2",
+            "endIndex": 338,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-2",
+              "source-3"
+            ],
+            "startIndex": 175
+          },
+          {
+            "claimId": "claim-3",
+            "endIndex": 514,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-4",
+              "source-2",
+              "source-5"
+            ],
+            "startIndex": 342
+          },
+          {
+            "claimId": "claim-4",
+            "endIndex": 726,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-2",
+              "source-5"
+            ],
+            "startIndex": 518
+          },
+          {
+            "claimId": "claim-5",
+            "endIndex": 949,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-6",
+              "source-4"
+            ],
+            "startIndex": 730
+          },
+          {
+            "claimId": "claim-6",
+            "endIndex": 1131,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-4",
+              "source-3"
+            ],
+            "startIndex": 953
+          },
+          {
+            "claimId": "claim-7",
+            "endIndex": 1328,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-3"
+            ],
+            "startIndex": 1135
+          },
+          {
+            "claimId": "claim-8",
+            "endIndex": 1555,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-4",
+              "source-3"
+            ],
+            "startIndex": 1332
+          },
+          {
+            "claimId": "claim-9",
+            "endIndex": 1704,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-6"
+            ],
+            "startIndex": 1559
+          },
+          {
+            "claimId": "claim-10",
+            "endIndex": 1903,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-6",
+              "source-4",
+              "source-3"
+            ],
+            "startIndex": 1708
+          },
+          {
+            "claimId": "claim-11",
+            "endIndex": 2169,
+            "partIndex": 0,
+            "sourceIds": [
+              "source-7",
+              "source-2",
+              "source-8"
+            ],
+            "startIndex": 1907
+          }
+        ]
+      },
+      "provenance": [
+        {
+          "claimId": "claim-bd4d05bca795ad31",
+          "originalClaimId": "claim-1",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-0f33bb1251fd92c9",
+            "source-5f988b99a0f4ae9f"
+          ]
+        },
+        {
+          "claimId": "claim-32230890735e531c",
+          "originalClaimId": "claim-2",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-5f988b99a0f4ae9f",
+            "source-102c597688b90cde"
+          ]
+        },
+        {
+          "claimId": "claim-5eb6e6c844097375",
+          "originalClaimId": "claim-3",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-d3e17a68f1bd2754",
+            "source-5f988b99a0f4ae9f",
+            "source-5a3512ce47ec8935"
+          ]
+        },
+        {
+          "claimId": "claim-bf0db79692f748a4",
+          "originalClaimId": "claim-4",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-5f988b99a0f4ae9f",
+            "source-5a3512ce47ec8935"
+          ]
+        },
+        {
+          "claimId": "claim-669f6f28f948487c",
+          "originalClaimId": "claim-5",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-5588ef781f0b1d7c",
+            "source-d3e17a68f1bd2754"
+          ]
+        },
+        {
+          "claimId": "claim-a7adbba9a87fad37",
+          "originalClaimId": "claim-6",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-d3e17a68f1bd2754",
+            "source-102c597688b90cde"
+          ]
+        },
+        {
+          "claimId": "claim-4cf9408ce49ef4f2",
+          "originalClaimId": "claim-7",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-102c597688b90cde"
+          ]
+        },
+        {
+          "claimId": "claim-70ba216e9eebf448",
+          "originalClaimId": "claim-8",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-d3e17a68f1bd2754",
+            "source-102c597688b90cde"
+          ]
+        },
+        {
+          "claimId": "claim-cfc8bc909b40d79c",
+          "originalClaimId": "claim-9",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-5588ef781f0b1d7c"
+          ]
+        },
+        {
+          "claimId": "claim-425f259ead69cc58",
+          "originalClaimId": "claim-10",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-5588ef781f0b1d7c",
+            "source-d3e17a68f1bd2754",
+            "source-102c597688b90cde"
+          ]
+        },
+        {
+          "claimId": "claim-bda05d5564fc6c5a",
+          "originalClaimId": "claim-11",
+          "searchRevision": 0,
+          "sourceIds": [
+            "source-7641a86dcccade69",
+            "source-5f988b99a0f4ae9f",
+            "source-d9764400be487b86"
+          ]
+        }
+      ]
+    }
+  ],
+  "researchDossier": {
+    "claims": [
+      {
+        "id": "claim-bd4d05bca795ad31",
+        "sourceIds": [
+          "source-0f33bb1251fd92c9",
+          "source-5f988b99a0f4ae9f"
+        ],
+        "support": "supported",
+        "text": "Sunlight, which contains a broad spectrum of wavelengths from red to violet, enters Earth's atmosphere where it interacts with gas molecules, primarily nitrogen and oxygen"
+      },
+      {
+        "id": "claim-32230890735e531c",
+        "sourceIds": [
+          "source-5f988b99a0f4ae9f",
+          "source-102c597688b90cde"
+        ],
+        "support": "supported",
+        "text": "Because these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight through a process called Rayleigh scattering"
+      },
+      {
+        "id": "claim-5eb6e6c844097375",
+        "sourceIds": [
+          "source-d3e17a68f1bd2754",
+          "source-5f988b99a0f4ae9f",
+          "source-5a3512ce47ec8935"
+        ],
+        "support": "supported",
+        "text": "According to Rayleigh's mathematical formulation, the intensity of scattered light is inversely proportional to the fourth power of its wavelength ($I \\propto 1/\\lambda^4$)"
+      },
+      {
+        "id": "claim-bf0db79692f748a4",
+        "sourceIds": [
+          "source-5f988b99a0f4ae9f",
+          "source-5a3512ce47ec8935"
+        ],
+        "support": "supported",
+        "text": "As a result of this fourth-power relationship, shorter wavelengths of light (such as blue and violet) scatter far more efficiently and in all directions compared to longer wavelengths (such as red and orange)"
+      },
+      {
+        "id": "claim-669f6f28f948487c",
+        "sourceIds": [
+          "source-5588ef781f0b1d7c",
+          "source-d3e17a68f1bd2754"
+        ],
+        "support": "supported",
+        "text": "Although violet light has the shortest visible wavelength and is scattered most intensely by the atmosphere, the sky does not appear violet due to the spectral composition of sunlight and the limitations of human vision"
+      },
+      {
+        "id": "claim-a7adbba9a87fad37",
+        "sourceIds": [
+          "source-d3e17a68f1bd2754",
+          "source-102c597688b90cde"
+        ],
+        "support": "supported",
+        "text": "First, the sunlight entering Earth's atmosphere follows a thermal blackbody distribution that peaks in the visible range and inherently contains less violet light than blue light"
+      },
+      {
+        "id": "claim-4cf9408ce49ef4f2",
+        "sourceIds": [
+          "source-102c597688b90cde"
+        ],
+        "support": "supported",
+        "text": "Second, as sunlight travels through the atmosphere, violet light undergoes greater bulk attenuation, which filters and removes a larger portion of it from the path before it reaches an observer"
+      },
+      {
+        "id": "claim-70ba216e9eebf448",
+        "sourceIds": [
+          "source-d3e17a68f1bd2754",
+          "source-102c597688b90cde"
+        ],
+        "support": "supported",
+        "text": "Third, the human retina detects color using three types of cone photoreceptors—short (S), medium (M), and long (L) wavelength-sensitive cones—which are biologically much more sensitive to blue light than to violet light"
+      },
+      {
+        "id": "claim-cfc8bc909b40d79c",
+        "sourceIds": [
+          "source-5588ef781f0b1d7c"
+        ],
+        "support": "supported",
+        "text": "When we look at the sky, the mixture of scattered light stimulates the S-cones strongly, while stimulating the M-cones and L-cones almost equally"
+      },
+      {
+        "id": "claim-425f259ead69cc58",
+        "sourceIds": [
+          "source-5588ef781f0b1d7c",
+          "source-d3e17a68f1bd2754",
+          "source-102c597688b90cde"
+        ],
+        "support": "supported",
+        "text": "The brain interprets this specific combination of cone responses as an unsaturated, pale blue color (a metameric match to a mixture of pure blue and white light) rather than a pure blue or violet"
+      },
+      {
+        "id": "claim-bda05d5564fc6c5a",
+        "sourceIds": [
+          "source-7641a86dcccade69",
+          "source-5f988b99a0f4ae9f",
+          "source-d9764400be487b86"
+        ],
+        "support": "supported",
+        "text": "Additionally, larger atmospheric particles like dust, haze, and water vapor induce Mie scattering, which is less dependent on wavelength and scatters all colors more uniformly, further desaturating the sky's blue color toward white, particularly near the horizon"
+      }
+    ],
+    "contradictions": [],
+    "mode": "researched",
+    "quotations": [],
+    "schemaVersion": 1,
+    "sources": [
+      {
+        "id": "source-0f33bb1251fd92c9",
+        "title": "Visible Light - NASA Science",
+        "url": "https://science.nasa.gov/ems/09_visiblelight/"
+      },
+      {
+        "id": "source-5f988b99a0f4ae9f",
+        "title": "Science Behind It: Why Sky Is Blue? ",
+        "url": "https://www.jagranjosh.com/general-knowledge/science-behind-it-why-sky-is-blue-1727710489-1"
+      },
+      {
+        "id": "source-102c597688b90cde",
+        "title": "Why is the sky blue? | Science Questions with Surprising Answers",
+        "url": "https://www.wtamu.edu/~cbaird/sq/2013/03/28/why-is-the-sky-blue/"
+      },
+      {
+        "id": "source-d3e17a68f1bd2754",
+        "title": "S D",
+        "url": "https://www.patarnott.com/atms749/pdf/blueSkyHumanResponse.pdf"
+      },
+      {
+        "id": "source-5a3512ce47ec8935",
+        "title": "Rayleigh scattering | Chemistry | Research Starters | EBSCOhost",
+        "url": "https://www.ebsco.com/research-starters/chemistry/rayleigh-scattering"
+      },
+      {
+        "id": "source-5588ef781f0b1d7c",
+        "title": "Why isn't the sky violet?",
+        "url": "http://www.atmo.arizona.edu/students/courselinks/fall14/atmo170a1s2/lecture_notes/scattering/why_not_violet.html"
+      },
+      {
+        "id": "source-7641a86dcccade69",
+        "title": "visible light - Why is the sky not purple? - Physics Stack Exchange",
+        "url": "https://physics.stackexchange.com/questions/28895/why-is-the-sky-not-purple"
+      },
+      {
+        "id": "source-d9764400be487b86",
+        "title": "Why Is The Sky Blue?",
+        "url": "https://www.weather.gov/fgz/SkyBlue"
+      }
+    ],
+    "statistics": [],
+    "visualOpportunities": []
+  },
+  "narrative": {
+    "angle": "An explanation of how Earth's atmosphere scatters shorter wavelengths of sunlight, known as Rayleigh scattering, and how our eyes perceive it.",
+    "beats": [
+      {
+        "claimIds": [
+          "claim-bd4d05bca795ad31"
+        ],
+        "factual": true,
+        "id": "beat-1",
+        "text": "Sunlight looks white, but it actually contains a broad spectrum of wavelengths, from red to violet. When this light enters Earth's atmosphere, it interacts with gas molecules, primarily nitrogen and oxygen."
+      },
+      {
+        "claimIds": [
+          "claim-32230890735e531c",
+          "claim-bf0db79692f748a4"
+        ],
+        "factual": true,
+        "id": "beat-2",
+        "text": "Because these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight in all directions through a process called Rayleigh scattering. Under this process, shorter wavelengths of light, like blue and violet, are scattered far more efficiently than longer wavelengths like red and orange."
+      },
+      {
+        "claimIds": [
+          "claim-669f6f28f948487c",
+          "claim-a7adbba9a87fad37",
+          "claim-4cf9408ce49ef4f2"
+        ],
+        "factual": true,
+        "id": "beat-3",
+        "text": "But why isn't the sky violet, since violet has the shortest wavelength and scatters most intensely? It turns out sunlight contains less violet light than blue to begin with, and violet light undergoes greater atmospheric attenuation, filtering it out before it reaches our eyes."
+      },
+      {
+        "claimIds": [
+          "claim-70ba216e9eebf448",
+          "claim-cfc8bc909b40d79c",
+          "claim-425f259ead69cc58",
+          "claim-bda05d5564fc6c5a"
+        ],
+        "factual": true,
+        "id": "beat-4",
+        "text": "Furthermore, our eyes are biologically much more sensitive to blue than violet. When scattered light stimulates our color receptors, our brain interprets the mix as an unsaturated, pale blue. This blue is softened even further toward white near the horizon, where larger dust and water vapor particles scatter all colors uniformly."
+      }
+    ],
+    "hook": "Uncover the science of sunlight and human perception that turns our sky blue.",
+    "schemaVersion": 1
+  },
+  "visualBible": {
+    "colorRoles": [
+      "neutral",
+      "positive"
+    ],
+    "forbiddenTreatments": [
+      "cutout",
+      "duotone"
+    ],
+    "motifs": [
+      "atmospheric gas molecules",
+      "light wave spectrum diagrams",
+      "sunlight rays traversing space",
+      "the human retina and cone cells",
+      "graduated sky horizons"
+    ],
+    "motionIntent": [
+      "subtleDrift",
+      "pushIn",
+      "cinematic"
+    ],
+    "schemaVersion": 1,
+    "theme": "editorial-cold",
+    "treatments": [
+      "photo",
+      "illustration"
+    ]
+  },
+  "videoPlan": {
+    "beats": [
+      {
+        "id": "beat-1",
+        "text": "Sunlight looks white, but it actually contains a broad spectrum of wavelengths, from red to violet. When this light enters Earth's atmosphere, it interacts with gas molecules, primarily nitrogen and oxygen."
+      },
+      {
+        "id": "beat-2",
+        "text": "Because these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight in all directions through a process called Rayleigh scattering. Under this process, shorter wavelengths of light, like blue and violet, are scattered far more efficiently than longer wavelengths like red and orange."
+      },
+      {
+        "id": "beat-3",
+        "text": "But why isn't the sky violet, since violet has the shortest wavelength and scatters most intensely? It turns out sunlight contains less violet light than blue to begin with, and violet light undergoes greater atmospheric attenuation, filtering it out before it reaches our eyes."
+      },
+      {
+        "id": "beat-4",
+        "text": "Furthermore, our eyes are biologically much more sensitive to blue than violet. When scattered light stimulates our color receptors, our brain interprets the mix as an unsaturated, pale blue. This blue is softened even further toward white near the horizon, where larger dust and water vapor particles scatter all colors uniformly."
+      }
+    ],
+    "sections": [
+      {
+        "id": "section-light-scattering",
+        "scenes": [
+          {
+            "component": "image_context",
+            "events": [
+              {
+                "action": "revealImage",
+                "at": "beat-1.start"
+              },
+              {
+                "action": "revealCopy",
+                "at": "beat-1.word:enters"
+              },
+              {
+                "action": "emphasize",
+                "at": "beat-1.word:wavelengths",
+                "payload": {
+                  "text": "broad spectrum"
+                }
+              }
+            ],
+            "id": "scene-sunlight-atmosphere",
+            "layout": "splitLeft",
+            "motionProfile": "cinematic",
+            "props": {
+              "assetRequirement": {
+                "identityKey": "sunlight-atmosphere-view",
+                "orientation": "landscape",
+                "subject": "Sunlight rays traversing space and entering Earth's atmosphere",
+                "treatment": "illustration",
+                "type": "image"
+              },
+              "caption": "White sunlight actually contains a full spectrum of colors.",
+              "headline": "Sunlight and Earth's Atmosphere"
+            },
+            "spansBeats": [
+              "beat-1"
+            ]
+          },
+          {
+            "component": "image_detail",
+            "events": [
+              {
+                "action": "annotate",
+                "at": "beat-2.word:scatter",
+                "payload": {
+                  "text": "Blue and violet light scatters in all directions"
+                }
+              },
+              {
+                "action": "focus",
+                "at": "beat-2.word:shorter",
+                "payload": {
+                  "region": "center"
+                }
+              },
+              {
+                "action": "annotate",
+                "at": "beat-2.word:efficiently",
+                "payload": {
+                  "text": "Rayleigh scattering intensity: 1 / λ⁴"
+                }
+              }
+            ],
+            "id": "scene-rayleigh-scattering",
+            "layout": "plate",
+            "motionProfile": "subtleDrift",
+            "props": {
+              "assetRequirement": {
+                "identityKey": "rayleigh-scattering-diagram",
+                "orientation": "landscape",
+                "subject": "Atmospheric gas molecules scattering short blue light waves",
+                "treatment": "illustration",
+                "type": "image"
+              },
+              "caption": "Shorter wavelengths (blue and violet) scatter much more efficiently than longer ones.",
+              "headline": "The Physics of Rayleigh Scattering"
+            },
+            "spansBeats": [
+              "beat-2"
+            ]
+          }
+        ],
+        "spansBeats": [
+          "beat-1",
+          "beat-2"
+        ]
+      },
+      {
+        "id": "section-perception-and-color",
+        "scenes": [
+          {
+            "component": "image_context",
+            "events": [
+              {
+                "action": "revealImage",
+                "at": "beat-3.start"
+              },
+              {
+                "action": "revealCopy",
+                "at": "beat-3.word:turns"
+              },
+              {
+                "action": "emphasize",
+                "at": "beat-3.word:attenuation",
+                "payload": {
+                  "text": "atmospheric attenuation"
+                }
+              }
+            ],
+            "id": "scene-why-not-violet",
+            "layout": "splitLeft",
+            "motionProfile": "pushIn",
+            "props": {
+              "assetRequirement": {
+                "identityKey": "solar-spectrum-violet-attenuation",
+                "orientation": "landscape",
+                "subject": "A light wave spectrum diagram showing less violet light than blue light",
+                "treatment": "illustration",
+                "type": "image"
+              },
+              "caption": "Sunlight contains less violet initially, and atmospheric filtering removes more of it.",
+              "headline": "Why Isn't the Sky Violet?"
+            },
+            "spansBeats": [
+              "beat-3"
+            ]
+          },
+          {
+            "component": "image_detail",
+            "events": [
+              {
+                "action": "focus",
+                "at": "beat-4.word:receptors",
+                "payload": {
+                  "region": "left"
+                }
+              },
+              {
+                "action": "annotate",
+                "at": "beat-4.word:receptors",
+                "payload": {
+                  "text": "Photoreceptors interpret the mix as pale blue"
+                }
+              },
+              {
+                "action": "focus",
+                "at": "beat-4.word:horizon",
+                "payload": {
+                  "region": "bottom"
+                }
+              },
+              {
+                "action": "annotate",
+                "at": "beat-4.word:horizon",
+                "payload": {
+                  "text": "Mie scattering by larger dust particles creates a white haze"
+                }
+              }
+            ],
+            "id": "scene-human-vision-horizon",
+            "layout": "plate",
+            "motionProfile": "subtleDrift",
+            "props": {
+              "assetRequirement": {
+                "identityKey": "retina-horizon-view",
+                "orientation": "landscape",
+                "subject": "An illustration of human eye cone photoreceptors and a soft blue sky horizon",
+                "treatment": "illustration",
+                "type": "image"
+              },
+              "caption": "The brain perceives a pale, unsaturated blue, which fades to white near the horizon.",
+              "headline": "Human Color Perception & Horizon"
+            },
+            "spansBeats": [
+              "beat-4"
+            ]
+          }
+        ],
+        "spansBeats": [
+          "beat-3",
+          "beat-4"
+        ]
+      }
+    ]
+  }
+}

@@ -20,19 +20,19 @@ like has never been argued, and the contract is another team's to move. What a s
 do is read this beside the one taken before a contract change, for this same role, and see
 what moved.
 
-The prefix is **96,372 characters**, in 5 categories and the crew's own preamble.
+The prefix is **107,495 characters**, in 5 categories and the crew's own preamble.
 
 ## Where the prefix goes
 
 | part | characters | share | `<beatId>.start\|end` | `<beatId>.word:<word>` | unparsed | statements |
 |---|---|---|---|---|---|---|
-| preamble | 885 | 0.9% | 0 (0) | 0 (0) | 0 | 0 |
-| language | 19,905 | 20.7% | 2 (1) | 2 (2) | 1 | 3 |
-| plan | 7,467 | 7.7% | 5 (5) | 9 (3) | 0 | 8 |
-| catalog | 57,355 | 59.5% | 33 (16) | 1 (1) | 0 | 17 |
-| checks | 9,660 | 10.0% | 0 (0) | 0 (0) | 0 | 0 |
-| operating | 1,100 | 1.1% | 0 (0) | 0 (0) | 0 | 0 |
-| **the whole prefix** | **96,372** | **100.0%** | **40 (19)** | **12 (6)** | **1** | **22** |
+| preamble | 885 | 0.8% | 0 (0) | 0 (0) | 0 | 0 |
+| language | 21,569 | 20.1% | 2 (1) | 2 (2) | 1 | 3 |
+| plan | 7,467 | 6.9% | 5 (5) | 9 (3) | 0 | 8 |
+| catalog | 66,814 | 62.2% | 40 (19) | 1 (1) | 0 | 20 |
+| checks | 9,660 | 9.0% | 0 (0) | 0 (0) | 0 | 0 |
+| operating | 1,100 | 1.0% | 0 (0) | 0 (0) | 0 | 0 |
+| **the whole prefix** | **107,495** | **100.0%** | **47 (22)** | **12 (6)** | **1** | **25** |
 
 Anchor cells read `occurrences (distinct statements)`. The second number is the one that
 matters: anchors that differ only in the word they name, sitting in otherwise identical
@@ -50,21 +50,22 @@ per-category framing is not searched for and is not counted here.
 The crew does not act on this: dropping a repeat would be a consumer editing a published
 projection, which its own assembly rule forbids. Noticing is the whole of its part.
 
-**5,114 characters** — 5.3% of the prefix — are copies of content published elsewhere in it, across 42 repeats.
+**6,352 characters** — 5.9% of the prefix — are copies of content published elsewhere in it, across 45 repeats.
 
 | characters | copies | repeated | share | where |
 |---|---|---|---|---|
-| 755 | 2 | 755 | 0.8% | `catalog.capabilities.2.propsSchema.properties.assetRequirement.properties`, `plan.schema.properties.sections.items.properties.persistent.items.properties.assetRequirement.properties` |
+| 755 | 3 | 1,510 | 1.4% | `catalog.capabilities.2.propsSchema.properties.assetRequirement.properties`, `catalog.capabilities.3.propsSchema.properties.assetRequirement.properties`, `plan.schema.properties.sections.items.properties.persistent.items.properties.assetRequirement.properties` |
 | 164 | 4 | 492 | 0.5% | `catalog.capabilities.2.examples.0.props.assetRequirement`, `catalog.capabilities.2.examples.2.props.assetRequirement`, `plan.examples.2.plan.sections.0.scenes.0.props.assetRequirement`, `plan.examples.2.plan.sections.0.scenes.2.props.assetRequirement` |
 | 406 | 2 | 406 | 0.4% | `catalog.capabilities.1.examples.0.props`, `catalog.capabilities.1.examples.1.props` |
-| 368 | 2 | 368 | 0.4% | `catalog.capabilities.6.examples.0.props`, `catalog.capabilities.6.examples.1.props` |
-| 364 | 2 | 364 | 0.4% | `catalog.capabilities.3.examples.0.props`, `catalog.capabilities.3.examples.2.props` |
-| 120 | 3 | 240 | 0.2% | `catalog.capabilities.7.examples.0.props`, `catalog.capabilities.7.examples.1.props`, `plan.examples.1.plan.sections.0.scenes.0.props` |
-| 153 | 2 | 153 | 0.2% | `catalog.capabilities.0.examples.0.props.data`, `plan.examples.2.plan.sections.0.scenes.1.props.data` |
-| 146 | 2 | 146 | 0.2% | `catalog.capabilities.4.examples.0.props`, `catalog.capabilities.4.examples.2.props` |
-| 122 | 2 | 122 | 0.1% | `catalog.capabilities.5.examples.0.props`, `catalog.capabilities.5.examples.2.props` |
+| 368 | 2 | 368 | 0.3% | `catalog.capabilities.8.examples.0.props`, `catalog.capabilities.8.examples.1.props` |
+| 364 | 2 | 364 | 0.3% | `catalog.capabilities.5.examples.0.props`, `catalog.capabilities.5.examples.2.props` |
+| 169 | 3 | 338 | 0.3% | `catalog.capabilities.3.examples.0.props.assetRequirement`, `catalog.capabilities.3.examples.1.props.assetRequirement`, `catalog.capabilities.3.examples.2.props.assetRequirement` |
+| 120 | 3 | 240 | 0.2% | `catalog.capabilities.9.examples.0.props`, `catalog.capabilities.9.examples.1.props`, `plan.examples.1.plan.sections.0.scenes.0.props` |
+| 153 | 2 | 153 | 0.1% | `catalog.capabilities.0.examples.0.props.data`, `plan.examples.2.plan.sections.0.scenes.1.props.data` |
+| 146 | 2 | 146 | 0.1% | `catalog.capabilities.6.examples.0.props`, `catalog.capabilities.6.examples.2.props` |
+| 122 | 2 | 122 | 0.1% | `catalog.capabilities.7.examples.0.props`, `catalog.capabilities.7.examples.2.props` |
 
-33 smaller repeats, together 2,068 characters, 2.1% of the prefix, are counted in the total above and not listed: under 100 characters a repeat is a JSON declaration rather than a document.
+35 smaller repeats, together 2,213 characters, 2.1% of the prefix, are counted in the total above and not listed: under 100 characters a repeat is a JSON declaration rather than a document.
 
 ## What the contract publishes elsewhere
 
@@ -73,20 +74,20 @@ held and read — `refusals.py` and `converge.py` read rules that live here — 
 never assembled into a prompt. The `would have been` column is the share this category
 would have held had it been taught, which is what the crew stopped spending.
 
-**36,362 characters** the contract publishes to another audience are not assembled into this prefix, across 2 categories. None of it is counted anywhere above.
+**42,154 characters** the contract publishes to another audience are not assembled into this prefix, across 2 categories. None of it is counted anywhere above.
 
 | category | characters | would have been | repeated inside it |
 |---|---|---|---|
 | design | 270 | 0.2% | — |
-| protocol | 36,092 | 27.2% | 11,985 |
+| protocol | 41,884 | 28.0% | 14,532 |
 
 The repeats inside them, on the same outermost-only rule and the same listing floor. No share, because there is no denominator: this is duplication in a published contract that no model is charged for.
 
 | characters | copies | repeated | where |
 |---|---|---|---|
 | 5,146 | 2 | 5,146 | `protocol.schemas.commandData.run.preflight.properties.report.properties`, `protocol.schemas.preflightReport.properties` |
-| 1,610 | 3 | 3,220 | `protocol.schemas.commandData.run.image.accept`, `protocol.schemas.commandData.run.image.reject`, `protocol.schemas.commandData.run.image.status` |
-| 361 | 3 | 722 | `protocol.schemas.imageGenerationGrant.properties.expiresAt`, `protocol.schemas.imageGenerationGrant.properties.issuedAt`, `protocol.schemas.replacementGrant.properties.issuedAt` |
+| 2,029 | 3 | 4,058 | `protocol.schemas.commandData.run.image.accept`, `protocol.schemas.commandData.run.image.reject`, `protocol.schemas.commandData.run.image.status` |
+| 361 | 7 | 2,166 | `protocol.schemas.commandData.run.image.start.anyOf.2.properties.notBefore`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.authorizedAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.expiresAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.nextImageDispatchAt`, `protocol.schemas.imageGenerationGrant.properties.expiresAt`, `protocol.schemas.imageGenerationGrant.properties.issuedAt`, `protocol.schemas.replacementGrant.properties.issuedAt` |
 | 549 | 2 | 549 | `protocol.schemas.commandData.run.decline`, `protocol.schemas.decline` |
 | 275 | 2 | 275 | `protocol.schemas.commandData.run.compile.properties.report`, `protocol.schemas.commandData.run.validate.properties.report` |
 | 254 | 2 | 254 | `protocol.schemas.commandData.run.status.properties.artifacts`, `protocol.schemas.resultEnvelope.properties.artifacts` |

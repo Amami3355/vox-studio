@@ -1,0 +1,741 @@
+{
+  "usage": {
+    "totalDispatchAttempts": 30,
+    "groundedSearches": 2,
+    "byRole": {
+      "Director": 6,
+      "ParallelGroundedResearch": 2,
+      "NarrativeAgent": 1,
+      "ArtDirectorAgent": 1,
+      "VisualStructurer": 2,
+      "SceneAuthor": 8,
+      "PlanRepairAgent": 1,
+      "Recording": 1,
+      "ImageCreator": 3,
+      "ImageGeneration": 3,
+      "MediaReviewer": 2
+    },
+    "pending": [],
+    "imageGenerations": 3,
+    "narrations": 1,
+    "technicalRepairs": 1,
+    "editorialCorrections": 0,
+    "filmCorrections": 0
+  },
+  "records": [
+    {
+      "id": "ac893d4a-d96f-4be5-8ef5-eca589525b70",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:09:35.212185+00:00"
+    },
+    {
+      "id": "ac893d4a-d96f-4be5-8ef5-eca589525b70",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 289,
+        "candidates_token_count": 172,
+        "thoughts_token_count": 225,
+        "total_token_count": 686
+      },
+      "observedAt": "2026-09-08T05:09:38.847585+00:00"
+    },
+    {
+      "id": "eff77252-474e-4c18-895d-d57a9dd0490b",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ParallelGroundedResearch",
+      "model": "gemini-3.5-flash",
+      "grounded": true,
+      "observedAt": "2026-09-08T05:09:39.000053+00:00"
+    },
+    {
+      "id": "eff77252-474e-4c18-895d-d57a9dd0490b",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 192,
+        "candidates_token_count": 158,
+        "thoughts_token_count": 5337,
+        "total_token_count": 5687
+      },
+      "searchQueries": [
+        "\"supersonic retropropulsion\" falcon 9",
+        "spacex why propulsive landing instead of parachutes",
+        "spacex falcon 1 parachute attempts"
+      ],
+      "sources": [
+        {
+          "id": "source-1",
+          "title": "SpaceX reusable launch system development program - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+        },
+        {
+          "id": "source-2",
+          "title": "Falcon 9 first-stage landing tests - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+        },
+        {
+          "id": "source-3",
+          "title": "SpaceX reusable launch system development program - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+        },
+        {
+          "id": "source-4",
+          "title": "List of Falcon 9 first-stage boosters - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/List_of_Falcon_9_first-stage_boosters"
+        },
+        {
+          "id": "source-5",
+          "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview",
+          "url": "https://ntrs.nasa.gov/api/citations/20170008725/downloads/20170008725.pdf"
+        }
+      ],
+      "supports": [
+        {
+          "claimId": "claim-1",
+          "partIndex": 0,
+          "startIndex": 0,
+          "endIndex": 203,
+          "sourceIds": [
+            "source-1"
+          ]
+        },
+        {
+          "claimId": "claim-2",
+          "partIndex": 0,
+          "startIndex": 205,
+          "endIndex": 403,
+          "sourceIds": [
+            "source-2",
+            "source-3",
+            "source-4"
+          ]
+        },
+        {
+          "claimId": "claim-3",
+          "partIndex": 0,
+          "startIndex": 405,
+          "endIndex": 612,
+          "sourceIds": [
+            "source-5"
+          ]
+        }
+      ],
+      "answerParts": [
+        {
+          "partIndex": 0,
+          "text": "### Atmospheric Reentry and Thermal Protection\n* At stage separation, first-stage rocket boosters travel at hypersonic speeds where atmospheric friction generates extreme aerodynamic heating and pressure.\n* Early recovery attempts using parachutes on early rocket configurations failed because the boosters disintegrated and burned up during atmospheric reentry before their parachutes could even deploy.\n* To survive this high-velocity phase, reusable rockets perform an active \"entry burn\" by firing their engines directly into the oncoming supersonic freestream\u00e2\u20ac\u201da process known as supersonic retropropulsion.\n* Firing the engines counter to the supersonic airflow creates an exhaust plume that pushes the atmospheric bow shock wave further"
+        }
+      ],
+      "extractionStatus": "validated",
+      "responseSha256": "6becd910e88a98223bdbaa3265ec3eceb2ea1e4bed976f2da48f40ec9c489c87",
+      "modelVersion": "gemini-3.5-flash",
+      "observedAt": "2026-09-08T05:10:16.258446+00:00"
+    },
+    {
+      "id": "ba0c3845-5d93-4099-842b-971e314363c9",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:10:16.279269+00:00"
+    },
+    {
+      "id": "ba0c3845-5d93-4099-842b-971e314363c9",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 1682,
+        "candidates_token_count": 361,
+        "thoughts_token_count": 792,
+        "total_token_count": 2835
+      },
+      "observedAt": "2026-09-08T05:10:22.769206+00:00"
+    },
+    {
+      "id": "12ac7ebb-b2de-409c-b49a-55e5e9a3c5bc",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:23:43.700345+00:00"
+    },
+    {
+      "id": "12ac7ebb-b2de-409c-b49a-55e5e9a3c5bc",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 1999,
+        "candidates_token_count": 369,
+        "thoughts_token_count": 840,
+        "total_token_count": 3208
+      },
+      "observedAt": "2026-09-08T05:23:51.333173+00:00"
+    },
+    {
+      "id": "249ecb4d-4208-4c65-836b-d76ccdb51830",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ParallelGroundedResearch",
+      "model": "gemini-3.5-flash",
+      "grounded": true,
+      "observedAt": "2026-09-08T05:23:51.505291+00:00"
+    },
+    {
+      "id": "249ecb4d-4208-4c65-836b-d76ccdb51830",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 347,
+        "candidates_token_count": 164,
+        "thoughts_token_count": 4785,
+        "total_token_count": 5296
+      },
+      "searchQueries": [
+        "\"parachute\" \"impractical\" \"booster\" landing weight OR size OR mass",
+        "ntrs nasa gov api citations 20170008725",
+        " \"20170008725\""
+      ],
+      "sources": [
+        {
+          "id": "source-1",
+          "title": "SpaceX reusable launch system development program - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+        },
+        {
+          "id": "source-2",
+          "title": "The New Mars Landing Approach: How We'll Land Large Payloads on the Red Planet",
+          "url": "https://www.universetoday.com/articles/the-new-mars-landing-approach-how-well-land-large-payloads-on-the-red-planet"
+        },
+        {
+          "id": "source-3",
+          "title": "falcon 9 - Why would SpaceX not use parachutes for the final descent of the first stage? - Space Exploration Stack Exchange",
+          "url": "https://space.stackexchange.com/questions/7718/why-would-spacex-not-use-parachutes-for-the-final-descent-of-the-first-stage"
+        },
+        {
+          "id": "source-4",
+          "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview - NASA Technical Reports Server (NTRS)",
+          "url": "https://ntrs.nasa.gov/citations/20170008725"
+        }
+      ],
+      "supports": [
+        {
+          "claimId": "claim-1",
+          "partIndex": 0,
+          "startIndex": 0,
+          "endIndex": 250,
+          "sourceIds": [
+            "source-1",
+            "source-2",
+            "source-3"
+          ]
+        },
+        {
+          "claimId": "claim-2",
+          "partIndex": 0,
+          "startIndex": 252,
+          "endIndex": 474,
+          "sourceIds": [
+            "source-1",
+            "source-4",
+            "source-2"
+          ]
+        }
+      ],
+      "answerParts": [
+        {
+          "partIndex": 0,
+          "text": "### Deceleration and Supersonic Retropropulsion\n* A reusable rocket first-stage booster relies on rocket fuel to decelerate during entry and landing because atmospheric drag alone is insufficient to protect the vehicle and ensure a controlled descent.\n* Firing rocket engines against the direction of travel\u00e2\u20ac\u201da process known as retropropulsion\u00e2\u20ac\u201dallows the vehicle to shed hypersonic and supersonic velocities, manage thermal loads, and target a specific touchdown location.\n* Deceleration under engine power is the only entry, descent, and landing technology that is intrinsically scalable across a wide range of massive vehicles to enable safe landings on both Earth and airless"
+        }
+      ],
+      "extractionStatus": "validated",
+      "responseSha256": "8b47dbac5865871876e804acd794f1b3038054d0a7563b7d6c3b254d57813027",
+      "modelVersion": "gemini-3.5-flash",
+      "observedAt": "2026-09-08T05:24:29.305078+00:00"
+    },
+    {
+      "id": "bcf72743-88e1-4e57-9385-e40d413e4db8",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:24:29.328707+00:00"
+    },
+    {
+      "id": "bcf72743-88e1-4e57-9385-e40d413e4db8",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2515,
+        "candidates_token_count": 31,
+        "thoughts_token_count": 1366,
+        "total_token_count": 3912
+      },
+      "observedAt": "2026-09-08T05:24:37.385768+00:00"
+    },
+    {
+      "id": "f1636fa3-2821-44ae-9e0e-3b9b44e64d4a",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "NarrativeAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:24:37.426740+00:00"
+    },
+    {
+      "id": "f1636fa3-2821-44ae-9e0e-3b9b44e64d4a",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 1597,
+        "candidates_token_count": 432,
+        "thoughts_token_count": 1899,
+        "total_token_count": 3928
+      },
+      "observedAt": "2026-09-08T05:24:47.341831+00:00"
+    },
+    {
+      "id": "837a866c-19f1-4875-b75c-6657b16d7cd9",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:24:47.374299+00:00"
+    },
+    {
+      "id": "837a866c-19f1-4875-b75c-6657b16d7cd9",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2095,
+        "candidates_token_count": 8,
+        "thoughts_token_count": 1239,
+        "total_token_count": 3342
+      },
+      "observedAt": "2026-09-08T05:24:53.996652+00:00"
+    },
+    {
+      "id": "da684c14-6883-4a27-9d5b-6402b254b848",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ArtDirectorAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:24:54.039278+00:00"
+    },
+    {
+      "id": "da684c14-6883-4a27-9d5b-6402b254b848",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 1588,
+        "candidates_token_count": 173,
+        "thoughts_token_count": 934,
+        "total_token_count": 2695
+      },
+      "observedAt": "2026-09-08T05:24:59.928492+00:00"
+    },
+    {
+      "id": "cb55cde4-c40b-4b6b-af23-44bfc38a2c6a",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "VisualStructurer",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:24:59.971372+00:00"
+    },
+    {
+      "id": "cb55cde4-c40b-4b6b-af23-44bfc38a2c6a",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 3446,
+        "candidates_token_count": 448,
+        "thoughts_token_count": 1974,
+        "total_token_count": 5868
+      },
+      "observedAt": "2026-09-08T05:25:12.676349+00:00"
+    },
+    {
+      "id": "3ca0d50a-25e8-4269-b1b7-67cf43ba5b52",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:25:12.709212+00:00"
+    },
+    {
+      "id": "3ca0d50a-25e8-4269-b1b7-67cf43ba5b52",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 5260,
+        "candidates_token_count": 895,
+        "thoughts_token_count": 4714,
+        "total_token_count": 10869
+      },
+      "observedAt": "2026-09-08T05:25:34.397479+00:00"
+    },
+    {
+      "id": "12105c7b-914d-483e-8309-98b08642d1fc",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "PlanRepairAgent",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:25:34.439739+00:00"
+    },
+    {
+      "id": "12105c7b-914d-483e-8309-98b08642d1fc",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 3749,
+        "candidates_token_count": 970,
+        "thoughts_token_count": 2605,
+        "total_token_count": 7324
+      },
+      "observedAt": "2026-09-08T05:25:48.639225+00:00"
+    },
+    {
+      "id": "0da33d03-d084-45c5-be0f-53893177208a",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "VisualStructurer",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:15.763238+00:00"
+    },
+    {
+      "id": "0da33d03-d084-45c5-be0f-53893177208a",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 3446,
+        "candidates_token_count": 439,
+        "thoughts_token_count": 1861,
+        "total_token_count": 5746
+      },
+      "observedAt": "2026-09-08T05:35:26.518955+00:00"
+    },
+    {
+      "id": "42e29667-47b1-4ae1-9719-63826ac839fa",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:26.609110+00:00"
+    },
+    {
+      "id": "42e29667-47b1-4ae1-9719-63826ac839fa",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 5251,
+        "candidates_token_count": 602,
+        "thoughts_token_count": 2186,
+        "total_token_count": 8039
+      },
+      "observedAt": "2026-09-08T05:35:38.841519+00:00"
+    },
+    {
+      "id": "f0d826c7-65bc-420c-81e2-ff5bf0306718",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:38.856671+00:00"
+    },
+    {
+      "id": "f0d826c7-65bc-420c-81e2-ff5bf0306718",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 7874,
+        "candidates_token_count": 194,
+        "thoughts_token_count": 1022,
+        "total_token_count": 9090
+      },
+      "observedAt": "2026-09-08T05:35:44.874730+00:00"
+    },
+    {
+      "id": "fa09b156-f0e9-42b4-bfc1-87ec5ae36205",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:44.884923+00:00"
+    },
+    {
+      "id": "fa09b156-f0e9-42b4-bfc1-87ec5ae36205",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 9068,
+        "candidates_token_count": 214,
+        "thoughts_token_count": 27,
+        "total_token_count": 9309
+      },
+      "observedAt": "2026-09-08T05:35:47.167510+00:00"
+    },
+    {
+      "id": "480244ac-02ce-4b9e-bfa4-c5d60bcf3d17",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:47.185690+00:00"
+    },
+    {
+      "id": "480244ac-02ce-4b9e-bfa4-c5d60bcf3d17",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 9287,
+        "candidates_token_count": 202,
+        "thoughts_token_count": 212,
+        "total_token_count": 9701
+      },
+      "observedAt": "2026-09-08T05:35:50.213393+00:00"
+    },
+    {
+      "id": "83ab7406-6bc4-48b7-a7af-4570d04925bc",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:50.230996+00:00"
+    },
+    {
+      "id": "83ab7406-6bc4-48b7-a7af-4570d04925bc",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 9633,
+        "candidates_token_count": 195,
+        "thoughts_token_count": 209,
+        "total_token_count": 10037
+      },
+      "observedAt": "2026-09-08T05:35:52.826179+00:00"
+    },
+    {
+      "id": "9b8d6670-5280-4c92-82d8-0826ecef08a0",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:52.843174+00:00"
+    },
+    {
+      "id": "9b8d6670-5280-4c92-82d8-0826ecef08a0",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 9971,
+        "candidates_token_count": 242,
+        "thoughts_token_count": 25,
+        "total_token_count": 10238
+      },
+      "observedAt": "2026-09-08T05:35:54.709536+00:00"
+    },
+    {
+      "id": "8221b2fb-dba1-4aaa-8fae-4760518db173",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:35:54.725699+00:00"
+    },
+    {
+      "id": "8221b2fb-dba1-4aaa-8fae-4760518db173",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 10158,
+        "candidates_token_count": 826,
+        "thoughts_token_count": 958,
+        "total_token_count": 11942
+      },
+      "observedAt": "2026-09-08T05:36:03.365288+00:00"
+    },
+    {
+      "id": "d3b2e36e-f827-42e2-a339-a440a7713a0d",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "Director",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:03.473879+00:00"
+    },
+    {
+      "id": "d3b2e36e-f827-42e2-a339-a440a7713a0d",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 5377,
+        "candidates_token_count": 17,
+        "thoughts_token_count": 1880,
+        "total_token_count": 7274
+      },
+      "observedAt": "2026-09-08T05:36:14.042306+00:00"
+    },
+    {
+      "id": "fe71de05-5edb-4f09-b070-f63d061a47e7",
+      "status": "dispatched",
+      "provider": "elevenlabs",
+      "role": "Recording",
+      "model": "production",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:14.531143+00:00"
+    },
+    {
+      "id": "fe71de05-5edb-4f09-b070-f63d061a47e7",
+      "status": "responded",
+      "usage": {},
+      "observedAt": "2026-09-08T05:36:20.634146+00:00"
+    },
+    {
+      "id": "cc2a6dc6-73f1-46b9-a0a7-506bae8b8c63",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageCreator",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:20.930980+00:00"
+    },
+    {
+      "id": "cc2a6dc6-73f1-46b9-a0a7-506bae8b8c63",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2920,
+        "candidates_token_count": 509,
+        "thoughts_token_count": 995,
+        "total_token_count": 4424
+      },
+      "observedAt": "2026-09-08T05:36:30.912430+00:00"
+    },
+    {
+      "id": "d3ab68e0-7504-457f-a131-afd902dc5df2",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageGeneration",
+      "model": "production",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:30.957282+00:00"
+    },
+    {
+      "id": "d3ab68e0-7504-457f-a131-afd902dc5df2",
+      "status": "responded",
+      "usage": {},
+      "observedAt": "2026-09-08T05:36:37.244871+00:00"
+    },
+    {
+      "id": "44eb37c1-7bf4-46a1-860a-487f2f4660f2",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "MediaReviewer",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:37.504040+00:00"
+    },
+    {
+      "id": "44eb37c1-7bf4-46a1-860a-487f2f4660f2",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 4804,
+        "candidates_token_count": 285,
+        "thoughts_token_count": 1433,
+        "total_token_count": 6522
+      },
+      "mediaSha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448",
+      "observedAt": "2026-09-08T05:36:50.522362+00:00"
+    },
+    {
+      "id": "a49e16e0-55a5-4fb4-9001-a5138bc6f335",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageCreator",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:50.764795+00:00"
+    },
+    {
+      "id": "a49e16e0-55a5-4fb4-9001-a5138bc6f335",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 4805,
+        "candidates_token_count": 478,
+        "thoughts_token_count": 712,
+        "total_token_count": 5995
+      },
+      "observedAt": "2026-09-08T05:36:58.051334+00:00"
+    },
+    {
+      "id": "a5aa6787-1a95-47dc-b7c2-8fd2456b7c5b",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageGeneration",
+      "model": "production",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:36:58.101829+00:00"
+    },
+    {
+      "id": "a5aa6787-1a95-47dc-b7c2-8fd2456b7c5b",
+      "status": "responded",
+      "usage": {},
+      "observedAt": "2026-09-08T05:37:04.611065+00:00"
+    },
+    {
+      "id": "3eaf73df-aeaf-4e8e-a3c0-5053ae3e42e3",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "MediaReviewer",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:37:04.866981+00:00"
+    },
+    {
+      "id": "3eaf73df-aeaf-4e8e-a3c0-5053ae3e42e3",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 6748,
+        "candidates_token_count": 120,
+        "thoughts_token_count": 496,
+        "total_token_count": 7364
+      },
+      "mediaSha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc",
+      "observedAt": "2026-09-08T05:37:09.585683+00:00"
+    },
+    {
+      "id": "9b545c8a-1ca9-46d4-a70a-d144a383a957",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageCreator",
+      "model": "gemini-3.5-flash",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:37:09.901185+00:00"
+    },
+    {
+      "id": "9b545c8a-1ca9-46d4-a70a-d144a383a957",
+      "status": "responded",
+      "usage": {
+        "prompt_token_count": 2920,
+        "candidates_token_count": 427,
+        "thoughts_token_count": 728,
+        "total_token_count": 4075
+      },
+      "observedAt": "2026-09-08T05:37:18.036956+00:00"
+    },
+    {
+      "id": "3237492b-1fa6-4de9-b627-d5de78162a9d",
+      "status": "dispatched",
+      "provider": "google-cloud",
+      "role": "ImageGeneration",
+      "model": "production",
+      "grounded": false,
+      "observedAt": "2026-09-08T05:37:18.091323+00:00"
+    },
+    {
+      "id": "3237492b-1fa6-4de9-b627-d5de78162a9d",
+      "status": "responded",
+      "usage": {},
+      "observedAt": "2026-09-08T05:37:22.097458+00:00"
+    }
+  ]
+}

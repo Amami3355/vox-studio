@@ -1,0 +1,79 @@
+{
+  "artifactDigestsVerified": true,
+  "files": [
+    {
+      "exportedAs": "6ba9d16db5bfcccd0680330d1a9d1ca75dc400468340a2fd95a04ae4ac7ef3b5.json",
+      "kind": "production_request",
+      "path": "inputs/request.json",
+      "sha256": "6ba9d16db5bfcccd0680330d1a9d1ca75dc400468340a2fd95a04ae4ac7ef3b5"
+    },
+    {
+      "exportedAs": "f1324ba7c44add36b14bf181082b89b2055a9ac214f4a927ca9170e92f15d609.json",
+      "kind": "plan_snapshot",
+      "path": "inputs/plans/3e64e00d10000f9b2a6e992de9a7e961bb6b8c725fec69ebd3c345aacad00de5.json",
+      "sha256": "f1324ba7c44add36b14bf181082b89b2055a9ac214f4a927ca9170e92f15d609"
+    },
+    {
+      "exportedAs": "fc948ff7b63ebd129a665d22fa537d91057d2fca38537f973bc725712ed5c2a0.json",
+      "kind": "validation_report",
+      "path": "artifacts/validation/568447ed295a840b607aeca713f589a232f747329f6e5ef26fb629bd19f1746d/report.json",
+      "sha256": "fc948ff7b63ebd129a665d22fa537d91057d2fca38537f973bc725712ed5c2a0"
+    },
+    {
+      "exportedAs": "6e07036eba4f3c7806dcd441648e178f38321a0eaeca67a63a42d8d146fe2fe8.json",
+      "kind": "preflight_report",
+      "path": "artifacts/preflight/e9739bda3955a25aed271b600ed1f02ca6922d1156bdbe51613e834e2002072f/report.json",
+      "sha256": "6e07036eba4f3c7806dcd441648e178f38321a0eaeca67a63a42d8d146fe2fe8"
+    },
+    {
+      "exportedAs": "3b2745feb957bb402d0ef965b63e6882c435aaedd8cd400ff80e646d40fb4878.json",
+      "kind": "take_manifest",
+      "path": "artifacts/takes/645d85ac434b7d0e30f8a2e9aacd0c6e4216c0ff82dc42f6d11d63abfb27fc2b/take.json",
+      "sha256": "3b2745feb957bb402d0ef965b63e6882c435aaedd8cd400ff80e646d40fb4878"
+    },
+    {
+      "exportedAs": "a4eaeaea13dfcb139993b71f414c4e3cfbb516ca02122bd41fcb07c244f1a8d1.mp3",
+      "kind": "take_audio",
+      "path": "artifacts/takes/645d85ac434b7d0e30f8a2e9aacd0c6e4216c0ff82dc42f6d11d63abfb27fc2b/audio.mp3",
+      "sha256": "a4eaeaea13dfcb139993b71f414c4e3cfbb516ca02122bd41fcb07c244f1a8d1"
+    },
+    {
+      "exportedAs": "91075d28e93b23f3eda16808b331276d2e0195b9dc1f76e3ca2d960bf8e1b0b7.json",
+      "kind": "take_alignment",
+      "path": "artifacts/takes/645d85ac434b7d0e30f8a2e9aacd0c6e4216c0ff82dc42f6d11d63abfb27fc2b/alignment.json",
+      "sha256": "91075d28e93b23f3eda16808b331276d2e0195b9dc1f76e3ca2d960bf8e1b0b7"
+    },
+    {
+      "exportedAs": "f2a142a9b006408c5a8ac5a1d813a9d40e8fa7ba60823d74d84dc188b4bf900f.json",
+      "kind": "timed_beat_fold",
+      "path": "artifacts/takes/645d85ac434b7d0e30f8a2e9aacd0c6e4216c0ff82dc42f6d11d63abfb27fc2b/folds/7c1c2a2f692106ce7c7ee64b2080dccbe53d68eae2885c42794f0158c1702660/timed-beats.json",
+      "sha256": "f2a142a9b006408c5a8ac5a1d813a9d40e8fa7ba60823d74d84dc188b4bf900f"
+    },
+    {
+      "exportedAs": "4fc7dfd8075fbaafe651fc0a28f1b8c50059ee5796400af1f753112fc453f94f.json",
+      "kind": "compiled_document",
+      "path": "artifacts/compilations/85f91f26571f429a3b91f5a657dd0e25629f13eccb6a80adb73e851b7f3fec27/document.json",
+      "sha256": "4fc7dfd8075fbaafe651fc0a28f1b8c50059ee5796400af1f753112fc453f94f"
+    },
+    {
+      "exportedAs": "c000bc6450c824d2d081b0fa5774bc8cb755dfa38d608de98ff4c9737d0960bb.json",
+      "kind": "compile_report",
+      "path": "artifacts/compilations/85f91f26571f429a3b91f5a657dd0e25629f13eccb6a80adb73e851b7f3fec27/report.json",
+      "sha256": "c000bc6450c824d2d081b0fa5774bc8cb755dfa38d608de98ff4c9737d0960bb"
+    },
+    {
+      "exportedAs": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+      "kind": "generated_image_candidate",
+      "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+      "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+    },
+    {
+      "exportedAs": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+      "kind": "generated_image_candidate",
+      "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+      "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+    }
+  ],
+  "runId": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+  "signedStatusVerified": true
+}

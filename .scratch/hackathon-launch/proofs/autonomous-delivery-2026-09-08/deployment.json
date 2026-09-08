@@ -1,0 +1,50 @@
+{
+  "productionImage": "europe-west1-docker.pkg.dev/studio-prod-7f3a/vox/production@sha256:1f380f9dcbd64d6abd72cd7dfd722b20c0d6372929dd8fb4f4fbd57659bbc7a2",
+  "crewImage": "europe-west1-docker.pkg.dev/studio-prod-7f3a/vox-crew/crew@sha256:95c4a7ba4679ad2704029f17a3a0a66003ec7bd94fe9d2fcf50f4a5f0074c33a",
+  "submissions": {
+    "rocket": {
+      "id": "autonomous-2026-09-08-rocket",
+      "requestSha256": "493d0a35daf6fbfa7b65f38c313d6e9d49aeabd0f7e4d92d3fb8f028b33e999d",
+      "request": {
+        "protocolVersion": 1,
+        "brief": {
+          "id": "autonomous-2026-09-08-rocket",
+          "text": "Explain why a reusable rocket needs fuel to slow down and land.",
+          "durationSeconds": 50,
+          "maxGeneratedImages": 5
+        },
+        "production": {
+          "voice": {
+            "provider": "elevenlabs",
+            "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+            "modelId": "eleven_multilingual_v2",
+            "seed": 7
+          },
+          "maxNewTakes": 1
+        }
+      }
+    },
+    "sky": {
+      "id": "autonomous-2026-09-08-sky",
+      "requestSha256": "0cb9633fb87e6cb27d2879cb06765aa40a1283e8ad76245d86b8f4c0d689b257",
+      "request": {
+        "protocolVersion": 1,
+        "brief": {
+          "id": "autonomous-2026-09-08-sky",
+          "text": "Explain why the sky is blue.",
+          "durationSeconds": 50,
+          "maxGeneratedImages": 5
+        },
+        "production": {
+          "voice": {
+            "provider": "elevenlabs",
+            "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+            "modelId": "eleven_multilingual_v2",
+            "seed": 7
+          },
+          "maxNewTakes": 1
+        }
+      }
+    }
+  }
+}

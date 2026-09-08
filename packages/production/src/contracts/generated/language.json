@@ -4,6 +4,31 @@
   "contract": {
     "entries": [
       {
+        "term": "Editorial brief",
+        "definition": "The Director's interpretation of an original prompt: central question, audience, language, angle, understanding goals and target duration. It does not replace the original request or confer spending authority.",
+        "avoid": null
+      },
+      {
+        "term": "Coverage review",
+        "definition": "A judgement of whether cited evidence answers the central question, explains the mechanism and covers necessary nuances. Valid citations alone do not imply coverage.",
+        "avoid": null
+      },
+      {
+        "term": "Image intention",
+        "definition": "The meaning, arrangement, visible details and intended crops of one image, including which explanatory elements belong to its renderer rather than to the image itself.",
+        "avoid": null
+      },
+      {
+        "term": "Media review",
+        "definition": "An explicit judgement of identified image or audiovisual bytes against their intended explanatory uses. Observations name affected elements and, for a film, time ranges. It remains distinct from final human appreciation.",
+        "avoid": null
+      },
+      {
+        "term": "Autonomous envelope",
+        "definition": "An operator's bounded image-spending authorization for an exact Production request and one Run, retained across corrections and restarts.",
+        "avoid": null
+      },
+      {
         "term": "SceneCapability",
         "definition": "A *type* of scene available in the catalog (`bar_chart`, `image_context`, …). 8–12 exist in V1. Defined by code, generated into the manifest at build time, immutable at runtime.",
         "avoid": "\"component\", \"scene type\", \"template\"."
@@ -175,8 +200,13 @@
       },
       {
         "term": "Brief",
-        "definition": "One paragraph of editorial intent, written by the user, carrying no structure and no vocabulary from the manifest. The gate's input. Two of the ten are deliberately unservable.",
-        "avoid": "\"prompt\" — a brief is not addressed to a model's instructions."
+        "definition": "Editorial intent written by the user, optionally accompanied by a target duration in seconds and a maximum generated-image count. Duration is an estimate; the image maximum is a ceiling, not a required count. It carries no scene structure or vocabulary from the manifest. Beat, word, scene and animation counts remain artistic decisions.",
+        "avoid": "\"prompt\" — a Brief is not addressed to a model's instructions."
+      },
+      {
+        "term": "Editorial review",
+        "definition": "A judgement of whether the planned visual story supports its narration and artistic intent. It may request revision even when the plan satisfies its technical contracts. Reviewing a semantic plan does not establish acceptance of generated images or the rendered film.",
+        "avoid": null
       },
       {
         "term": "Agent production interface",

@@ -1,0 +1,12 @@
+{
+  "url": "http://127.0.0.1:8766/",
+  "pageUtf8Verified": true,
+  "mp4Sha256Verified": true,
+  "rangeStatus": 206,
+  "contentRange": "bytes 100000-100255/9703881",
+  "fullAudioVideoDecode": "passed",
+  "humanAudioListening": "not performed; audio input is unavailable to this agent",
+  "visualReview": "contact sheet sampled every three seconds and full-size last frame inspected",
+  "durationSeconds": 41.621333,
+  "previewBytes": 9703881
+}

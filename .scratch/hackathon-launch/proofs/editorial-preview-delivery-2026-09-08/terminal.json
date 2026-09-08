@@ -1,0 +1,15 @@
+{
+  "briefId": "editorial-preview-reusable-rocket-2026-09-08-revision-2",
+  "outcome": "rendered",
+  "preview": {
+    "id": "preview:304aac1e-c04c-466b-b786-30ac725b8f9d",
+    "kind": "preview",
+    "mediaType": "video/mp4",
+    "sha256": "2ecc251c5d30ea1645d7fc48ce26edbc557968467b8370e166eb20406c4afdcb",
+    "sizeBytes": 9703881
+  },
+  "runId": "304aac1e-c04c-466b-b786-30ac725b8f9d",
+  "schemaVersion": 1,
+  "sequence": 24,
+  "summary": "The narrated preview is verified."
+}

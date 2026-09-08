@@ -1,0 +1,195 @@
+{
+  "beats": [
+    {
+      "id": "beat-1-force",
+      "text": "When a rocket booster falls back to Earth, gravity pulls it down at extreme speeds. To slow it down, an external force must act in the opposite direction of its motion."
+    },
+    {
+      "id": "beat-2-propulsion",
+      "text": "A rocket creates this braking force by expelling onboard mass. Chemical combustion heats gases that expand and shoot out of the nozzle, pushing the vehicle in the opposite direction."
+    },
+    {
+      "id": "beat-3-descent",
+      "text": "During descent, the Falcon 9 first-stage restarts engines for an entry burn to begin slowing down, while grid fins aerodynamically steer its descent."
+    },
+    {
+      "id": "beat-4-braking",
+      "text": "Finally, a landing engine ignition fires. This downward exhaust provides the critical upward thrust that halts the booster's downward speed, achieving a soft vertical landing."
+    }
+  ],
+  "sections": [
+    {
+      "id": "section-aerodynamic-physics",
+      "scenes": [
+        {
+          "component": "image_detail",
+          "events": [
+            {
+              "action": "annotate",
+              "at": "beat-1-force.word:gravity",
+              "payload": {
+                "text": "Gravity accelerating descent"
+              }
+            },
+            {
+              "action": "focus",
+              "at": "beat-1-force.word:external",
+              "payload": {
+                "region": "bottom"
+              }
+            },
+            {
+              "action": "annotate",
+              "at": "beat-1-force.word:external",
+              "payload": {
+                "text": "External force must oppose motion"
+              }
+            }
+          ],
+          "id": "scene-force-vectors",
+          "layout": "plate",
+          "motionProfile": "subtleDrift",
+          "props": {
+            "assetRequirement": {
+              "identityKey": "rocket-descent-physics",
+              "orientation": "landscape",
+              "subject": "Booster falling with gravity and drag force vectors",
+              "treatment": "illustration",
+              "type": "image"
+            },
+            "caption": "Gravity pulls the booster down while opposing forces must act to decelerate it.",
+            "headline": "Opposing forces in descent"
+          },
+          "spansBeats": [
+            "beat-1-force"
+          ]
+        },
+        {
+          "component": "image_detail",
+          "events": [
+            {
+              "action": "annotate",
+              "at": "beat-2-propulsion.word:combustion",
+              "payload": {
+                "text": "High pressure combustion"
+              }
+            },
+            {
+              "action": "focus",
+              "at": "beat-2-propulsion.word:nozzle",
+              "payload": {
+                "region": "bottom"
+              }
+            },
+            {
+              "action": "annotate",
+              "at": "beat-2-propulsion.word:nozzle",
+              "payload": {
+                "text": "Gases expelled through nozzle"
+              }
+            }
+          ],
+          "id": "scene-propulsion-mechanics",
+          "layout": "plate",
+          "motionProfile": "pushIn",
+          "props": {
+            "assetRequirement": {
+              "identityKey": "propulsion-thrust-mechanics",
+              "orientation": "landscape",
+              "subject": "A schematic illustration of a rocket engine nozzle with expanding gas plumes",
+              "treatment": "illustration",
+              "type": "image"
+            },
+            "caption": "Expanding gas plume pushes the vehicle in the opposite direction.",
+            "headline": "Mass expulsion creates thrust"
+          },
+          "spansBeats": [
+            "beat-2-propulsion"
+          ]
+        }
+      ],
+      "spansBeats": [
+        "beat-1-force",
+        "beat-2-propulsion"
+      ]
+    },
+    {
+      "id": "section-landing-sequence",
+      "scenes": [
+        {
+          "component": "process_steps",
+          "events": [
+            {
+              "action": "advance",
+              "at": "beat-3-descent.start"
+            },
+            {
+              "action": "advance",
+              "at": "beat-3-descent.word:fins"
+            }
+          ],
+          "id": "scene-descent-stages",
+          "layout": "path",
+          "motionProfile": "editorialStatic",
+          "props": {
+            "headline": "First-stage descent sequence",
+            "steps": [
+              {
+                "detail": "First-stage engines restart to begin slowing descent.",
+                "label": "Entry Burn"
+              },
+              {
+                "detail": "Grid fins deploy and guide the booster aerodynamically.",
+                "label": "Aerodynamic Steering"
+              }
+            ]
+          },
+          "spansBeats": [
+            "beat-3-descent"
+          ]
+        },
+        {
+          "component": "image_context",
+          "events": [
+            {
+              "action": "revealImage",
+              "at": "beat-4-braking.start"
+            },
+            {
+              "action": "revealCopy",
+              "at": "beat-4-braking.word:ignition"
+            },
+            {
+              "action": "emphasize",
+              "at": "beat-4-braking.word:thrust",
+              "payload": {
+                "text": "Upward Thrust"
+              }
+            }
+          ],
+          "id": "scene-final-touchdown",
+          "layout": "splitLeft",
+          "motionProfile": "cinematic",
+          "props": {
+            "assetRequirement": {
+              "identityKey": "landing-touchdown-sequence",
+              "orientation": "landscape",
+              "subject": "Booster structural silhouette during touchdown with expanding gas plumes",
+              "treatment": "illustration",
+              "type": "image"
+            },
+            "caption": "Downward exhaust provides critical upward braking thrust for touchdown.",
+            "headline": "Landing burn halts descent"
+          },
+          "spansBeats": [
+            "beat-4-braking"
+          ]
+        }
+      ],
+      "spansBeats": [
+        "beat-3-descent",
+        "beat-4-braking"
+      ]
+    }
+  ]
+}

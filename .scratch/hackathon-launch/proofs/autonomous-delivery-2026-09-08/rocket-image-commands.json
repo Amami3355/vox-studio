@@ -1,0 +1,322 @@
+[
+  {
+    "dependencies": {
+      "args": [
+        "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        {
+          "candidateSha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc",
+          "jobId": "image-job-85ae8daffe5ac562fdd0",
+          "protocolVersion": 1
+        }
+      ],
+      "key": null
+    },
+    "name": "production.image_accept",
+    "result": {
+      "artifacts": [
+        {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+          "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+        }
+      ],
+      "command": "run.image.accept",
+      "data": {
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+              "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+            },
+            "height": 768,
+            "id": "image-candidate-4f28a4e3a58efe4ae79f",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "be1070dda3d1bf4c95033790f3361d191f004d227a4fe72c8c84a2fc057a9a5b",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-85ae8daffe5ac562fdd0",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "3ca82dc2c6e1b5f3cae60de38ee57af7af9b1432bc003e74e1d3b7b503428587",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "accepted"
+        }
+      },
+      "error": null,
+      "next": [
+        {
+          "args": [
+            "--run",
+            "."
+          ],
+          "command": "run.compile",
+          "reason": "Recompile to bind the accepted image bytes."
+        }
+      ],
+      "outcome": "succeeded",
+      "protocolVersion": 1,
+      "run": {
+        "id": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        "stage": "compiled"
+      }
+    }
+  },
+  {
+    "dependencies": {
+      "args": [
+        "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        {
+          "aspectRatio": "16:9",
+          "identityKey": "booster_descent",
+          "outputMimeType": "image/png",
+          "prompt": "VOX_IMAGE_REQUEST_V1\nSubject: Rocket booster falling through the atmosphere under aerodynamic drag\nMaterial: image\nEditorial treatment: illustration\nComposition: landscape, target aspect ratio 16:9\nDesign theme: editorial-cold\nTreatment family: photo, illustration\nPalette: neutral=#ff5a1f, negative=#ff4d4d, positive=#3dd68c\nExclude treatment families: duotone, cutout\nKeep the principal subject inside the central safe crop; include no text or watermark.\nVOX_COMPOSITION_INTENT_V2\n{\"meaning\": \"This illustration visualizes a heavy orbital-class rocket booster falling engine-first through the atmosphere, demonstrating the limits of passive deceleration. By showing the intense atmospheric compression, drag friction, and aerodynamic heating around the cold, unlit engines, the image makes it clear that air resistance alone creates destructive conditions and is insufficient to safely decelerate or control the heavy booster without active retropropulsion.\", \"arrangement\": \"The composition is a dynamic diagonal shot showing the rocket booster oriented from the top-right down towards the bottom-left to emphasize rapid descent. The surrounding atmosphere transitions from the deep black-blue of the upper mesosphere at the top to a denser, misty blue at the bottom. High-speed aerodynamic shockwaves wrap around the engine bay at the leading edge, while long streamlines of turbulent air trail along the cylindrical hull.\", \"visibleDetails\": [\"A cylindrical, metallic booster rocket body in white and steel-gray tones, showing realistic soot stains from its launch.\", \"An unlit, dark engine cluster at the bottom of the booster, facing forward in the direction of descent.\", \"A bright orange and yellow aerodynamic bow shock wave formed by air compression directly in front of the downward-facing engine bay.\", \"Thin, high-speed atmospheric friction lines wrapping around the sides of the booster hull.\", \"Four grid fins deployed near the top of the booster, catching the air to stabilize the orientation.\", \"A background color gradient transitioning from the black edge of outer space down to a hazy blue atmospheric layer below.\"], \"plannedCrops\": [\"Wide landscape shot showing the full booster plunging diagonally through the transition from space to atmosphere.\", \"Close-up crop focusing on the unlit engine bay and the surrounding bright orange compression shockwave to highlight the extreme friction point.\"], \"rendererElements\": [\"An overlay arrow pointing upward against the direction of travel, labeled 'Aerodynamic Drag'.\", \"A larger downward-pointing arrow labeled 'Hypersonic Velocity Vector'.\", \"A curved dotted trajectory line showing the booster's steep descent path.\", \"A highlighted glow zone around the engine bay labeled 'Friction & Thermal Stress Zone'\"]}\nRenderer elements must NOT be baked into the image. No lettering or watermark.",
+          "protocolVersion": 1,
+          "requestSha256": "857043398d5465c14d9c31c55bf146bfb3a9ce632ecb1a72066c6d682e87a353",
+          "requirementId": "req_6b2afd42",
+          "seed": 880389943
+        }
+      ],
+      "key": null
+    },
+    "name": "production.image_start",
+    "result": {
+      "artifacts": [],
+      "command": "run.image.start",
+      "data": {
+        "disposition": "created",
+        "job": {
+          "candidate": null,
+          "failure": "Image generation did not produce a valid candidate.",
+          "id": "image-job-de39ebdb32e5091e0b40",
+          "identityKey": "booster_descent",
+          "providerMode": "live",
+          "requestSha256": "857043398d5465c14d9c31c55bf146bfb3a9ce632ecb1a72066c6d682e87a353",
+          "requirementId": "req_6b2afd42",
+          "schemaVersion": 1,
+          "status": "failed"
+        },
+        "providerMode": "live"
+      },
+      "error": null,
+      "next": [],
+      "outcome": "succeeded",
+      "protocolVersion": 1,
+      "run": {
+        "id": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        "stage": "compiled"
+      }
+    }
+  },
+  {
+    "dependencies": {
+      "args": [
+        "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        {
+          "aspectRatio": "16:9",
+          "identityKey": "parachute_failure_booster",
+          "outputMimeType": "image/png",
+          "prompt": "VOX_IMAGE_REQUEST_V1\nSubject: Rocket booster disintegrating under intense reentry friction\nMaterial: image\nEditorial treatment: illustration\nComposition: landscape, target aspect ratio 16:9\nDesign theme: editorial-cold\nTreatment family: photo, illustration\nPalette: neutral=#ff5a1f, negative=#ff4d4d, positive=#3dd68c\nExclude treatment families: duotone, cutout\nKeep the principal subject inside the central safe crop; include no text or watermark.\nVOX_COMPOSITION_INTENT_V2\n{\"meaning\": \"This illustration visualizes why parachute recovery is impossible for orbital-class boosters during reentry. The extreme heat and structural pressure generated by hypersonic speeds create a violent plasma envelope that disintegrates the massive booster and incinerates the parachute system before it can deploy successfully, emphasizing the necessity of retropropulsion.\", \"arrangement\": \"A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive cylindrical rocket booster is shown plunging nose-first through the upper atmosphere. The leading nose cone is the epicenter of a blazing white and orange shockwave of compressed gas. Portions of the metal hull are peeling away, exposing superheated internal structures. Trailing behind the falling rocket in the high-velocity slipstream are the shredded, charred, and actively burning remnants of a failed parachute canopy, with lines snapping under extreme aerodynamic tension against a dark, cold background of space and the blue curve of the Earth.\", \"visibleDetails\": [\"A cylindrical rocket booster plunging diagonally nose-first through the upper atmosphere\", \"An intense, glowing orange and brilliant white compression shockwave centered directly on the leading nose cone\", \"Peeling metal hull plating exposing scorched internal framing and wiring radiating intense heat\", \"Shredded, charred, and blackened remains of a white parachute canopy actively ripping apart in the supersonic slipstream\", \"Snapped and whipping suspension cables burning in the turbulent hot wake behind the rocket\", \"Bright trails of molten metal sparks and glowing debris shedding from the disintegrating vehicle\", \"The deep blue curve of the Earth's atmosphere contrasting against the blackness of space in the background\"], \"plannedCrops\": [\"A close-up of the leading nose cone engulfed in the brilliant, white-hot plasma shockwave\", \"A detailed view of the shredded, burning parachute canopy and snapping cables in the turbulent wake\", \"A wide landscape view showing the entire disintegrating booster cutting across the atmospheric boundary\"], \"rendererElements\": [\"A dynamic shockwave overlay representing high-velocity atmospheric compression\", \"Callout lines indicating points of structural failure and heat concentration\", \"A velocity vector arrow pointing downwards along the path of descent\"]}\nRenderer elements must NOT be baked into the image. No lettering or watermark.",
+          "protocolVersion": 1,
+          "requestSha256": "3ca82dc2c6e1b5f3cae60de38ee57af7af9b1432bc003e74e1d3b7b503428587",
+          "requirementId": "req_b2514966",
+          "seed": 1608272456
+        }
+      ],
+      "key": null
+    },
+    "name": "production.image_start",
+    "result": {
+      "artifacts": [
+        {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+          "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+        }
+      ],
+      "command": "run.image.start",
+      "data": {
+        "disposition": "created",
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+              "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+            },
+            "height": 768,
+            "id": "image-candidate-4f28a4e3a58efe4ae79f",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "be1070dda3d1bf4c95033790f3361d191f004d227a4fe72c8c84a2fc057a9a5b",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-85ae8daffe5ac562fdd0",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "3ca82dc2c6e1b5f3cae60de38ee57af7af9b1432bc003e74e1d3b7b503428587",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "candidate"
+        },
+        "providerMode": "live"
+      },
+      "error": null,
+      "next": [
+        {
+          "args": [
+            "--run",
+            ".",
+            "--decision",
+            "<acceptance.json>"
+          ],
+          "command": "run.image.accept",
+          "reason": "Inspect the candidate and bind an explicit decision to its digest."
+        }
+      ],
+      "outcome": "succeeded",
+      "protocolVersion": 1,
+      "run": {
+        "id": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        "stage": "compiled"
+      }
+    }
+  },
+  {
+    "dependencies": {
+      "args": [
+        "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        {
+          "aspectRatio": "16:9",
+          "identityKey": "parachute_failure_booster",
+          "outputMimeType": "image/png",
+          "prompt": "VOX_IMAGE_REQUEST_V1\nSubject: Rocket booster disintegrating under intense reentry friction\nMaterial: image\nEditorial treatment: illustration\nComposition: landscape, target aspect ratio 16:9\nDesign theme: editorial-cold\nTreatment family: photo, illustration\nPalette: neutral=#ff5a1f, negative=#ff4d4d, positive=#3dd68c\nExclude treatment families: duotone, cutout\nKeep the principal subject inside the central safe crop; include no text or watermark.\nVOX_COMPOSITION_INTENT_V2\n{\"meaning\": \"This illustration visualizes the extreme mechanical and thermal failure that occurs when attempting to recover orbital-class boosters using parachutes. It shows that hypersonic reentry speeds generate atmospheric friction and heat so intense that the structural integrity of the massive booster is destroyed, and parachute systems are incinerated or torn apart before they can even deploy, demonstrating why retropropulsion is structurally required.\", \"arrangement\": \"A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive, cylindrical rocket booster is shown tumbling out of control through the upper atmosphere. The leading nose and sides of the booster are engulfed in a violent, glowing orange and white compression shockwave. Portions of the metal skin are peeling back, exposing internal components to the extreme heat. Trailing behind the falling rocket in the high-velocity slipstream are the charred, shredded remnants of a premature parachute deployment, with lines snapping and canopy fabric burning up. The background is a cold, dark blue fading into the blackness of space at the top edge of the frame.\", \"visibleDetails\": [\"A large cylindrical rocket booster tumbling diagonally downward at hypersonic speed\", \"A brilliant white, yellow, and orange plasma sheath of atmospheric friction enveloping the leading edges of the booster\", \"Peeling outer hull plating exposing scorched internal framing, wiring, and fuel tanks\", \"Clouds of sparks, incandescent metal debris, and superheated gas trailing behind the disintegrating vehicle\", \"Tattered, blackened remains of a white parachute canopy tearing apart under aerodynamic stress\", \"Snapped suspension lines whipping wildly in the turbulent supersonic wake\", \"A deep blue atmospheric horizon curving slightly against the black of space in the upper third of the canvas\"], \"plannedCrops\": [\"A close-up focusing on the peeling, heat-stressed metal plating and internal structural failure near the rocket's midsection\", \"A high-impact detail crop of the shredded parachute canopy and burning lines trailing in the slipstream\", \"A wide-angle composition showing the entire booster engulfed in a brilliant plasma envelope against the dark curve of the Earth\"], \"rendererElements\": [\"A dynamic shockwave overlay representing high-velocity atmospheric compression\", \"Callout lines indicating points of structural failure and heat concentration\", \"A velocity vector arrow pointing downwards along the path of descent\"]}\nRenderer elements must NOT be baked into the image. No lettering or watermark.",
+          "protocolVersion": 1,
+          "requestSha256": "6e49c017aa936a8fb8c1cfcfd2be1ce68b2900c12d63df29b8f144b6113bc134",
+          "requirementId": "req_b2514966",
+          "seed": 409118687
+        }
+      ],
+      "key": null
+    },
+    "name": "production.image_start",
+    "result": {
+      "artifacts": [
+        {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+          "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+        }
+      ],
+      "command": "run.image.start",
+      "data": {
+        "disposition": "created",
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+              "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+            },
+            "height": 768,
+            "id": "image-candidate-242918834793337968e4",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "795932872554252f0fa636ac45fa76f8b4894500d1ac911c86c7f77791490617",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-3a064e792c6430b8925b",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "6e49c017aa936a8fb8c1cfcfd2be1ce68b2900c12d63df29b8f144b6113bc134",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "candidate"
+        },
+        "providerMode": "live"
+      },
+      "error": null,
+      "next": [
+        {
+          "args": [
+            "--run",
+            ".",
+            "--decision",
+            "<acceptance.json>"
+          ],
+          "command": "run.image.accept",
+          "reason": "Inspect the candidate and bind an explicit decision to its digest."
+        }
+      ],
+      "outcome": "succeeded",
+      "protocolVersion": 1,
+      "run": {
+        "id": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        "stage": "compiled"
+      }
+    }
+  },
+  {
+    "dependencies": {
+      "args": [
+        "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        {
+          "candidateSha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448",
+          "jobId": "image-job-3a064e792c6430b8925b",
+          "protocolVersion": 1,
+          "reason": "The parachute canopy is pristine, white, and fully inflated, directly contradicting the planned design of a tattered, blackened canopy tearing apart and burning up in the supersonic wake. The nose cone, which acts as the leading edge during nose-first reentry, is completely cool and dark without any plasma compression or thermal glow, which is physically incorrect."
+        }
+      ],
+      "key": null
+    },
+    "name": "production.image_reject",
+    "result": {
+      "artifacts": [
+        {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+          "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+        }
+      ],
+      "command": "run.image.reject",
+      "data": {
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+              "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+            },
+            "height": 768,
+            "id": "image-candidate-242918834793337968e4",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "795932872554252f0fa636ac45fa76f8b4894500d1ac911c86c7f77791490617",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-3a064e792c6430b8925b",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "6e49c017aa936a8fb8c1cfcfd2be1ce68b2900c12d63df29b8f144b6113bc134",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "rejected"
+        }
+      },
+      "error": null,
+      "next": [],
+      "outcome": "succeeded",
+      "protocolVersion": 1,
+      "run": {
+        "id": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+        "stage": "compiled"
+      }
+    }
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "artifacts": [
+    {
+      "kind": "generated_image_candidate",
+      "path": "artifacts/images/image-job-0769bf15094b0bd5b3b7/f21fd10923c9135a930190fa54699e962a1186a6c13f4115f1095d5227a32324.png",
+      "sha256": "f21fd10923c9135a930190fa54699e962a1186a6c13f4115f1095d5227a32324"
+    }
+  ],
+  "command": "run.image.accept",
+  "data": {
+    "job": {
+      "candidate": {
+        "artifact": {
+          "kind": "generated_image_candidate",
+          "path": "artifacts/images/image-job-0769bf15094b0bd5b3b7/f21fd10923c9135a930190fa54699e962a1186a6c13f4115f1095d5227a32324.png",
+          "sha256": "f21fd10923c9135a930190fa54699e962a1186a6c13f4115f1095d5227a32324"
+        },
+        "height": 768,
+        "id": "image-candidate-f21fd10923c9135a9301",
+        "identityKey": "propulsion-thrust-mechanics",
+        "promptSha256": "965397c4eddfae408d234479898b3c31ddff7d20f07e36b075d997919357c837",
+        "requirementId": "req_444a583b",
+        "width": 1344
+      },
+      "failure": null,
+      "id": "image-job-0769bf15094b0bd5b3b7",
+      "identityKey": "propulsion-thrust-mechanics",
+      "providerMode": "live",
+      "requestSha256": "f97184690590b1e7b4a9c2d26ec5f5ef5a4df3dc0644110d05319ad41e1dde23",
+      "requirementId": "req_444a583b",
+      "schemaVersion": 1,
+      "status": "accepted"
+    }
+  },
+  "error": null,
+  "next": [
+    {
+      "args": [
+        "--run",
+        "."
+      ],
+      "command": "run.compile",
+      "reason": "Recompile to bind the accepted image bytes."
+    }
+  ],
+  "outcome": "succeeded",
+  "protocolVersion": 1,
+  "run": {
+    "id": "304aac1e-c04c-466b-b786-30ac725b8f9d",
+    "stage": "rendered"
+  }
+}

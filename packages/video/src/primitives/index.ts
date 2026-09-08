@@ -16,3 +16,5 @@ export * from './Stamp';
 export * from './EmptyState';
 export * from './Backdrop';
 export * from './useEntrance';
+export * from './ImageViewport';
+export * from './ProcessPath';

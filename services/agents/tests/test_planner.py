@@ -299,14 +299,15 @@ def test_a_contract_that_publishes_no_audience_is_taught_whole() -> None:
         assert category_part(older, category) in text
 
 
-def test_the_role_split_only_adds_generated_catalog_projections() -> None:
-    """The canonical catalog survives the deliberate ADR-0017 successor unchanged.
+def test_the_role_split_preserves_contracts_beside_declared_editorial_evolutions() -> None:
+    """The role split never rewrites canonical capability material.
 
     Catalog v6 appends three generated documents: the tier definitions and role projections the
     role split needs, and the closed visual vocabulary an Art Director selects from.  Removing
-    those additions must recover the frozen v4 contract exactly; language, plan and checks remain
-    byte-identical.  The retired whole-author prefix length is intentionally not compared across
-    the new role regime.
+    those additions and the September 8 editorial additions recovers the frozen v4 catalog.
+    The new capabilities and Timeline redirection are deliberate content changes, separate
+    from projection mechanics. Plan and checks remain byte-identical. The retired whole-author
+    prefix length is intentionally not compared across the new role regime.
 
     Every addition is derived from something the design system already decided, which is what
     makes removing them recover the old document rather than approximate it.
@@ -314,7 +315,7 @@ def test_the_role_split_only_adds_generated_catalog_projections() -> None:
     older = an_older_teaching_surface()
     text = instructions(SURFACE)
 
-    for untouched in ("language", "plan", "checks"):
+    for untouched in ("plan", "checks"):
         assert category_part(older, untouched) == category_part(SURFACE, untouched)
         assert category_part(SURFACE, untouched) in text
     old_catalog = (older.projections["catalog"].data or {})["contract"]
@@ -324,7 +325,27 @@ def test_the_role_split_only_adds_generated_catalog_projections() -> None:
     current_catalog.pop("visualVocabulary")
     assert current_catalog["manifestVersion"] == 5
     current_catalog["manifestVersion"] = old_catalog["manifestVersion"]
+    additions = {"image_detail", "process_steps"}
+    assert additions <= {item["id"] for item in current_catalog["capabilities"]}
+    current_catalog["capabilities"] = [
+        dict(item) for item in current_catalog["capabilities"] if item["id"] not in additions
+    ]
+    timeline = next(item for item in current_catalog["capabilities"] if item["id"] == "timeline")
+    assert 'showing ordered steps that carry no dates → process_steps' in timeline["avoidWhen"]
+    timeline["avoidWhen"] = [
+        entry.replace('→ process_steps', '→ diagram') for entry in timeline["avoidWhen"]
+    ]
     assert current_catalog == old_catalog
+    assert category_part(SURFACE, "language") in text
+    old_terms = {item["term"]: item for item in (older.projections["language"].data or {})["contract"]["entries"]}
+    current_terms = {item["term"]: item for item in (SURFACE.projections["language"].data or {})["contract"]["entries"]}
+    assert set(current_terms) == set(old_terms) | {"Editorial review", "Editorial brief",
+        "Coverage review", "Image intention", "Media review", "Autonomous envelope"}
+    assert "maximum generated-image count" in current_terms["Brief"]["definition"]
+    assert {key: value for key, value in current_terms.items() if key not in {"Brief", "Editorial review",
+        "Editorial brief", "Coverage review", "Image intention", "Media review", "Autonomous envelope"}} == {
+        key: value for key, value in old_terms.items() if key != "Brief"
+    }
     # The palettes those roles resolve to are published, and not here: an author's projection
     # names a colour role and never its value.
     assert "palettes" not in (SURFACE.projections["catalog"].data or {})["contract"]

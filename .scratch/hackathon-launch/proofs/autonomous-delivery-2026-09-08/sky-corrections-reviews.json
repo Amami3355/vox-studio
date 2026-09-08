@@ -1,0 +1,294 @@
+{
+  "images": {},
+  "filmReviews": null,
+  "events": [
+    {
+      "phase": "research",
+      "schemaVersion": 2,
+      "sequence": 1,
+      "status": "started",
+      "summary": "Researching the central question and identified coverage gaps."
+    },
+    {
+      "phase": "research_coverage",
+      "schemaVersion": 2,
+      "sequence": 2,
+      "status": "accepted",
+      "summary": "Coverage review recorded with citation provenance."
+    },
+    {
+      "phase": "narrative",
+      "schemaVersion": 2,
+      "sequence": 3,
+      "status": "started",
+      "summary": "Writing the complete spoken Beats."
+    },
+    {
+      "phase": "verification",
+      "schemaVersion": 2,
+      "sequence": 4,
+      "status": "blocked",
+      "summary": "ContractViolation: inspect operator evidence before resuming."
+    }
+  ],
+  "editorialCorrections": 0,
+  "technicalRepairs": 1,
+  "filmCorrections": 0,
+  "reconciliations": null,
+  "accountingReconciliations": [
+    {
+      "action": "restore_consumed_repair_without_resume",
+      "checkpointSha256": "b44a81d330cb03e3627a8ca203e7537542cbb952ea3732a4e11b97f462767e81",
+      "journalSha256": "5baec00ddc958f0da0c0458b6de1855ecec4e5771c0a649063068282de4988ca",
+      "limits": {
+        "maxCalls": 40,
+        "maxImages": 5,
+        "maxSearches": 4
+      },
+      "observedAt": "2026-09-08T05:52:34.055097+00:00",
+      "reason": "The old repair adapter failed assembly after the provider responded, before saving the repair counter or response. Its one technical repair is consumed; the lost response cannot be replayed. The Run remains blocked.",
+      "signedProductionSnapshotVerified": true,
+      "technicalRepairsAfter": 1,
+      "technicalRepairsBefore": 0,
+      "totalCalls": 17
+    }
+  ],
+  "terminal": {
+    "reason": "ContractViolation: inspect operator evidence before resuming.",
+    "runId": "17d9b570-3c05-4a9c-8e13-61096581fa5c",
+    "status": "blocked"
+  },
+  "contractDiagnostic": {
+    "error": "scene author output.scenes[0] has unknown fields: component, spansBeats.",
+    "step": {
+      "dependencies": {
+        "plan": {
+          "beats": [
+            {
+              "id": "beat-1",
+              "text": "Sunlight looks white, but it actually contains a broad spectrum of wavelengths, from red to violet. When this light enters Earth's atmosphere, it interacts with gas molecules, primarily nitrogen and oxygen."
+            },
+            {
+              "id": "beat-2",
+              "text": "Because these gas molecules are much smaller than the wavelengths of visible light, they scatter the incoming sunlight in all directions through a process called Rayleigh scattering. Under this process, shorter wavelengths of light, like blue and violet, are scattered far more efficiently than longer wavelengths like red and orange."
+            },
+            {
+              "id": "beat-3",
+              "text": "But why isn't the sky violet, since violet has the shortest wavelength and scatters most intensely? It turns out sunlight contains less violet light than blue to begin with, and violet light undergoes greater atmospheric attenuation, filtering it out before it reaches our eyes."
+            },
+            {
+              "id": "beat-4",
+              "text": "Furthermore, our eyes are biologically much more sensitive to blue than violet. When scattered light stimulates our color receptors, our brain interprets the mix as an unsaturated, pale blue. This blue is softened even further toward white near the horizon, where larger dust and water vapor particles scatter all colors uniformly."
+            }
+          ],
+          "sections": [
+            {
+              "id": "section-light-scattering",
+              "scenes": [
+                {
+                  "component": "image_context",
+                  "events": [
+                    {
+                      "action": "revealImage",
+                      "at": "beat-1.start"
+                    },
+                    {
+                      "action": "revealCopy",
+                      "at": "beat-1.word:enters"
+                    },
+                    {
+                      "action": "emphasize",
+                      "at": "beat-1.word:wavelengths",
+                      "payload": {
+                        "text": "broad spectrum"
+                      }
+                    }
+                  ],
+                  "id": "scene-sunlight-atmosphere",
+                  "layout": "splitLeft",
+                  "motionProfile": "cinematic",
+                  "props": {
+                    "assetRequirement": {
+                      "identityKey": "sunlight-atmosphere-view",
+                      "orientation": "landscape",
+                      "subject": "Sunlight rays traversing space and entering Earth's atmosphere",
+                      "treatment": "illustration",
+                      "type": "image"
+                    },
+                    "caption": "White sunlight actually contains a full spectrum of colors.",
+                    "headline": "Sunlight and Earth's Atmosphere"
+                  },
+                  "spansBeats": [
+                    "beat-1"
+                  ]
+                },
+                {
+                  "component": "image_detail",
+                  "events": [
+                    {
+                      "action": "annotate",
+                      "at": "beat-2.word:scatter",
+                      "payload": {
+                        "text": "Blue and violet light scatters in all directions"
+                      }
+                    },
+                    {
+                      "action": "focus",
+                      "at": "beat-2.word:shorter",
+                      "payload": {
+                        "region": "center"
+                      }
+                    },
+                    {
+                      "action": "annotate",
+                      "at": "beat-2.word:efficiently",
+                      "payload": {
+                        "text": "Rayleigh scattering intensity: 1 / λ⁴"
+                      }
+                    }
+                  ],
+                  "id": "scene-rayleigh-scattering",
+                  "layout": "plate",
+                  "motionProfile": "subtleDrift",
+                  "props": {
+                    "assetRequirement": {
+                      "identityKey": "rayleigh-scattering-diagram",
+                      "orientation": "landscape",
+                      "subject": "Atmospheric gas molecules scattering short blue light waves",
+                      "treatment": "illustration",
+                      "type": "image"
+                    },
+                    "caption": "Shorter wavelengths (blue and violet) scatter much more efficiently than longer ones.",
+                    "headline": "The Physics of Rayleigh Scattering"
+                  },
+                  "spansBeats": [
+                    "beat-2"
+                  ]
+                }
+              ],
+              "spansBeats": [
+                "beat-1",
+                "beat-2"
+              ]
+            },
+            {
+              "id": "section-perception-and-color",
+              "scenes": [
+                {
+                  "component": "image_context",
+                  "events": [
+                    {
+                      "action": "revealImage",
+                      "at": "beat-3.start"
+                    },
+                    {
+                      "action": "revealCopy",
+                      "at": "beat-3.word:turns"
+                    },
+                    {
+                      "action": "emphasize",
+                      "at": "beat-3.word:attenuation",
+                      "payload": {
+                        "text": "atmospheric attenuation"
+                      }
+                    }
+                  ],
+                  "id": "scene-why-not-violet",
+                  "layout": "splitLeft",
+                  "motionProfile": "pushIn",
+                  "props": {
+                    "assetRequirement": {
+                      "identityKey": "solar-spectrum-violet-attenuation",
+                      "orientation": "landscape",
+                      "subject": "A light wave spectrum diagram showing less violet light than blue light",
+                      "treatment": "illustration",
+                      "type": "image"
+                    },
+                    "caption": "Sunlight contains less violet initially, and atmospheric filtering removes more of it.",
+                    "headline": "Why Isn't the Sky Violet?"
+                  },
+                  "spansBeats": [
+                    "beat-3"
+                  ]
+                },
+                {
+                  "component": "image_detail",
+                  "events": [
+                    {
+                      "action": "focus",
+                      "at": "beat-4.word:receptors",
+                      "payload": {
+                        "region": "left"
+                      }
+                    },
+                    {
+                      "action": "annotate",
+                      "at": "beat-4.word:receptors",
+                      "payload": {
+                        "text": "Photoreceptors interpret the mix as pale blue"
+                      }
+                    },
+                    {
+                      "action": "focus",
+                      "at": "beat-4.word:horizon",
+                      "payload": {
+                        "region": "bottom"
+                      }
+                    },
+                    {
+                      "action": "annotate",
+                      "at": "beat-4.word:horizon",
+                      "payload": {
+                        "text": "Mie scattering by larger dust particles creates a white haze"
+                      }
+                    }
+                  ],
+                  "id": "scene-human-vision-horizon",
+                  "layout": "plate",
+                  "motionProfile": "subtleDrift",
+                  "props": {
+                    "assetRequirement": {
+                      "identityKey": "retina-horizon-view",
+                      "orientation": "landscape",
+                      "subject": "An illustration of human eye cone photoreceptors and a soft blue sky horizon",
+                      "treatment": "illustration",
+                      "type": "image"
+                    },
+                    "caption": "The brain perceives a pale, unsaturated blue, which fades to white near the horizon.",
+                    "headline": "Human Color Perception & Horizon"
+                  },
+                  "spansBeats": [
+                    "beat-4"
+                  ]
+                }
+              ],
+              "spansBeats": [
+                "beat-3",
+                "beat-4"
+              ]
+            }
+          ]
+        },
+        "report": {
+          "errors": [
+            {
+              "code": "DEICTIC_ANCHOR_REQUIRED",
+              "expected": [
+                "beat-1.word:broad",
+                "beat-1.word:spectrum"
+              ],
+              "field": "events[2].at",
+              "message": "Action \"emphasize\" points at \"broad spectrum\" through its \"text\", and \"beat-1.word:wavelengths\" does not land on it. A pointing gesture says \"this one\", which is only true while the narrator is saying the thing pointed at — \"wavelengths\" is a different word. Anchor the event to the word it names, or use an action that makes no such claim.",
+              "sceneId": "scene-sunlight-atmosphere",
+              "sectionId": "section-light-scattering"
+            }
+          ],
+          "ok": false,
+          "warnings": []
+        }
+      },
+      "identity": "faf5ef1487ed05b8820b7dbd2ecfe2743c83496c7bf3e00a233b9370b0d66027",
+      "name": "technical_repair"
+    }
+  }
+}

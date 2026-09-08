@@ -102,12 +102,9 @@ export type ImageGenerationAdapter = {
   }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png' }>;
 };
 
-export class ImageDispatchUncertain extends Error {
-  constructor(message = 'The image provider dispatch outcome is uncertain.') {
-    super(message);
-    this.name = 'ImageDispatchUncertain';
-  }
-}
+import type { ImageRecoveryPolicy } from '../contracts/schemas';
+import { ImageDispatchUncertain, ImageGenerationFailure } from '../image/failure';
+export { ImageDispatchUncertain } from '../image/failure';
 
 export type ProductionCommandServiceOptions = {
   ledgerRoot: string;
@@ -123,6 +120,19 @@ export type ProductionCommandServiceOptions = {
   verifyReplacementGrant?: (grant: ReplacementGrant) => boolean | Promise<boolean>;
   imageGenerator?: ImageGenerationAdapter;
   verifyImageGrant?: (grant: ImageGenerationGrant) => boolean | Promise<boolean>;
+  autonomousImages?: {
+    bind: (requestSha256: string, runId: string) => Promise<void>;
+    authorize: (
+      requestSha256: string,
+      runId: string,
+      imageSha256: string,
+      retryOf?: string,
+    ) => Promise<ImageGenerationGrant | undefined>;
+    recoveryPolicy?: (
+      requestSha256: string,
+      runId: string,
+    ) => Promise<ImageRecoveryPolicy | undefined>;
+  };
   recordingCrashAt?: (point: 'after_dispatch' | 'after_response_received') => void;
   now?: () => Date;
   createRunId?: () => string;
@@ -162,6 +172,7 @@ export class ProductionCommandService {
       const runId = this.createRunId();
       const store = this.store(input.out, runId);
       const checkpoint = await store.initialize(request);
+      await this.options.autonomousImages?.bind(checkpoint.request.requestSha256, runId);
       return this.success(
         'run.init',
         checkpoint,
@@ -191,10 +202,16 @@ export class ProductionCommandService {
             binding !== null && 'freshness' in binding && binding.freshness.state === 'stale',
         )
         .map(([name]) => this.stageForBinding(name));
+      const imageRecoveryPolicy = await this.imageRecovery(checkpoint);
       return this.success(
         'run.status',
         checkpoint,
-        { staleStages: [...new Set(staleStages)], lastOutcome: checkpoint.lastOutcome, artifacts },
+        {
+          staleStages: [...new Set(staleStages)],
+          lastOutcome: checkpoint.lastOutcome,
+          artifacts,
+          ...(imageRecoveryPolicy ? { imageRecoveryPolicy } : {}),
+        },
         [],
         [],
       );
@@ -224,10 +241,80 @@ export class ProductionCommandService {
         );
       }
 
-      const existing = checkpoint.bindings.images.jobs.find(
-        (job) => job.identityKey === request.identityKey,
+      const existing = [...checkpoint.bindings.images.jobs]
+        .reverse()
+        .find((job) => job.identityKey === request.identityKey);
+      const recovery = await this.imageRecovery(checkpoint);
+      // An explicit predecessor makes retry idempotency separate from observing the original job.
+      const retryJobId = request.retryOf
+        ? imageJobIdOf(
+            request.identityKey,
+            sha256Bytes(Buffer.from(`${request.requestSha256}:${request.retryOf}`)),
+          )
+        : undefined;
+      const priorRetry =
+        retryJobId && checkpoint.bindings.images.jobs.find((job) => job.id === retryJobId);
+      if (priorRetry)
+        return this.success(
+          'run.image.start',
+          checkpoint,
+          { disposition: 'reused', providerMode: priorRetry.providerMode, job: priorRetry },
+          priorRetry.candidate ? [priorRetry.candidate.artifact] : [],
+          [],
+        );
+      const authorizedRetry = Boolean(
+        request.retryOf &&
+          recovery &&
+          existing?.id === request.retryOf &&
+          existing.status === 'failed' &&
+          existing.requestSha256 === request.requestSha256 &&
+          existing.failure?.includes('HTTP_429;'),
       );
-      if (existing) {
+      if (request.retryOf && !authorizedRetry)
+        throw new RunStoreError(
+          'IMAGE_RECOVERY_NOT_AUTHORIZED',
+          'Retry must name the latest confirmed HTTP 429 job, its unchanged exact request, and an operator recovery policy.',
+        );
+      const mayDispatch =
+        !existing ||
+        authorizedRetry ||
+        (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256);
+      if (
+        mayDispatch &&
+        recovery &&
+        this.now().getTime() < Date.parse(recovery.nextImageDispatchAt)
+      ) {
+        return this.success(
+          'run.image.start',
+          checkpoint,
+          { reason: 'IMAGE_RATE_WAIT', notBefore: recovery.nextImageDispatchAt },
+          [],
+          [],
+          'paused',
+        );
+      }
+      let authorization = input.authorization;
+      if (
+        authorization === undefined &&
+        (!existing ||
+          authorizedRetry ||
+          (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256))
+      ) {
+        authorization = await this.options.autonomousImages?.authorize(
+          checkpoint.request.requestSha256,
+          checkpoint.runId,
+          request.requestSha256,
+          request.retryOf,
+        );
+      }
+      // An operator may correct a rejected candidate with a different exact request and a
+      // fresh signed grant. Keep every old job and consumed grant; never retry uncertain or
+      // failed work, or purchase a replacement merely because the crew resumes.
+      const authorizedCorrection =
+        existing?.status === 'rejected' &&
+        existing.requestSha256 !== request.requestSha256 &&
+        authorization !== undefined;
+      if (existing && !authorizedCorrection && !authorizedRetry) {
         return this.success(
           'run.image.start',
           checkpoint,
@@ -237,11 +324,19 @@ export class ProductionCommandService {
         );
       }
 
+      const productionRequest = await this.requestOf(store, checkpoint);
+      const imageMaximum = recovery?.maxImageAttempts ?? productionRequest.brief.maxGeneratedImages;
+      if (imageMaximum !== undefined && checkpoint.bindings.images.jobs.length >= imageMaximum) {
+        throw new RunStoreError(
+          'IMAGE_QUOTA_EXHAUSTED',
+          'This Run has reached its maximum generated-image count. Reuse an existing image.',
+        );
+      }
       const generator = this.imageGenerator();
       // Parsed once, in the live branch below, and read again where the spend is recorded.
       let grant: ReturnType<typeof imageGenerationGrantSchema.parse> | null = null;
       if (generator.mode === 'live') {
-        if (input.authorization === undefined) {
+        if (authorization === undefined) {
           // One object: the checkpoint's next step and the reply's are the same instruction,
           // and an operator following one of two drifting copies follows the wrong one.
           const authorise = [
@@ -274,9 +369,9 @@ export class ProductionCommandService {
             'paused',
           );
         }
-        grant = imageGenerationGrantSchema.parse(input.authorization);
+        grant = imageGenerationGrantSchema.parse(authorization);
         await this.requireImageGrant(grant, checkpoint, request);
-      } else if (input.authorization !== undefined) {
+      } else if (authorization !== undefined) {
         throw new RunStoreError(
           'IMAGE_AUTHORIZATION_NOT_APPLICABLE',
           'Recorded image generation does not consume a live authorization grant.',
@@ -285,7 +380,7 @@ export class ProductionCommandService {
 
       const job: ImageJob = {
         schemaVersion: 1,
-        id: imageJobIdOf(request.identityKey, request.requestSha256),
+        id: retryJobId ?? imageJobIdOf(request.identityKey, request.requestSha256),
         requirementId: request.requirementId,
         identityKey: request.identityKey,
         requestSha256: request.requestSha256,
@@ -293,6 +388,8 @@ export class ProductionCommandService {
         status: 'dispatching',
         candidate: null,
         failure: null,
+        dispatchedAt: this.now().toISOString(),
+        ...(request.retryOf ? { retryOf: request.retryOf } : {}),
       };
       // The grant parsed above, not a second parse of the same input: parsing twice let the
       // spend check and the record of what was spent disagree about which grant that was.
@@ -390,9 +487,12 @@ export class ProductionCommandService {
           ...currentJob,
           status: uncertain ? 'uncertain' : 'failed',
           candidate: null,
-          failure: uncertain
-            ? 'Image dispatch outcome is uncertain; observe this job before any replacement.'
-            : 'Image generation did not produce a valid candidate.',
+          failure:
+            error instanceof ImageGenerationFailure
+              ? error.diagnostic
+              : uncertain
+                ? 'Image dispatch outcome is uncertain; observe this job before any replacement.'
+                : 'Image generation did not produce a valid candidate.',
         };
         const next = await store.commit({
           expectedRevision: current.revision,
@@ -489,10 +589,19 @@ export class ProductionCommandService {
       const checkpoint = await store.inspect();
       this.assertNonTerminal(checkpoint);
       const job = this.requireImageJob(checkpoint, decision.jobId);
-      if (job.status !== 'candidate' || job.candidate === null) {
+      if (!['candidate', 'accepted'].includes(job.status) || job.candidate === null) {
         throw new RunStoreError(
           'IMAGE_CANDIDATE_REQUIRED',
-          'Only an inspectable image candidate can be rejected.',
+          'Only an inspectable candidate or accepted image can be rejected.',
+        );
+      }
+      if (
+        (job.status === 'accepted' && (!decision.candidateSha256 || !decision.reason)) ||
+        (decision.candidateSha256 && decision.candidateSha256 !== job.candidate.artifact.sha256)
+      ) {
+        throw new RunStoreError(
+          'IMAGE_DIGEST_MISMATCH',
+          'Withdrawing an accepted image requires its exact digest and a reason.',
         );
       }
       const rejected: ImageJob = { ...job, status: 'rejected' };
@@ -500,8 +609,12 @@ export class ProductionCommandService {
         expectedRevision: checkpoint.revision,
         command: 'run.image.reject',
         outcome: 'succeeded',
-        bindings: this.replaceImageJob(checkpoint.bindings, job.id, rejected),
-        data: { job: rejected },
+        bindings: this.replaceImageJob(
+          this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
+          job.id,
+          rejected,
+        ),
+        data: { job: rejected, decision },
       });
       return this.success(
         'run.image.reject',
@@ -1681,6 +1794,32 @@ export class ProductionCommandService {
     );
   }
 
+  private async imageRecovery(checkpoint: RunCheckpoint) {
+    const policy = await this.options.autonomousImages?.recoveryPolicy?.(
+      checkpoint.request.requestSha256,
+      checkpoint.runId,
+    );
+    if (!policy) return undefined;
+    const jobs = checkpoint.bindings.images.jobs;
+    const latest = jobs.at(-1);
+    const consecutive =
+      latest?.status === 'failed' && latest.failure?.includes('HTTP_429;')
+        ? jobs.filter(
+            (job) => job.requestSha256 === latest.requestSha256 && job.status === 'failed',
+          ).length
+        : 0;
+    const delay = policy.minimumIntervalSeconds * Math.min(8, 2 ** Math.max(0, consecutive - 1));
+    const last = Math.max(
+      Date.parse(policy.authorizedAt),
+      Date.parse(latest?.dispatchedAt ?? policy.authorizedAt),
+    );
+    return {
+      ...policy,
+      attemptsUsed: jobs.length,
+      nextImageDispatchAt: new Date(last + delay * 1000).toISOString(),
+    };
+  }
+
   private imageGenerator(): ImageGenerationAdapter {
     if (!this.options.imageGenerator) {
       throw new RunStoreError(
@@ -1780,7 +1919,13 @@ export class ProductionCommandService {
         resolution.status === 'placeholder' &&
         resolution.pendingRequirementId === request.requirementId,
     );
-    if (!pending) {
+    const previouslyPublished = checkpoint.bindings.images.jobs.some(
+      (job) =>
+        job.requirementId === request.requirementId &&
+        job.identityKey === request.identityKey &&
+        job.requestSha256 === request.requestSha256,
+    );
+    if (!pending && !previouslyPublished) {
       throw new RunStoreError(
         'IMAGE_REQUIREMENT_NOT_PENDING',
         'The named requirement is not a pending placeholder in the bound compilation.',
@@ -1880,7 +2025,10 @@ export class ProductionCommandService {
     const requirements = this.assetRequirements(plan);
     const entries: LocalAssetEntry[] = [];
     const digestsByUri = new Map<string, string>();
-    for (const job of checkpoint.bindings.images.jobs) {
+    const seenIdentities = new Set<string>();
+    for (const job of [...checkpoint.bindings.images.jobs].reverse()) {
+      if (seenIdentities.has(job.identityKey)) continue;
+      seenIdentities.add(job.identityKey);
       if (job.status !== 'accepted' && job.status !== 'failed') continue;
       const requirement = requirements.find(
         (candidate) => assetRequirementId(candidate) === job.requirementId,

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "research": {"mode": "live", "grantId": "autonomous-research-v2"},
+  "models": {"mode": "live", "grantId": "autonomous-models-v2"},
+  "images": {"mode": "live", "grantId": "autonomous-images-v2"},
+  "recording": {"mode": "live", "grantId": "autonomous-recording-v2"}
+}

@@ -1,0 +1,77 @@
+{
+  "req_444a583b": {
+    "candidate": {
+      "artifact": {
+        "id": "image-candidate-f21fd10923c9135a9301",
+        "kind": "generated_image_candidate",
+        "mediaType": "image/png",
+        "sha256": "f21fd10923c9135a930190fa54699e962a1186a6c13f4115f1095d5227a32324",
+        "sizeBytes": 793483
+      },
+      "height": 768,
+      "id": "image-candidate-f21fd10923c9135a9301",
+      "identityKey": "propulsion-thrust-mechanics",
+      "promptSha256": "965397c4eddfae408d234479898b3c31ddff7d20f07e36b075d997919357c837",
+      "requirementId": "req_444a583b",
+      "width": 1344
+    },
+    "failure": null,
+    "id": "image-job-0769bf15094b0bd5b3b7",
+    "identityKey": "propulsion-thrust-mechanics",
+    "providerMode": "live",
+    "requestSha256": "f97184690590b1e7b4a9c2d26ec5f5ef5a4df3dc0644110d05319ad41e1dde23",
+    "requirementId": "req_444a583b",
+    "schemaVersion": 1,
+    "status": "accepted"
+  },
+  "req_5b23f310": {
+    "candidate": {
+      "artifact": {
+        "id": "image-candidate-020aa654894431a2aebb",
+        "kind": "generated_image_candidate",
+        "mediaType": "image/png",
+        "sha256": "020aa654894431a2aebb23caa456bba738b77bf9d93043b98e00e729f11d3873",
+        "sizeBytes": 780696
+      },
+      "height": 768,
+      "id": "image-candidate-020aa654894431a2aebb",
+      "identityKey": "landing-touchdown-sequence",
+      "promptSha256": "6addfb88a974fefad337e2ec592e2cdf3fedc82fbf9056967afced8c35294bf9",
+      "requirementId": "req_5b23f310",
+      "width": 1344
+    },
+    "failure": null,
+    "id": "image-job-ddd8db74dab88be3e4dc",
+    "identityKey": "landing-touchdown-sequence",
+    "providerMode": "live",
+    "requestSha256": "f4fb029c91fa7bab359640ee39dc5c22133ccc3c1c99e2637a9e274a0c3ff843",
+    "requirementId": "req_5b23f310",
+    "schemaVersion": 1,
+    "status": "accepted"
+  },
+  "req_d19c7d3e": {
+    "candidate": {
+      "artifact": {
+        "id": "image-candidate-0b6e57fd06566db2c38f",
+        "kind": "generated_image_candidate",
+        "mediaType": "image/png",
+        "sha256": "0b6e57fd06566db2c38fc672b26e6c35d1d1c82bccda9c085cf37df35458b358",
+        "sizeBytes": 1231505
+      },
+      "height": 768,
+      "id": "image-candidate-0b6e57fd06566db2c38f",
+      "identityKey": "rocket-descent-physics",
+      "promptSha256": "0f0f14dfc780e79da03633c58c6aec630645e75d1c67f9027a7f8a4a0bcac283",
+      "requirementId": "req_d19c7d3e",
+      "width": 1344
+    },
+    "failure": null,
+    "id": "image-job-4bb3eecc627ccace100d",
+    "identityKey": "rocket-descent-physics",
+    "providerMode": "live",
+    "requestSha256": "661b01dae9b7bc9a491e2433d1d199b19c853e4be29717c4a238f92eba92f6a7",
+    "requirementId": "req_d19c7d3e",
+    "schemaVersion": 1,
+    "status": "accepted"
+  }
+}

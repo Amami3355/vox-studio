@@ -8,6 +8,7 @@ instances therefore represent values that have already crossed their owning sche
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -254,19 +255,45 @@ class Brief:
     id: str
     text: str
     kind: BriefKind
+    duration_seconds: float | None = None
+    max_generated_images: int | None = None
+
+    def __post_init__(self) -> None:
+        duration = self.duration_seconds
+        if duration is not None and (
+            isinstance(duration, bool)
+            or not isinstance(duration, (int, float))
+            or not math.isfinite(duration)
+            or duration <= 0
+        ):
+            raise ContractViolation("brief.durationSeconds must be a finite positive estimate.")
+        maximum = self.max_generated_images
+        if maximum is not None and (
+            isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0
+        ):
+            raise ContractViolation("brief.maxGeneratedImages must be a non-negative integer ceiling.")
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> Brief:
         value = _mapping(value, "brief")
-        _strict(value, {"id", "text", "kind"}, "brief")
+        _strict(value, {"id", "text", "kind", "durationSeconds", "maxGeneratedImages"}, "brief")
+        if any(key in value and value[key] is None for key in ("durationSeconds", "maxGeneratedImages")):
+            raise ContractViolation("Omit unspecified Brief limits instead of writing null.")
         return cls(
             id=_required_string(value, "id", "brief"),
             text=_required_string(value, "text", "brief"),
             kind=_enum(BriefKind, value.get("kind"), "brief.kind"),
+            duration_seconds=value.get("durationSeconds"),
+            max_generated_images=value.get("maxGeneratedImages"),
         )
 
     def to_mapping(self) -> dict[str, Any]:
-        return {"id": self.id, "text": self.text, "kind": self.kind.value}
+        value = {"id": self.id, "text": self.text, "kind": self.kind.value}
+        if self.duration_seconds is not None:
+            value["durationSeconds"] = self.duration_seconds
+        if self.max_generated_images is not None:
+            value["maxGeneratedImages"] = self.max_generated_images
+        return value
 
 
 @dataclass(frozen=True, slots=True)

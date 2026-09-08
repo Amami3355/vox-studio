@@ -1,0 +1,729 @@
+{
+  "images": {
+    "booster_descent": [],
+    "parachute_failure_booster": [
+      {
+        "accepted": false,
+        "intention": {
+          "arrangement": "A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive, cylindrical rocket booster is shown tumbling out of control through the upper atmosphere. The leading nose and sides of the booster are engulfed in a violent, glowing orange and white compression shockwave. Portions of the metal skin are peeling back, exposing internal components to the extreme heat. Trailing behind the falling rocket in the high-velocity slipstream are the charred, shredded remnants of a premature parachute deployment, with lines snapping and canopy fabric burning up. The background is a cold, dark blue fading into the blackness of space at the top edge of the frame.",
+          "meaning": "This illustration visualizes the extreme mechanical and thermal failure that occurs when attempting to recover orbital-class boosters using parachutes. It shows that hypersonic reentry speeds generate atmospheric friction and heat so intense that the structural integrity of the massive booster is destroyed, and parachute systems are incinerated or torn apart before they can even deploy, demonstrating why retropropulsion is structurally required.",
+          "plannedCrops": [
+            "A close-up focusing on the peeling, heat-stressed metal plating and internal structural failure near the rocket's midsection",
+            "A high-impact detail crop of the shredded parachute canopy and burning lines trailing in the slipstream",
+            "A wide-angle composition showing the entire booster engulfed in a brilliant plasma envelope against the dark curve of the Earth"
+          ],
+          "rendererElements": [
+            "A dynamic shockwave overlay representing high-velocity atmospheric compression",
+            "Callout lines indicating points of structural failure and heat concentration",
+            "A velocity vector arrow pointing downwards along the path of descent"
+          ],
+          "visibleDetails": [
+            "A large cylindrical rocket booster tumbling diagonally downward at hypersonic speed",
+            "A brilliant white, yellow, and orange plasma sheath of atmospheric friction enveloping the leading edges of the booster",
+            "Peeling outer hull plating exposing scorched internal framing, wiring, and fuel tanks",
+            "Clouds of sparks, incandescent metal debris, and superheated gas trailing behind the disintegrating vehicle",
+            "Tattered, blackened remains of a white parachute canopy tearing apart under aerodynamic stress",
+            "Snapped suspension lines whipping wildly in the turbulent supersonic wake",
+            "A deep blue atmospheric horizon curving slightly against the black of space in the upper third of the canvas"
+          ]
+        },
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-3a064e792c6430b8925b/242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448.png",
+              "sha256": "242918834793337968e4a44bb81ad1bb2f1ad3a3ea0bcf160b1d7e58f21bc448"
+            },
+            "height": 768,
+            "id": "image-candidate-242918834793337968e4",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "795932872554252f0fa636ac45fa76f8b4894500d1ac911c86c7f77791490617",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-3a064e792c6430b8925b",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "6e49c017aa936a8fb8c1cfcfd2be1ce68b2900c12d63df29b8f144b6113bc134",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "candidate"
+        },
+        "request": {
+          "aspectRatio": "16:9",
+          "identityKey": "parachute_failure_booster",
+          "outputMimeType": "image/png",
+          "prompt": "VOX_IMAGE_REQUEST_V1\nSubject: Rocket booster disintegrating under intense reentry friction\nMaterial: image\nEditorial treatment: illustration\nComposition: landscape, target aspect ratio 16:9\nDesign theme: editorial-cold\nTreatment family: photo, illustration\nPalette: neutral=#ff5a1f, negative=#ff4d4d, positive=#3dd68c\nExclude treatment families: duotone, cutout\nKeep the principal subject inside the central safe crop; include no text or watermark.\nVOX_COMPOSITION_INTENT_V2\n{\"meaning\": \"This illustration visualizes the extreme mechanical and thermal failure that occurs when attempting to recover orbital-class boosters using parachutes. It shows that hypersonic reentry speeds generate atmospheric friction and heat so intense that the structural integrity of the massive booster is destroyed, and parachute systems are incinerated or torn apart before they can even deploy, demonstrating why retropropulsion is structurally required.\", \"arrangement\": \"A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive, cylindrical rocket booster is shown tumbling out of control through the upper atmosphere. The leading nose and sides of the booster are engulfed in a violent, glowing orange and white compression shockwave. Portions of the metal skin are peeling back, exposing internal components to the extreme heat. Trailing behind the falling rocket in the high-velocity slipstream are the charred, shredded remnants of a premature parachute deployment, with lines snapping and canopy fabric burning up. The background is a cold, dark blue fading into the blackness of space at the top edge of the frame.\", \"visibleDetails\": [\"A large cylindrical rocket booster tumbling diagonally downward at hypersonic speed\", \"A brilliant white, yellow, and orange plasma sheath of atmospheric friction enveloping the leading edges of the booster\", \"Peeling outer hull plating exposing scorched internal framing, wiring, and fuel tanks\", \"Clouds of sparks, incandescent metal debris, and superheated gas trailing behind the disintegrating vehicle\", \"Tattered, blackened remains of a white parachute canopy tearing apart under aerodynamic stress\", \"Snapped suspension lines whipping wildly in the turbulent supersonic wake\", \"A deep blue atmospheric horizon curving slightly against the black of space in the upper third of the canvas\"], \"plannedCrops\": [\"A close-up focusing on the peeling, heat-stressed metal plating and internal structural failure near the rocket's midsection\", \"A high-impact detail crop of the shredded parachute canopy and burning lines trailing in the slipstream\", \"A wide-angle composition showing the entire booster engulfed in a brilliant plasma envelope against the dark curve of the Earth\"], \"rendererElements\": [\"A dynamic shockwave overlay representing high-velocity atmospheric compression\", \"Callout lines indicating points of structural failure and heat concentration\", \"A velocity vector arrow pointing downwards along the path of descent\"]}\nRenderer elements must NOT be baked into the image. No lettering or watermark.",
+          "protocolVersion": 1,
+          "requestSha256": "6e49c017aa936a8fb8c1cfcfd2be1ce68b2900c12d63df29b8f144b6113bc134",
+          "requirementId": "req_b2514966",
+          "seed": 409118687
+        },
+        "review": {
+          "accepted": false,
+          "assessment": "The illustration is rejected due to visual inconsistencies with the creative intention and physical inaccuracy. The parachute canopy is depicted as pristine, white, and fully inflated instead of being tattered, charred, and tearing apart under aerodynamic stress. Additionally, the leading nose cone of the booster lacks any plasma glow or compression shockwave, which is aerodynamically inaccurate for a vehicle experiencing intense hypersonic reentry friction.",
+          "inspectionPossible": true,
+          "observations": [
+            {
+              "affectedIds": [
+                "parachute_failure_booster"
+              ],
+              "endSeconds": 0,
+              "expected": "Depict the parachute canopy as shredded, charred, and actively disintegrating under extreme heat and aerodynamic pressure.",
+              "problem": "The parachute canopy is pristine, white, and fully inflated, directly contradicting the planned design of a tattered, blackened canopy tearing apart and burning up in the supersonic wake.",
+              "startSeconds": 0
+            },
+            {
+              "affectedIds": [
+                "parachute_failure_booster"
+              ],
+              "endSeconds": 0,
+              "expected": "Add a bright, intense compression shockwave and plasma glow enveloping the leading tip of the nose cone to represent hypersonic reentry friction.",
+              "problem": "The nose cone, which acts as the leading edge during nose-first reentry, is completely cool and dark without any plasma compression or thermal glow, which is physically incorrect.",
+              "startSeconds": 0
+            }
+          ],
+          "requiresNarrationChange": false
+        }
+      },
+      {
+        "accepted": true,
+        "intention": {
+          "arrangement": "A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive cylindrical rocket booster is shown plunging nose-first through the upper atmosphere. The leading nose cone is the epicenter of a blazing white and orange shockwave of compressed gas. Portions of the metal hull are peeling away, exposing superheated internal structures. Trailing behind the falling rocket in the high-velocity slipstream are the shredded, charred, and actively burning remnants of a failed parachute canopy, with lines snapping under extreme aerodynamic tension against a dark, cold background of space and the blue curve of the Earth.",
+          "meaning": "This illustration visualizes why parachute recovery is impossible for orbital-class boosters during reentry. The extreme heat and structural pressure generated by hypersonic speeds create a violent plasma envelope that disintegrates the massive booster and incinerates the parachute system before it can deploy successfully, emphasizing the necessity of retropropulsion.",
+          "plannedCrops": [
+            "A close-up of the leading nose cone engulfed in the brilliant, white-hot plasma shockwave",
+            "A detailed view of the shredded, burning parachute canopy and snapping cables in the turbulent wake",
+            "A wide landscape view showing the entire disintegrating booster cutting across the atmospheric boundary"
+          ],
+          "rendererElements": [
+            "A dynamic shockwave overlay representing high-velocity atmospheric compression",
+            "Callout lines indicating points of structural failure and heat concentration",
+            "A velocity vector arrow pointing downwards along the path of descent"
+          ],
+          "visibleDetails": [
+            "A cylindrical rocket booster plunging diagonally nose-first through the upper atmosphere",
+            "An intense, glowing orange and brilliant white compression shockwave centered directly on the leading nose cone",
+            "Peeling metal hull plating exposing scorched internal framing and wiring radiating intense heat",
+            "Shredded, charred, and blackened remains of a white parachute canopy actively ripping apart in the supersonic slipstream",
+            "Snapped and whipping suspension cables burning in the turbulent hot wake behind the rocket",
+            "Bright trails of molten metal sparks and glowing debris shedding from the disintegrating vehicle",
+            "The deep blue curve of the Earth's atmosphere contrasting against the blackness of space in the background"
+          ]
+        },
+        "job": {
+          "candidate": {
+            "artifact": {
+              "kind": "generated_image_candidate",
+              "path": "artifacts/images/image-job-85ae8daffe5ac562fdd0/4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc.png",
+              "sha256": "4f28a4e3a58efe4ae79f62cc6f2b61d780b1a28e49b893c7a6f187a8e67f33bc"
+            },
+            "height": 768,
+            "id": "image-candidate-4f28a4e3a58efe4ae79f",
+            "identityKey": "parachute_failure_booster",
+            "promptSha256": "be1070dda3d1bf4c95033790f3361d191f004d227a4fe72c8c84a2fc057a9a5b",
+            "requirementId": "req_b2514966",
+            "width": 1344
+          },
+          "failure": null,
+          "id": "image-job-85ae8daffe5ac562fdd0",
+          "identityKey": "parachute_failure_booster",
+          "providerMode": "live",
+          "requestSha256": "3ca82dc2c6e1b5f3cae60de38ee57af7af9b1432bc003e74e1d3b7b503428587",
+          "requirementId": "req_b2514966",
+          "schemaVersion": 1,
+          "status": "candidate"
+        },
+        "request": {
+          "aspectRatio": "16:9",
+          "identityKey": "parachute_failure_booster",
+          "outputMimeType": "image/png",
+          "prompt": "VOX_IMAGE_REQUEST_V1\nSubject: Rocket booster disintegrating under intense reentry friction\nMaterial: image\nEditorial treatment: illustration\nComposition: landscape, target aspect ratio 16:9\nDesign theme: editorial-cold\nTreatment family: photo, illustration\nPalette: neutral=#ff5a1f, negative=#ff4d4d, positive=#3dd68c\nExclude treatment families: duotone, cutout\nKeep the principal subject inside the central safe crop; include no text or watermark.\nVOX_COMPOSITION_INTENT_V2\n{\"meaning\": \"This illustration visualizes why parachute recovery is impossible for orbital-class boosters during reentry. The extreme heat and structural pressure generated by hypersonic speeds create a violent plasma envelope that disintegrates the massive booster and incinerates the parachute system before it can deploy successfully, emphasizing the necessity of retropropulsion.\", \"arrangement\": \"A dynamic landscape illustration structured along a diagonal axis from the upper right to the lower left. A massive cylindrical rocket booster is shown plunging nose-first through the upper atmosphere. The leading nose cone is the epicenter of a blazing white and orange shockwave of compressed gas. Portions of the metal hull are peeling away, exposing superheated internal structures. Trailing behind the falling rocket in the high-velocity slipstream are the shredded, charred, and actively burning remnants of a failed parachute canopy, with lines snapping under extreme aerodynamic tension against a dark, cold background of space and the blue curve of the Earth.\", \"visibleDetails\": [\"A cylindrical rocket booster plunging diagonally nose-first through the upper atmosphere\", \"An intense, glowing orange and brilliant white compression shockwave centered directly on the leading nose cone\", \"Peeling metal hull plating exposing scorched internal framing and wiring radiating intense heat\", \"Shredded, charred, and blackened remains of a white parachute canopy actively ripping apart in the supersonic slipstream\", \"Snapped and whipping suspension cables burning in the turbulent hot wake behind the rocket\", \"Bright trails of molten metal sparks and glowing debris shedding from the disintegrating vehicle\", \"The deep blue curve of the Earth's atmosphere contrasting against the blackness of space in the background\"], \"plannedCrops\": [\"A close-up of the leading nose cone engulfed in the brilliant, white-hot plasma shockwave\", \"A detailed view of the shredded, burning parachute canopy and snapping cables in the turbulent wake\", \"A wide landscape view showing the entire disintegrating booster cutting across the atmospheric boundary\"], \"rendererElements\": [\"A dynamic shockwave overlay representing high-velocity atmospheric compression\", \"Callout lines indicating points of structural failure and heat concentration\", \"A velocity vector arrow pointing downwards along the path of descent\"]}\nRenderer elements must NOT be baked into the image. No lettering or watermark.",
+          "protocolVersion": 1,
+          "requestSha256": "3ca82dc2c6e1b5f3cae60de38ee57af7af9b1432bc003e74e1d3b7b503428587",
+          "requirementId": "req_b2514966",
+          "seed": 1608272456
+        },
+        "review": {
+          "accepted": true,
+          "assessment": "The updated illustration successfully addresses all previous concerns. The leading nose of the falling booster is now enveloped in a brilliant, physically accurate white-hot plasma shockwave. Additionally, the parachute assembly and rear of the rocket are depicted as tattered, charred, and actively disintegrating under extreme thermal and aerodynamic stress, with realistic fire plumes and debris trailing into space. The composition is highly dynamic, matches the cold-editorial aesthetic, and contains no text or watermarks.",
+          "inspectionPossible": true,
+          "observations": [],
+          "requiresNarrationChange": false
+        }
+      }
+    ]
+  },
+  "filmReviews": null,
+  "events": [
+    {
+      "phase": "research",
+      "schemaVersion": 2,
+      "sequence": 1,
+      "status": "started",
+      "summary": "Researching the central question and identified coverage gaps."
+    },
+    {
+      "phase": "verification",
+      "schemaVersion": 2,
+      "sequence": 2,
+      "status": "blocked",
+      "summary": "ContractViolation: inspect operator evidence before resuming."
+    },
+    {
+      "phase": "research",
+      "schemaVersion": 2,
+      "sequence": 3,
+      "status": "started",
+      "summary": "Researching the central question and identified coverage gaps."
+    },
+    {
+      "phase": "research_coverage",
+      "schemaVersion": 2,
+      "sequence": 4,
+      "status": "correction",
+      "summary": "Coverage review recorded with citation provenance."
+    },
+    {
+      "phase": "research",
+      "schemaVersion": 2,
+      "sequence": 5,
+      "status": "started",
+      "summary": "Researching the central question and identified coverage gaps."
+    },
+    {
+      "phase": "research_coverage",
+      "schemaVersion": 2,
+      "sequence": 6,
+      "status": "accepted",
+      "summary": "Coverage review recorded with citation provenance."
+    },
+    {
+      "phase": "narrative",
+      "schemaVersion": 2,
+      "sequence": 7,
+      "status": "started",
+      "summary": "Writing the complete spoken Beats."
+    },
+    {
+      "phase": "verification",
+      "schemaVersion": 2,
+      "sequence": 8,
+      "status": "blocked",
+      "summary": "ContractViolation: inspect operator evidence before resuming."
+    },
+    {
+      "phase": "image_review",
+      "schemaVersion": 2,
+      "sequence": 9,
+      "status": "started",
+      "summary": "Inspecting verified candidate bytes against their intended uses."
+    },
+    {
+      "phase": "image_review",
+      "schemaVersion": 2,
+      "sequence": 10,
+      "status": "started",
+      "summary": "Inspecting verified candidate bytes against their intended uses."
+    },
+    {
+      "phase": "verification",
+      "schemaVersion": 2,
+      "sequence": 11,
+      "status": "blocked",
+      "summary": "Image call failed, is uncertain or is not inspectable; no replacement was started."
+    }
+  ],
+  "editorialCorrections": 0,
+  "technicalRepairs": 1,
+  "filmCorrections": 0,
+  "reconciliations": [
+    {
+      "action": "reconcile_responded_invalid_coverage",
+      "checkpointSha256": "7e9168355dbec34e6bf0d86fc4567217479a3784e29a80e5a68d1c4a83eb42a2",
+      "crewImage": "europe-west1-docker.pkg.dev/studio-prod-7f3a/vox-crew/crew@sha256:f450b34022fe134b5405f46f06494f79075d99f36c6f0a748410fe422f029246",
+      "journalSha256": "c45db43770270f4632169dfa3f7f91016de93cad9a35b7ef18b596dace667361",
+      "limits": {
+        "maxCalls": 40,
+        "maxImages": 5,
+        "maxSearches": 4
+      },
+      "observedAt": "2026-09-08T05:23:38.959680+00:00",
+      "priorPending": {
+        "dependencies": {
+          "dossier": {
+            "claims": [
+              {
+                "id": "claim-8ed9f64807908e36",
+                "sourceIds": [
+                  "source-d721400aab954ac0"
+                ],
+                "support": "supported",
+                "text": "### Atmospheric Reentry and Thermal Protection\n* At stage separation, first-stage rocket boosters travel at hypersonic speeds where atmospheric friction generates extreme aerodynamic heating and pressure"
+              },
+              {
+                "id": "claim-c01af5b83373fc41",
+                "sourceIds": [
+                  "source-3a01858177e2e4a7",
+                  "source-d721400aab954ac0",
+                  "source-d123d592cf8b5d08"
+                ],
+                "support": "supported",
+                "text": "* Early recovery attempts using parachutes on early rocket configurations failed because the boosters disintegrated and burned up during atmospheric reentry before their parachutes could even deploy"
+              },
+              {
+                "id": "claim-a9e3c7f4fa3e9969",
+                "sourceIds": [
+                  "source-65f1fcf35d26f334"
+                ],
+                "support": "supported",
+                "text": "* To survive this high-velocity phase, reusable rockets perform an active \"entry burn\" by firing their engines directly into the oncoming supersonic freestream—a process known as supersonic retropropulsion"
+              }
+            ],
+            "contradictions": [],
+            "mode": "researched",
+            "quotations": [],
+            "schemaVersion": 1,
+            "sources": [
+              {
+                "id": "source-d721400aab954ac0",
+                "title": "SpaceX reusable launch system development program - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+              },
+              {
+                "id": "source-3a01858177e2e4a7",
+                "title": "Falcon 9 first-stage landing tests - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+              },
+              {
+                "id": "source-d123d592cf8b5d08",
+                "title": "List of Falcon 9 first-stage boosters - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/List_of_Falcon_9_first-stage_boosters"
+              },
+              {
+                "id": "source-65f1fcf35d26f334",
+                "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview",
+                "url": "https://ntrs.nasa.gov/api/citations/20170008725/downloads/20170008725.pdf"
+              }
+            ],
+            "statistics": [],
+            "visualOpportunities": []
+          },
+          "revision": 0
+        },
+        "identity": "3574952f8fa732f6a830f321363b5274cf0843371263a2c79f2f299a7ce856c5",
+        "name": "director.coverage"
+      },
+      "priorTerminal": {
+        "reason": "ContractViolation: inspect operator evidence before resuming.",
+        "runId": null,
+        "status": "blocked"
+      },
+      "reason": "Coverage response was received but failed validation. Re-run only that judgement with structured output and diagnostic evidence; retain every prior dispatch and validated result.",
+      "respondedCallIds": [
+        "ac893d4a-d96f-4be5-8ef5-eca589525b70",
+        "eff77252-474e-4c18-895d-d57a9dd0490b",
+        "ba0c3845-5d93-4099-842b-971e314363c9"
+      ],
+      "submissionId": "autonomous-2026-09-08-rocket"
+    },
+    {
+      "action": "reconcile_responded_invalid_preparation",
+      "checkpointSha256": "95e7a6a95c8ae5f6bdd35747c43996a44e2a2612f00c47b43fcd6c2287b6ddba",
+      "crewImage": "europe-west1-docker.pkg.dev/studio-prod-7f3a/vox-crew/crew@sha256:02ba178face4fa6ceaa78ed71d500a8743cc78bed195cba9a3271599f6cd801a",
+      "journalSha256": "a586dbdc0be945a6f4bc4e7913e9581873e03cfc69888f43ef11460da11cab44",
+      "limits": {
+        "maxCalls": 40,
+        "maxImages": 5,
+        "maxSearches": 4
+      },
+      "observedAt": "2026-09-08T05:35:10.854208+00:00",
+      "priorPending": {
+        "dependencies": {
+          "editorialBrief": {
+            "angle": "An engineering-focused explanation showing that the extreme weight, speed, and need for precision steering make rocket-powered deceleration (retropropulsion) the only viable option for landing orbital-class boosters.",
+            "audience": "General audience interested in space, technology, and physics",
+            "centralQuestion": "Why do reusable rockets need to burn fuel to slow down and land instead of using parachutes?",
+            "durationSeconds": 50,
+            "language": "English",
+            "schemaVersion": 2,
+            "understandingGoals": [
+              "Why parachutes are ineffective for slowing down and safely landing massive, heavy orbital rocket stages.",
+              "How 'retropropulsion' works by firing engines in the opposite direction of travel to fight gravity and atmospheric speed.",
+              "The role of engine thrust in providing the precise steering needed to land on a designated pad or droneship."
+            ]
+          },
+          "feedback": null,
+          "filmRevision": 0,
+          "narrative": {
+            "angle": "An engineering-focused explanation showing that the extreme weight, speed, and need for precision steering make rocket-powered deceleration (retropropulsion) the only viable option for landing orbital-class boosters.",
+            "beats": [
+              {
+                "claimIds": [
+                  "claim-8ed9f64807908e36",
+                  "claim-c01af5b83373fc41"
+                ],
+                "factual": true,
+                "id": "beat_1",
+                "text": "When a rocket's first stage separates, it's traveling at hypersonic speeds. Early attempts to recover these massive boosters with parachutes failed because the extreme heat and pressure of reentry destroyed them before the chutes could even deploy."
+              },
+              {
+                "claimIds": [
+                  "claim-da1cedd6db796633"
+                ],
+                "factual": true,
+                "id": "beat_2",
+                "text": "To survive, a reusable rocket relies on its own fuel to slow down. Atmospheric drag alone is not enough to protect the vehicle or ensure a controlled descent."
+              },
+              {
+                "claimIds": [
+                  "claim-a9e3c7f4fa3e9969",
+                  "claim-14f7db88cf9b652f"
+                ],
+                "factual": true,
+                "id": "beat_3",
+                "text": "By firing its engines directly against the direction of travel—a process called retropropulsion—the rocket sheds its extreme speed, manages the intense thermal loads, and steers precisely to a target landing pad."
+              }
+            ],
+            "hook": "Explain why parachutes fail for orbital boosters and how retropropulsion provides the necessary thermal shield and precision to land a rocket.",
+            "schemaVersion": 1
+          },
+          "researchDossier": {
+            "claims": [
+              {
+                "id": "claim-8ed9f64807908e36",
+                "sourceIds": [
+                  "source-d721400aab954ac0"
+                ],
+                "support": "supported",
+                "text": "### Atmospheric Reentry and Thermal Protection\n* At stage separation, first-stage rocket boosters travel at hypersonic speeds where atmospheric friction generates extreme aerodynamic heating and pressure"
+              },
+              {
+                "id": "claim-c01af5b83373fc41",
+                "sourceIds": [
+                  "source-3a01858177e2e4a7",
+                  "source-d721400aab954ac0",
+                  "source-d123d592cf8b5d08"
+                ],
+                "support": "supported",
+                "text": "* Early recovery attempts using parachutes on early rocket configurations failed because the boosters disintegrated and burned up during atmospheric reentry before their parachutes could even deploy"
+              },
+              {
+                "id": "claim-a9e3c7f4fa3e9969",
+                "sourceIds": [
+                  "source-65f1fcf35d26f334"
+                ],
+                "support": "supported",
+                "text": "* To survive this high-velocity phase, reusable rockets perform an active \"entry burn\" by firing their engines directly into the oncoming supersonic freestream—a process known as supersonic retropropulsion"
+              },
+              {
+                "id": "claim-da1cedd6db796633",
+                "sourceIds": [
+                  "source-d721400aab954ac0",
+                  "source-50848af70410644a",
+                  "source-e5a5396df6359f93"
+                ],
+                "support": "supported",
+                "text": "### Deceleration and Supersonic Retropropulsion\n* A reusable rocket first-stage booster relies on rocket fuel to decelerate during entry and landing because atmospheric drag alone is insufficient to protect the vehicle and ensure a controlled descent"
+              },
+              {
+                "id": "claim-14f7db88cf9b652f",
+                "sourceIds": [
+                  "source-d721400aab954ac0",
+                  "source-fdf31e92fb49e56f",
+                  "source-50848af70410644a"
+                ],
+                "support": "supported",
+                "text": "* Firing rocket engines against the direction of travel—a process known as retropropulsion—allows the vehicle to shed hypersonic and supersonic velocities, manage thermal loads, and target a specific touchdown location"
+              }
+            ],
+            "contradictions": [],
+            "mode": "researched",
+            "quotations": [],
+            "schemaVersion": 1,
+            "sources": [
+              {
+                "id": "source-d721400aab954ac0",
+                "title": "SpaceX reusable launch system development program - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+              },
+              {
+                "id": "source-3a01858177e2e4a7",
+                "title": "Falcon 9 first-stage landing tests - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+              },
+              {
+                "id": "source-d123d592cf8b5d08",
+                "title": "List of Falcon 9 first-stage boosters - Wikipedia",
+                "url": "https://en.wikipedia.org/wiki/List_of_Falcon_9_first-stage_boosters"
+              },
+              {
+                "id": "source-65f1fcf35d26f334",
+                "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview",
+                "url": "https://ntrs.nasa.gov/api/citations/20170008725/downloads/20170008725.pdf"
+              },
+              {
+                "id": "source-50848af70410644a",
+                "title": "The New Mars Landing Approach: How We'll Land Large Payloads on the Red Planet",
+                "url": "https://www.universetoday.com/articles/the-new-mars-landing-approach-how-well-land-large-payloads-on-the-red-planet"
+              },
+              {
+                "id": "source-e5a5396df6359f93",
+                "title": "falcon 9 - Why would SpaceX not use parachutes for the final descent of the first stage? - Space Exploration Stack Exchange",
+                "url": "https://space.stackexchange.com/questions/7718/why-would-spacex-not-use-parachutes-for-the-final-descent-of-the-first-stage"
+              },
+              {
+                "id": "source-fdf31e92fb49e56f",
+                "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview - NASA Technical Reports Server (NTRS)",
+                "url": "https://ntrs.nasa.gov/citations/20170008725"
+              }
+            ],
+            "statistics": [],
+            "visualOpportunities": []
+          },
+          "revision": 0,
+          "visualBible": {
+            "colorRoles": [
+              "neutral",
+              "negative",
+              "positive"
+            ],
+            "forbiddenTreatments": [
+              "duotone",
+              "cutout"
+            ],
+            "motifs": [
+              "retropropulsion-fire-plumes",
+              "aerodynamic-force-vectors",
+              "descent-trajectories",
+              "atmospheric-reentry-friction-glow"
+            ],
+            "motionIntent": [
+              "cinematic",
+              "pushIn",
+              "subtleDrift"
+            ],
+            "schemaVersion": 1,
+            "theme": "editorial-cold",
+            "treatments": [
+              "photo",
+              "illustration"
+            ]
+          }
+        },
+        "identity": "dcbc12b533586ad314feb8843c301f3923273cbc33a5fe5bd7c424364fba4bf7",
+        "name": "composition"
+      },
+      "priorTerminal": {
+        "reason": "ContractViolation: inspect operator evidence before resuming.",
+        "runId": null,
+        "status": "blocked"
+      },
+      "reason": "The named preparation step responded but failed validation. Resume after a tested contract-boundary fix; retain every prior dispatch, ceiling and validated result. Lost role responses may require additional counted calls.",
+      "respondedCallIds": [
+        "ac893d4a-d96f-4be5-8ef5-eca589525b70",
+        "eff77252-474e-4c18-895d-d57a9dd0490b",
+        "ba0c3845-5d93-4099-842b-971e314363c9",
+        "12ac7ebb-b2de-409c-b49a-55e5e9a3c5bc",
+        "249ecb4d-4208-4c65-836b-d76ccdb51830",
+        "bcf72743-88e1-4e57-9385-e40d413e4db8",
+        "f1636fa3-2821-44ae-9e0e-3b9b44e64d4a",
+        "837a866c-19f1-4875-b75c-6657b16d7cd9",
+        "da684c14-6883-4a27-9d5b-6402b254b848",
+        "cb55cde4-c40b-4b6b-af23-44bfc38a2c6a",
+        "3ca0d50a-25e8-4269-b1b7-67cf43ba5b52",
+        "12105c7b-914d-483e-8309-98b08642d1fc"
+      ],
+      "step": "composition",
+      "submissionId": "autonomous-2026-09-08-rocket",
+      "technicalRepairsAfter": 1,
+      "technicalRepairsBefore": 0
+    }
+  ],
+  "accountingReconciliations": null,
+  "terminal": {
+    "reason": "Image call failed, is uncertain or is not inspectable; no replacement was started.",
+    "runId": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+    "status": "blocked"
+  },
+  "contractDiagnostic": {
+    "error": "scene author output.scenes[0] has unknown fields: component, spansBeats.",
+    "step": {
+      "dependencies": {
+        "editorialBrief": {
+          "angle": "An engineering-focused explanation showing that the extreme weight, speed, and need for precision steering make rocket-powered deceleration (retropropulsion) the only viable option for landing orbital-class boosters.",
+          "audience": "General audience interested in space, technology, and physics",
+          "centralQuestion": "Why do reusable rockets need to burn fuel to slow down and land instead of using parachutes?",
+          "durationSeconds": 50,
+          "language": "English",
+          "schemaVersion": 2,
+          "understandingGoals": [
+            "Why parachutes are ineffective for slowing down and safely landing massive, heavy orbital rocket stages.",
+            "How 'retropropulsion' works by firing engines in the opposite direction of travel to fight gravity and atmospheric speed.",
+            "The role of engine thrust in providing the precise steering needed to land on a designated pad or droneship."
+          ]
+        },
+        "feedback": null,
+        "filmRevision": 0,
+        "narrative": {
+          "angle": "An engineering-focused explanation showing that the extreme weight, speed, and need for precision steering make rocket-powered deceleration (retropropulsion) the only viable option for landing orbital-class boosters.",
+          "beats": [
+            {
+              "claimIds": [
+                "claim-8ed9f64807908e36",
+                "claim-c01af5b83373fc41"
+              ],
+              "factual": true,
+              "id": "beat_1",
+              "text": "When a rocket's first stage separates, it's traveling at hypersonic speeds. Early attempts to recover these massive boosters with parachutes failed because the extreme heat and pressure of reentry destroyed them before the chutes could even deploy."
+            },
+            {
+              "claimIds": [
+                "claim-da1cedd6db796633"
+              ],
+              "factual": true,
+              "id": "beat_2",
+              "text": "To survive, a reusable rocket relies on its own fuel to slow down. Atmospheric drag alone is not enough to protect the vehicle or ensure a controlled descent."
+            },
+            {
+              "claimIds": [
+                "claim-a9e3c7f4fa3e9969",
+                "claim-14f7db88cf9b652f"
+              ],
+              "factual": true,
+              "id": "beat_3",
+              "text": "By firing its engines directly against the direction of travel—a process called retropropulsion—the rocket sheds its extreme speed, manages the intense thermal loads, and steers precisely to a target landing pad."
+            }
+          ],
+          "hook": "Explain why parachutes fail for orbital boosters and how retropropulsion provides the necessary thermal shield and precision to land a rocket.",
+          "schemaVersion": 1
+        },
+        "researchDossier": {
+          "claims": [
+            {
+              "id": "claim-8ed9f64807908e36",
+              "sourceIds": [
+                "source-d721400aab954ac0"
+              ],
+              "support": "supported",
+              "text": "### Atmospheric Reentry and Thermal Protection\n* At stage separation, first-stage rocket boosters travel at hypersonic speeds where atmospheric friction generates extreme aerodynamic heating and pressure"
+            },
+            {
+              "id": "claim-c01af5b83373fc41",
+              "sourceIds": [
+                "source-3a01858177e2e4a7",
+                "source-d721400aab954ac0",
+                "source-d123d592cf8b5d08"
+              ],
+              "support": "supported",
+              "text": "* Early recovery attempts using parachutes on early rocket configurations failed because the boosters disintegrated and burned up during atmospheric reentry before their parachutes could even deploy"
+            },
+            {
+              "id": "claim-a9e3c7f4fa3e9969",
+              "sourceIds": [
+                "source-65f1fcf35d26f334"
+              ],
+              "support": "supported",
+              "text": "* To survive this high-velocity phase, reusable rockets perform an active \"entry burn\" by firing their engines directly into the oncoming supersonic freestream—a process known as supersonic retropropulsion"
+            },
+            {
+              "id": "claim-da1cedd6db796633",
+              "sourceIds": [
+                "source-d721400aab954ac0",
+                "source-50848af70410644a",
+                "source-e5a5396df6359f93"
+              ],
+              "support": "supported",
+              "text": "### Deceleration and Supersonic Retropropulsion\n* A reusable rocket first-stage booster relies on rocket fuel to decelerate during entry and landing because atmospheric drag alone is insufficient to protect the vehicle and ensure a controlled descent"
+            },
+            {
+              "id": "claim-14f7db88cf9b652f",
+              "sourceIds": [
+                "source-d721400aab954ac0",
+                "source-fdf31e92fb49e56f",
+                "source-50848af70410644a"
+              ],
+              "support": "supported",
+              "text": "* Firing rocket engines against the direction of travel—a process known as retropropulsion—allows the vehicle to shed hypersonic and supersonic velocities, manage thermal loads, and target a specific touchdown location"
+            }
+          ],
+          "contradictions": [],
+          "mode": "researched",
+          "quotations": [],
+          "schemaVersion": 1,
+          "sources": [
+            {
+              "id": "source-d721400aab954ac0",
+              "title": "SpaceX reusable launch system development program - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/SpaceX_reusable_launch_system_development_program"
+            },
+            {
+              "id": "source-3a01858177e2e4a7",
+              "title": "Falcon 9 first-stage landing tests - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+            },
+            {
+              "id": "source-d123d592cf8b5d08",
+              "title": "List of Falcon 9 first-stage boosters - Wikipedia",
+              "url": "https://en.wikipedia.org/wiki/List_of_Falcon_9_first-stage_boosters"
+            },
+            {
+              "id": "source-65f1fcf35d26f334",
+              "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview",
+              "url": "https://ntrs.nasa.gov/api/citations/20170008725/downloads/20170008725.pdf"
+            },
+            {
+              "id": "source-50848af70410644a",
+              "title": "The New Mars Landing Approach: How We'll Land Large Payloads on the Red Planet",
+              "url": "https://www.universetoday.com/articles/the-new-mars-landing-approach-how-well-land-large-payloads-on-the-red-planet"
+            },
+            {
+              "id": "source-e5a5396df6359f93",
+              "title": "falcon 9 - Why would SpaceX not use parachutes for the final descent of the first stage? - Space Exploration Stack Exchange",
+              "url": "https://space.stackexchange.com/questions/7718/why-would-spacex-not-use-parachutes-for-the-final-descent-of-the-first-stage"
+            },
+            {
+              "id": "source-fdf31e92fb49e56f",
+              "title": "Advancing Supersonic Retropropulsion Using Mars-Relevant Flight Data: An Overview - NASA Technical Reports Server (NTRS)",
+              "url": "https://ntrs.nasa.gov/citations/20170008725"
+            }
+          ],
+          "statistics": [],
+          "visualOpportunities": []
+        },
+        "revision": 0,
+        "visualBible": {
+          "colorRoles": [
+            "neutral",
+            "negative",
+            "positive"
+          ],
+          "forbiddenTreatments": [
+            "duotone",
+            "cutout"
+          ],
+          "motifs": [
+            "retropropulsion-fire-plumes",
+            "aerodynamic-force-vectors",
+            "descent-trajectories",
+            "atmospheric-reentry-friction-glow"
+          ],
+          "motionIntent": [
+            "cinematic",
+            "pushIn",
+            "subtleDrift"
+          ],
+          "schemaVersion": 1,
+          "theme": "editorial-cold",
+          "treatments": [
+            "photo",
+            "illustration"
+          ]
+        }
+      },
+      "identity": "dcbc12b533586ad314feb8843c301f3923273cbc33a5fe5bd7c424364fba4bf7",
+      "name": "composition"
+    }
+  }
+}

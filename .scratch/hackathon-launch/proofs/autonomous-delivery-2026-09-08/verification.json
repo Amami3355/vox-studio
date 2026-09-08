@@ -1,0 +1,64 @@
+[
+  {
+    "subject": "rocket",
+    "result": {
+      "reason": "Image call failed, is uncertain or is not inspectable; no replacement was started.",
+      "runId": "1b2e480b-4a2f-447e-ac71-b607a8781ebc",
+      "status": "blocked"
+    },
+    "providerUsage": {
+      "totalDispatchAttempts": 30,
+      "groundedSearches": 2,
+      "byRole": {
+        "Director": 6,
+        "ParallelGroundedResearch": 2,
+        "NarrativeAgent": 1,
+        "ArtDirectorAgent": 1,
+        "VisualStructurer": 2,
+        "SceneAuthor": 8,
+        "PlanRepairAgent": 1,
+        "Recording": 1,
+        "ImageCreator": 3,
+        "ImageGeneration": 3,
+        "MediaReviewer": 2
+      },
+      "pending": [],
+      "imageGenerations": 3,
+      "narrations": 1,
+      "technicalRepairs": 1,
+      "editorialCorrections": 0,
+      "filmCorrections": 0
+    },
+    "artifactDigestsVerified": true,
+    "blockingDetail": "Image call failed, is uncertain or is not inspectable; no replacement was started."
+  },
+  {
+    "subject": "sky",
+    "result": {
+      "reason": "ContractViolation: inspect operator evidence before resuming.",
+      "runId": "17d9b570-3c05-4a9c-8e13-61096581fa5c",
+      "status": "blocked"
+    },
+    "providerUsage": {
+      "totalDispatchAttempts": 17,
+      "groundedSearches": 1,
+      "byRole": {
+        "Director": 4,
+        "ParallelGroundedResearch": 1,
+        "NarrativeAgent": 1,
+        "ArtDirectorAgent": 1,
+        "VisualStructurer": 1,
+        "SceneAuthor": 8,
+        "PlanRepairAgent": 1
+      },
+      "pending": [],
+      "imageGenerations": 0,
+      "narrations": 0,
+      "technicalRepairs": 1,
+      "editorialCorrections": 0,
+      "filmCorrections": 0
+    },
+    "artifactDigestsVerified": true,
+    "blockingDetail": "The old repair adapter failed assembly after the provider responded, before saving the repair counter or response. Its one technical repair is consumed; the lost response cannot be replayed. The Run remains blocked."
+  }
+]

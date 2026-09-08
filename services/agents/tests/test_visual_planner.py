@@ -382,7 +382,8 @@ class SceneAuthor:
         self.specifications: tuple[dict[str, Any], ...] = ()
         self.tool_names: tuple[str, ...] = ()
 
-    async def author(self, _structure: dict[str, Any], specifications: tuple[dict[str, Any], ...], tools: VisualCatalogTools) -> dict[str, Any]:
+    async def author(self, _structure: dict[str, Any], specifications: tuple[dict[str, Any], ...], tools: VisualCatalogTools, *, context=None) -> dict[str, Any]:
+        self.context = context
         self.specifications = specifications
         self.tool_names = tools.names
         return self.answer

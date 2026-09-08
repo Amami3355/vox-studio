@@ -1,0 +1,14 @@
+[
+  {
+    "vm": "vox-service",
+    "matchesLocalBytes": true,
+    "sha256": "4a3cc88a95a88679709344f350ef611d3cb2384f914ee4345abfeabba7a02c87",
+    "bytes": 22383
+  },
+  {
+    "vm": "vox-crew-worker",
+    "matchesLocalBytes": true,
+    "sha256": "75e2e007a4850cb0be3a8688ae8de3935fe65674db1a7d27bede5e247613cba5",
+    "bytes": 14055
+  }
+]

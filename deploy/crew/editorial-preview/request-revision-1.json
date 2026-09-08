@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "brief": {
+    "id": "editorial-preview-reusable-rocket-2026-09-08-revision-1",
+    "durationSeconds": 50,
+    "maxGeneratedImages": 5,
+    "text": "Create a visually engaging English factual explainer for curious general viewers: Why does a reusable rocket still need fuel to land? Focus on the Falcon 9 first stage. Research original sources and explain the mechanism through a coherent artistic progression of illustrations, details and schematic actions synchronized with the narration. Let the story determine the number of Beats, scenes and images. Introduce ideas with brief titles when useful, give the subject room, and end with an earned insight. Generated illustrations must be distinguishable from documentary footage, and simplified diagrams must not imply unsupported physical precision. Preserve source references for factual statements. The structured duration is an estimate and the image count is a maximum, not a required count. Editorial research correction: answer WHY propellant is needed to slow a descending booster, rather than making a catalogue of exact burn durations. Establish the causal mechanism from primary sources; qualify which recovery maneuvers depend on the mission. Avoid unnecessary numbers, universal three-burn claims, and claims that exhaust forms a protective shield unless the source directly supports that interpretation. Useful starting sources to investigate, not preapproved claims: https://science.nasa.gov/learn/basics-of-space-flight/chapter3-2/ ; https://www.nasa.gov/wp-content/uploads/2020/08/falcon9_launch_and_landing.pdf ; https://www.spacex.com/vehicles/falcon-9/ . The crew still owns narration, segmentation and all artistic decisions. Visual annotations must be grounded as carefully as the spoken explanation."
+  },
+  "production": {
+    "voice": {
+      "provider": "elevenlabs",
+      "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+      "modelId": "eleven_multilingual_v2",
+      "seed": 7
+    },
+    "maxNewTakes": 1
+  }
+}

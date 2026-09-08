@@ -1,0 +1,41 @@
+{
+  "angle": "Why a descending Falcon 9 booster must burn fuel to land safely.",
+  "beats": [
+    {
+      "claimIds": [
+        "operator-claim-force"
+      ],
+      "factual": true,
+      "id": "beat-1-force",
+      "text": "When a rocket booster falls back to Earth, gravity pulls it down at extreme speeds. To slow it down, an external force must act in the opposite direction of its motion."
+    },
+    {
+      "claimIds": [
+        "operator-claim-thrust",
+        "operator-claim-propellant"
+      ],
+      "factual": true,
+      "id": "beat-2-propulsion",
+      "text": "A rocket creates this braking force by expelling onboard mass. Chemical combustion heats gases that expand and shoot out of the nozzle, pushing the vehicle in the opposite direction."
+    },
+    {
+      "claimIds": [
+        "operator-claim-entry",
+        "operator-claim-guidance"
+      ],
+      "factual": true,
+      "id": "beat-3-descent",
+      "text": "During descent, the Falcon 9 first-stage restarts engines for an entry burn to begin slowing down, while grid fins aerodynamically steer its descent."
+    },
+    {
+      "claimIds": [
+        "operator-claim-landing-mechanism"
+      ],
+      "factual": true,
+      "id": "beat-4-braking",
+      "text": "Finally, a landing engine ignition fires. This downward exhaust provides the critical upward thrust that halts the booster's downward speed, achieving a soft vertical landing."
+    }
+  ],
+  "hook": "Why does a reusable rocket need to burn fuel when it is already falling back to Earth?",
+  "schemaVersion": 1
+}

@@ -1,0 +1,13 @@
+{
+  "artifactDigestsVerified": true,
+  "files": [
+    {
+      "exportedAs": "55bce6e1907eab742a3e405b1e1061f458bc56450b2f7a89b440f65b943cef85.json",
+      "kind": "production_request",
+      "path": "inputs/request.json",
+      "sha256": "55bce6e1907eab742a3e405b1e1061f458bc56450b2f7a89b440f65b943cef85"
+    }
+  ],
+  "runId": "17d9b570-3c05-4a9c-8e13-61096581fa5c",
+  "signedStatusVerified": true
+}

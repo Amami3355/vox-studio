@@ -16,6 +16,7 @@ from typing import Any, NotRequired, Protocol, TypedDict
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
+from .editorial import EditorialRejected, EditorialReview, EditorialReviewer
 
 from .crew_contract import (
     Brief,
@@ -99,6 +100,7 @@ class PublishedCatalog:
     capabilities: tuple[JsonObject, ...]
     tier_fields: Mapping[str, tuple[str, ...]]
     role_projections: Mapping[str, tuple[tuple[str, ...], str]]
+    authoring_vocabulary: JsonObject
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> PublishedCatalog:
@@ -168,7 +170,9 @@ class PublishedCatalog:
                 raise ContractViolation(f"catalog role {role_name} has an unknown selection rule.")
             roles[_name(role_name, "catalog role name")] = (role_tiers, selection)
 
-        return cls(tuple(capabilities), tier_fields, roles)
+        vocabulary = {key: deepcopy(dict(_object(value.get(key), f"catalog.{key}")))
+                      for key in ("time", "visualVocabulary")}
+        return cls(tuple(capabilities), tier_fields, roles, vocabulary)
 
     def for_role(
         self, role: CatalogProjectionRole, capability_ids: Sequence[str] = ()
@@ -561,6 +565,8 @@ class VisualStructurer(Protocol):
         narrative: Narrative,
         visual_bible: VisualBible,
         selection_catalog: tuple[JsonObject, ...],
+        *,
+        feedback: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]: ...
 
 
@@ -570,6 +576,8 @@ class SceneAuthor(Protocol):
         structure: Mapping[str, Any],
         specifications: tuple[JsonObject, ...],
         tools: VisualCatalogTools,
+        *,
+        context: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]: ...
 
 
@@ -625,9 +633,14 @@ class SplitVisualPlanner:
         repair: PlanRepairAgent | None = None,
         repair_budget: int = PLAN_REPAIR_BUDGET,
         check_meanings: CheckMeanings = lambda _codes: {},
+        reviewer: EditorialReviewer | None = None,
+        editorial_revision_budget: int = 1,
+        allow_structural_echo: bool = False,
     ) -> None:
         if repair_budget < 0:
             raise ContractViolation("A plan repair budget cannot be negative.")
+        if editorial_revision_budget < 0:
+            raise ContractViolation("An editorial revision budget cannot be negative.")
         self._catalog = catalog
         self._structurer = structurer
         self._scene_author = scene_author
@@ -639,6 +652,10 @@ class SplitVisualPlanner:
         self._repair_budget = repair_budget
         #: Readable after a Run, so evidence can say what repair cost and not merely that it ran.
         self.repairs_spent = 0
+        self._reviewer = reviewer
+        self._editorial_revision_budget = editorial_revision_budget
+        self.editorial_reviews: list[JsonObject] = []
+        self.allow_structural_echo = allow_structural_echo
 
     async def plan(
         self,
@@ -646,28 +663,55 @@ class SplitVisualPlanner:
         dossier: ResearchDossier,
         narrative: Narrative,
         visual_bible: VisualBible,
+        *,
+        editorial_context: Mapping[str, Any] | None = None,
+        feedback: Mapping[str, Any] | None = None,
+        reset_repairs: bool = True,
+        checkpoint=None,
     ) -> Mapping[str, Any]:
         selection = self._catalog.for_role(CatalogProjectionRole.VISUAL_STRUCTURER)
-        structure = self._structure(
-            await self._structurer.structure(
-                brief, dossier, narrative, visual_bible, selection
-            ),
-            narrative,
-        )
-        selected_ids = _selected_capabilities(structure)
-        specifications = self._catalog.for_role(CatalogProjectionRole.SCENE_AUTHOR, selected_ids)
-        tools = VisualCatalogTools(
-            self._catalog,
-            frozenset(selected_ids),
-            self._validate_scene,
-            self._validate_plan,
-        )
-        fills = await self._scene_author.author(deepcopy(structure), specifications, tools)
-        plan = self._assemble(structure, fills)
-        return await self._repaired(plan, structure, tools)
+        context = {"brief": brief.to_mapping(), "visualBible": visual_bible.to_mapping(),
+                   "researchDossier": dossier.to_mapping(),
+                   "authoringVocabulary": deepcopy(self._catalog.authoring_vocabulary),
+                   **dict(editorial_context or {})}
+        self.editorial_reviews = []
+        if reset_repairs:
+            self.repairs_spent = 0
+        if editorial_context:
+            feedback = {**dict(feedback or {}), **dict(editorial_context)}
+        for revision in range(self._editorial_revision_budget + 1):
+            kwargs = {} if feedback is None else {"feedback": deepcopy(feedback)}
+            async def structure_turn():
+                return await self._structurer.structure(brief, dossier, narrative, visual_bible, selection, **kwargs)
+            dependencies = {"context": context, "narrative": narrative.to_mapping(), "selection": selection, "feedback": feedback}
+            raw_structure = await checkpoint("structurer", dependencies, structure_turn) if checkpoint else await structure_turn()
+            structure = self._structure(raw_structure, narrative)
+            selected_ids = _selected_capabilities(structure)
+            specifications = self._catalog.for_role(CatalogProjectionRole.SCENE_AUTHOR, selected_ids)
+            tools = VisualCatalogTools(
+                self._catalog, frozenset(selected_ids), self._validate_scene, self._validate_plan,
+            )
+            author_context = {**context, "editorialFeedback": feedback}
+            async def author_turn():
+                return await self._scene_author.author(deepcopy(structure), specifications, tools, context=deepcopy(author_context))
+            dependencies = {"structure": structure, "specifications": specifications, "context": author_context}
+            fills = await checkpoint("scene_author", dependencies, author_turn) if checkpoint else await author_turn()
+            plan = await self._repaired(self._assemble(structure, fills, allow_structural_echo=self.allow_structural_echo), structure, tools, checkpoint)
+            if self._reviewer is None:
+                return plan
+            review = EditorialReview.from_mapping(
+                await self._reviewer.review(deepcopy(plan), deepcopy(context), specifications), plan,
+            )
+            self.editorial_reviews.append(review.to_mapping())
+            if review.accepted:
+                return plan
+            if revision == self._editorial_revision_budget:
+                raise EditorialRejected("Editorial review remains unresolved; no media production started.")
+            feedback = {"previousPlan": plan, **review.to_mapping()}
+        raise AssertionError("The bounded editorial loop must return or refuse.")
 
     async def _repaired(
-        self, plan: JsonObject, structure: JsonObject, tools: VisualCatalogTools
+        self, plan: JsonObject, structure: JsonObject, tools: VisualCatalogTools, checkpoint=None
     ) -> JsonObject:
         """Validate, and give a refused plan a bounded number of chances to come back green.
 
@@ -680,14 +724,14 @@ class SplitVisualPlanner:
         Brief, while a Decline says the catalog cannot express it — a claim only the Structurer is
         placed to make, and one it makes through `unservable`.
         """
-        self.repairs_spent = 0
+        seen_plans = set()
         while True:
             refusal = self._refusal(plan, tools)
             if refusal is None:
                 return plan
-            if self._repair is None or self.repairs_spent >= self._repair_budget:
+            if checkpoint and repr(plan) in seen_plans:
                 raise ContractViolation(refusal.summary)
-            self.repairs_spent += 1
+            seen_plans.add(repr(plan))
             # `implicated`, never the whole catalog: ADR-0019 gives a repair the full
             # specifications of exactly the capabilities the refusal names.
             specifications = (
@@ -695,13 +739,15 @@ class SplitVisualPlanner:
                 if refusal.capability_ids
                 else ()
             )
-            fills = await self._repair.repair(
-                deepcopy(plan),
-                refusal,
-                specifications,
-                tools.restricted_to(refusal.capability_ids),
-            )
-            plan = _retaining(plan, self._assemble(structure, fills), _refused_scene_ids(refusal))
+            async def repair_turn():
+                if self._repair is None or self.repairs_spent >= self._repair_budget:
+                    raise ContractViolation(refusal.summary)
+                self.repairs_spent += 1
+                return await self._repair.repair(deepcopy(plan), refusal, specifications,
+                    tools.restricted_to(refusal.capability_ids))
+            dependencies = {"plan": plan, "findings": refusal.findings, "specifications": specifications}
+            fills = await checkpoint("plan_repair", dependencies, repair_turn) if checkpoint else await repair_turn()
+            plan = _retaining(plan, self._assemble(structure, fills, allow_structural_echo=self.allow_structural_echo), _refused_scene_ids(refusal))
 
     def _refusal(self, plan: JsonObject, tools: VisualCatalogTools) -> PlanRefusal | None:
         """Every refusal in one pass, so one repair turn sees the whole problem.
@@ -845,13 +891,22 @@ class SplitVisualPlanner:
         return {"beats": deepcopy(expected_beats), "sections": sections}
 
     @staticmethod
-    def _assemble(structure: JsonObject, value: Mapping[str, Any]) -> JsonObject:
+    def _assemble(structure: JsonObject, value: Mapping[str, Any], *, allow_structural_echo=False) -> JsonObject:
         value = _object(value, "scene author output")
         _strict(value, {"scenes"}, "scene author output")
         fills: dict[str, JsonObject] = {}
         allowed = {"id", "props", "layout", "motionProfile", "events", "pace"}
+        slots = {s["id"]: s for section in structure["sections"] for s in section["scenes"]}
         for index, fill_value in enumerate(_array(value.get("scenes"), "scene author output.scenes")):
             fill = _object(fill_value, f"scene author output.scenes[{index}]")
+            if allow_structural_echo:
+                fill = deepcopy(fill)
+                slot = slots.get(fill.get("id"), {})
+                for field in ("component", "spansBeats"):
+                    if field in fill:
+                        if field not in slot or fill[field] != slot[field]:
+                            raise ContractViolation("Scene Author changed immutable structure: " + field)
+                        del fill[field]
             _strict(fill, allowed, f"scene author output.scenes[{index}]")
             fill_id = _name(fill.get("id"), f"scene author output.scenes[{index}].id")
             if "props" not in fill or not isinstance(fill["props"], Mapping):
