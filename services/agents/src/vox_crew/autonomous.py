@@ -23,12 +23,14 @@ class AutonomousBlocked(RuntimeError):
 
 class AutonomousRun:
     def __init__(self, client, surface, work: Path, request, *, director, research, creative,
-                 planner, reviewer, vocabulary, palettes, language=None, max_searches=4):
+                 planner, reviewer, vocabulary, palettes, language=None, max_searches=4,
+                 on_snapshot=None, image_review_hook=None):
         self.client, self.surface, self.work, self.request = client, surface, work, request
         self.director, self.research, self.creative = director, research, creative
         self.planner, self.reviewer = planner, reviewer
         self.vocabulary, self.palettes, self.language = vocabulary, palettes, language
         self.max_searches = min(max_searches, 4)
+        self.on_snapshot, self.image_review_hook = on_snapshot, image_review_hook
         self.brief = Brief.from_mapping({**request["brief"], "kind": "factual"})
         from .provider_usage import CURRENT
         journal = CURRENT.get()
@@ -45,9 +47,15 @@ class AutonomousRun:
             raise AutonomousBlocked("Checkpoint version or original request mismatch; historical Runs are not converted.")
         if self.state.get("limits") != limits:
             raise AutonomousBlocked("The original autonomous ceilings must survive restart unchanged.")
+        review_mode = "studio" if image_review_hook else "autonomous"
+        if self.path.exists() and self.state.get("imageReviewMode", "autonomous") != review_mode:
+            raise AutonomousBlocked("Image review authority must remain unchanged after restart.")
+        self.state["imageReviewMode"] = review_mode
 
     def save(self):
         write_json(self.path, self.state)
+        if self.on_snapshot:
+            self.on_snapshot(deepcopy(self.state))
 
     def event(self, phase, status, summary):
         row = {"schemaVersion": 2, "sequence": len(self.state["events"]) + 1,
@@ -459,6 +467,15 @@ class AutonomousRun:
                         {**payload, "intention": intention, "imageIdentity": requirement.identity}))
                 if not review["inspectionPossible"] or review["requiresNarrationChange"]:
                     raise AutonomousBlocked("Image review is impossible or requires changed narration; the Take is preserved.")
+                if review["accepted"] and self.image_review_hook:
+                    human = await self.image_review_hook(artifact, intention)
+                    self.state.setdefault("humanImageReviews", {})[artifact.sha256] = human
+                    self.save()
+                    if not human["accepted"]:
+                        review = {**review, "accepted": False, "observations": [{
+                            "problem": human["reason"], "affectedIds": [requirement.identity],
+                            "expected": "Address the human image review before delivery.",
+                            "startSeconds": 0, "endSeconds": 0}]}
                 decision = {"protocolVersion": 1, "jobId": job["id"], "candidateSha256": artifact.sha256}
                 if not review["accepted"]:
                     decision["reason"] = " ".join(o["problem"] for o in review["observations"])

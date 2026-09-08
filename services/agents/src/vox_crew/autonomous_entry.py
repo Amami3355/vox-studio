@@ -32,7 +32,7 @@ def prompt_request(text, defaults, *, duration=None, submission_id=None):
 
 
 async def submit_prompt(client, state, config, text, *, duration=None, language=None,
-                        submission_id=None, prepare_only=False):
+                        submission_id=None, prepare_only=False, on_snapshot=None, image_review_hook=None):
     defaults = json.loads((config / "prompt-defaults.json").read_text(encoding="utf-8"))
     request = prompt_request(text, defaults, duration=duration, submission_id=submission_id)
     language = language or defaults.get("language")
@@ -75,7 +75,7 @@ async def submit_prompt(client, state, config, text, *, duration=None, language=
             planner=planner, reviewer=MediaReviewer(model),
             vocabulary=visual_vocabulary(surface.contract("catalog")),
             palettes=trusted_palettes(surface.contract("design")), language=language,
-            max_searches=limits["maxGroundedCalls"])
+            max_searches=limits["maxGroundedCalls"], on_snapshot=on_snapshot, image_review_hook=image_review_hook)
         result = await run.run()
     write_json(work / "result.json", result)
     print(json.dumps(result), flush=True)

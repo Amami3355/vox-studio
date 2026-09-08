@@ -7,6 +7,10 @@ This file is the glossary. Use these terms verbatim — the synonyms listed unde
 
 ## Glossary
 
+**Studio submission** — A saved request for a film in the private workspace, with its progress,
+human decisions and resulting media. It exists before a Production Run and does not itself
+authorize spending. Avoid: treating a browser session or an ADK session as the submission.
+
 **Editorial brief** — The Director's interpretation of an original prompt: central question,
 audience, language, angle, understanding goals and target duration. It does not replace the
 original request or confer spending authority.
