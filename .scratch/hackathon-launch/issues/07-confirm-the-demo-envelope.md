@@ -36,3 +36,13 @@ Production and local playback delivery are proved. On September 8 the user accep
 technical result and requested validation, commit and push of the programmatic work.
 Artistic/editorial acceptance remains open, with substantial feedback deferred to a later
 session. The separate Studio release/access choices also remain open.
+
+## Comments
+
+2026-09-08, Studio: The user confirmed a private workspace and explicitly accepted the new
+trial envelope: 40 total counted dispatches, including at most four searches, five image
+generations and one narration. The browser brief is `Explain why we see lightning before we
+hear thunder.`, 50 seconds, English. The immutable request and authorization are recorded in
+[Studio evidence](../proofs/studio-progress-2026-09-08.md). This settles access and this trial's
+budget; it does not authorize further trials or accept generated images on the user's behalf.
+The current candidate awaits human approval. Final editorial/release acceptance stays open.

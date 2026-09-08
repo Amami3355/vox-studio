@@ -4,6 +4,12 @@ Updated 2026-09-08: [the first real hosted video is delivered](proofs/milestone-
 
 ## The product to finish
 
+Studio update, September 8: the [private hosted workspace](https://vox-studio-164544259455.europe-west1.run.app)
+is implemented and deployed. Authenticated submission, persistent progress, image decisions,
+verified media delivery and browser refresh are exercised; the separately running worker has
+started the newly authorized lightning/thunder trial and awaits a human image decision.
+The fresh complete film and rehearsal gates remain open. See [current Studio evidence](proofs/studio-progress-2026-09-08.md).
+
 A user opens a deployed Studio, submits a factual Brief, sees the crew research and construct a visual story, reviews an image when needed, and watches/downloads a real narrated preview. Closing the tab does not lose the work. Sources and actual phase status make the result trustworthy.
 
 For the September 8 internal demo target, recommend controlled authenticated access, one active production attempt at a time, a short 30–60 second hero explainer using existing SceneCapabilities, and one deliberate image approval. Audience, Brief, staffing and spending choices remain in [Who uses the first Studio, with which Brief and limits?](issues/07-confirm-the-demo-envelope.md). The event and deadline are established; do not ask for them again.
@@ -18,8 +24,8 @@ The distinctive story is already in the architecture: sourced research, speciali
 | --- | --- | --- |
 | Production | Running pinned image, persistent Run store, deployed smoke checks and signed cloud-to-cloud proof | Hosted video delivered; historical receipt compatibility tracked separately |
 | ADK crew | Deployed operator entry point, async Director, research/creative roles, checkpoint adapters, persistent disk and supervised bridge | Hosted run rendered; consolidate documented runtime overrides into the next deployment |
-| Browser Studio | Internal Component Studio only | End-user workspace, authenticated application API, durable status and authorized media delivery |
-| Recovery | Crew file/ADK session adapters and authoritative Production checkpoints | Durable execution ownership, submission deduplication and reconciliation of an interrupted command |
+| Browser Studio | Private HTTPS workspace, persistent API, separate worker, real sources/status, image approval and verified media delivery | Authorized fresh trial awaits human image review; complete browser-to-film proof remains open |
+| Recovery | Durable submission deduplication, exclusive execution locks and guarded checkpoint reconciliation; API restart preserves active worker/session | Live worker recovery and uncertain-render rehearsal still need proof; do not interrupt the active trial to simulate them |
 | Research integration | Gemini grounding with Parallel Search implemented and deployed; citation binding tests pass; Parallel secret version 2 accepted | Grounded dossier proved; human editorial acceptance pending |
 | Google model access | Google Cloud inference from crew identity proved; cloud image adapter deployed | Live authors and accepted image proved; deploy the migrated Gemini adapter for future Runs |
 | Narration | Working ElevenLabs adapter and timestamp-based alignment | Keep for initial milestones; final provider work must preserve actual-word synchronization |
@@ -58,7 +64,9 @@ Two traps are already evidenced locally:
 - Production binds only `127.0.0.1` on its private VM. A hosted crew with VPC access still needs a concrete authorized route to that listener. If introducing a gateway or changing ingress, record the ADR-0018 topology amendment and test the isolation properties. Do not weaken the Run store to fit a serverless mount.
 - Long synchronous renders previously lost the tunnel after 137–181 seconds while the server continued. Durable submission, operation status and reconciliation must outlive the browser request. Merely configuring a longer client timeout or saving an ADK session does not establish this. After an uncertain completion, inspect the same Production Run before authorizing more work.
 
-Browser media is another missing contract: the public outcome carries an artifact handle/digest, not a playable URL. Add a trusted application route that authenticates ownership, fetches/verifies the published descriptor and supports usable video playback/download. An application-owned export is a separate option to evaluate; it does not make an object bucket a valid Production Run store.
+Browser media now uses authenticated application routes and a digest-verified cache on the
+Studio persistent disk. Historical MP4 playback, seeking and byte ranges are verified over HTTPS;
+the fresh trial has not yet produced final media. Production retains its private POSIX Run store.
 
 ## Delivery milestones
 
@@ -76,7 +84,7 @@ These are observable implementation outcomes, not additional decision tickets. O
 | --- | --- | --- | --- |
 | [x] | Cloud path answers | Production and crew deployed; private signed connection, persistent disk and separate operator policy verified | [Signed round trip before/after restart, deployed digests and isolation refusals](proofs/cloud-path-progress-2026-09-07.md) |
 | [ ] | First real video to watch: technical result accepted, editorial review open | [Hosted Run rendered and MP4 delivered](proofs/milestone-2-delivery-2026-09-08.md), with research, live authors, accepted illustration and narration | User accepted the technical result; artistic/editorial feedback and acceptance remain |
-| [ ] | Studio produces that result | Add durable submit/status execution, Brief form, real progress, sources, image approval and authorized playback/download; connect the smallest screen before polishing it | Fresh browser completes the hosted path and reconnects to the same work after refresh |
+| [ ] | Studio produces that result | Private hosted workspace and durable worker are deployed; the authorized fresh trial awaits human image approval | Refresh is verified; complete hosted film and human viewing remain pending in [current evidence](proofs/studio-progress-2026-09-08.md) |
 | [ ] | Product holds up in rehearsal | Verify duplicate admission, restart and uncertain-render reconciliation; enforce spending/concurrency limits; improve visible states and composition | Second complete run, focused recovery checks, no duplicated paid dispatch, usable failure states and saved backup demonstration |
 | [ ] | Final voice work | Address the deferred ElevenLabs compliance gap after the visible product; prove replacement audio and actual-word timing before integrating any provider change | Fresh end-to-end run with verified synchronization and provider evidence, or an explicitly unresolved submission blocker; the earlier ElevenLabs video alone cannot close this milestone |
 | [ ] | Submission ready | Freeze the final revision; recheck access and requirements; capture the final English demo and publish the required source/license/instructions | Tested hosted URL, public repository, final video and completed submission before cutoff |
@@ -116,4 +124,11 @@ For submission, verify the event requirements recorded in the priority decision 
 
 ## Decisions awaiting the user
 
-The remaining audience, Brief, staffing and budget choices live in [Who uses the first Studio, with which Brief and limits?](issues/07-confirm-the-demo-envelope.md). Topology and durable execution decisions remain in their existing tickets. Ask only when a missing choice affects dependent work; the event, deadline and priority of a visible result are already settled. No migration away from ElevenLabs belongs ahead of the first video or Studio.
+The user confirmed private workspace access and explicitly authorized the new 50-second English
+lightning/thunder trial with 40 total counted dispatches, including at most four searches, five
+image generations and one narration. These choices are recorded in
+[Who uses the first Studio, with which Brief and limits?](issues/07-confirm-the-demo-envelope.md).
+Human image acceptance, final editorial acceptance and any further paid rehearsal remain
+separate decisions. Ask only when a missing choice affects dependent work; the event, deadline
+and priority of a visible result are already settled. No migration away from ElevenLabs belongs
+ahead of the first video or Studio.
