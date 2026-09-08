@@ -1,0 +1,25 @@
+{
+  "colorRoles": [
+    "neutral",
+    "positive"
+  ],
+  "forbiddenTreatments": [
+    "duotone"
+  ],
+  "motifs": [
+    "vector-grid",
+    "spacecraft-telemetry",
+    "propulsion-flame"
+  ],
+  "motionIntent": [
+    "cinematic",
+    "subtleDrift"
+  ],
+  "schemaVersion": 1,
+  "theme": "editorial-cold",
+  "treatments": [
+    "photo",
+    "illustration",
+    "cutout"
+  ]
+}

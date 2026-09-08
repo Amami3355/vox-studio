@@ -1,0 +1,11 @@
+{
+  "protocolVersion": 1,
+  "brief": {
+    "id": "milestone-2-reusable-rocket-2026-09-07",
+    "text": "Create a premium English factual explainer for curious general viewers, 45–60 seconds and roughly 110–130 spoken words: Why does a reusable rocket still need fuel to land? Focus specifically on a Falcon 9 first stage rather than generalizing to every rocket. Open with the surprising contrast between falling back to Earth and landing safely. Use original sources from SpaceX, NASA or ESA to establish what engine burns, aerodynamic control and landing legs actually do; clearly separate facts from simplifications. Use four or five visually distinct moments, meaningful animation on spoken words, minimal on-screen copy and a strong final insight about controlled descent. Include exactly one generated editorial illustration of an unbranded first-stage booster descending toward a landing pad, visibly labelled Illustration rather than presented as documentary footage. The other visuals should explain the mechanism using the available capabilities. Avoid unverified numerical performance claims, invented quotations, current launch news and promises about cost savings. Preserve source references for every factual narration Beat."
+  },
+  "production": {
+    "voice": {"provider": "elevenlabs", "voiceId": "JBFqnCBsd6RMkjVDRZzb", "modelId": "eleven_multilingual_v2", "seed": 7},
+    "maxNewTakes": 1
+  }
+}

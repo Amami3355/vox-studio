@@ -1,0 +1,78 @@
+{
+  "artifacts": [],
+  "command": "run.status",
+  "data": {
+    "artifacts": [
+      {
+        "kind": "production_request",
+        "path": "inputs/request.json",
+        "sha256": "254c97e879a96cb6b924ad1a5d1477eb3b28bdb60b4db0c7ddfc4efa848cdf00"
+      },
+      {
+        "kind": "plan_snapshot",
+        "path": "inputs/plans/47da399fa0ddc709e69c11f4c7567550d7ab699fccc1fd04eb84ce84d02996ce.json",
+        "sha256": "9716a55c11ae2d641fdbeb061d3d85529505b139e39a16ca4aaabdc3ab26ea4d"
+      },
+      {
+        "kind": "validation_report",
+        "path": "artifacts/validation/a22028e7d1c2d807fdbe7b5338651dd97faf20e2e763eff206886178dc54a375/report.json",
+        "sha256": "fc948ff7b63ebd129a665d22fa537d91057d2fca38537f973bc725712ed5c2a0"
+      },
+      {
+        "kind": "preflight_report",
+        "path": "artifacts/preflight/b0323f0045f96ce23a3a50a06c39604246590aab4e9b164fab04248b8d0b5a55/report.json",
+        "sha256": "6e07036eba4f3c7806dcd441648e178f38321a0eaeca67a63a42d8d146fe2fe8"
+      },
+      {
+        "kind": "take_manifest",
+        "path": "artifacts/takes/bf85b0aa0b0480828d7cc0b108a01b289d7f7f669b8c03b904ef55540df3b674/take.json",
+        "sha256": "e90fd281d695bc83bcbfbf44853685fe6842c19cda56046a38552e036ff19233"
+      },
+      {
+        "kind": "take_audio",
+        "path": "artifacts/takes/bf85b0aa0b0480828d7cc0b108a01b289d7f7f669b8c03b904ef55540df3b674/audio.mp3",
+        "sha256": "d2fa37234ae613293eead48f027575127a79d069904516e68a6f303b39464578"
+      },
+      {
+        "kind": "take_alignment",
+        "path": "artifacts/takes/bf85b0aa0b0480828d7cc0b108a01b289d7f7f669b8c03b904ef55540df3b674/alignment.json",
+        "sha256": "60bf891ceed169c7cf2a77cf524930a3a3a56d152efff6f5d4362b810612c071"
+      },
+      {
+        "kind": "timed_beat_fold",
+        "path": "artifacts/takes/bf85b0aa0b0480828d7cc0b108a01b289d7f7f669b8c03b904ef55540df3b674/folds/b2ee4cf14f645dbf6e8546794051fd9d54d57f9f836d0537beb78b7cb7471393/timed-beats.json",
+        "sha256": "25a09944ef30e7f25658ee21ff02133f0a029781f8a42e24255798bf264cc848"
+      },
+      {
+        "kind": "compiled_document",
+        "path": "artifacts/compilations/6578a6e31cf65ad6bc10fbd1401275073cf3f0d10c18517ce03d95d87af00662/document.json",
+        "sha256": "b02ad00dd1f926ea3651d2e6c6f3e17f8c7b4361579957964f7e2d97d4eabd28"
+      },
+      {
+        "kind": "compile_report",
+        "path": "artifacts/compilations/6578a6e31cf65ad6bc10fbd1401275073cf3f0d10c18517ce03d95d87af00662/report.json",
+        "sha256": "fc948ff7b63ebd129a665d22fa537d91057d2fca38537f973bc725712ed5c2a0"
+      },
+      {
+        "kind": "preview",
+        "path": "artifacts/renders/74c098019e5bae13fb58b511092b187b29ffce29b20b1283bf8a6aa4fdfff942/preview.mp4",
+        "sha256": "50d1ddbc973ff54a8c7ee4b00147cec1d27b7f3abec3a6b533960e916d2b9de9"
+      },
+      {
+        "kind": "generated_image_candidate",
+        "path": "artifacts/images/image-job-49c61acf99fc568a7928/2bbe636cc8548aa35aa4c2e705254998b07dcd102625ee2c57f126bcb7ccb0f3.png",
+        "sha256": "2bbe636cc8548aa35aa4c2e705254998b07dcd102625ee2c57f126bcb7ccb0f3"
+      }
+    ],
+    "lastOutcome": "succeeded",
+    "staleStages": []
+  },
+  "error": null,
+  "next": [],
+  "outcome": "succeeded",
+  "protocolVersion": 1,
+  "run": {
+    "id": "28364527-1061-4a27-9010-c317865747c9",
+    "stage": "rendered"
+  }
+}

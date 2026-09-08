@@ -192,9 +192,9 @@ def build_crew(
         # it anything would fail loudly instead of quietly spending a research call.
         research: Any = _NoResearch(policy.research.mode)
     elif live_research:
-        from .parallel_research import ParallelResearchAdapter  # noqa: PLC0415
+        from .grounded_research import GroundedParallelResearchAdapter  # noqa: PLC0415
 
-        research = ParallelResearchAdapter()
+        research = GroundedParallelResearchAdapter()
         if live_models:
             # The agent half of research. Only when the model roles are live: planning an inquiry
             # is itself a model call, and a run that asked for live research while pinning

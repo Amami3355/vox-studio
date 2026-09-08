@@ -1,0 +1,161 @@
+{
+  "beats": [
+    {
+      "id": "beat-1",
+      "text": "When a rocket falls back to Earth, gravity isn't enough to guide it home safely. Unlike a winged spaceplane, the Falcon 9 first stage cannot glide passively to its target, meaning it must use its engines to steer and slow down."
+    },
+    {
+      "id": "beat-2",
+      "text": "Early concepts used parachutes, but extreme atmospheric heating and high-velocity stress destroyed the boosters. Today, its restartable engines burn liquid oxygen and kerosene to actively fight physics."
+    },
+    {
+      "id": "beat-3",
+      "text": "Instead of drifting, the booster performs up to three controlled burns. During descent, grid fins steer the aerodynamic lift, while an entry burn slows the vehicle through the upper atmosphere."
+    },
+    {
+      "id": "beat-4",
+      "text": "Finally, carbon-fiber landing legs deploy. A final, precise engine firing provides a propulsive cushion, bringing the booster to a soft, controlled landing."
+    }
+  ],
+  "sections": [
+    {
+      "id": "section-1",
+      "scenes": [
+        {
+          "component": "typographic_statement",
+          "events": [
+            {
+              "action": "revealStatement",
+              "at": "beat-1.start"
+            },
+            {
+              "action": "advanceWord",
+              "at": "beat-1.word:gravity"
+            },
+            {
+              "action": "advanceWord",
+              "at": "beat-1.word:isn't"
+            },
+            {
+              "action": "advanceWord",
+              "at": "beat-1.word:enough"
+            }
+          ],
+          "id": "scene-1",
+          "layout": "cut",
+          "motionProfile": "editorialStatic",
+          "props": {
+            "emphasis": "neutral",
+            "eyebrow": "FALLING IS NOT LANDING",
+            "ordinal": "01 / 04",
+            "statement": "gravity isn't enough"
+          },
+          "spansBeats": [
+            "beat-1"
+          ]
+        },
+        {
+          "component": "typographic_statement",
+          "events": [
+            {
+              "action": "revealStatement",
+              "at": "beat-2.start"
+            },
+            {
+              "action": "advanceWord",
+              "at": "beat-2.word:restartable"
+            },
+            {
+              "action": "advanceWord",
+              "at": "beat-2.word:engines"
+            }
+          ],
+          "id": "scene-2",
+          "layout": "cut",
+          "motionProfile": "subtleDrift",
+          "props": {
+            "emphasis": "positive",
+            "eyebrow": "KEROSENE + LIQUID OXYGEN",
+            "ordinal": "02 / 04",
+            "statement": "restartable engines"
+          },
+          "spansBeats": [
+            "beat-2"
+          ]
+        },
+        {
+          "component": "stat_counter",
+          "events": [
+            {
+              "action": "revealStat",
+              "at": "beat-3.word:three"
+            }
+          ],
+          "id": "scene-3",
+          "layout": "centered",
+          "motionProfile": "editorialStatic",
+          "props": {
+            "emphasis": "positive",
+            "label": "Up to three engine burns",
+            "sublabel": "Boostback / entry / landing",
+            "unit": "",
+            "value": 3
+          },
+          "spansBeats": [
+            "beat-3"
+          ]
+        },
+        {
+          "component": "image_context",
+          "events": [
+            {
+              "action": "revealImage",
+              "at": "beat-4.start"
+            },
+            {
+              "action": "revealCopy",
+              "at": "beat-4.start"
+            },
+            {
+              "action": "emphasize",
+              "at": "beat-4.word:soft",
+              "payload": {
+                "text": "soft"
+              }
+            },
+            {
+              "action": "emphasize",
+              "at": "beat-4.word:controlled",
+              "payload": {
+                "text": "controlled"
+              }
+            }
+          ],
+          "id": "scene-4",
+          "layout": "splitLeft",
+          "motionProfile": "cinematic",
+          "props": {
+            "assetRequirement": {
+              "identityKey": "milestone2-booster-illustration",
+              "orientation": "landscape",
+              "subject": "Unbranded first-stage booster descending toward landing pad, legs deployed",
+              "treatment": "illustration",
+              "type": "image"
+            },
+            "caption": "Illustration - final burn and landing legs",
+            "headline": "A controlled landing"
+          },
+          "spansBeats": [
+            "beat-4"
+          ]
+        }
+      ],
+      "spansBeats": [
+        "beat-1",
+        "beat-2",
+        "beat-3",
+        "beat-4"
+      ]
+    }
+  ]
+}

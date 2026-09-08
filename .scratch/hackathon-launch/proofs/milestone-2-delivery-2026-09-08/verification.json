@@ -1,0 +1,24 @@
+{
+  "mp4SHA256": "50d1ddbc973ff54a8c7ee4b00147cec1d27b7f3abec3a6b533960e916d2b9de9",
+  "bytes": 7669537,
+  "durationSeconds": 49.28,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "videoCodec": "h264",
+  "audioCodec": "aac",
+  "exportedArtifactDigestsVerified": 12,
+  "ffmpegFullDecodeExitCode": 0,
+  "framesReviewedAtSeconds": [
+    10,
+    25,
+    34,
+    45
+  ],
+  "reviewer": "Codex agent",
+  "humanAcceptance": "pending",
+  "localURL": "http://127.0.0.1:8765/",
+  "httpPageStatus": 200,
+  "httpVideoHashVerified": true,
+  "httpByteRangeStatus": 206
+}

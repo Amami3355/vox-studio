@@ -1,0 +1,6 @@
+title: Vox model inference caller
+description: Invoke published models without managing AI resources or reading Production secrets.
+stage: GA
+includedPermissions:
+  - aiplatform.endpoints.predict
+  - serviceusage.services.use

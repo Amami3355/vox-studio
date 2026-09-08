@@ -1,0 +1,15 @@
+{
+  "briefId": "milestone-2-reusable-rocket-2026-09-07",
+  "outcome": "rendered",
+  "preview": {
+    "id": "preview:28364527-1061-4a27-9010-c317865747c9",
+    "kind": "preview",
+    "mediaType": "video/mp4",
+    "sha256": "50d1ddbc973ff54a8c7ee4b00147cec1d27b7f3abec3a6b533960e916d2b9de9",
+    "sizeBytes": 7669537
+  },
+  "runId": "28364527-1061-4a27-9010-c317865747c9",
+  "schemaVersion": 1,
+  "sequence": 19,
+  "summary": "The narrated preview is verified."
+}

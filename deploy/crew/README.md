@@ -1,5 +1,11 @@
 # Hosted crew connectivity
 
+Milestone 2 now has a separate [live operator runbook](milestone-2/README.md). Render with
+`--live` to install its bounded policy, Google Cloud model/image configuration and explicit
+Parallel secret fetch. The default configuration below remains the zero-provider connectivity
+path. Current deployment and remaining proof are recorded in
+[session 12 evidence](../../.scratch/hackathon-launch/proofs/milestone-2-progress-2026-09-07.md).
+
 The first launch milestone uses the existing signed `HttpProductionClient` from a separate
 crew VM. Production remains on loopback on `vox-service`. The crew image contains only the
 Python crew and its dependencies. It has no Production source, disk or private signing keys.

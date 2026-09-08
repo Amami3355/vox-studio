@@ -1,22 +1,20 @@
-import { GoogleGenAI } from '@google/genai';
+import {
+  type GenerateContentParameters,
+  GoogleGenAI,
+  type GoogleGenAIOptions,
+} from '@google/genai';
 import type { ImageGenerationAdapter } from '../commands/service';
 
 type GoogleImageClient = {
   models: {
-    generateImages(input: {
-      model: string;
-      prompt: string;
-      config: {
-        numberOfImages: number;
-        includeRaiReason: boolean;
-        aspectRatio: string;
-        outputMimeType: string;
-        seed: number;
-        addWatermark: boolean;
-      };
-    }): Promise<{
-      generatedImages?: Array<{
-        image?: { imageBytes?: string; mimeType?: string };
+    generateContent(input: GenerateContentParameters): Promise<{
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            thought?: boolean;
+            inlineData?: { data?: string; mimeType?: string };
+          }>;
+        };
       }>;
     }>;
   };
@@ -26,6 +24,8 @@ export type GoogleImageAdapterOptions = {
   keySource?: () => string | undefined;
   model?: string;
   clientFactory?: (apiKey: string) => GoogleImageClient;
+  cloudClientFactory?: (options: GoogleGenAIOptions) => GoogleImageClient;
+  environment?: Record<string, string | undefined>;
 };
 
 /** Provider names, credentials and response bodies stop at this trusted adapter. */
@@ -34,25 +34,56 @@ export const createGoogleImageAdapter = (
 ): ImageGenerationAdapter => ({
   mode: 'live',
   generate: async (request) => {
-    const apiKey = (options.keySource ?? (() => process.env.GOOGLE_API_KEY))();
-    if (!apiKey) throw new Error('GOOGLE_API_KEY is required for live image generation.');
-    const client = options.clientFactory?.(apiKey) ?? new GoogleGenAI({ apiKey });
-    const response = await client.models.generateImages({
-      model: options.model ?? 'imagen-4.0-generate-001',
-      prompt: request.prompt,
+    const environment = options.environment ?? process.env;
+    const cloud =
+      environment.GOOGLE_GENAI_USE_VERTEXAI?.toLowerCase() === 'true' ||
+      environment.GOOGLE_GENAI_USE_ENTERPRISE?.toLowerCase() === 'true';
+    let client: GoogleImageClient;
+    if (cloud) {
+      const project = environment.GOOGLE_CLOUD_PROJECT;
+      const location = environment.GOOGLE_CLOUD_LOCATION;
+      if (!project || !location) {
+        throw new Error(
+          'GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are required for cloud images.',
+        );
+      }
+      const configuration: GoogleGenAIOptions = {
+        vertexai: true,
+        project,
+        location,
+        httpOptions: { timeout: 180_000, retryOptions: { attempts: 1 } },
+      };
+      client = options.cloudClientFactory?.(configuration) ?? new GoogleGenAI(configuration);
+    } else {
+      const apiKey = (options.keySource ?? (() => environment.GOOGLE_API_KEY))();
+      if (!apiKey) throw new Error('GOOGLE_API_KEY is required for live image generation.');
+      client =
+        options.clientFactory?.(apiKey) ??
+        new GoogleGenAI({
+          apiKey,
+          httpOptions: { timeout: 180_000, retryOptions: { attempts: 1 } },
+        });
+    }
+    const response = await client.models.generateContent({
+      model: options.model ?? 'gemini-2.5-flash-image',
+      contents: request.prompt,
       config: {
-        numberOfImages: 1,
-        includeRaiReason: true,
-        aspectRatio: request.aspectRatio,
-        outputMimeType: request.outputMimeType,
+        candidateCount: 1,
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: { aspectRatio: request.aspectRatio },
         seed: request.seed,
-        addWatermark: false,
       },
     });
-    const image = response.generatedImages?.[0]?.image;
-    if (!image?.imageBytes || image.mimeType !== 'image/png') {
-      throw new Error('The image provider returned no PNG candidate.');
+    const images =
+      response.candidates?.flatMap((candidate) =>
+        (candidate.content?.parts ?? [])
+          .filter((part) => !part.thought && part.inlineData)
+          .map((part) => part.inlineData!),
+      ) ?? [];
+    const image = images[0];
+    if (images.length !== 1 || !image?.data || image.mimeType !== 'image/png') {
+      throw new Error('The image provider must return exactly one PNG candidate.');
     }
-    return { bytes: Buffer.from(image.imageBytes, 'base64'), mediaType: 'image/png' };
+    return { bytes: Buffer.from(image.data, 'base64'), mediaType: 'image/png' };
   },
 });

@@ -186,6 +186,29 @@ finish() {
 
 TOTAL_STAGES=13
 
+# A credential resume must be selected before any provisioning side effect.
+# Keep the historical infrastructure wizard behind an explicit --full option.
+usage() {
+  say "Parallel seul : bash scripts/provision-cloud-project.sh --parallel-only --project PROJECT_ID"
+  say "Provisionnement historique (13 étapes) : bash scripts/provision-cloud-project.sh --full"
+}
+MODE="${1:---help}"
+PARALLEL_PROJECT=""
+case "$MODE" in
+  --parallel-only)
+    if [[ $# != 3 || "${2:-}" != --project || -z "${3:-}" || "${3:-}" == -* ]]; then
+      usage; exit 2
+    fi
+    PARALLEL_PROJECT="$3"
+    ;;
+  --full) [[ $# == 1 ]] || { usage; exit 2; } ;;
+  --help|-h) usage; exit 0 ;;
+  *) usage; exit 2 ;;
+esac
+
+# Never trace secret input or the stdin pipeline, even when invoked with bash -x/-v.
+set +x +v
+
 # Values this wizard captures live outside the repository, deliberately: ticket 03's last
 # criterion is that no credential appears in the repository, a transcript or a shell history.
 # Only non-secret configuration is written here. Every secret goes straight into Secret Manager
@@ -311,6 +334,88 @@ store_secret() {
   ok "$name stored in $REGION, readable by $accessor"
 }
 
+# This path deliberately does not call capture_secret/store_secret: those legacy
+# helpers also create resources and change IAM. Only one version may be added here.
+parallel_gc() {
+  CLOUDSDK_CORE_LOG_HTTP=false CLOUDSDK_CORE_VERBOSITY=warning \
+    gc "$@" --project="$PARALLEL_PROJECT" --quiet
+}
+
+parallel_latest_state() {
+  # The runtime fetches latest, so an older ENABLED version is not sufficient.
+  # gcloud list applies an enum display transform (ENABLED -> enabled), whereas
+  # describe/JSON preserve the API spelling. Normalize that display boundary.
+  parallel_gc secrets versions list PARALLEL_API_KEY \
+    --sort-by='~createTime' --limit=1 --format='value(state)' | tr -d '\r' | tr '[:lower:]' '[:upper:]'
+}
+
+provision_parallel_only() {
+  TOTAL_STAGES=2
+  local latest_state readers expected_reader key_value=""
+  stage "Vérifier le projet existant"
+  say "Projet : $PARALLEL_PROJECT — seul secret concerné : PARALLEL_API_KEY."
+  if ! resolve_gcloud; then
+    bad "gcloud introuvable. Ouvrez Git Bash avec le SDK Google Cloud installé."
+    return 1
+  fi
+  if ! parallel_gc secrets describe PARALLEL_API_KEY >/dev/null; then
+    bad "Secret inaccessible. Vérifiez le projet et votre connexion gcloud."
+    return 1
+  fi
+  # Inspect resource-level bindings without reading any secret payload or changing IAM.
+  readers=$(parallel_gc secrets get-iam-policy PARALLEL_API_KEY \
+    --flatten='bindings[].members' --filter='bindings.role=roles/secretmanager.secretAccessor' \
+    --format='value(bindings.members)') || return 1
+  readers="${readers//$'\r'/}"
+  expected_reader="serviceAccount:vox-crew@${PARALLEL_PROJECT}.iam.gserviceaccount.com"
+  if [[ "$readers" != "$expected_reader" ]]; then
+    bad "Le droit de lecture direct attendu pour le crew seul ne correspond pas."
+    return 1
+  fi
+  latest_state=$(parallel_latest_state) || return 1
+  ok "Secret existant et droit de lecture direct du crew vérifiés."
+
+  stage "Provisionner uniquement la clé Parallel"
+  if [[ "$latest_state" == ENABLED ]]; then
+    ok "La dernière version est déjà active : clé conservée, aucune écriture."
+    return 0
+  fi
+  say "La dernière version n'est pas active (état : ${latest_state:-aucune version})."
+  open_url "https://platform.parallel.ai"
+  step "Dans votre tableau de bord Parallel, copiez votre clé API."
+  say "Collez-la ci-dessous : la saisie est masquée. Entrée vide annule sans écrire."
+  # The template helper must not fall back to a value from the non-secret env file.
+  local ENV_FILE=/dev/null _PARALLEL_INPUT=""
+  ask_secret _PARALLEL_INPUT "PARALLEL_API_KEY :"
+  key_value="$_PARALLEL_INPUT"
+  unset _PARALLEL_INPUT
+  if [[ -z "$key_value" || "$key_value" == *[[:space:]]* ]]; then
+    unset key_value
+    bad "Clé vide ou contenant des espaces/retours à la ligne : aucune version ajoutée."
+    return 1
+  fi
+  if ! printf '%s' "$key_value" | parallel_gc secrets versions add PARALLEL_API_KEY \
+      --data-file=- >/dev/null 2>&1; then
+    unset key_value
+    bad "Envoi non confirmé. Vérifiez les métadonnées des versions avant de réessayer."
+    return 1
+  fi
+  unset key_value
+  latest_state=$(parallel_latest_state) || return 1
+  if [[ "$latest_state" != ENABLED ]]; then
+    bad "La dernière version n'est pas active après l'envoi. Vérification nécessaire."
+    return 1
+  fi
+  ok "PARALLEL_API_KEY provisionnée : dernière version ENABLED, valeur non relue."
+  say "Provisionnement terminé. La vidéo sera démarrée séparément."
+}
+
+if [[ "$MODE" == --parallel-only ]]; then
+  provision_parallel_only
+  exit 0
+fi
+
+warn "Mode historique complet : 13 étapes de provisionnement de l'infrastructure."
 banner "Vox production project — provisioning a trust boundary"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────

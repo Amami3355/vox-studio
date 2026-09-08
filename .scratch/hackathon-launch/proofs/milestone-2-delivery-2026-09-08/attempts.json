@@ -1,0 +1,67 @@
+[
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "outcome": "paused",
+    "reason": "A live image call requires an explicit request-bound grant.",
+    "resumeId": "28364527-1061-4a27-9010-c317865747c9",
+    "runId": "28364527-1061-4a27-9010-c317865747c9",
+    "schemaVersion": 1,
+    "sequence": 13,
+    "summary": "Production is waiting before image generation."
+  },
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "code": "RESEARCH_CONTRACT_INVALID",
+    "outcome": "failed",
+    "retryable": true,
+    "runId": null,
+    "schemaVersion": 1,
+    "sequence": 3,
+    "summary": "Research output was rejected."
+  },
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "outcome": "rendered",
+    "preview": {
+      "id": "preview:28364527-1061-4a27-9010-c317865747c9",
+      "kind": "preview",
+      "mediaType": "video/mp4",
+      "sha256": "50d1ddbc973ff54a8c7ee4b00147cec1d27b7f3abec3a6b533960e916d2b9de9",
+      "sizeBytes": 7669537
+    },
+    "runId": "28364527-1061-4a27-9010-c317865747c9",
+    "schemaVersion": 1,
+    "sequence": 19,
+    "summary": "The narrated preview is verified."
+  },
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "code": "VISUAL_BIBLE_CONTRACT_INVALID",
+    "outcome": "failed",
+    "retryable": true,
+    "runId": null,
+    "schemaVersion": 1,
+    "sequence": 6,
+    "summary": "Visual bible output was rejected."
+  },
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "code": "NARRATIVE_CONTRACT_INVALID",
+    "outcome": "failed",
+    "retryable": true,
+    "runId": null,
+    "schemaVersion": 1,
+    "sequence": 6,
+    "summary": "Narrative output was rejected."
+  },
+  {
+    "briefId": "milestone-2-reusable-rocket-2026-09-07",
+    "code": "VIDEO_PLAN_CONTRACT_INVALID",
+    "outcome": "failed",
+    "retryable": true,
+    "runId": null,
+    "schemaVersion": 1,
+    "sequence": 9,
+    "summary": "The VideoPlan draft was rejected."
+  }
+]

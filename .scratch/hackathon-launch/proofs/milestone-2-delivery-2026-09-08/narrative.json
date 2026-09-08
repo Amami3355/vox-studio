@@ -1,0 +1,43 @@
+{
+  "angle": "Explaining the physics and engineering constraints that require the Falcon 9 first stage to use active propulsive descent rather than passive recovery systems.",
+  "beats": [
+    {
+      "claimIds": [
+        "claim-1"
+      ],
+      "factual": true,
+      "id": "beat-1",
+      "text": "When a rocket falls back to Earth, gravity isn't enough to guide it home safely. Unlike a winged spaceplane, the Falcon 9 first stage cannot glide passively to its target, meaning it must use its engines to steer and slow down."
+    },
+    {
+      "claimIds": [
+        "claim-2",
+        "claim-6"
+      ],
+      "factual": true,
+      "id": "beat-2",
+      "text": "Early concepts used parachutes, but extreme atmospheric heating and high-velocity stress destroyed the boosters. Today, its restartable engines burn liquid oxygen and kerosene to actively fight physics."
+    },
+    {
+      "claimIds": [
+        "claim-1",
+        "claim-3",
+        "claim-5"
+      ],
+      "factual": true,
+      "id": "beat-3",
+      "text": "Instead of drifting, the booster performs up to three controlled burns. During descent, grid fins steer the aerodynamic lift, while an entry burn slows the vehicle through the upper atmosphere."
+    },
+    {
+      "claimIds": [
+        "claim-4",
+        "claim-7"
+      ],
+      "factual": true,
+      "id": "beat-4",
+      "text": "Finally, carbon-fiber landing legs deploy. A final, precise engine firing provides a propulsive cushion, bringing the booster to a soft, controlled landing."
+    }
+  ],
+  "hook": "Why does a falling rocket booster need to burn precious fuel just to land?",
+  "schemaVersion": 1
+}

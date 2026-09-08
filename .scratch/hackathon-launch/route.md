@@ -1,6 +1,6 @@
 # The shortest route to a visible result
 
-Updated 2026-09-07 through session 11 deployment evidence. The accepted order is recorded in [What result comes first for the September 9 hackathon?](issues/02-name-the-demo-and-release-envelope.md); unresolved implementation choices remain recommendations.
+Updated 2026-09-08: [the first real hosted video is delivered](proofs/milestone-2-delivery-2026-09-08.md), with working Parallel credentials, live research/authors, an accepted Gemini illustration and one ElevenLabs Take. The local player is http://127.0.0.1:8765/. The user accepted the technical result and requested validation, commit and push of the programmatic work. Artistic/editorial acceptance remains open for later feedback. The accepted milestone order is recorded in [the priority decision](issues/02-name-the-demo-and-release-envelope.md).
 
 ## The product to finish
 
@@ -16,12 +16,12 @@ The distinctive story is already in the architecture: sourced research, speciali
 
 | Part | Evidence in this checkout | Remaining delivery gap |
 | --- | --- | --- |
-| Production | Running pinned image, persistent Run store, deployed smoke checks and signed cloud-to-cloud proof | First hosted creative/image/video run; historical receipt compatibility tracked separately |
-| ADK crew | Deployed operator entry point, async Director, research/creative roles, checkpoint adapters, persistent disk and supervised bridge | Live provider configuration and a real full hosted acceptance run |
+| Production | Running pinned image, persistent Run store, deployed smoke checks and signed cloud-to-cloud proof | Hosted video delivered; historical receipt compatibility tracked separately |
+| ADK crew | Deployed operator entry point, async Director, research/creative roles, checkpoint adapters, persistent disk and supervised bridge | Hosted run rendered; consolidate documented runtime overrides into the next deployment |
 | Browser Studio | Internal Component Studio only | End-user workspace, authenticated application API, durable status and authorized media delivery |
 | Recovery | Crew file/ADK session adapters and authoritative Production checkpoints | Durable execution ownership, submission deduplication and reconciliation of an interrupted command |
-| Research integration | Existing Parallel Task API adapter | Add a real Search call whose sources feed the research dossier |
-| Google model access | ADK model calls and Google image adapter | Explicit Google Cloud configuration and runtime evidence for crew inference and images |
+| Research integration | Gemini grounding with Parallel Search implemented and deployed; citation binding tests pass; Parallel secret version 2 accepted | Grounded dossier proved; human editorial acceptance pending |
+| Google model access | Google Cloud inference from crew identity proved; cloud image adapter deployed | Live authors and accepted image proved; deploy the migrated Gemini adapter for future Runs |
 | Narration | Working ElevenLabs adapter and timestamp-based alignment | Keep for initial milestones; final provider work must preserve actual-word synchronization |
 | Demo evidence | Prior remote Production preview and test evidence | Current factual Brief → live research → live authoring → accepted image → narrated preview, watched by a human |
 
@@ -75,16 +75,15 @@ These are observable implementation outcomes, not additional decision tickets. O
 | Done | Milestone | Work | Exit evidence |
 | --- | --- | --- | --- |
 | [x] | Cloud path answers | Production and crew deployed; private signed connection, persistent disk and separate operator policy verified | [Signed round trip before/after restart, deployed digests and isolation refusals](proofs/cloud-path-progress-2026-09-07.md) |
-| [ ] | First real video to watch | Connect Parallel Search to research; verify Google Cloud inference/image access; run one factual Brief through creative work, image approval, existing ElevenLabs narration and render | Playable MP4 delivered to the user, source evidence, Run identifier, actual provider usage and human review of narration/visuals |
+| [ ] | First real video to watch: technical result accepted, editorial review open | [Hosted Run rendered and MP4 delivered](proofs/milestone-2-delivery-2026-09-08.md), with research, live authors, accepted illustration and narration | User accepted the technical result; artistic/editorial feedback and acceptance remain |
 | [ ] | Studio produces that result | Add durable submit/status execution, Brief form, real progress, sources, image approval and authorized playback/download; connect the smallest screen before polishing it | Fresh browser completes the hosted path and reconnects to the same work after refresh |
 | [ ] | Product holds up in rehearsal | Verify duplicate admission, restart and uncertain-render reconciliation; enforce spending/concurrency limits; improve visible states and composition | Second complete run, focused recovery checks, no duplicated paid dispatch, usable failure states and saved backup demonstration |
 | [ ] | Final voice work | Address the deferred ElevenLabs compliance gap after the visible product; prove replacement audio and actual-word timing before integrating any provider change | Fresh end-to-end run with verified synchronization and provider evidence, or an explicitly unresolved submission blocker; the earlier ElevenLabs video alone cannot close this milestone |
 | [ ] | Submission ready | Freeze the final revision; recheck access and requirements; capture the final English demo and publish the required source/license/instructions | Tested hosted URL, public repository, final video and completed submission before cutoff |
 
-The cloud round trip is complete. Next, produce the first real video: integrate Parallel Search,
-verify provider access and run the factual Brief under bounded operator policy. Do not restart
-a broad hosting comparison. A local diagnostic preview can show progress but does not complete
-the hosted-video milestone.
+The cloud round trip and real hosted video production are proved. The final MP4 is delivered
+on the user's PC and technically accepted; capture artistic/editorial feedback next. Continue toward the smallest Studio workspace
+without regenerating the delivered video or repeating the hosting comparison.
 
 Prepare the Studio shell when useful, but do not postpone the first MP4 until the whole application is ready. One workspace, polling, native playback and a single image-approval action are the baseline recommendation. SceneInstance editing is outside this delivery sequence.
 

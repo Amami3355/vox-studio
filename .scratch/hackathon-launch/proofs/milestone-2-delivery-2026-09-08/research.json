@@ -1,0 +1,95 @@
+{
+  "claims": [
+    {
+      "id": "claim-1",
+      "sourceIds": [
+        "source-1",
+        "source-2"
+      ],
+      "support": "supported",
+      "text": "After separating from the second stage, a Falcon 9 first-stage booster must execute up to three separate engine burns\u2014boostback, reentry, and landing\u2014to return safely, because it cannot glide or drift passively to a target coordinate like a winged spaceplane"
+    },
+    {
+      "id": "claim-2",
+      "sourceIds": [
+        "source-2"
+      ],
+      "support": "supported",
+      "text": "While early recovery concepts relied on parachutes to slow the stage down, aerodynamic heating and high-velocity stress routinely destroyed the boosters on reentry, forcing a pivot to propulsive deceleration"
+    },
+    {
+      "id": "claim-3",
+      "sourceIds": [
+        "source-3"
+      ],
+      "support": "supported",
+      "text": "During Falcon 9 first-stage recovery, an entry burn uses the engines to reduce the stage speed."
+    },
+    {
+      "id": "claim-4",
+      "sourceIds": [
+        "source-3"
+      ],
+      "support": "supported",
+      "text": "A final engine firing brings the Falcon 9 first stage to a soft landing."
+    },
+    {
+      "id": "claim-5",
+      "sourceIds": [
+        "source-3"
+      ],
+      "support": "supported",
+      "text": "During atmospheric descent, Falcon 9 grid fins steer the aerodynamic lift produced by its first stage."
+    },
+    {
+      "id": "claim-6",
+      "sourceIds": [
+        "source-4",
+        "source-5"
+      ],
+      "support": "supported",
+      "text": "Falcon 9 first-stage engines use liquid oxygen and rocket-grade kerosene, and can restart."
+    },
+    {
+      "id": "claim-7",
+      "sourceIds": [
+        "source-5"
+      ],
+      "support": "supported",
+      "text": "Falcon 9 carries carbon-fiber landing legs as part of the hardware for a safe first-stage landing; the legs and grid fins are stowed during ascent."
+    }
+  ],
+  "contradictions": [],
+  "mode": "researched",
+  "quotations": [],
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "source-1",
+      "title": "Falcon 9 Booster Landing Explained - Tech Behind SpaceX Reusability",
+      "url": "https://orbitalxploration.com/falcon-9-booster-landing-explained-tech-behind-spacex-reusability"
+    },
+    {
+      "id": "source-2",
+      "title": "Falcon 9 first-stage landing tests - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+    },
+    {
+      "id": "source-3",
+      "title": "NASA / SpaceX: Falcon 9 launch and landing sequence",
+      "url": "https://www.nasa.gov/wp-content/uploads/2020/08/falcon9_launch_and_landing.pdf"
+    },
+    {
+      "id": "source-4",
+      "title": "SpaceX Falcon Users Guide, May 2025, first-stage propulsion table (PDF page 20)",
+      "url": "https://www.spacex.com/assets/media/falcon-users-guide-2025-05-09.pdf"
+    },
+    {
+      "id": "source-5",
+      "title": "NASA Commercial Crew Program Press Kit: Falcon 9",
+      "url": "https://www.nasa.gov/commercial-crew-program-press-kit/"
+    }
+  ],
+  "statistics": [],
+  "visualOpportunities": []
+}

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from .crew_contract import BriefKind, CrewTerminal, Rendered
+from .crew_contract import BriefKind, CrewTerminal, ProviderMode, Rendered
 from .crew_run import brief_from, build_crew, read_policy, read_recordings
 from .crew_state import FileCrewStateStore
 from .http_client import HttpProductionClient
@@ -42,6 +42,29 @@ def write_json(path: Path, value: Any) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(path)
+
+
+class HostedProductionClient(HttpProductionClient):
+    """Retain signed public outcomes and exact image requests for operator authorization."""
+    def __init__(self, state: Path):
+        super().__init__(os.environ.get("VOX_PRODUCTION_ADDRESS", "127.0.0.1:18080"))
+        self.state = state
+
+    def image_start(self, run_id, request, authorisation=None):
+        request_id = sha256(json.dumps({"runId": run_id, "request": request}, sort_keys=True).encode()).hexdigest()
+        write_json(self.state / "operator" / "image-requests" / f"{request_id}.json",
+                   {"runId": run_id, "request": dict(request)})
+        return super().image_start(run_id, request, authorisation)
+
+    def _command(self, command, **kwargs):
+        path = self.state / "operator" / "commands" / f"{uuid4()}.json"
+        write_json(path, {"status": "dispatched", "command": command, "runId": kwargs.get("run_id"),
+                          "observedAt": datetime.now(timezone.utc).isoformat()})
+        envelope = super()._command(command, **kwargs)
+        write_json(path, {"status": "responded", "signedResponseVerified": True,
+                          "observedAt": datetime.now(timezone.utc).isoformat(),
+                          "envelope": json.loads(envelope.raw)})
+        return envelope
 
 
 def probe(client: Any, state: Path, run_id: str) -> dict[str, Any]:
@@ -81,6 +104,34 @@ def probe(client: Any, state: Path, run_id: str) -> dict[str, Any]:
 
 
 async def run_attempt(
+    client: Any, state: Path, config: Path, request: dict[str, Any],
+    *, brief_kind: BriefKind = BriefKind.FACTUAL,
+) -> int:
+    if set(request) - {"protocolVersion", "brief", "production"}:
+        raise ValueError("A request cannot supply operator policy or runtime configuration.")
+    policy = read_policy(config / "operator-policy.json")
+    if policy.research.mode is ProviderMode.LIVE:
+        if not os.environ.get("PARALLEL_API_KEY") and os.environ.get("VOX_PARALLEL_AUTH") != "marketplace":
+            raise ValueError("Install PARALLEL_API_KEY before starting live research; no model call was made.")
+    if policy.models.mode is ProviderMode.LIVE or policy.research.mode is ProviderMode.LIVE:
+        from .provider_usage import ProviderJournal
+
+        if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
+            raise ValueError("GOOGLE_CLOUD_PROJECT is required for hosted live models.")
+        limits = json.loads((config / "execution-limits.json").read_text(encoding="utf-8"))
+        if set(limits) != {"maxModelCalls", "maxGroundedCalls"} or any(
+            type(value) is not int or not 1 <= value <= 40 for value in limits.values()
+        ):
+            raise ValueError("Operator execution limits must contain bounded positive call counts.")
+        brief = brief_from(request, brief_kind)
+        work = state / "briefs" / sha256(brief.id.encode()).hexdigest()
+        with ProviderJournal(work / "provider-calls.jsonl", max_calls=limits["maxModelCalls"],
+                             max_grounded_calls=limits["maxGroundedCalls"]):
+            return await _run_attempt(client, state, config, request, brief_kind=brief_kind)
+    return await _run_attempt(client, state, config, request, brief_kind=brief_kind)
+
+
+async def _run_attempt(
     client: Any, state: Path, config: Path, request: dict[str, Any],
     *, brief_kind: BriefKind = BriefKind.FACTUAL,
 ) -> int:
@@ -128,7 +179,7 @@ def main() -> int:
     parser.add_argument("--brief-kind", choices=[kind.value for kind in BriefKind], default="factual")
     args = parser.parse_args()
     state = persistent_root(args.state)
-    client = HttpProductionClient(os.environ.get("VOX_PRODUCTION_ADDRESS", "127.0.0.1:18080"))
+    client = HostedProductionClient(state)
     if args.command == "probe":
         if not args.run_id:
             parser.error("probe requires --run-id for an existing Production Run")

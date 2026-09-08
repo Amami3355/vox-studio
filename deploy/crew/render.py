@@ -24,7 +24,7 @@ def file(path, content, mode="0644"):
             "encoding": "b64", "content": base64.b64encode(content.encode()).decode()}
 
 
-def crew(image, production_ip, host_key, run_id):
+def crew(image, production_ip, host_key, run_id, *, live=False):
     image_ref(image)
     if "/vox-crew/crew@" not in image:
         raise ValueError("The crew needs a separate registry repository with no Production images.")
@@ -117,13 +117,22 @@ Type=oneshot
 ExecStart=/usr/bin/docker run {common} probe --run-id {run_id}
 TimeoutStartSec=180
 """
+    live_environment = ""
+    prepare_live = ""
+    if live:
+        live_environment = "--env-file /etc/vox-crew/parallel.env --env GOOGLE_CLOUD_LOCATION=global --env VOX_CREW_MODEL=gemini-3.5-flash --env VOX_RESEARCH_MODEL=gemini-3.5-flash "
+        prepare_live = f"ExecStartPre=/usr/bin/docker run --rm --user 0 --network host --entrypoint python --mount type=bind,src=/etc/vox-crew,dst=/runtime {image} /runtime/fetch-env.py --parallel\n"
+    attempt_common = common.replace("--rm ", "--rm --name vox-crew-attempt " + live_environment, 1)
+    # The last Docker --env value wins; replace the shared regional location explicitly.
+    if live:
+        attempt_common = attempt_common.replace("--env GOOGLE_CLOUD_LOCATION=europe-west1", "--env GOOGLE_CLOUD_LOCATION=global")
     attempt = f"""[Unit]
 Description=Explicit Vox crew attempt (no automatic paid retry)
 Requires=vox-crew-setup.service vox-crew-bridge.service
 After=vox-crew-setup.service vox-crew-bridge.service
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/docker run {common} run --request /var/lib/vox-crew/request.json
+{prepare_live}ExecStart=/usr/bin/docker run {attempt_common} run --request /var/lib/vox-crew/request.json
 TimeoutStartSec=infinity
 Restart=no
 """
@@ -134,6 +143,11 @@ Restart=no
         file("/etc/vox-crew/operator-policy.json", (HERE / "operator-policy.json").read_text(), "0444"),
         file("/etc/vox-crew/known_hosts", production_ip + " " + " ".join(host_key.split()[:2]) + "\n"),
     ]
+    if live:
+        for name in ("operator-policy.json", "execution-limits.json"):
+            files = [entry for entry in files if entry["path"] != "/etc/vox-crew/" + name]
+            files.append(file("/etc/vox-crew/" + name, (HERE / "milestone-2" / name).read_text(), "0444"))
+        files.append(file("/etc/vox-crew/milestone-2-request.json", (HERE / "milestone-2/request.json").read_text(), "0444"))
     for name, content in (("vox-crew-disk.service", prepare_unit), (mount_unit, mount), ("vox-crew-setup.service", setup_unit),
                           ("vox-crew-bridge.service", bridge), ("vox-crew-probe.service", probe_unit),
                           ("vox-crew-attempt.service", attempt)):
@@ -147,7 +161,7 @@ Restart=no
     return "#cloud-config\n" + json.dumps(config, indent=2) + "\n"
 
 
-def production(image, crew_key):
+def production(image, crew_key, *, live=False):
     image_ref(image)
     if not re.fullmatch(r"ssh-ed25519 [A-Za-z0-9+/=]+(?: [^\n]*)?", crew_key.strip()):
         raise ValueError("Supply only the crew host's public key.")
@@ -162,6 +176,8 @@ def production(image, crew_key):
     entries = "".join("  - " + json.dumps(entry) + "\n" for entry in additions)
     text = text.replace("runcmd:\n", entries + "\nruncmd:\n")
     text += "  - bash /etc/vox/install-production-bridge.sh\n"
+    if live:
+        text = text.replace("--env-file /etc/vox/service.env", "--env GOOGLE_GENAI_USE_VERTEXAI=true --env GOOGLE_CLOUD_PROJECT=studio-prod-7f3a --env GOOGLE_CLOUD_LOCATION=europe-west1 --env-file /etc/vox/service.env")
     if "${" in text:
         raise ValueError("Unresolved Production template placeholder.")
     return text
@@ -175,12 +191,13 @@ def main():
     parser.add_argument("--production-ip", default="10.132.0.2")
     parser.add_argument("--run-id", help="Existing public Run identifier, not its storage directory name")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--live", action="store_true", help="Install the bounded milestone-2 provider configuration")
     args = parser.parse_args()
     if args.kind == "crew" and not args.run_id:
         parser.error("crew requires --run-id from a public Run result")
     key = args.public_key.read_text().strip()
-    output = (crew(args.image, args.production_ip, key, args.run_id) if args.kind == "crew"
-              else production(args.image, key))
+    output = (crew(args.image, args.production_ip, key, args.run_id, live=args.live) if args.kind == "crew"
+              else production(args.image, key, live=args.live))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(output, encoding="utf-8", newline="\n")
 

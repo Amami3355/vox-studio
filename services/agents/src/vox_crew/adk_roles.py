@@ -82,12 +82,46 @@ class AdkJsonRole:
         self._agent_type = LlmAgent
 
     def agent(self, instruction: str, tools: Sequence[Callable[..., Any]] = ()) -> Any:
+        from .provider_usage import CURRENT, ProviderLimit, begin_call, finish_call
+
+        runtime: dict[str, Any] = {}
+        model: Any = self.model
+        if CURRENT.get() is not None:
+            import os
+            from google.adk.models.google_llm import Gemini
+            from google.genai import types
+
+            pending: list[str | None] = []
+
+            def before_model(callback_context, llm_request):
+                # Bound the actual accumulated context, including tool replies and prior turns.
+                size = len(llm_request.model_dump_json(exclude_none=True).encode("utf-8"))
+                if size > 300_000:
+                    raise ProviderLimit("The operator model-input ceiling has been reached.")
+                pending.append(begin_call(self.name, self.model))
+
+            def after_model(callback_context, llm_response):
+                if pending:
+                    finish_call(pending.pop(0), llm_response.usage_metadata)
+
+            model = Gemini(
+                model=self.model,
+                retry_options=types.HttpRetryOptions(attempts=1),
+                client_kwargs={"enterprise": True, "project": os.environ["GOOGLE_CLOUD_PROJECT"],
+                               "location": os.environ.get("GOOGLE_CLOUD_LOCATION", "global")},
+            )
+            runtime = {
+                "before_model_callback": before_model,
+                "after_model_callback": after_model,
+                "generate_content_config": types.GenerateContentConfig(max_output_tokens=8192),
+            }
         return self._agent_type(
             name=self.name,
-            model=self.model,
+            model=model,
             description=self.description,
             instruction=instruction,
             tools=list(tools),
+            **runtime,
         )
 
     async def ask(
@@ -283,9 +317,15 @@ class AdkCreativeAdapter:
         self, brief: Brief, dossier: ResearchDossier
     ) -> Mapping[str, Any]:
         return await self.narrative_agent.ask(
-            "Return only Narrative JSON: schemaVersion, angle, hook, and Beats with id, text, "
-            "claimIds, factual. Every factual Beat must cite supplied claim IDs. Do not expose "
-            "reasoning.",
+            'Return one JSON object with exactly these keys: "schemaVersion": 1 (integer), '
+            '"angle": string, "hook": string, "beats": an array of objects with exactly '
+            '"id": string, "text": string, "claimIds": array of supplied claim ID strings, '
+            '"factual": boolean. Every factual statement must cite supporting supplied claim IDs; '
+            'do not label a factual claim false to evade citations. Beat text is spoken verbatim: '
+            'no stage directions, image descriptions, citation markers or production instructions. '
+            'Respect the requested spoken word count, using four or five Beats. Prefer mechanisms '
+            'supported by original sources; omit unrelated recovery history and unsupported claims. '
+            'Do not expose reasoning.',
             {"brief": brief.to_mapping(), "researchDossier": dossier.to_mapping()},
         )
 
@@ -306,7 +346,11 @@ class AdkCreativeAdapter:
             "schemaVersion, theme, motionIntent, colorRoles, treatments, motifs, "
             "forbiddenTreatments. theme must be one of visualVocabulary.themes; motionIntent, "
             "colorRoles, treatments and forbiddenTreatments may name only values published in "
-            "the matching visualVocabulary list. Do not add provider prompts or raw style values.",
+            "the matching visualVocabulary list. schemaVersion must be the integer 1, never a "
+            "string or decimal version. theme is a string. motionIntent, colorRoles, treatments, "
+            "motifs and forbiddenTreatments are all arrays of strings, even for a single value. "
+            "motionIntent, colorRoles and treatments must not be empty. Use exactly the listed "
+            "keys. Do not add provider prompts or raw style values.",
             {
                 "brief": brief.to_mapping(),
                 "researchDossier": dossier.to_mapping(),
@@ -355,7 +399,16 @@ class AdkVisualStructurer:
             "must contain exactly id, component, spansBeats; never write props. If no published "
             "component can honestly carry the story, do not substitute a loose fit and do not "
             "name an unpublished component: answer instead with a single unservable object "
-            "holding summary, unmetNeed and catalogGap, and nothing else.",
+            "holding summary, unmetNeed and catalogGap, and nothing else. The normal response "
+            'has exactly two top-level keys: "beats" and "sections". beats must be an array '
+            'of objects with only id and text copied from narrative.beats. Each section must '
+            'have id, spansBeats (an array of beat ID strings), and scenes (an array). Every '
+            'scene spansBeats is also an array of beat ID strings, never Beat objects. Do not '
+            'add schemaVersion, theme, factual or claimIds. Partition the ordered beats among '
+            'the sections and scenes without duplicates. Respect the Brief image count: when '
+            'it requests exactly one illustration, select exactly one image_context scene; '
+            'use other available capabilities for the other moments. Prefer four or five '
+            'visually distinct moments and avoid invented quantitative charts.',
             {
                 "brief": brief.to_mapping(),
                 "researchDossier": dossier.to_mapping(),

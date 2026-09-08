@@ -1,0 +1,31 @@
+{
+  "decision": "Accept as stylized illustration; no branding or embedded text; landing legs and thrust visible.",
+  "displayLabel": "Illustration - final burn and landing legs",
+  "job": {
+    "candidate": {
+      "artifact": {
+        "kind": "generated_image_candidate",
+        "path": "artifacts/images/image-job-49c61acf99fc568a7928/2bbe636cc8548aa35aa4c2e705254998b07dcd102625ee2c57f126bcb7ccb0f3.png",
+        "sha256": "2bbe636cc8548aa35aa4c2e705254998b07dcd102625ee2c57f126bcb7ccb0f3"
+      },
+      "height": 768,
+      "id": "image-candidate-2bbe636cc8548aa35aa4",
+      "identityKey": "milestone2-booster-illustration",
+      "promptSha256": "2f3b10873a2de5cc91e3519160f3a228e10cb6c391321aeba3c68906e1eb66bc",
+      "requirementId": "req_5252453d",
+      "width": 1344
+    },
+    "failure": null,
+    "id": "image-job-49c61acf99fc568a7928",
+    "identityKey": "milestone2-booster-illustration",
+    "providerMode": "live",
+    "requestSha256": "cbdee70e12354d3b045942aa873b833d27164778773f5735a3f02cfc6bad47aa",
+    "requirementId": "req_5252453d",
+    "schemaVersion": 1,
+    "status": "accepted"
+  },
+  "limitation": "Conceptual unbranded booster, not a dimensionally accurate Falcon 9 engineering depiction.",
+  "reviewer": "Codex agent (not final human viewing)",
+  "runId": "28364527-1061-4a27-9010-c317865747c9",
+  "signedProductionStatusVerified": true
+}

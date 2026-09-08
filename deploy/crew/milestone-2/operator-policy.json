@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "research": {"mode": "live", "grantId": "milestone-2-research"},
+  "models": {"mode": "live", "grantId": "milestone-2-models"},
+  "images": {"mode": "live", "grantId": "milestone-2-image"},
+  "recording": {"mode": "live", "grantId": "milestone-2-recording"}
+}

@@ -52,6 +52,23 @@ def test_moving_image_tags_are_refused():
         render.crew("vox-crew:latest", "10.132.0.2", KEY, "run-test")
 
 
+def test_live_attempt_fetches_its_key_only_on_explicit_start_and_installs_limits():
+    config = json.loads(render.crew(IMAGE, "10.132.0.2", KEY, "run-test", live=True).split("\n", 1)[1])
+    content = files(config)
+    attempt = content["/etc/systemd/system/vox-crew-attempt.service"]
+    assert "fetch-env.py --parallel" in attempt
+    assert "--env-file /etc/vox-crew/parallel.env" in attempt
+    assert "GOOGLE_CLOUD_LOCATION=europe-west1" not in attempt
+    assert "VOX_RESEARCH_MODEL=gemini-3.5-flash" in attempt
+    assert "maxModelCalls" in content["/etc/vox-crew/execution-limits.json"]
+    assert "--parallel" not in content["/etc/vox-crew/setup.sh"]
+    assert not any("attempt.service" in command for command in config["runcmd"])
+    production = yaml.safe_load(render.production(IMAGE.replace("/crew@", "/production@"), KEY, live=True))
+    unit = next(f["content"] for f in production["write_files"]
+                if f["path"] == "/etc/systemd/system/vox-production.service")
+    assert "GOOGLE_GENAI_USE_VERTEXAI=true" in unit
+
+
 def test_crew_image_cannot_share_production_registry_permissions():
     with pytest.raises(ValueError, match="separate registry"):
         render.crew(IMAGE.replace("/vox-crew/", "/vox/"), "10.132.0.2", KEY, "run-test")

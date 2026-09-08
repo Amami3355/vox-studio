@@ -1,0 +1,384 @@
+{
+  "records": [
+    {
+      "grounded": false,
+      "id": "84c6cef3-d59a-4d01-b077-6d03da8aa862",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T22:46:34.249976+00:00",
+      "provider": "google-cloud",
+      "role": "ResearchAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "84c6cef3-d59a-4d01-b077-6d03da8aa862",
+      "observedAt": "2026-09-07T22:46:43.660374+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 276,
+        "prompt_token_count": 338,
+        "thoughts_token_count": 1276,
+        "total_token_count": 1890
+      }
+    },
+    {
+      "grounded": true,
+      "id": "c5da0d4a-b009-4056-ab38-741618b9dd73",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T22:46:43.796917+00:00",
+      "provider": "google-cloud",
+      "role": "ParallelGroundedResearch",
+      "status": "dispatched"
+    },
+    {
+      "id": "c5da0d4a-b009-4056-ab38-741618b9dd73",
+      "observedAt": "2026-09-07T22:47:36.179519+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 1059,
+        "prompt_token_count": 295,
+        "thoughts_token_count": 7682,
+        "total_token_count": 9036
+      }
+    },
+    {
+      "grounded": false,
+      "id": "675b1ef2-b32e-4c17-a625-af68ab5ce0c6",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:21:41.039548+00:00",
+      "provider": "google-cloud",
+      "role": "ResearchAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "675b1ef2-b32e-4c17-a625-af68ab5ce0c6",
+      "observedAt": "2026-09-07T23:21:50.098129+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 427,
+        "prompt_token_count": 338,
+        "thoughts_token_count": 1003,
+        "total_token_count": 1768
+      }
+    },
+    {
+      "grounded": true,
+      "id": "bb1ecadb-3be7-4b34-bc85-85fcb3d88333",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:21:50.234073+00:00",
+      "provider": "google-cloud",
+      "role": "ParallelGroundedResearch",
+      "status": "dispatched"
+    },
+    {
+      "id": "bb1ecadb-3be7-4b34-bc85-85fcb3d88333",
+      "modelVersion": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:22:21.836084+00:00",
+      "responseSha256": "4d62c16dda8dd73e881d22271fe604b5e15033819216d5e6b2e05ff3021278e1",
+      "searchQueries": [
+        "\"Falcon 9\" first stage landing burn propellant weight OR fuel",
+        "\"Falcon 9\" parachute recovery failure SpaceX"
+      ],
+      "sources": [
+        {
+          "id": "source-1",
+          "title": "Falcon 9 Booster Landing Explained - Tech Behind SpaceX Reusability",
+          "url": "https://orbitalxploration.com/falcon-9-booster-landing-explained-tech-behind-spacex-reusability"
+        },
+        {
+          "id": "source-2",
+          "title": "Falcon 9 first-stage landing tests - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Falcon_9_first-stage_landing_tests"
+        }
+      ],
+      "status": "responded",
+      "supports": [
+        {
+          "claimId": "claim-1",
+          "endIndex": 289,
+          "partIndex": 0,
+          "sourceIds": [
+            "source-1",
+            "source-2"
+          ],
+          "startIndex": 27
+        },
+        {
+          "claimId": "claim-2",
+          "endIndex": 501,
+          "partIndex": 0,
+          "sourceIds": [
+            "source-2"
+          ],
+          "startIndex": 294
+        }
+      ],
+      "usage": {
+        "candidates_token_count": 164,
+        "prompt_token_count": 295,
+        "thoughts_token_count": 6014,
+        "total_token_count": 6473
+      }
+    },
+    {
+      "grounded": false,
+      "id": "65ac7785-118f-48b8-aab9-81e25e0c0fae",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:22:21.856237+00:00",
+      "provider": "google-cloud",
+      "role": "NarrativeAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "65ac7785-118f-48b8-aab9-81e25e0c0fae",
+      "observedAt": "2026-09-07T23:22:33.188185+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 414,
+        "prompt_token_count": 573,
+        "thoughts_token_count": 2008,
+        "total_token_count": 2995
+      }
+    },
+    {
+      "grounded": false,
+      "id": "8e3bc8f1-277f-460b-9c9c-e2a59dc6ef42",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:22:33.198930+00:00",
+      "provider": "google-cloud",
+      "role": "ArtDirectorAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "8e3bc8f1-277f-460b-9c9c-e2a59dc6ef42",
+      "observedAt": "2026-09-07T23:22:37.973956+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 97,
+        "prompt_token_count": 673,
+        "thoughts_token_count": 869,
+        "total_token_count": 1639
+      }
+    },
+    {
+      "grounded": false,
+      "id": "51b208ad-4c02-4e68-ac90-bba16cfb589c",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:24:48.191755+00:00",
+      "provider": "google-cloud",
+      "role": "NarrativeAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "51b208ad-4c02-4e68-ac90-bba16cfb589c",
+      "observedAt": "2026-09-07T23:25:00.112834+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 448,
+        "prompt_token_count": 573,
+        "thoughts_token_count": 1903,
+        "total_token_count": 2924
+      }
+    },
+    {
+      "grounded": false,
+      "id": "6d0f28e4-647e-4b46-a67b-d5b18ae4e40d",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:25:00.127630+00:00",
+      "provider": "google-cloud",
+      "role": "ArtDirectorAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "6d0f28e4-647e-4b46-a67b-d5b18ae4e40d",
+      "observedAt": "2026-09-07T23:25:05.751814+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 98,
+        "prompt_token_count": 673,
+        "thoughts_token_count": 913,
+        "total_token_count": 1684
+      }
+    },
+    {
+      "grounded": false,
+      "id": "36066ae8-bb99-4712-8ae3-35c2ea82d34d",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:32:14.417495+00:00",
+      "provider": "google-cloud",
+      "role": "NarrativeAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "36066ae8-bb99-4712-8ae3-35c2ea82d34d",
+      "observedAt": "2026-09-07T23:32:23.438593+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 434,
+        "prompt_token_count": 1047,
+        "thoughts_token_count": 1522,
+        "total_token_count": 3003
+      }
+    },
+    {
+      "grounded": false,
+      "id": "fb82ef1f-ccac-4c45-a068-e86f92254a67",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:32:23.453270+00:00",
+      "provider": "google-cloud",
+      "role": "ArtDirectorAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "fb82ef1f-ccac-4c45-a068-e86f92254a67",
+      "observedAt": "2026-09-07T23:32:29.174981+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 144,
+        "prompt_token_count": 1113,
+        "thoughts_token_count": 1047,
+        "total_token_count": 2304
+      }
+    },
+    {
+      "grounded": false,
+      "id": "d1da8976-d231-420c-a34a-8b3d84a7144d",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:32:29.197073+00:00",
+      "provider": "google-cloud",
+      "role": "VisualStructurer",
+      "status": "dispatched"
+    },
+    {
+      "id": "d1da8976-d231-420c-a34a-8b3d84a7144d",
+      "observedAt": "2026-09-07T23:32:38.590596+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 434,
+        "prompt_token_count": 2493,
+        "thoughts_token_count": 1858,
+        "total_token_count": 4785
+      }
+    },
+    {
+      "grounded": false,
+      "id": "91213b11-f30b-4d69-99fe-d1c180b0dd5c",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:35:31.061164+00:00",
+      "provider": "google-cloud",
+      "role": "VisualStructurer",
+      "status": "dispatched"
+    },
+    {
+      "id": "91213b11-f30b-4d69-99fe-d1c180b0dd5c",
+      "observedAt": "2026-09-07T23:35:42.782906+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 504,
+        "prompt_token_count": 2638,
+        "thoughts_token_count": 2090,
+        "total_token_count": 5232
+      }
+    },
+    {
+      "grounded": false,
+      "id": "a4369914-bab4-4efe-9710-c6b4506e187f",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:35:42.837234+00:00",
+      "provider": "google-cloud",
+      "role": "SceneAuthor",
+      "status": "dispatched"
+    },
+    {
+      "id": "a4369914-bab4-4efe-9710-c6b4506e187f",
+      "observedAt": "2026-09-07T23:36:01.775784+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 775,
+        "prompt_token_count": 6037,
+        "thoughts_token_count": 3409,
+        "total_token_count": 10221
+      }
+    },
+    {
+      "grounded": false,
+      "id": "da9f6c65-d07a-49fe-b126-33c5e3bb7059",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:36:01.824468+00:00",
+      "provider": "google-cloud",
+      "role": "PlanRepairAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "da9f6c65-d07a-49fe-b126-33c5e3bb7059",
+      "observedAt": "2026-09-07T23:36:12.423312+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 175,
+        "prompt_token_count": 2416,
+        "thoughts_token_count": 1975,
+        "total_token_count": 4566
+      }
+    },
+    {
+      "grounded": false,
+      "id": "ad324cb7-5121-4edc-989e-b343cc509237",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:36:12.445533+00:00",
+      "provider": "google-cloud",
+      "role": "PlanRepairAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "ad324cb7-5121-4edc-989e-b343cc509237",
+      "observedAt": "2026-09-07T23:36:24.618503+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 771,
+        "prompt_token_count": 4512,
+        "thoughts_token_count": 2189,
+        "total_token_count": 7472
+      }
+    },
+    {
+      "grounded": false,
+      "id": "bbb40c88-84c4-4e96-9049-6a29c1c28c57",
+      "model": "gemini-3.5-flash",
+      "observedAt": "2026-09-07T23:40:26.446889+00:00",
+      "provider": "google-cloud",
+      "role": "ImageCreatorAgent",
+      "status": "dispatched"
+    },
+    {
+      "id": "bbb40c88-84c4-4e96-9049-6a29c1c28c57",
+      "observedAt": "2026-09-07T23:40:28.012955+00:00",
+      "status": "responded",
+      "usage": {
+        "candidates_token_count": 6,
+        "prompt_token_count": 155,
+        "thoughts_token_count": 141,
+        "total_token_count": 302
+      }
+    }
+  ],
+  "summary": {
+    "byRole": {
+      "ArtDirectorAgent": 3,
+      "ImageCreatorAgent": 1,
+      "NarrativeAgent": 3,
+      "ParallelGroundedResearch": 2,
+      "PlanRepairAgent": 2,
+      "ResearchAgent": 2,
+      "SceneAuthor": 1,
+      "VisualStructurer": 2
+    },
+    "groundedDispatches": 2,
+    "modelDispatches": 16,
+    "pending": [],
+    "usage": {
+      "candidates_token_count": 6226,
+      "prompt_token_count": 24169,
+      "thoughts_token_count": 35899,
+      "total_token_count": 66294
+    }
+  }
+}
