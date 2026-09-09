@@ -41,15 +41,19 @@ export function ProductionConsumption({ job }: { job: Job }) {
         </div>
         <div className="consumption-price">
           <strong>{money(report?.estimatedSubtotalUsd ?? null)}</strong>
-          <span>Partial model estimate · USD</span>
+          <span>Partial generation estimate · USD</span>
+          <span>
+            Images: {money(report?.imageEstimatedSubtotalUsd ?? null)} ·{' '}
+            {count(report?.imageCostedCalls ?? 0, 'priced attempt')}
+          </span>
         </div>
       </div>
       <p className="consumption-note">
         {report?.costedCalls
           ? `${report.costedCalls} of ${report.totalCalls} calls priced. `
           : 'No priced measurements yet. '}
-        Image generation, narration, search fees, hosting and calls without pricing are excluded.
-        This is a list-price estimate before credits and taxes, not your bill.
+        Narration, search fees, hosting and calls without pricing are excluded. This is a list-price
+        estimate before credits and taxes, not your bill.
       </p>
       {Boolean(report?.pendingCalls) && (
         <p>
@@ -82,8 +86,8 @@ export function ProductionConsumption({ job }: { job: Job }) {
           <>
             <p>
               Token totals reported for {report.meteredCalls} of {report.totalCalls} calls. Cached
-              tokens are part of input. Output and reasoning are shown separately. Unavailable
-              measurements are not counted as zero.
+              tokens are part of input. Text output, image output and reasoning are shown
+              separately. Unavailable measurements are not counted as zero.
             </p>
             <section
               className="usage-scroll"
@@ -101,7 +105,8 @@ export function ProductionConsumption({ job }: { job: Job }) {
                       'Failed',
                       'Input',
                       'Cached input',
-                      'Output',
+                      'Text output',
+                      'Image output',
                       'Reasoning',
                       'Tool input',
                       'Total tokens',
@@ -125,18 +130,26 @@ export function ProductionConsumption({ job }: { job: Job }) {
                       </th>
                       <td>{number(row.calls)}</td>
                       <td>{number(row.failedCalls)}</td>
-                      {(['input', 'cached', 'output', 'reasoning', 'tools', 'total'] as const).map(
-                        (field) => (
-                          <td key={field}>
-                            {number(row.tokens[field])}
-                            {row.tokens[field] !== null && row.tokenReports[field] < row.calls && (
-                              <small>
-                                {row.tokenReports[field]}/{row.calls} calls
-                              </small>
-                            )}
-                          </td>
-                        ),
-                      )}
+                      {(
+                        [
+                          'input',
+                          'cached',
+                          'output',
+                          'imageOutput',
+                          'reasoning',
+                          'tools',
+                          'total',
+                        ] as const
+                      ).map((field) => (
+                        <td key={field}>
+                          {number(row.tokens[field] ?? null)}
+                          {row.tokens[field] !== null && row.tokenReports[field] < row.calls && (
+                            <small>
+                              {row.tokenReports[field]}/{row.calls} calls
+                            </small>
+                          )}
+                        </td>
+                      ))}
                       <td>
                         {money(
                           row.estimatedNanoUsd === null

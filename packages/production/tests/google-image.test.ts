@@ -1,4 +1,6 @@
+import { MediaModality } from '@google/genai';
 import { describe, expect, it, vi } from 'vitest';
+import { imageConsumption, imagePrice } from '../src/image/consumption';
 import { createGoogleImageAdapter } from '../src/image/google';
 
 const PNG = Buffer.from(
@@ -7,6 +9,127 @@ const PNG = Buffer.from(
 );
 
 describe('Google image adapter', () => {
+  it('captures image, text and reasoning costs for a paid response, including invalid candidates', async () => {
+    const usageMetadata = {
+      promptTokenCount: 1000,
+      cachedContentTokenCount: 200,
+      candidatesTokenCount: 1220,
+      candidatesTokensDetails: [
+        { modality: MediaModality.IMAGE, tokenCount: 1120 },
+        { modality: MediaModality.TEXT, tokenCount: 100 },
+      ],
+      thoughtsTokenCount: 50,
+      totalTokenCount: 2270,
+    };
+    for (const valid of [true, false]) {
+      const generateContent = vi.fn(async () => ({
+        usageMetadata,
+        candidates: [
+          {
+            content: {
+              parts: valid
+                ? [{ inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } }]
+                : [],
+            },
+          },
+        ],
+      }));
+      const adapter = createGoogleImageAdapter({
+        environment: {
+          GOOGLE_GENAI_USE_VERTEXAI: 'true',
+          GOOGLE_CLOUD_PROJECT: 'test',
+          GOOGLE_CLOUD_LOCATION: 'global',
+        },
+        cloudClientFactory: () => ({ models: { generateContent } }),
+        now: () => new Date('2026-09-09T12:00:00Z'),
+      });
+      const result = await adapter
+        .generate({
+          prompt: 'PRIVATE PROMPT',
+          aspectRatio: '16:9',
+          outputMimeType: 'image/png',
+          seed: 7,
+        })
+        .catch((error) => error);
+      expect(result.consumption.tokens).toMatchObject({
+        input: 1000,
+        cached: 200,
+        output: 100,
+        imageOutput: 1120,
+        reasoning: 50,
+      });
+      expect(result.consumption.estimatedNanoUsd).toBe(137840000);
+      expect(JSON.stringify(result.consumption)).not.toContain('PRIVATE');
+      expect(generateContent).toHaveBeenCalledTimes(1);
+      if (!valid) expect(result.message).toContain('NO_IMAGE');
+    }
+  });
+
+  it('keeps missing image measurements and unsupported tariffs unknown', () => {
+    const identity = {
+      provider: 'google-cloud' as const,
+      model: 'gemini-3-pro-image',
+      location: 'global',
+    };
+    const price = imagePrice(
+      identity.provider,
+      identity.model,
+      identity.location,
+      new Date('2026-09-09T12:00:00Z'),
+    );
+    expect(imageConsumption(undefined, identity, price).estimatedNanoUsd).toBeNull();
+    expect(
+      imageConsumption({ promptTokenCount: 100, candidatesTokenCount: 1120 }, identity, price)
+        .tokens.imageOutput,
+    ).toBeNull();
+    expect(
+      imageConsumption(
+        {
+          promptTokenCount: 100,
+          candidatesTokenCount: 1120,
+          candidatesTokensDetails: [{ modality: MediaModality.IMAGE, tokenCount: 1119 }],
+        },
+        identity,
+        price,
+      ).estimatedNanoUsd,
+    ).toBeNull();
+    for (const [model, location, date] of [
+      ['other-model', 'global', '2026-09-09'],
+      ['gemini-3-pro-image', 'europe-west1', '2026-09-09'],
+      ['gemini-3-pro-image', 'global', '2027-01-01'],
+    ]) {
+      expect(imagePrice('google-cloud', model!, location!, new Date(date!))).toBeNull();
+    }
+  });
+
+  it('uses the long-context input tier while retaining the image output rate', () => {
+    const identity = {
+      provider: 'google-cloud' as const,
+      model: 'gemini-3-pro-image',
+      location: 'global',
+    };
+    const price = imagePrice(
+      identity.provider,
+      identity.model,
+      identity.location,
+      new Date('2026-09-09T12:00:00Z'),
+    );
+    const result = imageConsumption(
+      {
+        promptTokenCount: 200001,
+        cachedContentTokenCount: 1,
+        candidatesTokenCount: 1121,
+        candidatesTokensDetails: [
+          { modality: MediaModality.IMAGE, tokenCount: 1120 },
+          { modality: MediaModality.TEXT, tokenCount: 1 },
+        ],
+      },
+      identity,
+      price,
+    );
+    expect(result.estimatedNanoUsd).toBe(934418400);
+  });
+
   it('edits the supplied verified pixels with the Pro model and corrected specification', async () => {
     const generateContent = vi.fn(async () => ({
       candidates: [
@@ -99,7 +222,7 @@ describe('Google image adapter', () => {
     expect(keySource).not.toHaveBeenCalled();
   });
 
-  it('maps the seeded request to Gemini and returns only normalized bytes', async () => {
+  it('maps the seeded request to Gemini and returns normalized bytes and consumption', async () => {
     const generateContent = vi.fn(async () => ({
       candidates: [
         {
@@ -133,7 +256,27 @@ describe('Google image adapter', () => {
         seed: 7,
       },
     });
-    expect(result).toEqual({ bytes: PNG, mediaType: 'image/png' });
+    expect(result).toEqual({
+      bytes: PNG,
+      mediaType: 'image/png',
+      consumption: {
+        schemaVersion: 1,
+        provider: 'gemini-api',
+        model: 'gemini-3-pro-image',
+        location: 'global',
+        tokens: {
+          input: null,
+          cached: null,
+          output: null,
+          imageOutput: null,
+          reasoning: null,
+          tools: null,
+          total: null,
+        },
+        estimatedNanoUsd: null,
+        priceVersion: null,
+      },
+    });
   });
 
   it.each([

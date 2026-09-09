@@ -2,15 +2,18 @@ import {
   BlockedReason,
   FinishReason,
   type GenerateContentParameters,
+  type GenerateContentResponseUsageMetadata,
   GoogleGenAI,
   type GoogleGenAIOptions,
 } from '@google/genai';
 import type { ImageGenerationAdapter } from '../commands/service';
+import { imageConsumption, imagePrice } from './consumption';
 import { ImageDispatchUncertain, ImageGenerationFailure } from './failure';
 
 type GoogleImageClient = {
   models: {
     generateContent(input: GenerateContentParameters): Promise<{
+      usageMetadata?: GenerateContentResponseUsageMetadata;
       promptFeedback?: { blockReason?: string };
       candidates?: Array<{
         finishReason?: string;
@@ -31,9 +34,10 @@ export type GoogleImageAdapterOptions = {
   clientFactory?: (apiKey: string) => GoogleImageClient;
   cloudClientFactory?: (options: GoogleGenAIOptions) => GoogleImageClient;
   environment?: Record<string, string | undefined>;
+  now?: () => Date;
 };
 
-/** Provider names, credentials and response bodies stop at this trusted adapter. */
+/** Credentials and response bodies stop here; allowlisted usage crosses the boundary. */
 export const createGoogleImageAdapter = (
   options: GoogleImageAdapterOptions = {},
 ): ImageGenerationAdapter => ({
@@ -70,9 +74,20 @@ export const createGoogleImageAdapter = (
         });
     }
     let response: Awaited<ReturnType<GoogleImageClient['models']['generateContent']>>;
+    const identity = {
+      provider: cloud ? ('google-cloud' as const) : ('gemini-api' as const),
+      model: options.model ?? 'gemini-3-pro-image',
+      location: cloud ? environment.GOOGLE_CLOUD_LOCATION! : 'global',
+    };
+    const price = imagePrice(
+      identity.provider,
+      identity.model,
+      identity.location,
+      (options.now ?? (() => new Date()))(),
+    );
     try {
       response = await client.models.generateContent({
-        model: options.model ?? 'gemini-3-pro-image',
+        model: identity.model,
         contents: request.sourceImage
           ? [
               {
@@ -116,6 +131,7 @@ export const createGoogleImageAdapter = (
         'TRANSPORT_UNKNOWN: image dispatch has no confirmed HTTP outcome; no retry was started.',
       );
     }
+    const consumption = imageConsumption(response.usageMetadata, identity, price);
     const images =
       response.candidates?.flatMap((candidate) =>
         (candidate.content?.parts ?? [])
@@ -136,8 +152,9 @@ export const createGoogleImageAdapter = (
       const code = images.length === 0 ? 'NO_IMAGE' : 'INVALID_IMAGE_RESPONSE';
       throw new ImageGenerationFailure(
         `The image provider must return exactly one PNG candidate. ${code}; images=${images.length}; mime=${mime}; finish=${finish}; block=${block}.`,
+        consumption,
       );
     }
-    return { bytes: Buffer.from(image.data, 'base64'), mediaType: 'image/png' };
+    return { bytes: Buffer.from(image.data, 'base64'), mediaType: 'image/png', consumption };
   },
 });

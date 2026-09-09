@@ -215,6 +215,30 @@ export const imageRecoveryPolicySchema = z
   .strict();
 export type ImageRecoveryPolicy = z.infer<typeof imageRecoveryPolicySchema>;
 
+const measuredTokens = z.number().int().nonnegative().nullable();
+export const imageConsumptionSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    provider: z.enum(['google-cloud', 'gemini-api']),
+    model: nonEmpty,
+    location: nonEmpty,
+    tokens: z
+      .object({
+        input: measuredTokens,
+        cached: measuredTokens,
+        output: measuredTokens,
+        imageOutput: measuredTokens,
+        reasoning: measuredTokens,
+        tools: measuredTokens,
+        total: measuredTokens,
+      })
+      .strict(),
+    estimatedNanoUsd: z.number().int().nonnegative().nullable(),
+    priceVersion: nonEmpty.nullable(),
+  })
+  .strict();
+export type ImageConsumption = z.infer<typeof imageConsumptionSchema>;
+
 export const imageJobSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -228,6 +252,7 @@ export const imageJobSchema = z
     failure: nonEmpty.nullable(),
     dispatchedAt: z.iso.datetime({ offset: true }).optional(),
     retryOf: nonEmpty.optional(),
+    consumption: imageConsumptionSchema.optional(),
   })
   .strict()
   .superRefine((job, context) => {
@@ -381,15 +406,22 @@ export const preflightReportSchema = z
   .strict();
 
 export const commandDataSchemas = {
-  'run.progress': z.object({ activity: z.object({
-    phase: z.enum(['bundle', 'composition', 'render', 'encoding', 'muxing', 'saving']),
-    elapsedMs: z.number().nonnegative(),
-    observedAt: z.iso.datetime({ offset: true }),
-    totalFrames: z.number().int().nonnegative().optional(),
-    renderedFrames: z.number().int().nonnegative().optional(),
-    encodedFrames: z.number().int().nonnegative().optional(),
-    concurrency: z.number().int().positive().optional(),
-  }).strict().nullable() }).strict(),
+  'run.progress': z
+    .object({
+      activity: z
+        .object({
+          phase: z.enum(['bundle', 'composition', 'render', 'encoding', 'muxing', 'saving']),
+          elapsedMs: z.number().nonnegative(),
+          observedAt: z.iso.datetime({ offset: true }),
+          totalFrames: z.number().int().nonnegative().optional(),
+          renderedFrames: z.number().int().nonnegative().optional(),
+          encodedFrames: z.number().int().nonnegative().optional(),
+          concurrency: z.number().int().positive().optional(),
+        })
+        .strict()
+        .nullable(),
+    })
+    .strict(),
   'contract.index': z
     .object({
       categories: z.array(

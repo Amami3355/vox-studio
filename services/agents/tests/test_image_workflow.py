@@ -198,6 +198,8 @@ class ParallelClient(Client):
 
 
 def test_reconcile_completed_generation_after_process_loss_without_dispatch(tmp_path, monkeypatch):
+    from test_consumption import IMAGE_CONSUMPTION
+    from vox_crew.consumption import public_consumption
     from vox_crew.autonomous import AutonomousRun
     from vox_crew.hosted import write_json
     from vox_crew.image_workflow import reconcile_saved_images
@@ -208,6 +210,7 @@ def test_reconcile_completed_generation_after_process_loss_without_dispatch(tmp_
         def image_start(self, run_id, request):
             super().image_start(run_id, request)
             self.jobs[-1]['id'] = AutonomousRun.image_job_id(request)
+            self.jobs[-1]['consumption'] = deepcopy(IMAGE_CONSUMPTION)
             raise Crash('The provider result was persisted but never returned to the worker')
 
         def image_status(self, run_id, job_id):
@@ -225,12 +228,14 @@ def test_reconcile_completed_generation_after_process_loss_without_dispatch(tmp_
     before = list(client.calls)
     reconciled = reconcile_saved_images(tmp_path, saved, client)
     assert client.calls == before and not reconciled['providerUsage']['uncertain']
+    assert public_consumption(reconciled)['imageEstimatedSubtotalUsd'] == pytest.approx(0.13784)
     write_json(run.path, reconciled)
     with ProviderJournal(tmp_path / 'provider-calls.jsonl', max_calls=None, max_grounded_calls=None):
         resumed = make(tmp_path, monkeypatch, client=client, reviewer=Reviewer(images=(True,)),
             production_limits=effective_limits({}))
         assert asyncio.run(resumed.run())['status'] == 'ready'
     assert client.calls.count('image_start') == 1
+    assert public_consumption(resumed.state)['imageCostedCalls'] == 1
 
 
 def test_parallel_stop_saves_inflight_results_and_prevents_queued_dispatch(tmp_path, monkeypatch):

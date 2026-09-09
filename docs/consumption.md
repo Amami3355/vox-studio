@@ -25,15 +25,41 @@ cannot reprice that dispatch. Cached input is charged at the cache rate; output 
 Rates expire January 1, 2027, so future calls remain unpriced until the table is reverified.
 
 Regional endpoints, other models, explicit provisioned-throughput responses and calls with tool
-input requiring separate tariff treatment remain unpriced. Image generation, ElevenLabs narration,
+input requiring separate tariff treatment remain unpriced. ElevenLabs narration,
 Parallel search fees, hosting/rendering, cache storage, taxes and credits are excluded. The subtotal
 is labelled partial even if all measured model calls have a price. It must not be presented as the
 film's final cost or an invoice. The report includes coverage and the pricing reference.
 
 The implementation deliberately reuses the journal instead of adding a second analytics service
 or estimating token use from text length. SDK metadata is the per-request observation; a future
-complete billing integration should add image/voice receipts at the Production boundary and
+complete billing integration should add voice receipts at the Production boundary and
 reconcile provider invoices separately. Existing authorization and consumption limits are unchanged.
+
+## Image generation
+
+The Production image adapter captures a tariff before dispatch and normalizes the provider's
+`usageMetadata`. The signed ImageJob retains an optional `consumption` receipt for both valid
+candidates and completed invalid responses that include usage. It contains the actual model,
+endpoint, token counts, estimated nano-USD and pricing version. Credentials, prompts, images and
+reasoning content are excluded. Old jobs without this optional field remain valid.
+
+For `gemini-3-pro-image` on the global Google Cloud endpoint, input/cache/text-output prices per
+million tokens are $2/$0.20/$12 for input up to 200,000 tokens, and $4/$0.40/$18 above that threshold.
+Image output costs $120 per million tokens. A 2K output is documented as 1,120 tokens, or $0.1344,
+before its input, text and reasoning costs. We use the actual complete modality breakdown rather
+than multiplying image attempts by a fixed price. Text and image output have separate columns.
+Missing or inconsistent modality measurements, unknown tariffs and unanswered operations remain
+unpriced, with coverage shown explicitly. API-key Gemini requests are not priced with Cloud rates.
+
+The worker copies this verified receipt into the existing dispatch journal; an observed completion
+after transport loss preserves the same measurement. Reusing an existing job adds no second price.
+Rejected illustrations and their new correction candidates each retain their own consumption.
+The Studio shows an image subtotal and includes it in the overall partial generation estimate
+and JSON export. HTTP errors with no usage are not guessed to be billable or free.
+
+Deploy the updated Production service and regenerated contracts with the worker/API/frontend to
+enable new image measurements. Historical image jobs without measurements cannot acquire a price
+from their saved PNG alone; publishing their old journals does not invent those missing receipts.
 
 ## Existing films
 
@@ -59,6 +85,8 @@ not provider answers, requests, credentials or journal contents.
 
 - [Google Gen AI Python SDK usage metadata](https://github.com/googleapis/python-genai/blob/main/google/genai/types.py),
   retrieved through Context7 using `find-docs` on September 9, 2026.
+- [Google Gen AI JavaScript usage metadata](https://googleapis.github.io/js-genai/release_docs/classes/types.GenerateContentResponseUsageMetadata.html),
+  retrieved through Context7 on September 9, 2026, including `candidatesTokensDetails` by modality.
 - [Google Cloud model pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing),
   verified September 9, 2026: global standard input/cache/output per million tokens are
   $0.75/$0.075/$3.75 for Gemini 3.6 Flash through December 31, 2026, and $1.50/$0.15/$9 for Gemini 3.5 Flash.

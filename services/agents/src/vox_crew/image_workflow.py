@@ -91,7 +91,8 @@ async def reconcile_image_step(child):
         for row in opened:
             if row["role"] != "ImageGeneration":
                 raise AutonomousBlocked("An unrelated provider call is unfinished.")
-            finish_call(row["id"])
+            finish_call(row["id"], imageConsumption=job.get("consumption"),
+                        providerOutcome="failed" if job["status"] == "failed" else "responded")
         result = json.loads(envelope.raw)
     elif name in ("production.image_accept", "production.image_reject"):
         decision = dependencies["args"][1]

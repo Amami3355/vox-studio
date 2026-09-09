@@ -19,8 +19,14 @@ export interface ConsumptionRow {
   pendingCalls: number;
   meteredCalls: number;
   costedCalls: number;
-  tokens: Record<'input' | 'cached' | 'output' | 'reasoning' | 'tools' | 'total', number | null>;
-  tokenReports: Record<'input' | 'cached' | 'output' | 'reasoning' | 'tools' | 'total', number>;
+  tokens: Record<
+    'input' | 'cached' | 'output' | 'imageOutput' | 'reasoning' | 'tools' | 'total',
+    number | null
+  >;
+  tokenReports: Record<
+    'input' | 'cached' | 'output' | 'imageOutput' | 'reasoning' | 'tools' | 'total',
+    number
+  >;
   estimatedNanoUsd: number | null;
   priceVersions: string[];
 }
@@ -36,6 +42,8 @@ export interface Consumption {
   costedCalls: number;
   unpricedCalls: number;
   estimatedSubtotalUsd: number | null;
+  imageEstimatedSubtotalUsd?: number | null;
+  imageCostedCalls?: number;
   priceSource: string;
   priceCheckedAt: string;
 }

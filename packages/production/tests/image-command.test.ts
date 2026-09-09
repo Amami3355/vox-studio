@@ -65,6 +65,46 @@ const compilePlaceholder = async (target: CommandFixture): Promise<void> => {
 };
 
 describe('published generated-image lifecycle', { timeout: 15_000 }, () => {
+  it.each([false, true])(
+    'persists consumption for successful or failed generations and reuses it without dispatch (%s)',
+    async (failed) => {
+      const consumption = {
+        schemaVersion: 1 as const,
+        provider: 'google-cloud' as const,
+        model: 'gemini-3-pro-image',
+        location: 'global',
+        tokens: {
+          input: 1000,
+          cached: 200,
+          output: 100,
+          imageOutput: 1120,
+          reasoning: 50,
+          tools: 0,
+          total: 2270,
+        },
+        estimatedNanoUsd: 137840000,
+        priceVersion: 'google-image-global-standard-2026-09-09',
+      };
+      const generate = vi.fn(async () => {
+        if (failed) throw new ImageGenerationFailure('NO_IMAGE', consumption);
+        return { bytes: PNG, mediaType: 'image/png' as const, consumption };
+      });
+      fixture = await createCommandFixture({
+        imageGenerator: { mode: 'live', generate },
+        verifyImageGrant: async () => true,
+        now: () => new Date('2026-09-06T12:00:00Z'),
+      });
+      await compilePlaceholder(fixture);
+      const input = { runRoot: fixture.runRoot, request: request(), authorization: grant() };
+      const first = jobOf(await fixture.service.imageStart(input));
+      expect(first.consumption).toEqual(consumption);
+      const reused = jobOf(await fixture.service.imageStart(input));
+      expect(reused.consumption).toEqual(consumption);
+      expect(reused.status).toBe(failed ? 'failed' : 'candidate');
+      expect(generate).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('binds an edit to a rejected candidate in the same Run and refuses an unknown source before dispatch', async () => {
     const generate = vi.fn(async () => ({ bytes: PNG, mediaType: 'image/png' as const }));
     fixture = await createCommandFixture({

@@ -30,8 +30,9 @@ test('film consumption exposes partial costs, saved tokens and a private export 
   await page.getByRole('button', { name: 'Enter studio' }).click();
   const panel = page.getByRole('region', { name: 'Film consumption', exact: true });
   await expect(panel.getByText('4 provider calls · 1 image attempt')).toBeVisible();
-  await expect(panel.getByText('$1.6050', { exact: true })).toBeVisible();
-  await expect(panel.getByText(/1 of 4 calls priced/)).toBeVisible();
+  await expect(panel.getByText('$1.7428', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/Images: \$0.1378/)).toBeVisible();
+  await expect(panel.getByText(/2 of 4 calls priced/)).toBeVisible();
   await expect(panel.getByText(/1 call is awaiting/)).toBeVisible();
   await panel.getByText('Production consumption', { exact: true }).click();
   await expect(panel.getByRole('cell', { name: '1,300,000 1/2 calls', exact: true })).toBeVisible();
@@ -39,17 +40,18 @@ test('film consumption exposes partial costs, saved tokens and a private export 
   await panel.getByRole('link', { name: 'Download consumption report' }).click();
   const download = await downloadEvent;
   const exported = await readFile((await download.path()) as string, 'utf8');
-  expect(JSON.parse(exported).consumption.estimatedSubtotalUsd).toBe(1.605);
+  expect(JSON.parse(exported).consumption.estimatedSubtotalUsd).toBe(1.74284);
+  expect(JSON.parse(exported).consumption.imageEstimatedSubtotalUsd).toBe(0.13784);
   expect(exported).not.toContain('PRIVATE PROVIDER ANSWER');
   await page.screenshot({
     path: '../../.scratch/hackathon-launch/runtime/studio-browser-tests/consumption-desktop.png',
     fullPage: true,
   });
   await administration.post(`/api/testing/consumption-response?job_id=${id}`, { headers });
-  await expect(panel.getByText('$3.2100', { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText('$3.3478', { exact: true }).first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await expect(panel.getByText('$3.2100', { exact: true })).toBeVisible();
+  await expect(panel.getByText('$3.3478', { exact: true })).toBeVisible();
   await panel.getByText('Production consumption', { exact: true }).click();
   await expect(panel.getByRole('cell', { name: '2,600,000', exact: true })).toBeVisible();
   const scroll = panel.getByRole('region', { name: 'Consumption by model and role' });

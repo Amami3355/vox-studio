@@ -132,6 +132,6 @@ def finish_call(call_id: str | None, usage: Any = None, **evidence: Any) -> None
     allowed = {key: value for key, value in evidence.items()
                if key in {"searchQueries", "sources", "supports", "responseSha256", "modelVersion",
                           "answerParts", "extractionStatus", "mediaSha256", "providerHttpStatus",
-                          "providerOutcome", "contextSha256", "finishReason"}}
+                          "providerOutcome", "contextSha256", "finishReason", "imageConsumption"}}
     journal.append({"id": call_id, "status": "responded", "usage": counts,
                     **({"trafficType": traffic} if isinstance(traffic, str) else {}), **allowed})

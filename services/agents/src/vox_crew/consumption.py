@@ -13,6 +13,7 @@ TOKEN_FIELDS = {
     "input": "prompt_token_count", "cached": "cached_content_token_count",
     "output": "candidates_token_count", "reasoning": "thoughts_token_count",
     "tools": "tool_use_prompt_token_count", "total": "total_token_count",
+    "imageOutput": "image_output_token_count",
 }
 COUNTERS = ("calls", "respondedCalls", "failedCalls", "pendingCalls", "meteredCalls", "costedCalls")
 
@@ -67,8 +68,11 @@ def consumption_records(records):
     responses = {row["id"]: row for row in records if row["status"] == "responded"}
     rows = []
     for identity, dispatch in dispatches.items():
-        row = empty_row(dispatch.get("provider", "unknown"), dispatch.get("model", "unknown"), dispatch.get("role", "unknown"))
         response = responses.get(identity)
+        image = (response or {}).get("imageConsumption") if dispatch.get("role") == "ImageGeneration" else None
+        image = image if isinstance(image, dict) and image.get("schemaVersion") == 1 else None
+        provider = image or dispatch
+        row = empty_row(provider.get("provider", "unknown"), provider.get("model", "unknown"), dispatch.get("role", "unknown"))
         row["calls"] = 1
         row["respondedCalls"] = int(response is not None)
         row["pendingCalls"] = int(response is None)
@@ -77,12 +81,19 @@ def consumption_records(records):
             counts = response.get("usage", {})
             row["tokens"] = {key: counts[field] if nonnegative(counts.get(field)) else None
                              for key, field in TOKEN_FIELDS.items()}
+            if image:
+                row["tokens"] = {key: image.get("tokens", {}).get(key) if nonnegative(image.get("tokens", {}).get(key)) else None
+                                 for key in TOKEN_FIELDS}
             row["tokenReports"] = {key: int(value is not None) for key, value in row["tokens"].items()}
             row["meteredCalls"] = int(row["tokens"]["total"] is not None)
-            row["estimatedNanoUsd"] = estimated_nano_usd(dispatch, response)
+            if image:
+                estimate = image.get("estimatedNanoUsd")
+                row["estimatedNanoUsd"] = estimate if nonnegative(estimate) and image.get("priceVersion") else None
+            else:
+                row["estimatedNanoUsd"] = estimated_nano_usd(dispatch, response)
             row["costedCalls"] = int(row["estimatedNanoUsd"] is not None)
             if row["costedCalls"]:
-                row["priceVersions"] = [dispatch["price"]["version"]]
+                row["priceVersions"] = [image["priceVersion"] if image else dispatch["price"]["version"]]
         rows.append(row)
     return merge_consumption([{"rows": rows}])
 
@@ -121,10 +132,13 @@ def public_consumption(state, *, saved=None):
     costed = sum(row["costedCalls"] for row in rows)
     total_calls = max(provider_usage.get("calls", 0), covered)
     prices = [row["estimatedNanoUsd"] for row in rows if row["estimatedNanoUsd"] is not None]
+    images = [row for row in rows if row["role"] == "ImageGeneration" and row["estimatedNanoUsd"] is not None]
     return {**report, "currency": "USD", "totalCalls": total_calls,
             "unattributedCalls": max(0, total_calls - covered),
             "meteredCalls": sum(row["meteredCalls"] for row in rows),
             "pendingCalls": sum(row["pendingCalls"] for row in rows),
             "costedCalls": costed, "unpricedCalls": total_calls - costed,
             "estimatedSubtotalUsd": sum(prices) / 1_000_000_000 if prices else None,
+            "imageEstimatedSubtotalUsd": sum(row["estimatedNanoUsd"] for row in images) / 1_000_000_000 if images else None,
+            "imageCostedCalls": sum(row["costedCalls"] for row in images),
             "priceSource": PRICE_SOURCE, "priceCheckedAt": PRICE_CHECKED}

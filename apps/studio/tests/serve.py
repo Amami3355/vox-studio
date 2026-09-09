@@ -105,7 +105,11 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
                 candidates_token_count=100000, thoughts_token_count=200000, total_token_count=1300000),
                 answerParts=[{"text": "PRIVATE PROVIDER ANSWER"}])
             call = journal.begin('ImageGeneration', 'production')
-            finish_call(call, providerOutcome='failed')
+            finish_call(call, providerOutcome='failed', imageConsumption={"schemaVersion": 1,
+                "provider": "google-cloud", "model": "gemini-3-pro-image", "location": "global",
+                "tokens": {"input": 1000, "cached": 200, "output": 100, "imageOutput": 1120,
+                    "reasoning": 50, "tools": 0, "total": 2270},
+                "estimatedNanoUsd": 137840000, "priceVersion": "google-image-global-standard-2026-09-09"})
             call = journal.begin('Recording', 'production', provider='elevenlabs')
             finish_call(call)
             journal.begin('SceneAuthor', 'gemini-3.6-flash')

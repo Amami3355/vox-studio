@@ -13,6 +13,10 @@ from vox_crew.studio_projection import public_job
 from vox_crew.studio_store import StudioStore
 from vox_crew.studio_worker import publish_consumption
 
+IMAGE_CONSUMPTION = {"schemaVersion": 1, "provider": "google-cloud", "model": "gemini-3-pro-image", "location": "global",
+    "tokens": {"input": 1000, "cached": 200, "output": 100, "imageOutput": 1120, "reasoning": 50, "tools": 0, "total": 2270},
+    "estimatedNanoUsd": 137840000, "priceVersion": "google-image-global-standard-2026-09-09"}
+
 
 def usage(**changes):
     return SimpleNamespace(prompt_token_count=1000, cached_content_token_count=400,
@@ -38,7 +42,7 @@ def test_reported_tokens_cache_reasoning_and_prices_survive_restart(tmp_path):
         report = public_consumption({"providerUsage": first})
     row = report["rows"][0]
     assert row["tokens"] == {"input": 1000, "cached": 400, "output": 100,
-                              "reasoning": 200, "total": 1300, "tools": 0}
+                              "reasoning": 200, "total": 1300, "tools": 0, "imageOutput": None}
     # 600 uncached input + 400 cached input + 300 output/reasoning.
     assert row["estimatedNanoUsd"] == 600 * 750 + 400 * 75 + 300 * 3750
     assert report["estimatedSubtotalUsd"] == pytest.approx(0.001605)
@@ -174,3 +178,44 @@ def test_old_image_branch_measurements_survive_continuation_without_restoring_ol
     assert state["videoPlan"] == {"current": True}
     assert state["providerUsage"]["calls"] == 1
     assert public_consumption(state)["estimatedSubtotalUsd"] == pytest.approx(0.001605)
+
+
+def test_image_costs_include_rejected_replacements_and_survive_cached_execution(tmp_path, monkeypatch):
+    import asyncio
+    from copy import deepcopy
+    from test_autonomous import Client, Reviewer, make
+
+    class MeteredImages(Client):
+        def image_start(self, run_id, request):
+            super().image_start(run_id, request)
+            self.jobs[-1]["consumption"] = deepcopy(IMAGE_CONSUMPTION)
+            return self.reply("run.image.start", {"job": self.jobs[-1]}, [self.jobs[-1]["candidate"]["artifact"]])
+
+    client = MeteredImages()
+    with ProviderJournal(tmp_path / "provider-calls.jsonl", max_calls=None) as journal:
+        run = make(tmp_path, monkeypatch, client=client, reviewer=Reviewer(images=(False, True)))
+        assert asyncio.run(run.run())["status"] == "ready"
+        first = public_consumption(run.state)
+        assert first["imageCostedCalls"] == 2
+        assert first["imageEstimatedSubtotalUsd"] == pytest.approx(0.27568)
+        assert first["rows"][0]["model"] == "production"  # Narration remains unpriced.
+        resumed = make(tmp_path, monkeypatch, client=client)
+        asyncio.run(resumed.run())
+        assert public_consumption(resumed.state)["imageEstimatedSubtotalUsd"] == first["imageEstimatedSubtotalUsd"]
+        assert client.calls.count("image_start") == 2
+
+
+def test_reused_production_job_does_not_charge_existing_image_twice(tmp_path, monkeypatch):
+    import asyncio
+    from copy import deepcopy
+    from test_autonomous import Client, make
+
+    class ReusedImage(Client):
+        def image_start(self, run_id, request):
+            return self.reply("run.image.start", {"disposition": "reused", "job": {
+                "status": "candidate", "consumption": deepcopy(IMAGE_CONSUMPTION)}})
+
+    with ProviderJournal(tmp_path / "provider-calls.jsonl"):
+        run = make(tmp_path, monkeypatch, client=ReusedImage())
+        asyncio.run(run.command("image_start", "run", {}))
+        assert public_consumption(run.state)["imageEstimatedSubtotalUsd"] is None

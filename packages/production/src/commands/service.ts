@@ -38,6 +38,7 @@ import {
   type CommandId,
   type Decline,
   type ImageAcceptance,
+  type ImageConsumption,
   type ImageGenerationGrant,
   type ImageGenerationRequest,
   type ImageJob,
@@ -107,7 +108,7 @@ export type ImageGenerationAdapter = {
     seed: number;
     sourceCandidateSha256?: string;
     sourceImage?: Uint8Array;
-  }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png' }>;
+  }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png'; consumption?: ImageConsumption }>;
 };
 
 import type { ImageRecoveryPolicy } from '../contracts/schemas';
@@ -636,19 +637,23 @@ export class ProductionCommandService {
       let generated: Awaited<ReturnType<ImageGenerationAdapter['generate']>>;
       let width: number;
       let height: number;
+      let consumption: ImageConsumption | undefined;
       try {
         generated = await generator.generate({
           ...providerRequest,
           ...(sourceImage ? { sourceImage } : {}),
         });
+        consumption = generated.consumption;
         ({ width, height } = this.assertGeneratedPng(generated.bytes, generated.mediaType));
       } catch (error) {
+        consumption = error instanceof ImageGenerationFailure ? error.consumption : consumption;
         return store.exclusive(async (session) => {
           const current = await session.inspect();
           const currentJob = this.requireImageJob(current, job.id);
           const uncertain = error instanceof ImageDispatchUncertain;
           const ended: ImageJob = {
             ...currentJob,
+            ...(consumption ? { consumption } : {}),
             status: uncertain ? 'uncertain' : 'failed',
             candidate: null,
             failure:
@@ -720,6 +725,7 @@ export class ProductionCommandService {
             return this.replaceImageJob(current.bindings, job.id, {
               ...currentJob,
               status: 'candidate',
+              ...(consumption ? { consumption } : {}),
               candidate,
               failure: null,
             });

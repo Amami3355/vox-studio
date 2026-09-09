@@ -287,7 +287,9 @@ class AutonomousRun:
             job = envelope.data.get("job") if name == "image_start" else None
             if not job or job.get("status") not in ("uncertain", "dispatching"):
                 finish_call(call_id, providerOutcome="responded" if envelope.succeeded
-                            and (not job or job.get("status") != "failed") else "failed")
+                            and (not job or job.get("status") != "failed") else "failed",
+                            imageConsumption=(job or {}).get("consumption")
+                                if envelope.data.get("disposition") != "reused" else None)
             if name == "init" and envelope.run:
                 self.state["runId"] = envelope.run.id
             if self.state["runId"]:
