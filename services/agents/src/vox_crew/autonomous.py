@@ -281,6 +281,11 @@ class AutonomousRun:
             try:
                 envelope = await asyncio.to_thread(getattr(self.client, name), *args)
             except Exception:
+                if name == "record" and self.state.get("runId"):
+                    # A lost command response may still have a durable paid receipt.
+                    # Observe only: never request synthesis again to obtain usage.
+                    self.state["productionSnapshot"] = await asyncio.to_thread(self.snapshot)
+                    self.save()
                 if name != "image_start":
                     raise
                 envelope = await self.observe_image(args[1])

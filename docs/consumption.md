@@ -8,7 +8,7 @@ checkpoint; this is not a live provider billing feed.
 
 ## Measurement and pricing
 
-The durable provider journal is the source. Each dispatch counts once; repairs are new dispatches,
+The durable provider journal and Production recording ledger are the sources. Each dispatch counts once; repairs are new dispatches,
 while cached steps and refreshing the browser add nothing. Disjoint image journals are aggregated
 with the coordinator journal, including previous correction branches. Reported failures and
 unanswered calls remain visible. An operation count is an attempt, not proof of a billable success.
@@ -25,15 +25,15 @@ cannot reprice that dispatch. Cached input is charged at the cache rate; output 
 Rates expire January 1, 2027, so future calls remain unpriced until the table is reverified.
 
 Regional endpoints, other models, explicit provisioned-throughput responses and calls with tool
-input requiring separate tariff treatment remain unpriced. ElevenLabs narration,
+input requiring separate tariff treatment remain unpriced.
 Parallel search fees, hosting/rendering, cache storage, taxes and credits are excluded. The subtotal
 is labelled partial even if all measured model calls have a price. It must not be presented as the
 film's final cost or an invoice. The report includes coverage and the pricing reference.
 
 The implementation deliberately reuses the journal instead of adding a second analytics service
 or estimating token use from text length. SDK metadata is the per-request observation; a future
-complete billing integration should add voice receipts at the Production boundary and
-reconcile provider invoices separately. Existing authorization and consumption limits are unchanged.
+complete billing integration should reconcile provider invoices separately.
+Existing authorization and consumption limits are unchanged.
 
 ## Image generation
 
@@ -60,6 +60,44 @@ and JSON export. HTTP errors with no usage are not guessed to be billable or fre
 Deploy the updated Production service and regenerated contracts with the worker/API/frontend to
 enable new image measurements. Historical image jobs without measurements cannot acquire a price
 from their saved PNG alone; publishing their old journals does not invent those missing receipts.
+
+## ElevenLabs narration
+
+The timestamped speech adapter reads `character-cost` and `request-id` from HTTP response
+headers. Production durably stores a normalized receipt on the recording attempt in its private
+authenticated ledger **before reading the response body**. Audio decoding, alignment validation,
+publication failures and HTTP errors therefore retain any received measurement. A connection lost
+before headers provides no measurement; an absent, blank, invalid or unsafe integer header remains
+unknown. An explicit zero is a measured zero. Text length and audio duration are never substitutes.
+
+The receipt records the configured model, provider character cost, request ID, estimated nano-USD
+and tariff version. It does not alter the Take or its audio/alignment identity. `run.status` exposes
+an optional `recordingConsumption` list of all attempts and receipts, including failed recordings
+and replacements. Older ledgers without receipts and older status responses remain valid.
+
+The worker saves this status in its existing production snapshot, including after observing a lost
+record command response. The public consumption projection replaces the journal's Recording rows
+with these authoritative attempts; it never sums successive snapshots. Reusing a Take, recovering
+a saved response, refreshing the page and replaying a cached workflow add no second expense.
+Separate replacement dispatches each count, even when they produce identical audio. The public
+report exports only aggregated measurements and tariff versions, not attempt IDs or request IDs.
+
+`character-cost` is documented as the generation cost in characters, not USD or a token count.
+For exact model IDs `eleven_v3` and `eleven_multilingual_v2`, the estimate uses the public API rate
+checked September 9, 2026: $0.10 per 1,000 reported characters. The tariff is captured before
+dispatch and expires January 1, 2027; saved receipts are never repriced. Other models, including
+Flash/Turbo, retain their characters but remain unpriced until their header-to-tariff conversion
+has been verified. This is a public list-price estimate, not the account's subscription charge,
+negotiated price or invoice; promotions, credits and taxes are not applied.
+
+The Studio displays an ElevenLabs subtotal in the overall partial estimate, the measured character
+count and recording coverage, model details and the pricing link. These values are included in the
+JSON export and refresh with checkpoints. No paid API call was made to validate header availability
+on this endpoint; the implementation and tests explicitly cover missing headers.
+
+Deploy Production with regenerated contracts and the updated worker/API/Studio to enable capture
+and display. Historical audio alone cannot recover missing measurements. No synthesis is dispatched
+to populate consumption, and no deployment is implied by this change.
 
 ## Existing films
 
@@ -90,5 +128,7 @@ not provider answers, requests, credentials or journal contents.
 - [Google Cloud model pricing](https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing),
   verified September 9, 2026: global standard input/cache/output per million tokens are
   $0.75/$0.075/$3.75 for Gemini 3.6 Flash through December 31, 2026, and $1.50/$0.15/$9 for Gemini 3.5 Flash.
-- [ElevenLabs timestamped speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps):
-  the current voice adapter retains audio/alignment; it does not yet persist provider billing receipts.
+- [ElevenLabs generation metadata](https://elevenlabs.io/docs/api-reference/introduction#tracking-generation-costs)
+  and [timestamped speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps),
+  retrieved through Context7 using `find-docs` on September 9, 2026.
+- [ElevenLabs API pricing](https://elevenlabs.io/pricing/api), verified September 9, 2026.

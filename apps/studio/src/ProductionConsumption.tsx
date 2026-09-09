@@ -46,14 +46,18 @@ export function ProductionConsumption({ job }: { job: Job }) {
             Images: {money(report?.imageEstimatedSubtotalUsd ?? null)} ·{' '}
             {count(report?.imageCostedCalls ?? 0, 'priced attempt')}
           </span>
+          <span>
+            ElevenLabs: {money(report?.voiceEstimatedSubtotalUsd ?? null)} ·{' '}
+            {count(report?.voiceCostedCalls ?? 0, 'priced recording')}
+          </span>
         </div>
       </div>
       <p className="consumption-note">
         {report?.costedCalls
           ? `${report.costedCalls} of ${report.totalCalls} calls priced. `
           : 'No priced measurements yet. '}
-        Narration, search fees, hosting and calls without pricing are excluded. This is a list-price
-        estimate before credits and taxes, not your bill.
+        Search fees, hosting and calls without pricing are excluded. This is a list-price estimate
+        before credits and taxes, not your bill.
       </p>
       {Boolean(report?.pendingCalls) && (
         <p>
@@ -63,6 +67,11 @@ export function ProductionConsumption({ job }: { job: Job }) {
       )}
       <details className="usage-details">
         <summary>Production consumption</summary>
+        <p>
+          ElevenLabs characters: {number(report?.voiceCharacterCost ?? null)} · measured for{' '}
+          {report?.voiceMeasuredCalls ?? 0} of {report?.voiceCalls ?? job.usage.maxTakes}{' '}
+          recordings. These are provider-reported characters, not tokens or a billed USD amount.
+        </p>
         <div className="usage-scroll">
           <table>
             <caption>Production operations</caption>
@@ -110,6 +119,7 @@ export function ProductionConsumption({ job }: { job: Job }) {
                       'Reasoning',
                       'Tool input',
                       'Total tokens',
+                      'Voice characters',
                       'Estimate (USD)',
                     ].map((label) => (
                       <th scope="col" key={label}>
@@ -151,6 +161,14 @@ export function ProductionConsumption({ job }: { job: Job }) {
                         </td>
                       ))}
                       <td>
+                        {number(row.characterCost ?? null)}
+                        {row.characterCost != null && (
+                          <small>
+                            {row.characterReports}/{row.calls} calls measured
+                          </small>
+                        )}
+                      </td>
+                      <td>
                         {money(
                           row.estimatedNanoUsd === null
                             ? null
@@ -187,6 +205,11 @@ export function ProductionConsumption({ job }: { job: Job }) {
           {report && (
             <a href={report.priceSource} target="_blank" rel="noreferrer">
               Pricing reference · {report.priceCheckedAt}
+            </a>
+          )}
+          {report?.voicePriceSource && (
+            <a href={report.voicePriceSource} target="_blank" rel="noreferrer">
+              ElevenLabs pricing · {report.voicePriceCheckedAt}
             </a>
           )}
         </div>

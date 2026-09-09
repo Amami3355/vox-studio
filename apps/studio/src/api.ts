@@ -29,6 +29,8 @@ export interface ConsumptionRow {
   >;
   estimatedNanoUsd: number | null;
   priceVersions: string[];
+  characterCost?: number | null;
+  characterReports?: number;
 }
 
 export interface Consumption {
@@ -44,6 +46,13 @@ export interface Consumption {
   estimatedSubtotalUsd: number | null;
   imageEstimatedSubtotalUsd?: number | null;
   imageCostedCalls?: number;
+  voiceEstimatedSubtotalUsd?: number | null;
+  voiceCharacterCost?: number | null;
+  voiceMeasuredCalls?: number;
+  voiceCalls?: number;
+  voiceCostedCalls?: number;
+  voicePriceSource?: string;
+  voicePriceCheckedAt?: string;
   priceSource: string;
   priceCheckedAt: string;
 }

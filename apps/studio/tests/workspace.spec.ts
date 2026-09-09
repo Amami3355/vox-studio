@@ -30,17 +30,24 @@ test('film consumption exposes partial costs, saved tokens and a private export 
   await page.getByRole('button', { name: 'Enter studio' }).click();
   const panel = page.getByRole('region', { name: 'Film consumption', exact: true });
   await expect(panel.getByText('4 provider calls · 1 image attempt')).toBeVisible();
-  await expect(panel.getByText('$1.7428', { exact: true })).toBeVisible();
+  await expect(panel.getByText('$2.0428', { exact: true })).toBeVisible();
   await expect(panel.getByText(/Images: \$0.1378/)).toBeVisible();
-  await expect(panel.getByText(/2 of 4 calls priced/)).toBeVisible();
+  await expect(panel.getByText(/ElevenLabs: \$0.3000 · 1 priced recording/)).toBeVisible();
+  await expect(panel.getByText(/3 of 4 calls priced/)).toBeVisible();
   await expect(panel.getByText(/1 call is awaiting/)).toBeVisible();
   await panel.getByText('Production consumption', { exact: true }).click();
+  await expect(
+    panel.getByText(/ElevenLabs characters: 3,000 · measured for 1 of 1 recordings/),
+  ).toBeVisible();
   await expect(panel.getByRole('cell', { name: '1,300,000 1/2 calls', exact: true })).toBeVisible();
   const downloadEvent = page.waitForEvent('download');
   await panel.getByRole('link', { name: 'Download consumption report' }).click();
   const download = await downloadEvent;
   const exported = await readFile((await download.path()) as string, 'utf8');
-  expect(JSON.parse(exported).consumption.estimatedSubtotalUsd).toBe(1.74284);
+  expect(JSON.parse(exported).consumption.estimatedSubtotalUsd).toBe(2.04284);
+  expect(JSON.parse(exported).consumption.voiceEstimatedSubtotalUsd).toBe(0.3);
+  expect(JSON.parse(exported).consumption.voiceCharacterCost).toBe(3000);
+  expect(exported).not.toContain('PRIVATE VOICE REQUEST');
   expect(JSON.parse(exported).consumption.imageEstimatedSubtotalUsd).toBe(0.13784);
   expect(exported).not.toContain('PRIVATE PROVIDER ANSWER');
   await page.screenshot({
@@ -48,10 +55,11 @@ test('film consumption exposes partial costs, saved tokens and a private export 
     fullPage: true,
   });
   await administration.post(`/api/testing/consumption-response?job_id=${id}`, { headers });
-  await expect(panel.getByText('$3.3478', { exact: true }).first()).toBeVisible();
+  await expect(panel.getByText('$3.6478', { exact: true }).first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await expect(panel.getByText('$3.3478', { exact: true })).toBeVisible();
+  await expect(panel.getByText('$3.6478', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/ElevenLabs: \$0.3000/)).toBeVisible();
   await panel.getByText('Production consumption', { exact: true }).click();
   await expect(panel.getByRole('cell', { name: '2,600,000', exact: true })).toBeVisible();
   const scroll = panel.getByRole('region', { name: 'Consumption by model and role' });
@@ -64,6 +72,36 @@ test('film consumption exposes partial costs, saved tokens and a private export 
     fullPage: true,
   });
   expect(errors).toEqual([]);
+});
+
+test('ElevenLabs consumption distinguishes absent measurements from an explicit zero', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByLabel('Access code').fill('browser-test-workspace-only');
+  await page.getByRole('button', { name: 'Enter studio' }).click();
+  for (const mode of ['missing', 'zero']) {
+    const { id } = await (
+      await administration.post(`/api/testing/consumption?voice=${mode}`, { headers })
+    ).json();
+    await page.goto(`/?film=${id}`);
+    const panel = page.getByRole('region', { name: 'Film consumption', exact: true });
+    await expect(
+      panel.getByText(
+        mode === 'zero'
+          ? /ElevenLabs: \$0.0000 · 1 priced recording/
+          : /ElevenLabs: Unavailable · 0 priced recordings/,
+      ),
+    ).toBeVisible();
+    await panel.getByText('Production consumption', { exact: true }).click();
+    await expect(
+      panel.getByText(
+        mode === 'zero'
+          ? /ElevenLabs characters: 0 · measured for 1 of 1 recordings/
+          : /ElevenLabs characters: Unavailable · measured for 0 of 1 recordings/,
+      ),
+    ).toBeVisible();
+  }
 });
 
 test('private workspace saves a brief and reconnects to the same work after refresh', async ({

@@ -1,5 +1,6 @@
 import { readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createElevenLabsAdapter } from '@vox/voice';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sha256Bytes } from '../src/canonical-json';
 import { recordingInputIdentity } from '../src/run-store/identities';
@@ -37,6 +38,122 @@ const replacementGrant = async (target: CommandFixture): Promise<string> => {
 };
 
 describe('record crash recovery', () => {
+  it('exposes a durable receipt while synthesis still holds the command lease', async () => {
+    let releaseBody = () => {};
+    let headersSaved = () => {};
+    const bodyGate = new Promise<void>((resolve) => {
+      releaseBody = resolve;
+    });
+    const headersGate = new Promise<void>((resolve) => {
+      headersSaved = resolve;
+    });
+    const recorded = recordedResponseFor(VALID_PLAN);
+    const response = Response.json(
+      {
+        audio_base64: Buffer.from(recorded.audio).toString('base64'),
+        alignment: recorded.alignment,
+      },
+      { headers: { 'character-cost': '3000' } },
+    );
+    const read = response.json.bind(response);
+    vi.spyOn(response, 'json').mockImplementation(async () => {
+      headersSaved();
+      await bodyGate;
+      return read();
+    });
+    fixture = await createCommandFixture({
+      synthesizer: createElevenLabsAdapter({
+        apiKey: 'fixture',
+        fetchImpl: vi.fn(async () => response),
+        now: () => new Date('2026-09-09T12:00:00Z'),
+      }),
+    });
+    await prepare(fixture);
+    const recording = fixture.service.record({ runRoot: fixture.runRoot });
+    try {
+      await headersGate;
+      const status = await fixture.service.status({ runRoot: fixture.runRoot });
+      expect(status.exitCode).toBe(0);
+      expect(status.envelope.data?.recordingConsumption).toEqual([
+        expect.objectContaining({
+          status: 'dispatching',
+          consumption: expect.objectContaining({
+            characterCost: 3000,
+            estimatedNanoUsd: 300_000_000,
+          }),
+        }),
+      ]);
+    } finally {
+      releaseBody();
+      await recording;
+    }
+  });
+
+  it.each(['valid', 'invalid-alignment', 'invalid-json', 'http-error'])(
+    'retains measured consumption through %s, restart and reuse',
+    async (mode) => {
+      let crash = mode === 'valid';
+      const recorded = recordedResponseFor(VALID_PLAN);
+      const fetchImpl = vi.fn(
+        async () =>
+          new Response(
+            mode === 'invalid-json'
+              ? '{invalid'
+              : JSON.stringify({
+                  audio_base64: Buffer.from(recorded.audio).toString('base64'),
+                  alignment: mode === 'invalid-alignment' ? {} : recorded.alignment,
+                }),
+            {
+              status: mode === 'http-error' ? 500 : 200,
+              headers: { 'character-cost': '3000', 'request-id': 'fixture-request' },
+            },
+          ),
+      );
+      fixture = await createCommandFixture({
+        synthesizer: createElevenLabsAdapter({
+          apiKey: 'test-only',
+          fetchImpl,
+          now: () => new Date('2026-09-09T12:00:00Z'),
+        }),
+        recordingCrashAt: (point) => {
+          if (crash && point === 'after_response_received') {
+            crash = false;
+            throw new Error('INJECTED_CRASH');
+          }
+        },
+      });
+      await prepare(fixture);
+      await fixture.service.record({ runRoot: fixture.runRoot });
+      const receipt = {
+        provider: 'elevenlabs',
+        model: REQUEST.production.voice.modelId,
+        characterCost: 3000,
+        estimatedNanoUsd: 300_000_000,
+        requestId: 'fixture-request',
+      };
+      const observed = await fixture.service.status({ runRoot: fixture.runRoot });
+      expect(observed.envelope.data?.recordingConsumption).toEqual([
+        expect.objectContaining({
+          status: mode === 'valid' ? 'response_received' : 'failed',
+          consumption: expect.objectContaining(receipt),
+        }),
+      ]);
+      const resumed = await fixture.service.record({ runRoot: fixture.runRoot });
+      if (mode === 'valid') {
+        expect(resumed.envelope.data?.disposition).toBe('recorded');
+        const reused = await fixture.service.record({ runRoot: fixture.runRoot });
+        expect(reused.envelope.data?.disposition).toBe('reused');
+      } else {
+        expect(resumed.envelope.outcome).toBe('paused');
+      }
+      const after = await fixture.service.status({ runRoot: fixture.runRoot });
+      expect(after.envelope.data?.recordingConsumption).toEqual([
+        expect.objectContaining({ consumption: expect.objectContaining(receipt) }),
+      ]);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('turns a durable dispatch without a response into uncertainty and never retries it', async () => {
     let crash = true;
     const synthesizer = vi.fn(async () => recordedResponseFor(VALID_PLAN));

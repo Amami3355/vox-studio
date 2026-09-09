@@ -1,5 +1,6 @@
 """Disposable HTTP test workspace. No crew, provider keys or worker is started."""
 from pathlib import Path
+import json
 import tempfile
 import uvicorn
 from vox_crew.studio_api import create_app
@@ -88,14 +89,14 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
         return {"id": job['id']}
 
     @app.post('/api/testing/consumption')
-    def consumption():
+    def consumption(voice: str = 'measured'):
         from types import SimpleNamespace
         from datetime import datetime, timezone
         from vox_crew.provider_usage import ProviderJournal, finish_call
         from vox_crew.consumption import price_at_dispatch
         from unittest.mock import patch
         store = app.state.store
-        job = store.submit('browser-consumption-fixture', {"text": "Explain film consumption.", "duration": 50, "language": "English"})
+        job = store.submit('browser-consumption-fixture-' + voice, {"text": "Explain film consumption.", "duration": 50, "language": "English"})
         work = store.work(job['id'])
         def price(provider, model, location):
             return price_at_dispatch(provider, model, 'global', now=datetime(2026, 9, 9, tzinfo=timezone.utc))
@@ -113,7 +114,14 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
             call = journal.begin('Recording', 'production', provider='elevenlabs')
             finish_call(call)
             journal.begin('SceneAuthor', 'gemini-3.6-flash')
-            write_json(work / 'checkpoint.json', {"providerUsage": journal.summary()})
+            receipt = {"schemaVersion": 1, "provider": "elevenlabs", "model": "eleven_v3",
+                "characterCost": 0 if voice == 'zero' else 3000,
+                "estimatedNanoUsd": 0 if voice == 'zero' else 300000000,
+                "priceVersion": "elevenlabs-api-characters-2026-09-09", "requestId": "PRIVATE VOICE REQUEST"}
+            write_json(work / 'checkpoint.json', {"providerUsage": journal.summary(),
+                "productionSnapshot": {"data": {"recordingConsumption": [{
+                    "attemptId": "voice-fixture", "status": "published",
+                    **({"consumption": receipt} if voice != 'missing' else {})}]}}})
         return {"id": job['id']}
 
     @app.post('/api/testing/consumption-response')
@@ -125,7 +133,8 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
             finish_call(journal.records[-1]['id'], SimpleNamespace(prompt_token_count=1000000,
                 cached_content_token_count=400000, candidates_token_count=100000,
                 thoughts_token_count=200000, total_token_count=1300000))
-            write_json(work / 'checkpoint.json', {"providerUsage": journal.summary()})
+            checkpoint = json.loads((work / 'checkpoint.json').read_text(encoding='utf-8'))
+            write_json(work / 'checkpoint.json', {**checkpoint, "providerUsage": journal.summary()})
         return {"saved": True}
 
     uvicorn.run(app, host="127.0.0.1", port=8781, access_log=False)

@@ -11,6 +11,7 @@ import {
   unlink,
 } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import type { VoiceConsumption } from '@vox/voice';
 import { z } from 'zod';
 import { type JsonValue, canonicalJson, hashCanonicalJson, sha256Bytes } from '../canonical-json';
 import {
@@ -26,13 +27,14 @@ import {
   imageJobSchema,
   productionRequestSchema,
   resultEnvelopeSchema,
+  voiceConsumptionSchema,
 } from '../contracts/schemas';
 import {
   type StudioAuthorization,
   studioAuthorizationSchema,
 } from '../contracts/studio-authorization';
-import { RUN_PATHS } from './paths';
 import { type ProductionMeasurement, reportMeasurement } from '../measurement';
+import { RUN_PATHS } from './paths';
 
 type JsonObject = { [key: string]: JsonValue };
 
@@ -180,6 +182,7 @@ export type RecordingAttemptStatus =
 
 export type RecordingAttempt = {
   attemptId: string;
+  consumption?: VoiceConsumption;
   recordingInputSha256: string;
   status: RecordingAttemptStatus;
   replacement: boolean;
@@ -210,6 +213,7 @@ export type RunStoreExclusiveSession = {
     response: PrivateRecordingResponse,
   ) => Promise<void>;
   readRecordingResponse: (attemptId: string) => Promise<PrivateRecordingResponse>;
+  persistRecordingConsumption: (attemptId: string, consumption: VoiceConsumption) => Promise<void>;
   markRecordingAttempt: (
     attemptId: string,
     status: Extract<RecordingAttemptStatus, 'uncertain' | 'failed' | 'published'>,
@@ -387,6 +391,7 @@ const ledgerSchema = z
         z
           .object({
             attemptId: z.uuid(),
+            consumption: voiceConsumptionSchema.optional(),
             recordingInputSha256: sha256Schema,
             status: z.enum([
               'dispatching',
@@ -591,6 +596,8 @@ export class RunStore {
         persistRecordingResponse: (attemptId, response) =>
           this.persistRecordingResponseUnderLease(attemptId, response),
         readRecordingResponse: (attemptId) => this.readRecordingResponseUnderLease(attemptId),
+        persistRecordingConsumption: (attemptId, consumption) =>
+          this.persistRecordingConsumptionUnderLease(attemptId, consumption),
         markRecordingAttempt: (attemptId, status, takeSha256) =>
           this.markRecordingAttemptUnderLease(attemptId, status, takeSha256),
       }),
@@ -1023,6 +1030,44 @@ export class RunStore {
     return structuredClone(attempt);
   }
 
+  async recordingConsumption() {
+    await this.assertRunRoot();
+    const ledger = await this.readLedger();
+    // The ledger is atomically replaced. Status must remain readable while synthesis
+    // holds the command lease, including after headers but before the body arrives.
+    return ledger.recordingAttempts.map(({ attemptId, status, consumption }) => ({
+      attemptId,
+      status,
+      ...(consumption ? { consumption } : {}),
+    }));
+  }
+
+  private async persistRecordingConsumptionUnderLease(
+    attemptId: string,
+    consumption: VoiceConsumption,
+  ): Promise<void> {
+    const receipt = voiceConsumptionSchema.parse(consumption);
+    const ledger = await this.readLedger();
+    const attempt = ledger.recordingAttempts.find((row) => row.attemptId === attemptId);
+    if (!attempt || attempt.status !== 'dispatching') {
+      throw new RunStoreError(
+        'RECORDING_ATTEMPT_STATE_INVALID',
+        'Only a dispatching attempt may accept consumption.',
+      );
+    }
+    if (attempt.consumption) {
+      if (canonicalJson(attempt.consumption) !== canonicalJson(receipt)) {
+        throw new RunStoreError(
+          'RECORDING_CONSUMPTION_CHANGED',
+          'A saved provider measurement cannot be replaced.',
+        );
+      }
+      return;
+    }
+    attempt.consumption = receipt;
+    await this.writeLedger(ledger);
+  }
+
   private async persistRecordingResponseUnderLease(
     attemptId: string,
     response: PrivateRecordingResponse,
@@ -1295,13 +1340,17 @@ export class RunStore {
         'Receipt chain does not terminate at revision one.',
       );
     }
-    (this.options.onMeasure ?? reportMeasurement)({ operation: 'verify_receipt_chain',
-      elapsedMs: performance.now() - started, bytes: bytesRead, count });
+    (this.options.onMeasure ?? reportMeasurement)({
+      operation: 'verify_receipt_chain',
+      elapsedMs: performance.now() - started,
+      bytes: bytesRead,
+      count,
+    });
     return head;
   }
 
   private async recoverProjectionUnderLease(ledger: Ledger, verified?: Receipt): Promise<Ledger> {
-    const receipt = verified ?? await this.verifyReceiptChain(ledger);
+    const receipt = verified ?? (await this.verifyReceiptChain(ledger));
     const authoritative = this.checkpointFrom(receipt.state, ledger.headReceiptSha256);
     const current = await this.readPublicCheckpoint();
 

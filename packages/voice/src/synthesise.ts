@@ -1,8 +1,8 @@
 /**
  * The impure half: one call to ElevenLabs, folded into a take.
  *
- * Nothing in the test suite reaches this file, and that is the design rather than an
- * omission. Synthesis is not reproducible — see `RECORDING.md` — so a test that called it
+ * Tests inject HTTP responses; they never reach the live provider.
+ * Synthesis is not reproducible — see `RECORDING.md` — so a test that called it
  * could assert almost nothing, would cost quota on every run, and would need a credential
  * ADR-0004 guarantees no contributor needs. What *is* testable is the fold, and the fold
  * is a pure function of a recording.
@@ -11,6 +11,7 @@
  * something a build step regenerates.
  */
 import type { Beat, TimedBeat } from '@vox/video';
+import { type VoiceConsumption, voiceConsumption, voicePriceAtDispatch } from './consumption';
 import { type Alignment, foldAlignment, scriptFor } from './fold';
 
 /** ElevenLabs' most expressive model, and the one that returns full character alignment. */
@@ -38,16 +39,19 @@ export type ProviderSynthesisRequest = {
 export type ProviderSynthesisResponse = {
   audio: Uint8Array;
   alignment: Alignment;
+  consumption?: VoiceConsumption;
 };
 
 export type SynthesisAdapter = (
   request: ProviderSynthesisRequest,
+  onConsumption?: (consumption: VoiceConsumption) => Promise<void>,
 ) => Promise<ProviderSynthesisResponse>;
 
 export const requestSynthesis = async (
   beats: Beat[],
   settings: VoiceSettings,
   adapter: SynthesisAdapter,
+  onConsumption?: (consumption: VoiceConsumption) => Promise<void>,
 ): Promise<ProviderSynthesisResponse & { script: string }> => {
   const script = scriptFor(beats);
   if (script.length > MAX_SCRIPT_LENGTH) {
@@ -55,21 +59,25 @@ export const requestSynthesis = async (
       `The script is ${script.length} characters, over ${settings.modelId}'s ${MAX_SCRIPT_LENGTH} limit. It cannot be split across two calls: beat boundaries are offsets into one alignment array.`,
     );
   }
-  const response = await adapter({ text: script, settings });
+  const request = { text: script, settings };
+  const response = await (onConsumption ? adapter(request, onConsumption) : adapter(request));
   return { ...response, script };
 };
 
 export const createElevenLabsAdapter = ({
   apiKey,
   fetchImpl = fetch,
+  now = () => new Date(),
 }: {
   apiKey: string;
   fetchImpl?: typeof fetch;
+  now?: () => Date;
 }): SynthesisAdapter => {
   if (!apiKey) throw new Error('ElevenLabs adapter requires a service-side API key.');
-  return async ({ text, settings }) => {
+  return async ({ text, settings }, onConsumption) => {
     if (settings.provider !== 'elevenlabs')
       throw new Error(`Unsupported provider: ${settings.provider}`);
+    const price = voicePriceAtDispatch(settings.modelId, now());
     const response = await fetchImpl(
       `https://api.elevenlabs.io/v1/text-to-speech/${settings.voiceId}/with-timestamps`,
       {
@@ -78,11 +86,18 @@ export const createElevenLabsAdapter = ({
         body: JSON.stringify({ text, model_id: settings.modelId, seed: settings.seed }),
       },
     );
+    const consumption = voiceConsumption(response.headers, settings.modelId, price);
+    // Persist headers before reading/decoding the body, including error responses.
+    await onConsumption?.(consumption);
     if (!response.ok) {
       throw new Error(`ElevenLabs returned ${response.status}: ${await response.text()}`);
     }
     const body = (await response.json()) as { audio_base64: string; alignment: Alignment };
-    return { audio: Buffer.from(body.audio_base64, 'base64'), alignment: body.alignment };
+    return {
+      audio: Buffer.from(body.audio_base64, 'base64'),
+      alignment: body.alignment,
+      consumption,
+    };
   };
 };
 

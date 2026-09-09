@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 PRICE_SOURCE = "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing"
 PRICE_CHECKED = "2026-09-09"
+VOICE_PRICE_SOURCE = "https://elevenlabs.io/pricing/api"
 TOKEN_FIELDS = {
     "input": "prompt_token_count", "cached": "cached_content_token_count",
     "output": "candidates_token_count", "reasoning": "thoughts_token_count",
@@ -60,6 +61,7 @@ def empty_row(provider, model, role):
     return {"provider": provider, "model": model, "role": role,
             **{key: 0 for key in COUNTERS}, "tokens": {key: None for key in TOKEN_FIELDS},
             "tokenReports": {key: 0 for key in TOKEN_FIELDS},
+            "characterCost": None, "characterReports": 0,
             "estimatedNanoUsd": None, "priceVersions": []}
 
 
@@ -117,22 +119,63 @@ def merge_consumption(summaries):
             value = row.get("estimatedNanoUsd")
             if nonnegative(value):
                 group["estimatedNanoUsd"] = (group["estimatedNanoUsd"] or 0) + value
+            characters = row.get("characterCost")
+            if nonnegative(characters):
+                group["characterCost"] = (group["characterCost"] or 0) + characters
+                group["characterReports"] += row.get("characterReports", 0)
             group["priceVersions"] = sorted(set(group["priceVersions"]) | set(row.get("priceVersions", [])))
     rows = [groups[key] for key in sorted(groups)]
     return {"version": 1, "rows": rows}
+
+
+def with_recording_consumption(summary, attempts):
+    """Replace command-level recording observations with authoritative dispatch receipts.
+
+    A status snapshot contains ALL attempts, including failed/replaced recordings. It is
+    never added to the previous snapshot: reuse and polling cannot add a second expense.
+    Older Production services omit the field and retain their historical unknown rows.
+    """
+    if not isinstance(attempts, list):
+        return summary
+    rows = [row for row in summary.get("rows", []) if row.get("role") != "Recording"]
+    for attempt in {item["attemptId"]: item for item in attempts}.values():
+        receipt = attempt.get("consumption") or {}
+        row = empty_row("elevenlabs", receipt.get("model", "unknown"), "Recording")
+        row["calls"] = 1
+        row["failedCalls"] = int(attempt.get("status") == "failed")
+        row["pendingCalls"] = int(attempt.get("status") in ("dispatching", "uncertain"))
+        row["respondedCalls"] = 1 - row["pendingCalls"]
+        characters = receipt.get("characterCost")
+        if receipt.get("schemaVersion") == 1 and nonnegative(characters):
+            row["characterCost"] = characters
+            row["characterReports"] = 1
+            estimate = receipt.get("estimatedNanoUsd")
+            if nonnegative(estimate) and receipt.get("priceVersion"):
+                row["estimatedNanoUsd"] = estimate
+                row["costedCalls"] = 1
+                row["priceVersions"] = [receipt["priceVersion"]]
+        rows.append(row)
+    return merge_consumption([{"rows": rows}])
 
 
 def public_consumption(state, *, saved=None):
     """Project only counters and prices; never return journal answers or request data."""
     provider_usage = state.get("providerUsage", {})
     measured = provider_usage.get("consumption") or saved or {}
-    report = merge_consumption([measured])
+    attempts = state.get("productionSnapshot", {}).get("data", {}).get("recordingConsumption")
+    report = with_recording_consumption(merge_consumption([measured]), attempts)
     rows = report["rows"]
     covered = sum(row["calls"] for row in rows)
     costed = sum(row["costedCalls"] for row in rows)
     total_calls = max(provider_usage.get("calls", 0), covered)
     prices = [row["estimatedNanoUsd"] for row in rows if row["estimatedNanoUsd"] is not None]
     images = [row for row in rows if row["role"] == "ImageGeneration" and row["estimatedNanoUsd"] is not None]
+    voice = [row for row in rows if row["role"] == "Recording"]
+    voice_prices = [row["estimatedNanoUsd"] for row in voice if row["estimatedNanoUsd"] is not None]
+    voice_characters = [row["characterCost"] for row in voice if row["characterCost"] is not None]
+    voice_calls = sum(row["calls"] for row in voice)
+    if not isinstance(attempts, list):
+        voice_calls = max(voice_calls, provider_usage.get("takes", 0))
     return {**report, "currency": "USD", "totalCalls": total_calls,
             "unattributedCalls": max(0, total_calls - covered),
             "meteredCalls": sum(row["meteredCalls"] for row in rows),
@@ -141,4 +184,10 @@ def public_consumption(state, *, saved=None):
             "estimatedSubtotalUsd": sum(prices) / 1_000_000_000 if prices else None,
             "imageEstimatedSubtotalUsd": sum(row["estimatedNanoUsd"] for row in images) / 1_000_000_000 if images else None,
             "imageCostedCalls": sum(row["costedCalls"] for row in images),
+            "voiceEstimatedSubtotalUsd": sum(voice_prices) / 1_000_000_000 if voice_prices else None,
+            "voiceCharacterCost": sum(voice_characters) if voice_characters else None,
+            "voiceMeasuredCalls": sum(row["characterReports"] for row in voice),
+            "voiceCalls": voice_calls,
+            "voiceCostedCalls": sum(row["costedCalls"] for row in voice),
+            "voicePriceSource": VOICE_PRICE_SOURCE, "voicePriceCheckedAt": PRICE_CHECKED,
             "priceSource": PRICE_SOURCE, "priceCheckedAt": PRICE_CHECKED}

@@ -405,6 +405,26 @@ export const preflightReportSchema = z
   })
   .strict();
 
+export const voiceConsumptionSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    provider: z.literal('elevenlabs'),
+    model: nonEmpty,
+    requestId: nonEmpty.nullable(),
+    characterCost: z.number().int().nonnegative().nullable(),
+    estimatedNanoUsd: z.number().int().nonnegative().nullable(),
+    priceVersion: nonEmpty.nullable(),
+  })
+  .strict();
+
+export const recordingConsumptionSchema = z
+  .object({
+    attemptId: z.uuid(),
+    status: z.enum(['dispatching', 'response_received', 'uncertain', 'failed', 'published']),
+    consumption: voiceConsumptionSchema.optional(),
+  })
+  .strict();
+
 export const commandDataSchemas = {
   'run.progress': z
     .object({
@@ -448,6 +468,7 @@ export const commandDataSchemas = {
     .object({
       staleStages: z.array(runStageSchema),
       lastOutcome: commandOutcomeSchema,
+      recordingConsumption: z.array(recordingConsumptionSchema).optional(),
       artifacts: z.array(artifactDescriptorSchema),
       studioAuthorization: studioAuthorizationSchema.optional(),
       imageRecoveryPolicy: imageRecoveryPolicySchema

@@ -17,6 +17,113 @@ IMAGE_CONSUMPTION = {"schemaVersion": 1, "provider": "google-cloud", "model": "g
     "tokens": {"input": 1000, "cached": 200, "output": 100, "imageOutput": 1120, "reasoning": 50, "tools": 0, "total": 2270},
     "estimatedNanoUsd": 137840000, "priceVersion": "google-image-global-standard-2026-09-09"}
 
+VOICE_CONSUMPTION = {"schemaVersion": 1, "provider": "elevenlabs", "model": "eleven_v3",
+    "characterCost": 3000, "estimatedNanoUsd": 300000000,
+    "requestId": "PRIVATE REQUEST ID", "priceVersion": "elevenlabs-api-characters-2026-09-09"}
+
+
+def voice_snapshot(*attempts):
+    return {"data": {"recordingConsumption": list(attempts)}}
+
+
+def test_voice_dispatches_keep_failed_replacements_unknowns_and_zero_separate():
+    attempts = [
+        {"attemptId": "first", "status": "failed", "consumption": VOICE_CONSUMPTION},
+        {"attemptId": "replacement", "status": "published", "consumption": VOICE_CONSUMPTION},
+        {"attemptId": "zero", "status": "published", "consumption": {
+            **VOICE_CONSUMPTION, "characterCost": 0, "estimatedNanoUsd": 0}},
+        {"attemptId": "old", "status": "published"},
+        {"attemptId": "lost", "status": "uncertain"},
+    ]
+    state = {"productionSnapshot": voice_snapshot(*attempts, attempts[0])}
+    report = public_consumption(state)
+    assert report["voiceCalls"] == 5
+    assert report["voiceMeasuredCalls"] == report["voiceCostedCalls"] == 3
+    assert report["voiceCharacterCost"] == 6000
+    assert report["voiceEstimatedSubtotalUsd"] == report["estimatedSubtotalUsd"] == 0.6
+    assert report["pendingCalls"] == 1
+    assert report["meteredCalls"] == 0  # Characters never become token counts.
+    assert sum(row["failedCalls"] for row in report["rows"]) == 1
+    assert "PRIVATE REQUEST ID" not in json.dumps(report)
+    assert "attemptId" not in json.dumps(report)
+    # Applying the same authoritative snapshot to an already projected report is idempotent.
+    state["providerUsage"] = {"consumption": report}
+    assert public_consumption(state) == report
+    historical = public_consumption({"providerUsage": {"calls": 5, "takes": 2}})
+    assert historical["voiceCalls"] == 2
+    assert historical["voiceCharacterCost"] is None
+    assert historical["voiceEstimatedSubtotalUsd"] is None
+
+
+@pytest.mark.parametrize("characters,estimate,measured,costed", [
+    (None, None, 0, 0), (0, 0, 1, 1), (3000, None, 1, 0), (-1, -1, 0, 0),
+])
+def test_voice_missing_zero_and_unsupported_prices(characters, estimate, measured, costed):
+    report = public_consumption({"productionSnapshot": voice_snapshot({"attemptId": "one",
+        "status": "published", "consumption": {**VOICE_CONSUMPTION,
+            "characterCost": characters, "estimatedNanoUsd": estimate}})})
+    assert report["voiceMeasuredCalls"] == measured
+    assert report["voiceCostedCalls"] == costed
+    assert report["voiceCharacterCost"] == (characters if measured else None)
+    assert report["voiceEstimatedSubtotalUsd"] == (0 if costed else None)
+
+
+def test_voice_snapshot_survives_full_workflow_saved_replay_and_fresh_commands(tmp_path, monkeypatch):
+    import asyncio
+    from test_autonomous import Client, make
+
+    class MeteredVoice(Client):
+        def status(self, run_id):
+            attempts = [{"attemptId": "one", "status": "published", "consumption": VOICE_CONSUMPTION}] if self.takes else []
+            return self.reply("run.status", voice_snapshot(*attempts)["data"])
+
+        def record(self, run_id):
+            if self.takes:
+                self.calls.append("record")
+                return self.reply("run.record", {"disposition": "reused"})
+            return super().record(run_id)
+
+    client = MeteredVoice()
+    with ProviderJournal(tmp_path / "provider-calls.jsonl", max_calls=None):
+        run = make(tmp_path, monkeypatch, client=client)
+        assert asyncio.run(run.run())["status"] == "ready"
+        first = public_consumption(run.state)
+        assert first["voiceCalls"] == first["voiceCostedCalls"] == 1
+        assert first["voiceEstimatedSubtotalUsd"] == 0.3
+        resumed = make(tmp_path, monkeypatch, client=client)
+        asyncio.run(resumed.run())
+        asyncio.run(resumed.command("record", "run-1", key="new-selection"))
+        final = public_consumption(resumed.state)
+        assert final["voiceCalls"] == 1
+        assert final["voiceEstimatedSubtotalUsd"] == first["voiceEstimatedSubtotalUsd"]
+        assert client.takes == 1
+        saved = json.loads((tmp_path / "autonomous-v2.json").read_text(encoding="utf-8"))
+        assert public_consumption(saved)["voiceEstimatedSubtotalUsd"] == 0.3
+
+
+def test_voice_receipt_is_observed_after_losing_the_command_response(tmp_path, monkeypatch):
+    import asyncio
+    from test_autonomous import Client, make
+
+    class LostResponse(Client):
+        def record(self, run_id):
+            self.calls.append("record")
+            raise ConnectionError("transport lost")
+
+        def status(self, run_id):
+            return self.reply("run.status", voice_snapshot({"attemptId": "one",
+                "status": "response_received", "consumption": VOICE_CONSUMPTION})["data"])
+
+    client = LostResponse()
+    with ProviderJournal(tmp_path / "provider-calls.jsonl"):
+        run = make(tmp_path, monkeypatch, client=client)
+        run.state["runId"] = "run-1"
+        with pytest.raises(ConnectionError):
+            asyncio.run(run.command("record", "run-1"))
+        saved = json.loads((tmp_path / "autonomous-v2.json").read_text(encoding="utf-8"))
+        assert public_consumption(saved)["voiceEstimatedSubtotalUsd"] == 0.3
+        assert client.calls == ["record"]
+
 
 def usage(**changes):
     return SimpleNamespace(prompt_token_count=1000, cached_content_token_count=400,

@@ -22,6 +22,7 @@ import {
 } from '@vox/video';
 import {
   type Alignment,
+  type ProviderSynthesisResponse,
   type RunTakeArtifacts,
   type RunTakeManifest,
   type SynthesisAdapter,
@@ -216,12 +217,14 @@ export class ProductionCommandService {
         )
         .map(([name]) => this.stageForBinding(name));
       const imageRecoveryPolicy = await this.imageRecovery(checkpoint);
+      const recordingConsumption = await store.recordingConsumption();
       return this.success(
         'run.status',
         checkpoint,
         {
           staleStages: [...new Set(staleStages)],
           lastOutcome: checkpoint.lastOutcome,
+          recordingConsumption,
           artifacts,
           ...(imageRecoveryPolicy ? { imageRecoveryPolicy } : {}),
           ...(checkpoint.bindings.studioAuthorization
@@ -1166,13 +1169,18 @@ export class ProductionCommandService {
         });
         this.options.recordingCrashAt?.('after_dispatch');
 
-        let response: { audio: Uint8Array; alignment: Alignment };
+        let response: ProviderSynthesisResponse;
         try {
           response = await requestSynthesis(
             plan.beats,
             request.production.voice,
             this.options.synthesizer,
+            (consumption) => session.persistRecordingConsumption(attempt.attemptId, consumption),
           );
+          // Adapters may return a receipt without implementing the early header callback.
+          if (response.consumption) {
+            await session.persistRecordingConsumption(attempt.attemptId, response.consumption);
+          }
         } catch (error) {
           await session.markRecordingAttempt(attempt.attemptId, 'failed');
           return this.failRecording(
