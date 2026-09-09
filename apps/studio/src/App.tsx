@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { ProductionConsumption } from './ProductionConsumption';
 import { ProductionControls } from './ProductionControls';
-import { ProductionProgress, activitySummary, productionMessage } from './ProductionProgress';
+import { ProductionProgress, activitySummary, phaseLabel } from './ProductionProgress';
 import { ApiError, api, statusLabels } from './api';
 import type { Job } from './api';
 
@@ -404,80 +405,106 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
             {job.recorded ? 'SAVED PRODUCTION · RECORDED' : 'YOUR PRODUCTION'}
           </span>
           <h1>{job.title}</h1>
-          <p>
-            {job.duration}s target<span>·</span>
-            {job.language}
-            <span>·</span>
-            {new Date(job.createdAt * 1000).toLocaleDateString('en', {
-              month: 'short',
-              day: 'numeric',
-            })}
-          </p>
         </div>
         <span className={`status status-${job.status}`}>
           {active && <span className="live-dot" />}
           {statusLabels[job.status] || job.status}
         </span>
       </div>
+      <section className="film-overview" aria-label="Video information">
+        <dl className="film-facts">
+          <div>
+            <dt>Target duration</dt>
+            <dd>{job.duration} seconds</dd>
+          </div>
+          <div>
+            <dt>Narration language</dt>
+            <dd>{job.language}</dd>
+          </div>
+          <div>
+            <dt>Created</dt>
+            <dd>
+              {new Date(job.createdAt * 1000).toLocaleDateString('en', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </dd>
+          </div>
+          <div>
+            <dt>Output</dt>
+            <dd>{job.preview ? 'Preview available' : 'Narrated video'}</dd>
+          </div>
+        </dl>
+        <details className="saved-brief">
+          <summary>View original brief</summary>
+          <p>{job.prompt}</p>
+        </details>
+      </section>
       <ProductionProgress job={job} />
       <div className="production-grid">
         <div className="film-main">
-          {!job.preview && (
-            <ProductionControls
-              key={`${job.status}:${job.corrections.length}`}
-              job={job}
-              refresh={refresh}
-            />
-          )}
-          {(job.preview || (!job.continuation.targets.length && !job.awaitingImage)) && (
-            <div className="player-shell">
-              {job.preview ? (
-                // biome-ignore lint/a11y/useMediaCaption: The Story tab exposes the full narration; verified timed captions are not yet available.
-                <video
-                  key={job.preview.sha256}
-                  src={job.preview.url}
-                  controls
-                  preload="metadata"
-                  playsInline
-                  aria-label="Produced film preview"
-                />
-              ) : (
-                <div className="player-empty">
-                  <div className="empty-film">
-                    <Icon name="film" size={34} />
+          <section className="video-preview" aria-label="Video preview">
+            <div className="panel-heading">
+              <h2>Your video</h2>
+              <span>{job.preview ? 'Saved preview' : 'Preview appears after rendering'}</span>
+            </div>
+            {(job.preview || (!job.continuation.targets.length && !job.awaitingImage)) && (
+              <div className="player-shell">
+                {job.preview ? (
+                  // biome-ignore lint/a11y/useMediaCaption: The Story tab exposes the full narration; verified timed captions are not yet available.
+                  <video
+                    key={job.preview.sha256}
+                    src={job.preview.url}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    aria-label="Produced film preview"
+                  />
+                ) : (
+                  <div className="player-empty">
+                    <div className="empty-film">
+                      <Icon name="film" size={34} />
+                    </div>
+                    <h2>
+                      {active ? 'Your story is taking shape.' : 'Your film will appear here.'}
+                    </h2>
+                    <p>
+                      {active
+                        ? 'Follow the crew’s progress. You can safely leave and come back.'
+                        : 'Your brief and progress are saved in this workspace.'}
+                    </p>
+                    <span>RESEARCHED. NARRATED. MADE TO EXPLAIN.</span>
                   </div>
-                  <h2>{active ? 'Your story is taking shape.' : 'Your film will appear here.'}</h2>
-                  <p>
-                    {active
-                      ? 'Follow the crew’s progress. You can safely leave and come back.'
-                      : 'Your brief and progress are saved in this workspace.'}
-                  </p>
-                  <span>RESEARCHED. NARRATED. MADE TO EXPLAIN.</span>
-                </div>
-              )}
-            </div>
-          )}
-          {job.preview && (
-            <div className="player-caption">
-              <span className={job.preview.ready || job.preview.reviewed ? 'accepted-text' : 'draft-text'}>
-                {job.preview.ready || job.preview.reviewed
-                  ? 'Film ready · Illustrations approved'
-                  : 'Rendered preview · File checks in progress'}
-              </span>
-              <a href={`${job.preview.url}?download=true`}>
-                <Icon name="download" size={16} /> Download
-              </a>
-            </div>
-          )}
-          {job.message && !job.continuation.targets.length && !job.awaitingImage && (
-            <div className={`notice ${active ? '' : 'attention'}`}>
-              <Icon name={active ? 'clock' : 'lock'} size={19} />
-              <div>
-                <strong>{statusLabels[job.status] || 'Production update'}</strong>
-                <p>{productionMessage(job)}</p>
+                )}
               </div>
-            </div>
-          )}
+            )}
+            {job.preview && (
+              <div className="player-caption">
+                <span
+                  className={
+                    job.preview.ready || job.preview.reviewed ? 'accepted-text' : 'draft-text'
+                  }
+                >
+                  {job.preview.ready || job.preview.reviewed
+                    ? 'Film ready · Illustrations approved'
+                    : 'Rendered preview · File checks in progress'}
+                </span>
+                <a href={`${job.preview.url}?download=true`}>
+                  <Icon name="download" size={16} /> Download
+                </a>
+              </div>
+            )}
+            {!job.preview && (job.continuation.targets.length > 0 || job.awaitingImage) && (
+              <div className="preview-pending">
+                <Icon name="film" size={28} />
+                <div>
+                  <h3>Your preview is not ready yet.</h3>
+                  <p>Complete the production action to continue your film.</p>
+                </div>
+              </div>
+            )}
+          </section>
           {job.awaitingImage && (
             <section className="image-decision">
               <span className="eyebrow">A MOMENT FOR YOUR EYE</span>
@@ -519,14 +546,11 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
               )}
             </section>
           )}
-          {job.preview && (
-            <ProductionControls
-              key={`${job.status}:${job.corrections.length}`}
-              job={job}
-              refresh={refresh}
-            />
-          )}
           <section className="details-panel">
+            <div className="panel-heading">
+              <h2>Inside your film</h2>
+              <span>Saved as production advances</span>
+            </div>
             <div className="tabs" role="tablist" aria-label="Production details">
               {[
                 ['story', 'Story', job.beats.length],
@@ -540,6 +564,25 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
                   id={`tab-${id}`}
                   aria-controls={`panel-${id}`}
                   aria-selected={tab === id}
+                  tabIndex={tab === id ? 0 : -1}
+                  onKeyDown={(event) => {
+                    const tabs = ['story', 'sources', 'images'];
+                    const index = tabs.indexOf(tab);
+                    const next =
+                      event.key === 'ArrowRight'
+                        ? (index + 1) % tabs.length
+                        : event.key === 'ArrowLeft'
+                          ? (index + tabs.length - 1) % tabs.length
+                          : event.key === 'Home'
+                            ? 0
+                            : event.key === 'End'
+                              ? tabs.length - 1
+                              : -1;
+                    if (next < 0) return;
+                    event.preventDefault();
+                    setTab(tabs[next]!);
+                    document.getElementById(`tab-${tabs[next]}`)?.focus();
+                  }}
                   onClick={() => setTab(String(id))}
                 >
                   {label}
@@ -552,6 +595,8 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
               id={`panel-${tab}`}
               aria-labelledby={`tab-${tab}`}
               className="tab-content"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: The tab panel is the keyboard destination after the selected tab.
+              tabIndex={0}
             >
               {tab === 'story' &&
                 (job.beats.length ? (
@@ -644,44 +689,63 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
             </div>
           </section>
         </div>
-        <aside className="activity">
-          <div className="activity-heading">
-            <h2>Production notes</h2>
-            <span className={active ? 'live-indicator' : 'saved-indicator'}>
-              {active ? 'LIVE' : 'SAVED'}
-            </span>
-          </div>
-          <p>Real steps from your crew.</p>
-          <ol>
-            <li className="activity-event">
-              <span className="event-dot done">
-                <Icon name="check" size={11} />
+        <aside className="production-side" aria-label="Production actions and history">
+          <ProductionControls
+            key={`${job.status}:${job.corrections.length}`}
+            job={job}
+            refresh={refresh}
+          />
+          <section className="activity">
+            <div className="activity-heading">
+              <h2>Production notes</h2>
+              <span className={active ? 'live-indicator' : 'saved-indicator'}>
+                {active ? 'LIVE' : 'SAVED'}
               </span>
-              <strong>Brief saved</strong>
+            </div>
+            <p>Latest updates first. Your earlier steps stay saved.</p>
+            <details className="brief-history">
+              <summary>Brief saved</summary>
               <p>{job.prompt}</p>
-            </li>
-            {job.events
-              .filter((event, index, all) => event.phase !== all[index + 1]?.phase)
-              .map((event) => (
-                <li className="activity-event" key={event.sequence}>
-                  <span
-                    className={`event-dot ${['accepted', 'completed'].includes(event.status) ? 'done' : ''}`}
-                  />{' '}
-                  <strong>{event.phase.replaceAll('_', ' ')}</strong>
-                  <p>{activitySummary(event)}</p>
-                </li>
-              ))}
-          </ol>
-          <div className="saved-note">
-            <Icon name="lock" size={15} />
-            <span>
-              Your work is saved.
-              <br />
-              Come back whenever you’re ready.
-            </span>
-          </div>
+            </details>
+            <ol>
+              {job.events
+                .filter((event, index, all) => event.phase !== all[index + 1]?.phase)
+                .reverse()
+                .map((event) => (
+                  <li className="activity-event" key={event.sequence}>
+                    <span
+                      className={`event-dot ${['accepted', 'completed'].includes(event.status) ? 'done' : ''}`}
+                    />{' '}
+                    <strong>{phaseLabel(event.phase)}</strong>
+                    <span className="event-state">
+                      {['accepted', 'completed'].includes(event.status)
+                        ? 'Completed'
+                        : event.status === 'blocked'
+                          ? 'Needs attention'
+                          : ['waiting', 'retry'].includes(event.status)
+                            ? 'Waiting'
+                            : ['failed', 'rejected'].includes(event.status)
+                              ? 'Needs attention'
+                              : event.status === 'recovering'
+                                ? 'Recovering'
+                                : 'In progress'}
+                    </span>
+                    <p>{activitySummary(event)}</p>
+                  </li>
+                ))}
+            </ol>
+            <div className="saved-note">
+              <Icon name="lock" size={15} />
+              <span>
+                Your work is saved.
+                <br />
+                Come back whenever you’re ready.
+              </span>
+            </div>
+          </section>
         </aside>
       </div>
+      <ProductionConsumption job={job} />
     </div>
   );
 }
@@ -783,6 +847,9 @@ export function App() {
   const current = jobs.find((job) => job.id === selected);
   return (
     <div className="app">
+      <a className="skip-link" href="#studio-content">
+        Skip to content
+      </a>
       <aside className="sidebar">
         <a
           className="brand"
@@ -791,9 +858,11 @@ export function App() {
             e.preventDefault();
             select(null);
           }}
-          aria-label="Vox Studio home"
         >
-          <Wordmark />
+          <span aria-hidden="true">
+            <Wordmark />
+          </span>
+          <span className="sr-only">Vox Studio home</span>
         </a>
         <div className="workspace-label">
           <span className="workspace-avatar">V</span>
@@ -816,6 +885,8 @@ export function App() {
                 type="button"
                 className={`library-item ${selected === job.id ? 'selected' : ''}`}
                 key={job.id}
+                aria-current={selected === job.id ? 'page' : undefined}
+                title={job.title}
                 onClick={() => select(job.id)}
               >
                 <Icon name="film" size={18} />
@@ -850,7 +921,9 @@ export function App() {
             <b>{selected ? 'Film production' : 'New film'}</b>
           </div>
           <span className="topbar-right">
-            <span className="tiny-dot" /> A little curiosity goes a long way.
+            <span className="workspace-privacy">
+              <Icon name="lock" size={14} /> Private workspace
+            </span>
             <button
               type="button"
               className="user-avatar"
@@ -863,7 +936,7 @@ export function App() {
           </span>
         </header>
         {error && <output className="connection-error">{error}</output>}
-        <main>
+        <main id="studio-content">
           {current ? (
             <Film key={current.id} job={current} refresh={() => setRevision((r) => r + 1)} />
           ) : selected ? (

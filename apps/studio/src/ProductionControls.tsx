@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ProductionConsumption } from './ProductionConsumption';
 import { ApiError, api } from './api';
 import type { Job } from './api';
 const targetLabels: Record<string, string> = {
@@ -166,7 +165,7 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
             onClick={stop}
           >
             {job.stopRequested
-              ? 'Stopping after the current operation?'
+              ? 'Stopping after current operation'
               : 'Stop after current operation'}
           </button>
           <p>The current result will be saved. You can resume later.</p>
@@ -353,7 +352,6 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
       {!canResume && job.continuation.refusal && (
         <p className="continuation-refusal">{job.continuation.refusal}</p>
       )}
-      <ProductionConsumption job={job} />
       {job.filmObservations.length > 0 && (
         <details className="review-detail">
           <summary>Film review details</summary>
