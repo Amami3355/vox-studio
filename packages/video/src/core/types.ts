@@ -242,6 +242,9 @@ export type SceneCapability = {
    * correct absolute reading for quiet and live regions.
    */
   paintsOwnGround?: boolean;
+  /** Media may fill the allocated region. Region gates inspect media containment
+   * normally and inspect foreground separately for a quiet border. */
+  hasBleedMedia?: boolean;
   /**
    * Referential checks the generic validator cannot express — a `highlight` naming a
    * label that is not in `data`, for instance. Optional, but this is where the

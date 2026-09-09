@@ -55,14 +55,16 @@ import {
 } from 'remotion';
 import { repositoryAssetLibrary } from '../assets/library';
 import { createAssetResolver, resolveSceneAssets } from '../assets/resolver';
+import type { ResolvedSceneAssets } from '../core/assets';
 import { NO_SAFE_AREA, type SafeArea, type TimedEvent } from '../core/types';
 import { waitForFonts } from '../design/fonts';
 import type { MotionProfileId } from '../design/motion';
-import { defaultTheme } from '../design/theme';
+import { type ThemeId, defaultTheme, themes } from '../design/theme';
 import { DISPLAY_ROLES } from '../primitives/AnimatedText';
 import { SCENE_BOX_ATTRIBUTE } from '../primitives/SlotFrame';
 import { MAX_HEADER_SHARE, MAX_STATEMENT_SHARE } from '../primitives/titleFit';
 import { requireCapability } from '../scenes/registry';
+import { ForegroundInspection } from './ForegroundInspection';
 import { SceneRenderer } from './SceneRenderer';
 import { controlIdFor } from './compositionIds';
 
@@ -91,6 +93,10 @@ const DISPLAY_FAMILIES = DISPLAY_ROLES.map((role) =>
 );
 
 export type StressSceneProps = {
+  inspectForeground?: boolean;
+  inspectBackground?: boolean;
+  assets?: ResolvedSceneAssets;
+  themeId?: ThemeId;
   capabilityId: string;
   /** Generated from the capability's published schema. See `tests/stress/cases.ts`. */
   props: Record<string, unknown>;
@@ -357,6 +363,10 @@ const LayoutProbe: React.FC<{ context: string }> = ({ context }) => {
  * `stress.ts`, and only for the ceiling.
  */
 export const StressScene: React.FC<StressSceneProps> = ({
+  inspectForeground,
+  inspectBackground,
+  assets: assetOverride,
+  themeId,
   capabilityId,
   props,
   events,
@@ -378,11 +388,13 @@ export const StressScene: React.FC<StressSceneProps> = ({
 
   return (
     <>
+      <ForegroundInspection enabled={inspectForeground} background={inspectBackground} />
       <SceneRenderer
         capabilityId={capabilityId}
         props={props}
         events={events}
-        assets={assets}
+        assets={assetOverride ?? assets}
+        theme={themeId ? themes[themeId] : undefined}
         layout={layout}
         motionProfile={motionProfile}
         safeArea={safeArea}

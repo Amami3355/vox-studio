@@ -10,23 +10,18 @@ import type { TimedEvent } from '../../core/types';
  * 0 for a field no event reached, which is indistinguishable from a reveal genuinely
  * anchored at the top of the scene.
  *
- * `null` therefore means "held back, and the plan said so". It is only reachable when the
- * plan carries the matching reveal event, which is what keeps an eventless instance
- * rendering exactly as it did before this file existed.
+ * `null` means held back by a future reveal, or removed by hideCopy. Eventless instances
+ * reveal both layers from frame zero.
  */
 export type ImageContextState = {
   /** Frame the image plate begins its wipe; `null` while the plan still holds it back. */
   imageFrame: number | null;
-  /** Frame the copy column begins its stagger; `null` while the plan still holds it back. */
+  /** Frame the message begins its stagger; `null` while held back or hidden. */
   copyFrame: number | null;
   /**
-   * The word or phrase currently stamped over the image, if any.
+   * The word or phrase currently emphasized over the image, if any.
    *
-   * Never cleared, and the action description says so rather than leaving the manifest to
-   * imply otherwise. Clearing would need either a duration this file is not allowed to
-   * invent — everything temporal comes from the motion profile — or a fourth verb whose
-   * only job is to undo a third. A later `emphasize` replaces it, which is the one
-   * transition an author can actually write.
+   * Replaces the visible copy while active; clearEmphasis restores that copy if not hidden.
    */
   emphasis: string | null;
 };
@@ -52,6 +47,10 @@ export const imageContextReducer: EventReducer<ImageContextState> = (state, even
       return { ...state, imageFrame: event.frame };
     case REVEAL_COPY_ACTION:
       return { ...state, copyFrame: event.frame };
+    case 'hideCopy':
+      return { ...state, copyFrame: null };
+    case 'clearEmphasis':
+      return { ...state, emphasis: null };
     case 'emphasize': {
       const text = readString(event.payload, 'text');
       return text === null ? state : { ...state, emphasis: text };

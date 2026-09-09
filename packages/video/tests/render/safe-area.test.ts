@@ -29,6 +29,8 @@
  * A scene that brings its own ground is measured against itself instead, on both counts.
  * `SceneCapability.paintsOwnGround` carries why; `quietBorderReading` in `png.ts` carries which
  * reading that selects, for this suite and for the content-stress one together.
+ * Edge-to-edge media uses an additional foreground-only frame for the quiet border;
+ * containment and liveness still inspect the original render, including the media.
  *
  * **The control is what makes these absolute, and that is the point.** The suite used to
  * ask the same three things as a relation between two examples of the same capability, on
@@ -67,8 +69,7 @@ import {
 /**
  * How close to its own edge a scene may put ink before the frame reads as clipped.
  *
- * Not a design margin — scenes choose their own, and `image_context` deliberately chooses
- * a tighter one than `grid.margin`. It is the width at which *any* margin has effectively
+ * Not a design margin — scenes choose their own. It is the width at which *any* margin has effectively
  * been spent: 16px is one step of the space scale, and text that ends there has either
  * been cropped or is about to be.
  */
@@ -122,6 +123,7 @@ type Case = {
   frames: number[];
   /** See `SceneCapability.paintsOwnGround`, and the quiet-border assertion below. */
   paintsOwnGround: boolean;
+  hasBleedMedia: boolean;
 };
 
 /**
@@ -145,6 +147,7 @@ const cases: Case[] = registry.flatMap((capability) =>
       examples: capability.examples.map((example) => example.id),
       frames: framesFor(capability.meta.recommendedDurationFrames),
       paintsOwnGround: capability.paintsOwnGround === true,
+      hasBleedMedia: capability.hasBleedMedia === true,
     })),
   ),
 );
@@ -166,10 +169,11 @@ const renderExample = (
   profile: (typeof PROFILES)[number],
   safeArea: SafeArea,
   frame: number,
+  inspectForeground = false,
 ): Promise<Bitmap> =>
   renderStillAt(
     compositionIdFor(capabilityId, exampleId),
-    { capabilityId, exampleId, layout: null, motionProfile: profile, safeArea },
+    { capabilityId, exampleId, layout: null, motionProfile: profile, safeArea, inspectForeground },
     frame,
   );
 
@@ -239,6 +243,7 @@ describe('a declared composition renders into the rectangle it declared', () => 
   describe.each(cases.map((one) => [one.label, one] as const))('%s', (_label, testCase) => {
     /** `[frame][example]`, in the order of `testCase.frames` and `testCase.examples`. */
     let frames: Bitmap[][] = [];
+    let foregroundFrames: Bitmap[][] = [];
 
     beforeAll(async () => {
       frames = await Promise.all(
@@ -256,13 +261,37 @@ describe('a declared composition renders into the rectangle it declared', () => 
           ),
         ),
       );
+      if (testCase.hasBleedMedia) {
+        foregroundFrames = await Promise.all(
+          testCase.frames.map((frame) =>
+            Promise.all(
+              testCase.examples.map((exampleId) =>
+                renderExample(
+                  testCase.capabilityId,
+                  exampleId,
+                  testCase.profile,
+                  testCase.safeArea,
+                  frame,
+                  true,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
     }, 180_000);
 
     /** Every rendered pair of `[frame, example]`, flattened with its labels attached. */
-    const eachRender = function* (): Generator<[number, string, Bitmap]> {
+    const eachRender = function* (foreground = false): Generator<[number, string, Bitmap]> {
       for (const [row, frame] of testCase.frames.entries()) {
         for (const [column, exampleId] of testCase.examples.entries()) {
-          yield [frame, exampleId, frames[row]?.[column] as Bitmap];
+          yield [
+            frame,
+            exampleId,
+            (foreground && testCase.hasBleedMedia ? foregroundFrames : frames)[row]?.[
+              column
+            ] as Bitmap,
+          ];
         }
       }
     };
@@ -312,7 +341,7 @@ describe('a declared composition renders into the rectangle it declared', () => 
       const border = bandsInside(insideOf(testCase.safeArea), EDGE_QUIET_PX);
       const { paintsOwnGround } = testCase;
 
-      for (const [frame, exampleId, bitmap] of eachRender()) {
+      for (const [frame, exampleId, bitmap] of eachRender(true)) {
         const { expected, actual, basis } = quietBorderReading(bitmap, border, {
           control,
           paintsOwnGround,

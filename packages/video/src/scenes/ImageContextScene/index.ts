@@ -17,6 +17,7 @@ export const imageContextCapability: SceneCapability = {
   examples: imageContextExamples,
   component: ImageContextScene as unknown as React.ComponentType<SceneProps<never>>,
   checks: imageContextChecks,
+  hasBleedMedia: true,
 };
 
 export { ImageContextScene } from './Component';

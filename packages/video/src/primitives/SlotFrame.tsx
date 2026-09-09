@@ -88,7 +88,10 @@ export const SlotFrame: React.FC<{
    * mean the same thing at every frame of the shot.
    */
   gridMargin?: boolean;
-}> = ({ safeArea, children, gridMargin = true }) => {
+  /** Media fills the allocated region; foreground retains the normal safe margins.
+   * Put CameraRig inside this layer to move the image without moving the typography. */
+  bleed?: React.ReactNode;
+}> = ({ safeArea, children, gridMargin = true, bleed }) => {
   const theme = useTheme();
   const margin = gridMargin ? theme.grid.margin : 0;
 
@@ -116,19 +119,45 @@ export const SlotFrame: React.FC<{
 
   return (
     <AbsoluteFill
-      {...{ [SCENE_BOX_ATTRIBUTE]: box.height }}
-      style={{
-        paddingTop: top,
-        paddingRight: right,
-        paddingBottom: bottom,
-        paddingLeft: left,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      style={
+        bleed
+          ? {
+              clipPath: `inset(${safeArea.top}% ${safeArea.right}% ${safeArea.bottom}% ${safeArea.left}%)`,
+            }
+          : undefined
+      }
     >
-      <FrameBoxCtx.Provider value={box}>
-        <DensityProvider value={density}>{children}</DensityProvider>
-      </FrameBoxCtx.Provider>
+      {bleed ? (
+        <AbsoluteFill
+          data-scene-bleed="media"
+          style={{
+            top: `${safeArea.top}%`,
+            right: `${safeArea.right}%`,
+            bottom: `${safeArea.bottom}%`,
+            left: `${safeArea.left}%`,
+            width: 'auto',
+            height: 'auto',
+            overflow: 'hidden',
+          }}
+        >
+          {bleed}
+        </AbsoluteFill>
+      ) : null}
+      <AbsoluteFill
+        {...{ [SCENE_BOX_ATTRIBUTE]: box.height }}
+        style={{
+          paddingTop: top,
+          paddingRight: right,
+          paddingBottom: bottom,
+          paddingLeft: left,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <FrameBoxCtx.Provider value={box}>
+          <DensityProvider value={density}>{children}</DensityProvider>
+        </FrameBoxCtx.Provider>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

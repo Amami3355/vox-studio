@@ -840,7 +840,7 @@
         "id": "image_context",
         "name": "ImageContextScene",
         "family": "context",
-        "summary": "Editorial image paired with concise context copy for openings and transitions.",
+        "summary": "Full-frame documentary image with concise, high-contrast editorial text overlaid for openings and transitions.",
         "useWhen": [
           "establishing a documentary subject with one strong image",
           "providing visual context before or after a data scene",
@@ -850,7 +850,8 @@
           "comparing numeric categories → bar_chart",
           "locating a place or route → map",
           "presenting a typography-only statement → typographic_statement",
-          "making a character carry the explanation → character_explainer"
+          "making a character carry the explanation → character_explainer",
+          "preserving an entire diagram or explaining specific image details → image_detail"
         ],
         "supportsEvents": true,
         "requiresAssets": true,
@@ -870,13 +871,25 @@
             "headline": {
               "type": "string",
               "maxLength": 120,
-              "description": "Editorial headline paired with the image. Best under 40 characters; longer copy reduces the type scale."
+              "description": "Short editorial message over the image. Prefer 3-7 words and under 40 characters. Longer copy reduces the type scale. No generic labels such as Visual context."
             },
             "caption": {
               "default": "",
-              "description": "Optional supporting context. Best under 120 characters.",
+              "description": "Optional single supporting sentence over the image. Prefer under 90 characters; do not repeat the headline or transcribe the narration.",
               "type": "string",
               "maxLength": 240
+            },
+            "imageFocus": {
+              "default": "center",
+              "description": "Region of the accepted image to retain when filling the frame. Choose a text layout away from its subject. This is a crop alignment, not subject detection.",
+              "type": "string",
+              "enum": [
+                "center",
+                "left",
+                "right",
+                "top",
+                "bottom"
+              ]
             },
             "assetRequirement": {
               "type": "object",
@@ -930,7 +943,7 @@
                 "subject"
               ],
               "additionalProperties": false,
-              "description": "Semantic visual request resolved before compilation. Never provide a path or URI."
+              "description": "Image fills the frame and may be cropped. Prefer a landscape image composed for the selected text placement, with the subject away from that area and important details away from the edges. Never provide a path or URI."
             }
           },
           "required": [
@@ -943,19 +956,46 @@
           "headline": {
             "recommendedMin": 1,
             "recommendedMax": 40,
-            "onEmpty": "The asset subject becomes the only visible context label.",
-            "onExceed": "The headline drops one step of the type scale.",
+            "onEmpty": "The image and optional caption carry the context. An unresolved image uses its subject as a fallback when all copy is empty.",
+            "onExceed": "Longer copy covers more of the image. The headline wraps and reduces its type scale when needed to fit.",
             "onExceedCode": "TITLE_DENSITY"
           },
           "caption": {
-            "recommendedMax": 120,
+            "recommendedMax": 90,
             "onExceed": "Shorten the caption to preserve an image-led composition."
           }
         },
         "layouts": [
           {
+            "id": "bottomLeft",
+            "description": "Full-frame image with a short message at bottom left. Choose for a subject on the right; request open space on the left.",
+            "slots": [
+              "image",
+              "headline",
+              "caption"
+            ]
+          },
+          {
+            "id": "bottomRight",
+            "description": "Full-frame image with a short message at bottom right. Choose for a subject on the left; request open space on the right.",
+            "slots": [
+              "image",
+              "headline",
+              "caption"
+            ]
+          },
+          {
+            "id": "lowerThird",
+            "description": "Full-frame image with a wider, shallow text band along the bottom. Keep the subject above the band; use for a broad establishing view.",
+            "slots": [
+              "image",
+              "headline",
+              "caption"
+            ]
+          },
+          {
             "id": "splitLeft",
-            "description": "Editorial image on the left with a concise headline and optional caption on the right. Composed into half a frame, the same three slots stack: plate above, copy below.",
+            "description": "Compatibility name for saved plans. Now renders the full-frame image with bottom-right text; choose bottomRight for new scenes.",
             "slots": [
               "image",
               "headline",
@@ -966,17 +1006,22 @@
         "actions": [
           {
             "id": "revealImage",
-            "description": "Bring the image plate onto the frame. Use it to hold the image back until the narration reaches its subject.",
+            "description": "Reveal the full-frame image when the narration reaches its subject.",
             "payloadSchema": null
           },
           {
             "id": "revealCopy",
-            "description": "Bring the headline and caption in, one after the other, after the image.",
+            "description": "Bring the headline and optional caption over the image, one after the other. Also restores copy after hideCopy.",
+            "payloadSchema": null
+          },
+          {
+            "id": "hideCopy",
+            "description": "Remove the headline and caption after reading, leaving the image visible. Clear an active emphasis separately with clearEmphasis.",
             "payloadSchema": null
           },
           {
             "id": "emphasize",
-            "description": "Points at one spoken word or short phrase by stamping it over the image, as the narrator says it. Anchor it with a word anchor onto that word, never a beat boundary. It holds until the scene ends, or until a later emphasis replaces it.",
+            "description": "Points at one spoken word or short phrase by showing it over the image as the narrator says it. Use a word anchor onto that word. Temporarily replaces headline and caption so only one message is visible. Holds until clearEmphasis, a replacement emphasis, or the scene ends.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -994,6 +1039,11 @@
             "deicticFields": [
               "text"
             ]
+          },
+          {
+            "id": "clearEmphasis",
+            "description": "Remove the emphasized phrase. Restores the headline and caption unless hideCopy has removed them.",
+            "payloadSchema": null
           }
         ],
         "examples": [
@@ -1002,17 +1052,17 @@
             "title": "Housing context opener",
             "note": "Canonical image-led opening for the housing and rent vertical slice.",
             "component": "image_context",
-            "layout": "splitLeft",
+            "layout": "bottomLeft",
             "motionProfile": "cinematic",
             "spansBeats": [
               "b1"
             ],
             "props": {
-              "headline": "The rent squeeze is reshaping city life",
-              "caption": "A growing share of income now disappears before the month begins.",
+              "headline": "The rent squeeze",
+              "caption": "Housing takes a growing share of income.",
               "assetRequirement": {
                 "type": "image",
-                "subject": "Dense apartment buildings in a European city at dusk",
+                "subject": "City apartments at dusk, open foreground at bottom left",
                 "treatment": "photo",
                 "orientation": "landscape",
                 "identityKey": "housing-city-context"
@@ -1043,13 +1093,14 @@
           {
             "id": "example-driven-context",
             "title": "Plan-driven reveal — the image lands before the copy",
-            "note": "The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject. Same media as the canonical example; only the events differ.",
+            "note": "The image arrives alone; the message enters on the next beat and leaves on the third, giving the viewer time with the image. Same media as the canonical example.",
             "component": "image_context",
-            "layout": "splitLeft",
+            "layout": "bottomLeft",
             "motionProfile": "subtleDrift",
             "spansBeats": [
               "b1",
-              "b2"
+              "b2",
+              "b3"
             ],
             "events": [
               {
@@ -1059,6 +1110,10 @@
               {
                 "at": "b2.start",
                 "action": "revealCopy"
+              },
+              {
+                "at": "b3.start",
+                "action": "hideCopy"
               }
             ],
             "props": {
@@ -1066,7 +1121,7 @@
               "caption": "For a growing number of households, the month is already spoken for.",
               "assetRequirement": {
                 "type": "image",
-                "subject": "Dense apartment buildings in a European city at dusk",
+                "subject": "City apartments at dusk, open foreground at bottom left",
                 "treatment": "photo",
                 "orientation": "landscape",
                 "identityKey": "housing-city-context"
@@ -1078,7 +1133,7 @@
             "title": "Empty case — unresolved image and copy",
             "note": "Empty copy remains renderable while the subject-labelled asset placeholder carries context.",
             "component": "image_context",
-            "layout": "splitLeft",
+            "layout": "bottomLeft",
             "motionProfile": "editorialStatic",
             "spansBeats": [
               "b1"
@@ -1091,6 +1146,52 @@
                 "subject": "Housing context image pending",
                 "treatment": "duotone",
                 "orientation": "landscape"
+              }
+            }
+          },
+          {
+            "id": "example-context-bottomRight",
+            "title": "Documentary context with bottomRight text",
+            "note": "Same repository image, alternate editorial placement. Compose production images for the selected text area.",
+            "component": "image_context",
+            "layout": "bottomRight",
+            "motionProfile": "cinematic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "A city under pressure",
+              "caption": "One image. One editorial idea.",
+              "imageFocus": "left",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Apartment blocks on the left, quiet dusk foreground on the right",
+                "treatment": "photo",
+                "orientation": "landscape",
+                "identityKey": "housing-city-context"
+              }
+            }
+          },
+          {
+            "id": "example-context-lowerThird",
+            "title": "Documentary context with lowerThird text",
+            "note": "Same repository image, alternate editorial placement. Compose production images for the selected text area.",
+            "component": "image_context",
+            "layout": "lowerThird",
+            "motionProfile": "cinematic",
+            "spansBeats": [
+              "b1"
+            ],
+            "props": {
+              "headline": "Where the city comes home",
+              "caption": "One image. One editorial idea.",
+              "imageFocus": "top",
+              "assetRequirement": {
+                "type": "image",
+                "subject": "Wide city skyline above a calm foreground for bottom text",
+                "treatment": "photo",
+                "orientation": "landscape",
+                "identityKey": "housing-city-context"
               }
             }
           }

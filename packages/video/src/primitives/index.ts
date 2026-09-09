@@ -18,3 +18,4 @@ export * from './Backdrop';
 export * from './useEntrance';
 export * from './ImageViewport';
 export * from './ProcessPath';
+export * from './TextScrim';

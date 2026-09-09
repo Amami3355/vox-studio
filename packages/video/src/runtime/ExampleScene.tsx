@@ -9,9 +9,11 @@ import type { SafeArea } from '../core/types';
 import type { MotionProfileId } from '../design/motion';
 import { type ThemeId, themes } from '../design/theme';
 import { requireCapability } from '../scenes/registry';
+import { ForegroundInspection } from './ForegroundInspection';
 import { SceneRenderer } from './SceneRenderer';
 
 export type ExampleSceneProps = {
+  inspectForeground?: boolean;
   capabilityId: string;
   exampleId: string;
   /** Overrides so layout and motion profile stay editable in the Remotion props panel. */
@@ -55,6 +57,7 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   assets,
   safeArea,
   themeId,
+  inspectForeground,
 }) => {
   const { durationInFrames } = useVideoConfig();
   const capability = requireCapability(capabilityId);
@@ -85,15 +88,18 @@ export const ExampleScene: React.FC<ExampleSceneProps> = ({
   );
 
   return (
-    <SceneRenderer
-      capabilityId={capabilityId}
-      props={example.props}
-      assets={assets ?? resolved}
-      events={events}
-      layout={layout ?? example.layout}
-      motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}
-      {...(safeArea ? { safeArea } : {})}
-      {...(themeId && themes[themeId] ? { theme: themes[themeId] } : {})}
-    />
+    <>
+      <ForegroundInspection enabled={inspectForeground} />
+      <SceneRenderer
+        capabilityId={capabilityId}
+        props={example.props}
+        assets={assets ?? resolved}
+        events={events}
+        layout={layout ?? example.layout}
+        motionProfile={motionProfile ?? example.motionProfile ?? 'subtleDrift'}
+        {...(safeArea ? { safeArea } : {})}
+        {...(themeId && themes[themeId] ? { theme: themes[themeId] } : {})}
+      />
+    </>
   );
 };

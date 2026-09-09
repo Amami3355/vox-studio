@@ -80,7 +80,7 @@ let control: Bitmap;
  * to put the finding. Caught here rather than left to escape from `beforeAll`, so the
  * failure lands on the assertion that is about fit instead of on the suite's plumbing.
  */
-type Rendered = { bitmap: Bitmap } | { failure: string };
+type Rendered = { bitmap: Bitmap; foreground?: Bitmap } | { failure: string };
 
 /**
  * The frames that did render, with their place in `testCase.frames`, or a skip if none did.
@@ -115,9 +115,11 @@ type Rendered = { bitmap: Bitmap } | { failure: string };
 const drawnFrames = (
   renders: Rendered[],
   skip: () => void,
+  foreground = false,
 ): Array<[index: number, bitmap: Bitmap]> => {
   const drawn = renders.flatMap(
-    (one, index): Array<[number, Bitmap]> => ('failure' in one ? [] : [[index, one.bitmap]]),
+    (one, index): Array<[number, Bitmap]> =>
+      'failure' in one ? [] : [[index, foreground ? (one.foreground ?? one.bitmap) : one.bitmap]],
   );
   if (drawn.length === 0) skip();
   return drawn;
@@ -135,13 +137,18 @@ const drawnFrames = (
  */
 const didNotFit: string[] = [];
 
-const renderCase = async (testCase: StressCase, frame: number): Promise<Rendered> => {
+const renderCase = async (
+  testCase: StressCase,
+  frame: number,
+  inspectForeground = false,
+): Promise<Rendered> => {
   try {
     return {
       bitmap: decodePng(
         await harness.still(
           STRESS_CONTROL_ID,
           {
+            inspectForeground,
             capabilityId: testCase.capabilityId,
             props: testCase.props,
             events: testCase.events,
@@ -183,6 +190,17 @@ describe('content the schema accepts renders into the box it was given', () => {
 
     beforeAll(async () => {
       renders = await Promise.all(testCase.frames.map((frame) => renderCase(testCase, frame)));
+      if (testCase.hasBleedMedia) {
+        const foreground = await Promise.all(
+          testCase.frames.map((frame) => renderCase(testCase, frame, true)),
+        );
+        renders = renders.map((one, index) => {
+          const mask = foreground[index];
+          if (!mask || 'failure' in mask)
+            return mask ?? { failure: 'Missing foreground inspection' };
+          return 'failure' in one ? one : { ...one, foreground: mask.bitmap };
+        });
+      }
       for (const one of renders) {
         if ('failure' in one) didNotFit.push(`${testCase.label} — ${one.failure}`);
       }
@@ -237,7 +255,7 @@ describe('content the schema accepts renders into the box it was given', () => {
       const border = bandsInside(regionOfInsets(testCase.safeArea, WIDTH, HEIGHT), EDGE_QUIET_PX);
       const { paintsOwnGround } = testCase;
 
-      for (const [index, bitmap] of drawnFrames(renders, skip)) {
+      for (const [index, bitmap] of drawnFrames(renders, skip, true)) {
         const { expected, actual, basis } = quietBorderReading(bitmap, border, {
           control,
           paintsOwnGround,

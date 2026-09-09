@@ -100,7 +100,8 @@ rather than wired per scene:
 (`primitives/Column.tsx`), which publishes a column width down the tree exactly as `SlotFrame`
 publishes the frame box and the density. A layout declares its columns once; `SceneTitle` fits
 itself. The default is the frame box, so a header spanning the canvas declares nothing — this is
-why `bar_chart` has no provider and `image_context` has one around its copy column. The `maxStep`
+why `bar_chart` has no provider. `image_context` fits its overlay directly with
+`useTitleStep`, using the width from its selected placement. The `maxStep`
 prop is a ceiling on top of the fit, never a replacement for it.
 
 **Cost of intervening.** Cheap. Four files, no geometry, every scene picks it up.
@@ -122,8 +123,9 @@ three are the *physics* of a frame and they are deliberately not negotiable by a
 - **`SlotFrame`** is the only place a scene touches its safe area. It converts safe-area
   percentages into padding, adds the grid margin and the camera allowance, and publishes two
   things downward: a `FrameBox` (the shape it got) and a `density` factor. A scene may decline
-  the *design* margin (`gridMargin={false}` — only `image_context` does) but never the camera
-  allowance.
+  the *design* margin (`gridMargin={false}`) but never the camera allowance. For immersive
+  imagery, its `bleed` layer fills and clips to the allocated region. `image_context` places
+  `CameraRig` inside this media layer, leaving copy fixed within the normal grid margin.
 - **`density`** is `sqrt(areaRatio)` clamped at `DENSITY_FLOOR = 0.72`. Type and spacing scale
   by it. That is the whole degradation story for a squeezed scene.
 - **`CameraRig`** is the only component allowed to write a transform, and it publishes its
@@ -256,13 +258,16 @@ zone the premium anchors speak to most directly.
 | decision | where | value |
 | --- | --- | --- |
 | chart / annotation split | `BarChartScene/Component.tsx:143-153` | `flex 62` / `flex 34` |
-| image / copy split | `ImageContextScene/layouts.ts:33-36` | `7fr / 5fr`, never 1:1 |
+| image / copy overlay | `ImageContextScene/layouts.ts` | full-frame image, message width 58% or lower-third band 86% |
 | portrait switch | both `layouts.ts` | aspect `< 1.2` |
 | categories a composed box holds | `BarChartScene/layouts.ts:72` | `chartShare 0.55`, floor 3 |
 
 **The layouts.** `bar_chart` publishes three (`standard`, `horizontal`, `withCallout`);
-`image_context` publishes one (`splitLeft`), on purpose — its own header argues that a second
-variant would be paid for out of the compiler.
+`image_context` offers `bottomLeft`, `bottomRight` and `lowerThird` placements with the same
+message lifecycle. Legacy `splitLeft` maps to `bottomRight` so saved plans still render.
+`TextScrim` supplies a dark contrast plateau under the complete text box, feathered outside
+it; image-overlay tokens remain light on dark in both themes. Foreground inspection in the
+render gates is described in [Adding a capability](adding-a-capability.md#full-frame-media-and-foreground-inspection).
 
 **A composition is not a layout.** The agent picks a layout; the compiler picks a composition;
 the scene is told only the *shape* of the box it got (`useFrameBox`), never the slot. ADR-0003

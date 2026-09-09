@@ -1,51 +1,33 @@
-/**
- * One layout, on purpose.
- *
- * The increment that added this capability bought breadth of *catalog* — a second
- * structurally different scene — not breadth of variants. A second layout here would be
- * paid for out of the compiler and the continuity test, which is where the remaining
- * unknowns actually live.
- *
- * That is still one layout after `meta.ts` gained `left` and `right`. A composition is not
- * a layout: the agent picks a layout, the compiler picks a composition, and the two must
- * not become the same list. `splitLeft` composed into half a frame is `splitLeft` drawn for
- * the box it was given, not a `stacked` the agent could ask for over the whole canvas —
- * which would be a different scene, with a different rhythm, needing its own examples.
- */
 import type { LayoutDef } from '../../core/types';
 
+/** Placements share one temporal grammar: image, message, then an unobstructed hold.
+ * Choose the text area opposite the subject. The camera only moves the image. */
 export const imageContextLayouts = {
+  bottomLeft: {
+    slots: ['image', 'headline', 'caption'],
+    description:
+      'Full-frame image with a short message at bottom left. Choose for a subject on the right; request open space on the left.',
+  },
+  bottomRight: {
+    slots: ['image', 'headline', 'caption'],
+    description:
+      'Full-frame image with a short message at bottom right. Choose for a subject on the left; request open space on the right.',
+  },
+  lowerThird: {
+    slots: ['image', 'headline', 'caption'],
+    description:
+      'Full-frame image with a wider, shallow text band along the bottom. Keep the subject above the band; use for a broad establishing view.',
+  },
   splitLeft: {
     slots: ['image', 'headline', 'caption'],
     description:
-      'Editorial image on the left with a concise headline and optional caption on the right. Composed into half a frame, the same three slots stack: plate above, copy below.',
+      'Compatibility name for saved plans. Now renders the full-frame image with bottom-right text; choose bottomRight for new scenes.',
   },
 } as const satisfies Record<string, LayoutDef>;
 
-/**
- * Layout-owned geometry. Agents never author these proportions.
- *
- * 7/5 rather than 1/1: an even split reads as a slide, and the asymmetry is what keeps
- * the image the subject and the copy its caption. The stack keeps the same 7/5, turned
- * ninety degrees, so the scene reads as itself in either arrangement.
- */
-export const splitLeftGeometry = {
-  imageColumns: 7,
-  copyColumns: 5,
-  imageRows: 7,
-  copyRows: 5,
-
-  /**
-   * Below this ratio of width to height, the split becomes a stack.
-   *
-   * The number sits in the gap between the two shapes this scene actually meets: the full
-   * canvas is 1.78, and any half of it is 0.89. It is not a tuned threshold — it is the
-   * statement that a box narrower than it is tall cannot hold two columns.
-   *
-   * Why a shape and not a flag: the scene is told the box it got, never the slot the
-   * compiler chose (ADR-0003 decision 4 — `safeArea` is the translation, not a second
-   * layout system). A `top` composition is 3.56 and stays split, which is right, and it
-   * follows from the shape rather than from a list of slots kept in step with `meta.ts`.
-   */
-  stackBelowAspect: 1.2,
+export const imageContextGeometry = {
+  columnShare: 0.58,
+  bandShare: 0.86,
+  narrowBelowAspect: 1.2,
+  titleHeightShare: 0.36,
 } as const;

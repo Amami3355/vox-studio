@@ -20,15 +20,23 @@ export const imageContextSchema = z
       .string()
       .max(120)
       .describe(
-        'Editorial headline paired with the image. Best under 40 characters; longer copy reduces the type scale.',
+        'Short editorial message over the image. Prefer 3-7 words and under 40 characters. Longer copy reduces the type scale. No generic labels such as Visual context.',
       ),
     caption: z
       .string()
       .max(240)
       .default('')
-      .describe('Optional supporting context. Best under 120 characters.'),
+      .describe(
+        'Optional single supporting sentence over the image. Prefer under 90 characters; do not repeat the headline or transcribe the narration.',
+      ),
+    imageFocus: z
+      .enum(['center', 'left', 'right', 'top', 'bottom'])
+      .default('center')
+      .describe(
+        'Region of the accepted image to retain when filling the frame. Choose a text layout away from its subject. This is a crop alignment, not subject detection.',
+      ),
     assetRequirement: assetRequirementSchema.describe(
-      'Semantic visual request resolved before compilation. Never provide a path or URI.',
+      'Image fills the frame and may be cropped. Prefer a landscape image composed for the selected text placement, with the subject away from that area and important details away from the edges. Never provide a path or URI.',
     ),
   })
   .strict();

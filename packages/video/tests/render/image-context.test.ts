@@ -8,10 +8,15 @@
  * baseline: literal hashes, accepted after visual review, and the suite that is expected
  * to fail when the design changes on purpose.
  */
+import { mkdir, writeFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { PLACEHOLDER_ASSET_URI } from '../../src/assets/resolver';
 import type { AssetRef, ResolvedSceneAssets } from '../../src/core/assets';
+import { NO_SAFE_AREA } from '../../src/core/types';
+import { imageOverlay } from '../../src/design/theme';
+import { STRESS_CONTROL_ID } from '../../src/runtime/StressControl';
 import { hashStill, renderHarness } from './harness';
+import { decodePng, hashRegions, pixelAt } from './png';
 import { expectRecordedStills } from './still-hashes';
 
 const READY_ASSET: AssetRef = {
@@ -40,19 +45,22 @@ const harness = renderHarness();
 
 const renderHash = async (exampleId: string, asset?: AssetRef): Promise<string> => {
   const assets: ResolvedSceneAssets | undefined = asset ? { assetRequirement: asset } : undefined;
-  return hashStill(
-    await harness.still(
-      `image-context--${exampleId}`,
-      {
-        capabilityId: 'image_context',
-        exampleId,
-        layout: null,
-        motionProfile: null,
-        ...(assets ? { assets } : {}),
-      },
-      SETTLED_FRAME,
-    ),
+  const bytes = await harness.still(
+    `image-context--${exampleId}`,
+    {
+      capabilityId: 'image_context',
+      exampleId,
+      layout: null,
+      motionProfile: null,
+      ...(assets ? { assets } : {}),
+    },
+    SETTLED_FRAME,
   );
+  if (!asset) {
+    await mkdir('.scratch/stills/image-context', { recursive: true });
+    await writeFile(`.scratch/stills/image-context/${exampleId}.png`, bytes);
+  }
+  return hashStill(bytes);
 };
 
 describe('ImageContextScene runtime', () => {
@@ -88,35 +96,133 @@ describe('ImageContextScene runtime', () => {
       { canonical, empty, longCopy, driven },
       {
         win32: {
-          // Re-accepted 2026-08-14 on Windows when `editorial-paper` became the default theme.
-          // All three moved, and this time *that* is the corroboration: a palette reaches every
-          // pixel of every frame, so an unchanged hash would have meant the theme had not
-          // arrived. The previous acceptance is the mirror of it — a camera-allowance change
-          // left `empty` alone precisely because `editorialStatic` has no camera. A baseline
-          // that moves for the whole reason and not part of it is the thing being checked here.
-          //
-          // Reviewed before accepting, per this file's header: the ready asset, the placeholder
-          // plate, the eyebrow, the title and the caption were each read on paper at frame 120.
-          canonical: 'deeb7727f43aac8958e2e4fb6e163369',
-          empty: '5c23bdadca1da65d59564540b73bd4b9',
-          // `longCopy` is unchanged by the 2026-08-20 header work, and that it is unchanged is
-          // the point. `useTitleStep` gained a height budget that day, and an intermediate
-          // version of it counted lines instead — under which this headline dropped a step to
-          // reach four and this hash moved. The rule it shipped as is a *share* of the scene:
-          // five lines here are 326px of a 1008px box, under the half a header may take, so
-          // the fit leaves the frame exactly where a human accepted it in the first place. A
-          // baseline that had moved would have meant the share was doing something the sentence
-          // it comes from never asked for.
-          longCopy: 'e26133541a06a7ec683d2915f506b5c8',
-          // Accepted 2026-08-15, the first key frame for the only example carrying events.
-          // It shares `identityKey` with `canonical` and still hashes differently, which is the
-          // corroboration here: same media, same layout, same theme, and the only variable left
-          // is the plan holding the copy back. An equal hash would have meant the events were
-          // not reaching the frame at all. Reviewed on stills before accepting: at frame 120 the
-          // plate carries the resolved photograph and the copy column is deliberately empty.
-          driven: '58a8bc4c5e1883d54d48844b2488700d',
+          // Reviewed 2026-09-09: full-frame media with a stable lower-left message,
+          // no card or eyebrow. Empty uses a subject fallback on the dark media ground;
+          // longCopy wraps fully at bottomRight (legacy splitLeft). At frame 120 the
+          // driven example has hidden its copy and scrim, leaving the image alone.
+          // The final scrim extends through the reading margin to avoid a hard edge seam.
+          canonical: '2fd63467a493c8864ce4e63519a50120',
+          empty: 'fafa63377b93a762a0f11e14f0b4ff05',
+          longCopy: '3142a07418a160b0d5d4a7d5b00d2c70',
+          driven: '65ed8f80831208f36134321a16b73b3d',
         },
       },
+    );
+  });
+});
+
+const whiteImage: AssetRef = {
+  status: 'ready',
+  uri: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><path fill="white" d="M0 0h1920v1080H0z"/></svg>')}`,
+};
+const props = {
+  headline: 'Context',
+  caption: 'A short caption.',
+  assetRequirement: {
+    type: 'image',
+    subject: 'Bright photographic test surface',
+    treatment: 'photo',
+    orientation: 'landscape',
+  },
+};
+const scene = {
+  capabilityId: 'image_context',
+  props,
+  layout: 'bottomLeft',
+  motionProfile: 'editorialStatic',
+  safeArea: NO_SAFE_AREA,
+  assets: { assetRequirement: whiteImage },
+};
+const luminance = (hex: string) => {
+  const channels = [1, 3, 5]
+    .map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
+    .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+  return (channels[0] ?? 0) * 0.2126 + (channels[1] ?? 0) * 0.7152 + (channels[2] ?? 0) * 0.0722;
+};
+
+describe('immersive image context', () => {
+  it.each(['bottomLeft', 'bottomRight', 'lowerThird'])(
+    'keeps light text legible over a white image in %s',
+    async (layout) => {
+      for (const themeId of ['editorial-paper', 'editorial-cold']) {
+        const bitmap = decodePng(
+          await harness.still(
+            STRESS_CONTROL_ID,
+            { ...scene, layout, themeId, inspectBackground: true },
+            120,
+          ),
+        );
+        expect(pixelAt(bitmap, 2, 2)).toBe('#ffffff'); // image reaches the actual canvas edge
+        // The anchored scrim must reach the edge even though its feather is density-scaled.
+        // A short scrim left a bright vertical seam beside bottom-right copy.
+        const edgeX = layout === 'bottomRight' ? 1918 : 2;
+        const copyX = layout === 'bottomRight' ? 1700 : 110;
+        expect(luminance(pixelAt(bitmap, edgeX, 950))).toBeLessThanOrEqual(
+          luminance(pixelAt(bitmap, copyX, 950)),
+        );
+        const xs = layout === 'bottomRight' ? [930, 1300, 1700] : [110, 450, 850];
+        for (const x of xs)
+          for (const y of [850, 950]) {
+            const background = pixelAt(bitmap, x, y);
+            const contrast =
+              (luminance(imageOverlay.secondaryInk) + 0.05) / (luminance(background) + 0.05);
+            expect(contrast).toBeGreaterThanOrEqual(4.5);
+          }
+      }
+    },
+  );
+
+  it('removes copy and its scrim, and restores it after a temporary spoken emphasis', async () => {
+    const normal = await harness.still(STRESS_CONTROL_ID, scene, 120);
+    const events = [
+      { frame: 0, action: 'revealCopy' },
+      { frame: 40, action: 'emphasize', payload: { text: 'One idea' } },
+      { frame: 80, action: 'clearEmphasis' },
+    ];
+    expect(hashStill(await harness.still(STRESS_CONTROL_ID, { ...scene, events }, 120))).toBe(
+      hashStill(normal),
+    );
+    const hidden = decodePng(
+      await harness.still(
+        STRESS_CONTROL_ID,
+        { ...scene, events: [{ frame: 30, action: 'hideCopy' }] },
+        120,
+      ),
+    );
+    expect(pixelAt(hidden, 110, 950)).toBe('#ffffff');
+    expect(pixelAt(hidden, 800, 850)).toBe('#ffffff');
+    const emphasized = await harness.still(
+      STRESS_CONTROL_ID,
+      { ...scene, events: events.slice(0, 2) },
+      120,
+    );
+    const onlyPhrase = await harness.still(
+      STRESS_CONTROL_ID,
+      { ...scene, props: { ...props, headline: 'One idea', caption: '' } },
+      120,
+    );
+    expect(hashStill(emphasized)).toBe(hashStill(onlyPhrase));
+  });
+
+  it('keeps foreground geometry still while the image camera moves', async () => {
+    const at = async (frame: number, inspectForeground = true) =>
+      decodePng(
+        await harness.still(
+          STRESS_CONTROL_ID,
+          {
+            ...scene,
+            assets: { assetRequirement: READY_ASSET },
+            motionProfile: 'pushIn',
+            inspectForeground,
+          },
+          frame,
+        ),
+      );
+    const textArea = [{ x: 80, y: 750, width: 1050, height: 250 }];
+    expect(hashRegions(await at(70), textArea)).toBe(hashRegions(await at(179), textArea));
+    const imageArea = [{ x: 0, y: 0, width: 1920, height: 700 }];
+    expect(hashRegions(await at(70, false), imageArea)).not.toBe(
+      hashRegions(await at(179, false), imageArea),
     );
   });
 });

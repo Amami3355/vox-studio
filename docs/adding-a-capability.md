@@ -133,8 +133,9 @@ means regenerating and re-reading every diff that quotes them.
    the arrow and the identifier shape.
 2. **`schema.ts`** — `.strict()`, generous ceilings, a `.describe()` on every field.
 3. **`constraints.ts`** — at least one entry, each naming the degradation it buys.
-4. **`layouts.ts`** — start with one layout. A second arrangement with its own rhythm is a
-   different scene, not a second layout.
+4. **`layouts.ts`** — start with one layout. Alternative placements may share the same
+   content and temporal grammar: `image_context` positions one message at bottom left,
+   bottom right or across the lower third. A different rhythm belongs in a different scene.
 5. **`actions.ts`** — write `{}` unless a beat has actually asked for a verb. A vocabulary the
    component does not read produces a plan that validates, renders, and animates nothing.
    If it is `{}`, set `supportsEvents: false` and skip steps 6 and 7.
@@ -161,8 +162,11 @@ means regenerating and re-reading every diff that quotes them.
    statement" is only true while the stamp is mounted inside the statement's gate. Move it to
    a sibling and the same code rejects plans that render perfectly, which teaches the agent a
    rule that is not true — worse under rule 2 than having no check at all.
-8. **`Component.tsx`** — `Backdrop` → `CameraRig` → `SlotFrame` → the layout. No colour, easing
-   or duration of its own; all of it comes from `design/`.
+8. **`Component.tsx`** — normally `Backdrop` → `CameraRig` → `SlotFrame` → the layout.
+   For full-frame imagery with stable copy, pass the media as `SlotFrame.bleed`, with
+   `CameraRig` inside that layer; the foreground remains outside the camera. SlotFrame
+   clips media to the allocated region and retains the foreground reading margins.
+   No colour, easing or duration of its own; all of it comes from `design/`.
 9. **`examples.ts`** — three minimum, "edge" and "empty" appearing in an example's title or
    note, time expressed symbolically. See the constraint below.
 10. **`index.ts`** — assemble, then add the capability to `src/scenes/registry.ts`.
@@ -288,6 +292,21 @@ packages/video/node_modules/.bin/tsx packages/video/scripts/still.mts \
 Then say in the accepted block what changed in the picture and why, next to the hash. A hash
 with no sentence beside it is a number nobody can re-check.
 
+### Full-frame media and foreground inspection
+
+A capability with edge-to-edge imagery declares `hasBleedMedia` on its runtime assembly.
+`SlotFrame.bleed` marks the media layer; `TextScrim` marks the contrast background. Normal
+renders still pass containment and liveness checks against the original pixels. For the quiet
+border check only, the render and stress suites take an additional foreground inspection
+frame with these marked layers hidden by `ForegroundInspection`; visibility changes without
+reflow. This checks text margins without treating intentional image bleed as clipped text.
+The stress DOM probe still runs on both frames. Do not mark text as bleed or skip containment.
+
+`image_context` also measures contrast over a white source in both themes, verifies that hiding
+copy removes its scrim, and compares foreground geometry while the image camera moves.
+Its `imageFocus` is an authored crop alignment, not subject detection. The asset request and
+layout must leave room for copy; the scrim guarantees contrast, not subject preservation.
+
 ## Gates
 
 Two loops, and they are not interchangeable. The narrow one runs while you write; the six
@@ -366,8 +385,9 @@ actually looked at. `pnpm studio` opens Remotion Studio.
 - **Do not run render and stress in parallel on Windows.** Both drive headless Chrome and
   the compositor, and running them concurrently has produced `spawn EPERM` here. Chain
   them, one after the other — each suite's internal parallelism is enough.
-- **The proof harness and `service-render.test.ts` need `ffprobe` on `PATH`.** It is not
-  global on this machine; Remotion ships one at
-  `node_modules/.pnpm/@remotion+compositor-win32-x64-msvc@*/node_modules/@remotion/compositor-win32-x64-msvc/ffprobe.exe`
-  — prefix that directory onto `PATH` for the gate. A missing `ffprobe` is an environment
-  failure, not a capability regression.
+- **Check `ffprobe` and `ffmpeg` on `PATH` before the media gates.** Prefer the complete
+  installed FFmpeg build. Remotion also ships `ffprobe.exe` in
+  `node_modules/.pnpm/@remotion+compositor-win32-x64-msvc@*/node_modules/@remotion/compositor-win32-x64-msvc/`,
+  but do not put that directory ahead of a complete FFmpeg installation: its reduced
+  `ffmpeg.exe` lacks the `wrapped_avframe` encoder used by `service-render.test.ts` when
+  decoding the finished video to a null output. Supply the probe separately if it is missing.

@@ -62,6 +62,20 @@ export const FPS = 30;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 
+/** Photography uses light ink in both themes. The scrim's minimum opacity applies
+ * across the whole text box, including over a white image. Feathering starts outside. */
+export const imageOverlay = {
+  ink: '#FFFFFF',
+  secondaryInk: '#E5E7EB',
+  ground: '#0B0E13',
+  scrimRgb: '11, 14, 19',
+  minimumOpacity: 0.82,
+  edgeOpacity: 0.94,
+  titleStep: 4,
+  captionStep: 1,
+  captionLineHeight: 1.35,
+} as const;
+
 /**
  * `editorial-cold` — Ember on Slate.
  *

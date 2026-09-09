@@ -325,6 +325,7 @@ export type StressCase = {
   frames: number[];
   /** See `SceneCapability.paintsOwnGround`, and `quietBorderReading` in `render/png.ts`. */
   paintsOwnGround: boolean;
+  hasBleedMedia: boolean;
 };
 
 /**
@@ -372,6 +373,7 @@ export const stressCases = (): StressCase[] =>
             safeArea: slotRect(composition),
             frames: framesFor(capability.meta.recommendedDurationFrames),
             paintsOwnGround: capability.paintsOwnGround === true,
+            hasBleedMedia: capability.hasBleedMedia === true,
           })),
         ),
       ),

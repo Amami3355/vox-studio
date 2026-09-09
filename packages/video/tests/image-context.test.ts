@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { getSceneSpec, searchScenes, validateScene } from '../src/catalog/tools';
+import { resolveEvents } from '../src/core/events';
+import type { TimedEvent } from '../src/core/types';
+import { imageContextSchema } from '../src/scenes/ImageContextScene/schema';
+import {
+  imageContextReducer,
+  initialImageContextState,
+} from '../src/scenes/ImageContextScene/state';
 
 describe('ImageContextScene catalog contract', () => {
-  it('publishes the one-layout capability the Visual Planner can author', () => {
+  it('publishes the immersive layouts the Visual Planner can author', () => {
     const spec = getSceneSpec('image_context');
 
     expect(spec).toMatchObject({
@@ -12,7 +19,12 @@ describe('ImageContextScene catalog contract', () => {
       requiresAssets: true,
       supportsEvents: true,
     });
-    expect(spec.layouts.map((layout) => layout.id)).toEqual(['splitLeft']);
+    expect(spec.layouts.map((layout) => layout.id)).toEqual([
+      'bottomLeft',
+      'bottomRight',
+      'lowerThird',
+      'splitLeft',
+    ]);
   });
 
   /**
@@ -20,9 +32,9 @@ describe('ImageContextScene catalog contract', () => {
    *
    * `architecture-evolutions.md` records that "actions inventées" is one of the four things
    * the step 9 harness measures, and that a capability with no actions cannot fail that
-   * measure — which means it cannot pass it either. Two of the three drive an entrance the
-   * motion profile used to own unconditionally; the third is a pointing gesture and is held
-   * to a word by `DEICTIC_ANCHOR_REQUIRED`, tested over a plan in `validate.test.ts`.
+   * measure — which means it cannot pass it either. Reveal and hide verbs drive the message
+   * lifecycle; emphasize is a pointing gesture held to a word by `DEICTIC_ANCHOR_REQUIRED`,
+   * tested over a plan in `validate.test.ts`.
    */
   it('publishes a closed action vocabulary the plan can drive the scene with', () => {
     const spec = getSceneSpec('image_context');
@@ -30,7 +42,9 @@ describe('ImageContextScene catalog contract', () => {
     expect(spec.actions.map((action) => action.id)).toEqual([
       'revealImage',
       'revealCopy',
+      'hideCopy',
       'emphasize',
+      'clearEmphasis',
     ]);
   });
 
@@ -195,7 +209,7 @@ describe('ImageContextScene catalog contract', () => {
         expect.objectContaining({
           code: 'UNKNOWN_LAYOUT',
           field: 'layout',
-          expected: ['splitLeft'],
+          expected: ['bottomLeft', 'bottomRight', 'lowerThird', 'splitLeft'],
         }),
       ]),
     );
@@ -227,6 +241,45 @@ describe('ImageContextScene catalog contract', () => {
           field: 'headline',
         }),
       ]),
+    );
+  });
+});
+
+describe('image context editorial lifecycle', () => {
+  it('restores copy after emphasis and releases the image after both layers are cleared', () => {
+    const events: TimedEvent[] = [
+      { frame: 0, action: 'revealImage' },
+      { frame: 20, action: 'revealCopy' },
+      { frame: 50, action: 'emphasize', payload: { text: 'Housing' } },
+      { frame: 80, action: 'clearEmphasis' },
+      { frame: 100, action: 'hideCopy' },
+      { frame: 140, action: 'revealCopy' },
+    ];
+    const at = (frame: number) =>
+      resolveEvents(events, frame, initialImageContextState(events), imageContextReducer);
+    expect(at(10).copyFrame.value).toBeNull();
+    expect(at(60).emphasis.value).toBe('Housing');
+    expect(at(90).emphasis.value).toBeNull();
+    expect(at(90).copyFrame.value).toBe(20);
+    expect(at(110).copyFrame.value).toBeNull();
+    expect(at(110).imageFrame.value).toBe(0);
+    expect(at(150).copyFrame.value).toBe(140);
+    expect(at(10).copyFrame.value).toBeNull(); // seeking backwards is deterministic
+  });
+
+  it('applies a centered crop to saved props and rejects invented crop commands', () => {
+    const props = {
+      headline: 'Context',
+      assetRequirement: {
+        type: 'image',
+        subject: 'City skyline',
+        treatment: 'photo',
+        orientation: 'landscape',
+      },
+    };
+    expect(imageContextSchema.parse(props).imageFocus).toBe('center');
+    expect(imageContextSchema.safeParse({ ...props, imageFocus: 'face-tracking' }).success).toBe(
+      false,
     );
   });
 });

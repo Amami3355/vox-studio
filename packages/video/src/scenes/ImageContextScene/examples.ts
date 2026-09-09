@@ -17,15 +17,15 @@ export const imageContextExamples: SceneExample[] = [
     title: 'Housing context opener',
     note: 'Canonical image-led opening for the housing and rent vertical slice.',
     component: 'image_context',
-    layout: 'splitLeft',
+    layout: 'bottomLeft',
     motionProfile: 'cinematic',
     spansBeats: ['b1'],
     props: {
-      headline: 'The rent squeeze is reshaping city life',
-      caption: 'A growing share of income now disappears before the month begins.',
+      headline: 'The rent squeeze',
+      caption: 'Housing takes a growing share of income.',
       assetRequirement: {
         type: 'image',
-        subject: 'Dense apartment buildings in a European city at dusk',
+        subject: 'City apartments at dusk, open foreground at bottom left',
         treatment: 'photo',
         orientation: 'landscape',
         identityKey: 'housing-city-context',
@@ -54,8 +54,7 @@ export const imageContextExamples: SceneExample[] = [
     },
   },
   /**
-   * The only example that drives the scene from the plan, and it drives exactly two of the
-   * three verbs.
+   * This example reveals the image, reveals the message, then leaves the image alone.
    *
    * `emphasize` is absent because it *cannot* be here: it declares a deictic field, so the
    * compiler requires a word anchor for it, and a scene example has no take —
@@ -68,9 +67,8 @@ export const imageContextExamples: SceneExample[] = [
    * legal under that ADR and neither is a defect.
    *
    * It deliberately requests the **same picture as the canonical example** — the same
-   * `identityKey`, resolving to the same committed media. Two examples that differ only in
-   * their events isolate what the events did: an agent comparing them sees one variable and
-   * not three. It also makes this the only driven example that can be *looked at*, which
+   * `identityKey`, resolving to the same committed media. It makes the driven example
+   * directly viewable with repository assets, which
    * matters more than it sounds. Written first with copy of its own and no `identityKey`,
    * it could resolve to nothing but the subject placeholder — so the one example whose
    * behaviour was new was the one example no still could show.
@@ -78,21 +76,22 @@ export const imageContextExamples: SceneExample[] = [
   {
     id: 'example-driven-context',
     title: 'Plan-driven reveal — the image lands before the copy',
-    note: 'The plan holds the copy back a beat, so the image is alone on the frame while the narration reaches its subject. Same media as the canonical example; only the events differ.',
+    note: 'The image arrives alone; the message enters on the next beat and leaves on the third, giving the viewer time with the image. Same media as the canonical example.',
     component: 'image_context',
-    layout: 'splitLeft',
+    layout: 'bottomLeft',
     motionProfile: 'subtleDrift',
-    spansBeats: ['b1', 'b2'],
+    spansBeats: ['b1', 'b2', 'b3'],
     events: [
       { at: 'b1.start', action: 'revealImage' },
       { at: 'b2.start', action: 'revealCopy' },
+      { at: 'b3.start', action: 'hideCopy' },
     ],
     props: {
       headline: 'Rent takes its share before anything else',
       caption: 'For a growing number of households, the month is already spoken for.',
       assetRequirement: {
         type: 'image',
-        subject: 'Dense apartment buildings in a European city at dusk',
+        subject: 'City apartments at dusk, open foreground at bottom left',
         treatment: 'photo',
         orientation: 'landscape',
         identityKey: 'housing-city-context',
@@ -104,7 +103,7 @@ export const imageContextExamples: SceneExample[] = [
     title: 'Empty case — unresolved image and copy',
     note: 'Empty copy remains renderable while the subject-labelled asset placeholder carries context.',
     component: 'image_context',
-    layout: 'splitLeft',
+    layout: 'bottomLeft',
     motionProfile: 'editorialStatic',
     spansBeats: ['b1'],
     props: {
@@ -119,3 +118,39 @@ export const imageContextExamples: SceneExample[] = [
     },
   },
 ];
+
+// Alternate placements teach the planner how to keep text away from the subject.
+for (const [layout, headline, subject] of [
+  [
+    'bottomRight',
+    'A city under pressure',
+    'Apartment blocks on the left, quiet dusk foreground on the right',
+  ],
+  [
+    'lowerThird',
+    'Where the city comes home',
+    'Wide city skyline above a calm foreground for bottom text',
+  ],
+] as const) {
+  imageContextExamples.push({
+    id: `example-context-${layout}`,
+    title: `Documentary context with ${layout} text`,
+    note: 'Same repository image, alternate editorial placement. Compose production images for the selected text area.',
+    component: 'image_context',
+    layout,
+    motionProfile: 'cinematic',
+    spansBeats: ['b1'],
+    props: {
+      headline,
+      caption: 'One image. One editorial idea.',
+      imageFocus: layout === 'bottomRight' ? 'left' : 'top',
+      assetRequirement: {
+        type: 'image',
+        subject,
+        treatment: 'photo',
+        orientation: 'landscape',
+        identityKey: 'housing-city-context',
+      },
+    },
+  });
+}
