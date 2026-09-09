@@ -84,6 +84,45 @@ def test_actual_sdk_request_and_usage_are_bound_to_parallel_and_journal(tmp_path
     assert "responded" in evidence
 
 
+@pytest.mark.parametrize("title", [None, "", "   "])
+def test_untitled_cited_source_survives_sdk_extraction_without_another_call(tmp_path, title):
+    from google.genai.types import GenerateContentResponse
+
+    body = response()
+    metadata = body["candidates"][0]["grounding_metadata"]
+    url = "https://arxiv.org/pdf/1204.4616v2"
+    metadata["grounding_chunks"].append({"web": {"uri": url, "title": title}})
+    metadata["grounding_supports"][0]["grounding_chunk_indices"] = [0, 1]
+    calls = []
+
+    async def generate_content(**kwargs):
+        calls.append(kwargs)
+        return GenerateContentResponse.model_validate(body)
+
+    client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate_content)))
+    adapter = GroundedParallelResearchAdapter(client_factory=lambda: client, key_source=lambda: "test-key")
+    brief = Brief.from_mapping({"id": "b", "text": "Explain landing.", "kind": "factual"})
+    with ProviderJournal(tmp_path / "usage.jsonl") as journal:
+        dossier = asyncio.run(adapter.research(brief))
+        assert not journal.summary()["uncertain"]
+
+    assert len(calls) == 1
+    assert dossier["sources"] == [
+        {"id": "source-1", "title": "NASA", "url": "https://www.nasa.gov/example"},
+        {"id": "source-2", "title": url, "url": url},
+    ]
+    assert dossier["claims"][0]["sourceIds"] == ["source-1", "source-2"]
+    assert adapter.evidence["extractionStatus"] == "validated"
+
+
+@pytest.mark.parametrize("url", ["", "file:///paper.pdf", "https://user@example.com/paper"])
+def test_untitled_source_still_requires_a_valid_web_url(url):
+    body = response()
+    body["candidates"][0]["grounding_metadata"]["grounding_chunks"][0]["web"] = {"uri": url}
+    with pytest.raises(ContractViolation, match="public web URL"):
+        grounded_dossier(body)
+
+
 def test_call_ceiling_survives_new_attempt_and_does_not_repay_uncertain_work(tmp_path):
     path = tmp_path / "usage.jsonl"
     with ProviderJournal(path, max_calls=1):

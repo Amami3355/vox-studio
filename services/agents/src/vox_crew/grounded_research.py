@@ -58,8 +58,14 @@ def grounded_dossier(response: Mapping[str, Any]) -> tuple[dict[str, Any], dict[
             web = chunks[index].get("web") or {}
             url, title = web.get("uri", ""), web.get("title", "")
             parsed = urlsplit(url)
-            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or not title:
-                raise ContractViolation("Grounding source requires a public web URL and title.")
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username:
+                raise ContractViolation("Grounding source requires a public web URL.")
+            if title is not None and not isinstance(title, str):
+                raise ContractViolation("Grounding source title must be text when supplied.")
+            # Provider titles are optional display metadata. Keep the exact cited
+            # URL as a label when absent, without changing the citation binding.
+            if not title or not title.strip():
+                title = url
             source_id = f"source-{index + 1}"
             sources[source_id] = {"id": source_id, "title": title, "url": url}
             if source_id not in source_ids:
