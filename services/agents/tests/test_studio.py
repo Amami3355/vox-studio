@@ -49,7 +49,7 @@ def test_submit_idempotency_survives_new_server_and_rejects_rebinding(app, brows
     first = browser.post("/api/jobs", json=BRIEF, headers=HEADERS)
     assert first.status_code == 202
     value = first.json()
-    assert value["status"] == "awaiting_authorization"
+    assert value["status"] == "queued"
     assert value["events"] == []
     assert browser.post("/api/jobs", json=BRIEF, headers=HEADERS).json()["id"] == value["id"]
     assert browser.post("/api/jobs", json={**BRIEF, "text": "Different"}, headers=HEADERS).status_code == 409
@@ -57,6 +57,24 @@ def test_submit_idempotency_survives_new_server_and_rejects_rebinding(app, brows
     assert browser.get(f'/api/jobs/{value["id"]}').json()["prompt"] == BRIEF["text"]
     assert browser.post("/api/jobs", json={**BRIEF, "maxImages": 100}, headers=HEADERS).status_code == 422
     assert browser.post("/api/jobs", json={**BRIEF, "text": "  "}, headers=HEADERS).status_code == 422
+
+
+@pytest.mark.parametrize("duration", [240, 300])
+def test_long_film_duration_survives_api_admission_and_worker_preparation(app, browser, tmp_path, duration):
+    from test_autonomous import DEFAULTS
+    response = browser.post("/api/jobs", json={**BRIEF, "duration": duration}, headers=HEADERS)
+    assert response.status_code == 202
+    job_id = response.json()["id"]
+    assert browser.get(f"/api/jobs/{job_id}").json()["duration"] == duration
+    config = tmp_path / "config"
+    write_json(config / "prompt-defaults.json", DEFAULTS)
+    request, _ = prepared_request(app.state.store.get(job_id), config)
+    assert request["brief"]["durationSeconds"] == duration
+
+
+def test_duration_above_five_minutes_is_refused_before_admission(app, browser):
+    assert browser.post("/api/jobs", json={**BRIEF, "duration": 301}, headers=HEADERS).status_code == 422
+    assert app.state.store.list() == []
 
 
 def test_concurrent_admission_is_one_job_and_claim_is_exclusive(tmp_path):
@@ -210,7 +228,7 @@ def test_studio_image_gate_rejects_then_corrects_without_changing_take(tmp_path,
     snapshots = []
     run = make(tmp_path, monkeypatch, reviewer=Reviewer(images=(True, True)),
                image_review_hook=human, on_snapshot=lambda state: snapshots.append(state))
-    assert asyncio.run(run.run())["status"] == "reviewed"
+    assert asyncio.run(run.run())["status"] == "ready"
     assert len(decisions) == 2
     assert run.client.takes == 1
     assert run.client.calls.count("image_reject") == 1
@@ -219,3 +237,67 @@ def test_studio_image_gate_rejects_then_corrects_without_changing_take(tmp_path,
     from vox_crew.autonomous import AutonomousBlocked
     with pytest.raises(AutonomousBlocked, match="review authority"):
         make(tmp_path, monkeypatch, client=run.client)
+
+
+def test_crash_at_human_gate_resumes_same_candidate_without_paid_redispatch(tmp_path, monkeypatch):
+    from test_autonomous import make, Reviewer
+    from vox_crew.provider_usage import ProviderJournal
+
+    class WorkerCrash(BaseException):
+        pass
+
+    async def crash(artifact, intention):
+        raise WorkerCrash()
+
+    run = make(tmp_path, monkeypatch, reviewer=Reviewer(images=(True,)), image_review_hook=crash)
+    journal_path = tmp_path / "provider-calls.jsonl"
+    with ProviderJournal(journal_path), pytest.raises(WorkerCrash):
+        asyncio.run(run.run())
+    saved = json.loads(run.path.read_text())
+    assert saved["pending"] is None and saved["terminal"] is None
+    before = list(run.client.calls)
+    candidate = run.client.jobs[-1]["candidate"]["artifact"]["sha256"]
+    decisions = []
+
+    async def accept(artifact, intention):
+        decisions.append(artifact.sha256)
+        return {"sha256": artifact.sha256, "accepted": True, "reason": ""}
+
+    resumed = make(tmp_path, monkeypatch, client=run.client,
+                   reviewer=Reviewer(images=()), image_review_hook=accept)
+    journal_before = journal_path.read_bytes()
+    with ProviderJournal(journal_path):
+        assert asyncio.run(resumed.run())["status"] == "ready"
+    assert decisions == [candidate]
+    assert run.client.calls[:len(before)] == before
+    assert run.client.calls.count("record") == run.client.calls.count("image_start") == 1
+    assert run.client.calls.count("render") == 1
+    assert journal_path.read_bytes() == journal_before
+
+
+def test_completed_render_with_lost_response_blocks_without_repeating_work(tmp_path, monkeypatch):
+    from test_autonomous import make, Client, Reviewer
+    from vox_crew.autonomous import AutonomousBlocked
+    from vox_crew.client import ProductionUnavailable
+    from vox_crew.provider_usage import ProviderJournal
+
+    class LostRenderResponse(Client):
+        def render(self, run_id):
+            super().render(run_id)  # Production completed, but its response never reaches the crew.
+            raise ProductionUnavailable("Simulated connection loss after render completion")
+
+    client = LostRenderResponse()
+    run = make(tmp_path, monkeypatch, client=client, reviewer=Reviewer(images=(True,)))
+    journal_path = tmp_path / "provider-calls.jsonl"
+    with ProviderJournal(journal_path):
+        result = asyncio.run(run.run())
+    assert result["status"] == "blocked"
+    assert run.state["pending"]["name"] == "production.render"
+    assert client.calls.count("render") == 1 and client.takes == 1
+    assert any(artifact.kind == "preview" for artifact in client.artifacts.values())
+    calls, before = list(client.calls), journal_path.read_bytes()
+    resumed = make(tmp_path, monkeypatch, client=client)
+    with ProviderJournal(journal_path), pytest.raises(AutonomousBlocked, match="interrupted action"):
+        asyncio.run(resumed.run())
+    assert client.calls == calls
+    assert journal_path.read_bytes() == before

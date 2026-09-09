@@ -16,13 +16,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .studio_projection import public_job, read_json
 from .studio_store import StudioConflict, StudioStore
+from .studio_controls import ProductionLimits, ResumeInput, validate_resume
 
 
 class BriefInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     text: str = Field(min_length=1, max_length=2000)
-    duration: int = Field(ge=30, le=60)
+    duration: int = Field(ge=30, le=300)
     language: str = Field(pattern=r"^(English|French)$")
+    limits: ProductionLimits = Field(default_factory=ProductionLimits)
 
 
 class LoginInput(BaseModel):
@@ -109,15 +111,59 @@ def create_app(root: Path, assets: Path, *, access_code: str, origin: str):
     def jobs():
         return {"jobs": [public_job(store, job) for job in store.list()]}
 
+    @app.get("/api/production-limits")
+    def production_limits():
+        return {"defaults": ProductionLimits().model_dump(), "schema": ProductionLimits.model_json_schema()}
+
     @app.post("/api/jobs", status_code=202)
     def submit(body: BriefInput, request: Request):
         key = request.headers.get("idempotency-key", "")
         if not re.fullmatch(r"[a-zA-Z0-9_-]{16,100}", key) or not body.text.strip():
             raise HTTPException(422, "A nonempty brief and a valid submission key are required.")
-        return public_job(store, store.submit(key, body.model_dump()))
+        value = body.model_dump()
+        value["limits"] = ProductionLimits().model_dump()
+        return public_job(store, store.submit(key, value))
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: str):
+        return public_job(store, store.get(job_id))
+
+    @app.post("/api/jobs/{job_id}/resume", status_code=202)
+    def resume(job_id: str, body: ResumeInput, request: Request):
+        key = request.headers.get("idempotency-key", "")
+        if not re.fullmatch(r"[a-zA-Z0-9_-]{16,100}", key):
+            raise HTTPException(422, "A valid continuation key is required.")
+        job = store.get(job_id)
+        value = body.model_dump()
+        old = store.continuation(job_id, key)
+        if old:
+            store.request_continuation(job_id, key, value, expected_status=job["status"])
+            return public_job(store, store.get(job_id))
+        state = read_json(store.work(job_id) / "checkpoint.json", {})
+        validate_resume(state, value)
+        store.request_continuation(job_id, key, value, expected_status=job["status"])
+        return public_job(store, store.get(job_id))
+
+    @app.post("/api/jobs/{job_id}/stop", status_code=202)
+    def stop(job_id: str):
+        store.request_stop(job_id)
+        return public_job(store, store.get(job_id))
+
+    @app.post("/api/jobs/{job_id}/retry-continuation", status_code=202)
+    def retry_continuation(job_id: str):
+        store.retry_continuation(job_id)
+        return public_job(store, store.get(job_id))
+
+    @app.post("/api/jobs/{job_id}/start", status_code=202)
+    def start(job_id: str, body: ProductionLimits, request: Request):
+        key = request.headers.get("idempotency-key", "")
+        if not re.fullmatch(r"[a-zA-Z0-9_-]{16,100}", key):
+            raise HTTPException(422, "A valid action key is required.")
+        job = store.get(job_id)
+        value = {"start": True, "limits": body.model_dump()}
+        if not store.continuation(job_id, key) and read_json(store.work(job_id) / "checkpoint.json"):
+            raise StudioConflict("This production already has saved work. Use its continuation controls.")
+        store.request_continuation(job_id, key, value, expected_status="awaiting_authorization")
         return public_job(store, store.get(job_id))
 
     @app.post("/api/jobs/{job_id}/image-decision")

@@ -7,15 +7,36 @@ import subprocess
 from hashlib import sha256
 from pathlib import Path
 
-from .adk_roles import AdkJsonRole, CREW_MODEL
+from .adk_roles import AdkJsonRole, CREW_MODEL, _json_answer
+from .model_recovery import RECOVERY, ModelResponseInvalid
 from .autonomous_contract import (EDITORIAL_BRIEF, DIRECTOR_DECISION, COVERAGE_REVIEW,
-    IMAGE_INTENT, MEDIA_REVIEW, checked)
+    IMAGE_INTENT, IMAGE_INTENT_V3, MEDIA_REVIEW, checked)
 from .crew_contract import ContractViolation
 from .image_generation import GenerationRequest, derive_generation_request, _canonical_digest, _purpose_digest
 from .provider_usage import begin_call, finish_call
 
 
+class ImageIntentViolation(ContractViolation):
+    """A bounded image-intention refusal safe to show in Studio."""
+
+
+def verify_rendered_video(data, expected_sha, directory):
+    """Decode the exact delivery bytes, with required audio and video, without a model call."""
+    if sha256(data).hexdigest() != expected_sha:
+        raise ContractViolation("Rendered bytes do not match their published digest.")
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{expected_sha}.mp4"
+    path.write_bytes(data)
+    subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-i", str(path),
+                    "-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"],
+                   check=True, capture_output=True, timeout=240)
+    return {"sha256": expected_sha, "fullyDecoded": True}
+
+
 class AutonomousDirector:
+    def fork(self, directory):
+        return AutonomousDirector(self.role.model, directory)
+
     def __init__(self, model=CREW_MODEL, output_directory=None):
         self.output_directory = output_directory
         self.role = AdkJsonRole("Director", "Judges explanatory coverage and editorial readiness.",
@@ -70,23 +91,86 @@ class AutonomousDirector:
             "is not itself a missing fact. Accept with no blocking observations.",
             {"stage": stage, **payload})
 
+    async def progress(self, payload):
+        from .autonomous_contract import PROGRESS_REVIEW
+        return await self._ask(PROGRESS_REVIEW,
+            "Decide whether another correction can make concrete progress. Compare the supplied "
+            "actual results, previous corrections and review findings against the original brief. "
+            "Continue only with a specific different change worth trying. Ask the user when "
+            "corrections merely repeat without improvement, when critiques demand incompatible "
+            "results, or when an editorial ambiguity requires their choice. Do not use an attempt "
+            "count or spending budget as a stop criterion. A new user direction can resolve an "
+            "earlier ambiguity. Return a short public explanation and the next concrete correction, "
+            "never hidden reasoning. Do not accept rejected media as a way to finish.", payload)
+
     async def image_intent(self, payload):
-        return await self._ask(IMAGE_INTENT,
+        separate = payload.get("imagePromptVersion") == 3
+        instruction = (
             "Design the exact educational image described by the compiler's requirement. Use "
             "all the supplied scenes, beats, relevant facts, crops and VisualBible. Explain the "
             "meaning, arrangement, visible details, and planned crops. Reserve labels, arrows "
             "and symbolic motion to the renderer when its actual plan provides them. Do not "
             "claim the renderer draws annotations absent from its plan. On rejection correct "
-            "the intention using the review; retain image identity. No provider configuration.",
-            payload, self.images)
+            "the intention using the review; retain image identity. No provider configuration. "
+            "Use a small set of concrete, visually testable requirements. On correction preserve "
+            "successful details and state the specific geometry or objects to change. Resolve "
+            "conflicting old reviews against the current educational brief and actual scene plan; "
+            "do not accumulate incompatible demands or add new decorative requirements.")
+        if separate:
+            instruction += (
+                " Each rendererElements entry must reference an EXISTING sceneId and an exact JSON Pointer "
+                "scenePath within that scene's props or events (for example /props/headline or /events/0/payload/text). Never promise an "
+                "assetRequirement as a renderer element: /props/assetRequirement and its children describe "
+                "the bitmap request, not an overlay. Use an empty rendererElements array when no overlay is needed. Never promise an "
+                "arrow, line, arc or annotation that is absent from those props. visibleDetails and "
+                "arrangement describe ONLY the bitmap: no text, labels, numerical captions or renderer "
+                "elements. Geometry required to understand the image must be in the bitmap unless the "
+                "actual plan draws it. Apply userCorrection explicitly, reconcile contradictory prior "
+                "reviews against the actual plan, and keep the accepted image identities unchanged.")
+        value = await self._ask(IMAGE_INTENT_V3 if separate else IMAGE_INTENT, instruction, payload, self.images)
+        return resolve_renderer_elements(value, payload["videoPlan"]) if separate else value
 
 
-def compile_intent(requirement, intention, bible, palettes):
+def resolve_renderer_elements(intention, plan):
+    """Only actual plan properties can be assigned to the renderer, never a promised overlay."""
+    intention = checked(IMAGE_INTENT_V3, intention)
+    scenes = {scene["id"]: scene for section in plan["sections"] for scene in section["scenes"]}
+    resolved = []
+    for reference in intention["rendererElements"]:
+        scene = scenes.get(reference["sceneId"])
+        pointer = reference["scenePath"]
+        if scene is None or not pointer.startswith(("/props/", "/events/")) or pointer.startswith("/props/assetRequirement"):
+            raise ImageIntentViolation("Renderer element must reference an existing scene property or event.")
+        value = scene
+        try:
+            for part in pointer[1:].split("/"):
+                part = part.replace("~1", "/").replace("~0", "~")
+                if isinstance(value, list):
+                    if not part.isdecimal():
+                        raise KeyError(part)
+                    value = value[int(part)]
+                else:
+                    value = value[part]
+        except (KeyError, IndexError, TypeError):
+            raise ImageIntentViolation("The intention assigns a missing plan property to the renderer.") from None
+        if value is None:
+            raise ImageIntentViolation("A missing renderer value cannot fulfill an image requirement.")
+        resolved.append(json.dumps({**reference, "value": value}, ensure_ascii=False, sort_keys=True))
+    return {**intention, "rendererElements": resolved}
+
+
+def compile_intent(requirement, intention, bible, palettes, *, user_correction=None, separate_renderer=False):
     intention = checked(IMAGE_INTENT, intention)
     ratio = {"landscape": "16:9", "portrait": "9:16", "square": "1:1"}[requirement.orientation]
     base = derive_generation_request(requirement, ratio, bible, palettes)
-    prompt = base.prompt + "\nVOX_COMPOSITION_INTENT_V2\n" + json.dumps(intention, ensure_ascii=False, sort_keys=True)
+    bitmap = {k: v for k, v in intention.items() if k != "rendererElements"} if separate_renderer or user_correction else intention
+    marker = "VOX_COMPOSITION_INTENT_V3" if separate_renderer or user_correction else "VOX_COMPOSITION_INTENT_V2"
+    prompt = base.prompt + "\n" + marker + "\n" + json.dumps(bitmap, ensure_ascii=False, sort_keys=True)
+    if user_correction:
+        prompt += "\nUSER_IMAGE_CORRECTION\n" + user_correction.strip()
     prompt += "\nRenderer elements must NOT be baked into the image. No lettering or watermark."
+    if len(prompt) > 4000:
+        raise ImageIntentViolation("The corrected image request exceeds 4000 characters. Shorten the image instructions before dispatch.")
     provisional = {"prompt": prompt, "aspectRatio": ratio, "outputMimeType": "image/png"}
     seed = int(_canonical_digest(provisional)[:8], 16) & 0x7fffffff
     return GenerationRequest(prompt, ratio, "image/png", seed,
@@ -109,7 +193,7 @@ def retained_image_request(request, steps):
             continue
         previous = step['dependencies']['args'][1]
         if previous.get('retryOf') or any(previous.get(key) != request.get(key) for key in
-            ('identityKey', 'requirementId', 'aspectRatio', 'outputMimeType')):
+            ('identityKey', 'requirementId', 'aspectRatio', 'outputMimeType', 'sourceCandidateSha256')):
             continue
         if semantic_image_prompt(previous['prompt']) == semantic_image_prompt(request['prompt']):
             matches[previous['requestSha256']] = previous
@@ -164,7 +248,8 @@ class MediaReviewer:
         from google.genai.errors import APIError
         from google.genai import types
         context_text = json.dumps(review_context(context), ensure_ascii=False)
-        if len(context_text) > 250_000:
+        from .provider_usage import CURRENT
+        if len(context_text) > 250_000 and (not CURRENT.get() or CURRENT.get().max_calls is not None):
             raise ContractViolation('Media review context exceeds its text allowance before dispatch.')
         client = self.client_factory() if self.client_factory else genai.Client(
             enterprise=True, project=os.environ["GOOGLE_CLOUD_PROJECT"],
@@ -176,7 +261,16 @@ class MediaReviewer:
             "crops, visible details and artistic consistency. "
             "For an image candidate, elements declared in intention.rendererElements are added later "
             "by the renderer and must not be demanded inside the bitmap. Check their presence only "
-            "in the finished video against the actual scene plan. Still reject scientific inaccuracies "
+            "in the finished video against the actual scene plan. Review the CURRENT intention and "
+            "actual intended use: earlier rejected versions are context, not additional requirements. "
+            "Block only observable defects that materially mislead the viewer, hide required content "
+            "in a planned crop, or make the image unusable. Minor aesthetic preferences and harmless "
+            "stylistic differences are not blocking defects. Do not invent required labels, exact "
+            "geometry or details absent from the current intention. A schematic convention is not "
+            "a scientific error merely because another convention would be clearer; identify the "
+            "specific false claim or failed explanatory distinction. "
+            "Keep the assessment to one short, user-facing sentence; list each actionable defect "
+            "once, with a concrete correction. Still reject scientific inaccuracies "
             "in the bitmap itself. For video watch AND listen: inspect "
             "readability, framing, explanatory progression, timing, synchronization, audible speech "
             "against the verbatim beats, and correspondence between narration and visuals. "
@@ -190,21 +284,29 @@ class MediaReviewer:
             "including accuracy, crops, composition and style for images, or visual/audio correspondence "
             "and timing for video. Accept with no blocking observations. Return only the requested JSON; no internal reasoning."
         )
-        call_id = begin_call("MediaReviewer", self.model)
+        output_limit = (RECOVERY.get() or {}).get("maxOutputTokens", 4096)
+        call_id = begin_call("MediaReviewer", self.model, max_output_tokens=output_limit)
         try:
             try:
                 response = await client.aio.models.generate_content(model=self.model,
                     contents=[instruction, context_text, types.Part.from_bytes(data=data, mime_type=mime_type)],
                     config=types.GenerateContentConfig(response_mime_type="application/json",
-                        response_json_schema=MEDIA_REVIEW, max_output_tokens=4096))
+                        response_json_schema=MEDIA_REVIEW, max_output_tokens=output_limit))
             except APIError as error:
-                if isinstance(error.code, int) and 400 <= error.code <= 599:
-                    finish_call(call_id, mediaSha256=expected_sha, providerHttpStatus=error.code,
-                        providerOutcome='failed', contextSha256=sha256(context_text.encode()).hexdigest())
-                    raise ContractViolation(f'Media review provider returned HTTP_{error.code}; no retry was started.') from None
+                from .provider_failure import received_error
+                failure = received_error(error, call_id)
+                if failure:
+                    raise failure from None
                 raise
-            finish_call(call_id, response.usage_metadata, mediaSha256=expected_sha)
-            return checked(MEDIA_REVIEW, json.loads(response.text))
+            candidates = getattr(response, "candidates", None) or ()
+            reason = getattr(candidates[0], "finish_reason", None) if candidates else None
+            reason = getattr(reason, "value", reason)
+            finish_call(call_id, response.usage_metadata, mediaSha256=expected_sha,
+                finishReason=reason, modelVersion=getattr(response, "model_version", None),
+                answerParts=[{"partIndex": 0, "text": response.text or ""}])
+            if reason not in (None, "STOP"):
+                raise ModelResponseInvalid(f"MediaReviewer response ended with {reason}.")
+            return checked(MEDIA_REVIEW, _json_answer(response.text or "", "MediaReviewer"))
         finally:
             if self.client_factory is None:
                 await client.aio.aclose()

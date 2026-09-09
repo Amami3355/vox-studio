@@ -24,3 +24,23 @@ records the contract. Hosted API restart preserved the session, jobs and live wo
 Tests cover guarded reconciliation, but live worker-crash and uncertain-render recovery are
 not yet rehearsed. Keep this ticket open for that evidence; do not infer exactly-once provider
 execution from the local tests. See [Studio verification](../proofs/studio-progress-2026-09-08.md).
+
+2026-09-08, user correction session: the user explicitly chose control over production ceilings
+and correction/reprise of blocked Runs. The updated ADR-0025 replaces operator-only budget
+admission with validated user totals and server-signed, request-bound authorization. The local
+implementation persists a correction and its limits atomically, verifies the same Production
+Run before adoption, retains the prior terminal/journal/media, and surfaces detailed review
+observations. Initial admission, lost responses and duplicate continuation are tested without
+providers. Hosted deployment and accepted-film/rehearsal evidence remain separate open gates.
+
+2026-09-08, rehearsal session: [live recovery evidence](../proofs/studio-rehearsal-2026-09-08.md)
+now proves SIGKILL at a nonterminal human-image gate, visible interrupted state, fresh signed
+checkpoint reconciliation, and return to the same Run/candidate with a byte-identical provider
+journal (14 dispatches). Hosted lost-admission-response/refresh and eight concurrent duplicate
+submissions also preserve one job. A simulated completed-render/lost-response test refuses
+implicit replay. Actual hosted render-disconnect evidence remains open; do not close the ticket yet.
+
+2026-09-08, deployment session: [the limits/correction rollout is hosted](../proofs/studio-limits-deployment-2026-09-08.md).
+Protocol 4, matching dedicated keys, signed connectivity and browser controls passed without
+providers. All four jobs and checkpoint/provider-journal hashes are preserved. The user's live
+trial, accepted-film and actual render-disconnect evidence remain open.

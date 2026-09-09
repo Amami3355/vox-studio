@@ -1,6 +1,6 @@
 {
   "category": "protocol",
-  "contractVersion": 3,
+  "contractVersion": 4,
   "contract": {
     "protocolVersion": 1,
     "commands": [
@@ -37,6 +37,24 @@
         "prerequisite": "an existing Run",
         "effect": "Verify and report current state without changing it.",
         "readOnly": true,
+        "network": "forbidden",
+        "quota": "never"
+      },
+      {
+        "id": "run.progress",
+        "syntax": "vox production run progress --run <run-dir>",
+        "prerequisite": "an existing Run",
+        "effect": "Observe current renderer activity without verifying or changing durable state. A null activity is not evidence of completion or failure. Use run.status for authoritative state.",
+        "readOnly": true,
+        "network": "forbidden",
+        "quota": "never"
+      },
+      {
+        "id": "run.authorize",
+        "syntax": "vox production run authorize --run <run-dir> --authorization <authorization.json>",
+        "prerequisite": "an existing Run and a request-bound authorization signed by the trusted Studio",
+        "effect": "Record a signed Studio authorization on the same Run. Null limits and expiry mean unlimited production; historical finite decisions remain readable. Preserve all consumption, image jobs, artifacts and prior decisions. An agent cannot sign an authorization or accept media by changing it.",
+        "readOnly": false,
         "network": "forbidden",
         "quota": "never"
       },
@@ -98,7 +116,7 @@
         "id": "run.image.start",
         "syntax": "vox production run image-start --run <run-dir> --request <image-request.json> [--authorisation <grant.json>]",
         "prerequisite": "a compiled ASSET_PLACEHOLDER work item; grant when the image provider is live",
-        "effect": "Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. A separate operator recovery policy permits retryOf naming the latest confirmed HTTP 429 job with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs count toward the effective image ceiling.",
+        "effect": "Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. Studio authorization or a separate operator recovery policy permits retryOf naming the latest confirmed temporary HTTP failure (429, 500, 502, 503, 504) with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without Studio authorization or a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs remain counted; a null Studio image ceiling is unlimited.",
         "readOnly": false,
         "network": "record_only",
         "quota": "may_spend"
@@ -189,6 +207,299 @@
       "staleHistoryRemainsVisible": true
     },
     "schemas": {
+      "productionLimits": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxCalls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxSearches": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxImages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxTakes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxImageCorrections": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxEditorialCorrections": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxFilmCorrections": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxTechnicalRepairs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "maxCalls",
+          "maxSearches",
+          "maxImages",
+          "maxTakes",
+          "maxImageCorrections",
+          "maxEditorialCorrections",
+          "maxFilmCorrections",
+          "maxTechnicalRepairs"
+        ],
+        "additionalProperties": false
+      },
+      "studioAuthorization": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "number",
+            "const": 1
+          },
+          "decisionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "previousDecisionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "maxCalls": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxSearches": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxImages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxTakes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxImageCorrections": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxEditorialCorrections": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxFilmCorrections": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxTechnicalRepairs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "maxCalls",
+              "maxSearches",
+              "maxImages",
+              "maxTakes",
+              "maxImageCorrections",
+              "maxEditorialCorrections",
+              "maxFilmCorrections",
+              "maxTechnicalRepairs"
+            ],
+            "additionalProperties": false
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "decisionId",
+          "runId",
+          "requestSha256",
+          "previousDecisionId",
+          "limits",
+          "issuedAt",
+          "expiresAt",
+          "signature"
+        ],
+        "additionalProperties": false
+      },
       "request": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -259,9 +570,16 @@
                 "additionalProperties": false
               },
               "maxNewTakes": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -412,6 +730,10 @@
           "retryOf": {
             "type": "string",
             "minLength": 1
+          },
+          "sourceCandidateSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         },
         "required": [
@@ -1190,6 +1512,8 @@
                   "contract.show",
                   "run.init",
                   "run.status",
+                  "run.progress",
+                  "run.authorize",
                   "run.decline",
                   "run.validate",
                   "run.preflight",
@@ -1336,6 +1660,8 @@
                     "contract.show",
                     "run.init",
                     "run.status",
+                    "run.progress",
+                    "run.authorize",
                     "run.decline",
                     "run.validate",
                     "run.preflight",
@@ -1381,6 +1707,74 @@
         "additionalProperties": false
       },
       "commandData": {
+        "run.progress": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "activity": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "bundle",
+                        "composition",
+                        "render",
+                        "encoding",
+                        "muxing",
+                        "saving"
+                      ]
+                    },
+                    "elapsedMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "totalFrames": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "renderedFrames": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "encodedFrames": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "concurrency": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "phase",
+                    "elapsedMs",
+                    "observedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "activity"
+          ],
+          "additionalProperties": false
+        },
         "contract.index": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -1482,6 +1876,195 @@
           ],
           "additionalProperties": false
         },
+        "run.authorize": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "authorization": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "const": 1
+                },
+                "decisionId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "requestSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "previousDecisionId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "maxCalls": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxSearches": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxImages": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxTakes": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxImageCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxEditorialCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxFilmCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxTechnicalRepairs": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "maxCalls",
+                    "maxSearches",
+                    "maxImages",
+                    "maxTakes",
+                    "maxImageCorrections",
+                    "maxEditorialCorrections",
+                    "maxFilmCorrections",
+                    "maxTechnicalRepairs"
+                  ],
+                  "additionalProperties": false
+                },
+                "issuedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "signature": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "decisionId",
+                "runId",
+                "requestSha256",
+                "previousDecisionId",
+                "limits",
+                "issuedAt",
+                "expiresAt",
+                "signature"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "authorization"
+          ],
+          "additionalProperties": false
+        },
         "run.status": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "type": "object",
@@ -1536,6 +2119,185 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "studioAuthorization": {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "type": "number",
+                  "const": 1
+                },
+                "decisionId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "requestSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "previousDecisionId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "maxCalls": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxSearches": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxImages": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxTakes": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxImageCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxEditorialCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxFilmCorrections": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "maxTechnicalRepairs": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "maxCalls",
+                    "maxSearches",
+                    "maxImages",
+                    "maxTakes",
+                    "maxImageCorrections",
+                    "maxEditorialCorrections",
+                    "maxFilmCorrections",
+                    "maxTechnicalRepairs"
+                  ],
+                  "additionalProperties": false
+                },
+                "issuedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "signature": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "decisionId",
+                "runId",
+                "requestSha256",
+                "previousDecisionId",
+                "limits",
+                "issuedAt",
+                "expiresAt",
+                "signature"
+              ],
+              "additionalProperties": false
             },
             "imageRecoveryPolicy": {
               "type": "object",
@@ -2205,9 +2967,16 @@
               "maximum": 9007199254740991
             },
             "maxNewTakes": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [

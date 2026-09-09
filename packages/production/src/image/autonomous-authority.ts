@@ -92,6 +92,7 @@ export class AutonomousImageAuthority {
   async recoveryPolicy(
     requestSha256: string,
     runId: string,
+    retainedMetadata = false,
   ): Promise<ImageRecoveryPolicy | undefined> {
     if (!/^[a-f0-9]{64}$/.test(requestSha256)) throw new Error('Invalid request digest.');
     let recovery: ImageRecoveryPolicy;
@@ -108,7 +109,7 @@ export class AutonomousImageAuthority {
     if (recovery.requestSha256 !== requestSha256 || recovery.runId !== runId)
       throw new Error('Image recovery binding mismatch.');
     if (
-      Date.parse(recovery.expiresAt) <= this.now().getTime() ||
+      (!retainedMetadata && Date.parse(recovery.expiresAt) <= this.now().getTime()) ||
       Date.parse(recovery.authorizedAt) > this.now().getTime()
     )
       throw new Error('Image recovery authorization is not current.');

@@ -4,17 +4,25 @@ Updated 2026-09-08: [the first real hosted video is delivered](proofs/milestone-
 
 ## The product to finish
 
+Latest rollout, September 8: [the limits/correction update is deployed](proofs/studio-limits-deployment-2026-09-08.md).
+The rocket Brief offers **Authorize and start**, new-film limits are editable, and the blocked
+rehearsal Run exposes rejection details and correction controls. Signed protocol 4 connectivity
+and preserved work were verified. The user's live trial remains next.
+
 Studio update, September 8: the [private hosted workspace](https://vox-studio-164544259455.europe-west1.run.app)
 is implemented and deployed. Authenticated submission, persistent progress, image decisions,
 verified media delivery and browser refresh are exercised; the separately running worker has
-started the newly authorized lightning/thunder trial and awaits a human image decision.
-The fresh complete film and rehearsal gates remain open. See [current Studio evidence](proofs/studio-progress-2026-09-08.md).
+produced the lightning/thunder preview, which the user can watch. No image decision remains
+pending. The final review/correction is terminally blocked by the [diagnosed framing and
+composition failures](proofs/studio-final-block-diagnosis-2026-09-08.md).
+Final reviewed delivery and rehearsal remain open. The user has deferred the visual correction
+to the new SceneCapabilities/catalog milestone and targets publication tonight, Tunis time.
 
 A user opens a deployed Studio, submits a factual Brief, sees the crew research and construct a visual story, reviews an image when needed, and watches/downloads a real narrated preview. Closing the tab does not lose the work. Sources and actual phase status make the result trustworthy.
 
 For the September 8 internal demo target, recommend controlled authenticated access, one active production attempt at a time, a short 30–60 second hero explainer using existing SceneCapabilities, and one deliberate image approval. Audience, Brief, staffing and spending choices remain in [Who uses the first Studio, with which Brief and limits?](issues/07-confirm-the-demo-envelope.md). The event and deadline are established; do not ask for them again.
 
-The first user-visible deliverable is a real narrated video using the current ElevenLabs path. The initial video does not wait for a voice migration, a complete Studio or visual polish. Connect the smallest browser workspace next, then prove recovery. The final voice milestone follows the demonstrated product; it remains an outstanding submission-compliance concern, as recorded in the priority decision.
+The first user-visible deliverable is a real narrated video using the current ElevenLabs path. The initial video does not wait for a voice migration, a complete Studio or visual polish. The browser workspace is now deployed; prove its reliability next. The final voice milestone follows the demonstrated product; it remains an outstanding submission-compliance concern, as recorded in the priority decision.
 
 The distinctive story is already in the architecture: sourced research, specialist creative roles, human control over generated visuals, and animation synchronized to the narrator's actual words through deterministic compilation. Demonstrate that combination visibly. An agent activity panel alone does not establish output quality or eligibility, and no design can guarantee an award.
 
@@ -24,8 +32,8 @@ The distinctive story is already in the architecture: sourced research, speciali
 | --- | --- | --- |
 | Production | Running pinned image, persistent Run store, deployed smoke checks and signed cloud-to-cloud proof | Hosted video delivered; historical receipt compatibility tracked separately |
 | ADK crew | Deployed operator entry point, async Director, research/creative roles, checkpoint adapters, persistent disk and supervised bridge | Hosted run rendered; consolidate documented runtime overrides into the next deployment |
-| Browser Studio | Private HTTPS workspace, persistent API, separate worker, real sources/status, image approval and verified media delivery | Authorized fresh trial awaits human image review; complete browser-to-film proof remains open |
-| Recovery | Durable submission deduplication, exclusive execution locks and guarded checkpoint reconciliation; API restart preserves active worker/session | Live worker recovery and uncertain-render rehearsal still need proof; do not interrupt the active trial to simulate them |
+| Browser Studio | Private HTTPS workspace, persistent API, separate worker, real sources/status, image approval and verified media delivery; fresh preview generated and viewable | Final audiovisual review rejected; diagnosed correction is tracked in milestone 09 |
+| Recovery | Durable submission deduplication, exclusive execution locks and guarded checkpoint reconciliation; API restart preserves active worker/session | Live worker recovery and uncertain-render rehearsal still need proof; a terminal blocked job must not be restarted as a recovery experiment |
 | Research integration | Gemini grounding with Parallel Search implemented and deployed; citation binding tests pass; Parallel secret version 2 accepted | Grounded dossier proved; human editorial acceptance pending |
 | Google model access | Google Cloud inference from crew identity proved; cloud image adapter deployed | Live authors and accepted image proved; deploy the migrated Gemini adapter for future Runs |
 | Narration | Working ElevenLabs adapter and timestamp-based alignment | Keep for initial milestones; final provider work must preserve actual-word synchronization |
@@ -66,7 +74,8 @@ Two traps are already evidenced locally:
 
 Browser media now uses authenticated application routes and a digest-verified cache on the
 Studio persistent disk. Historical MP4 playback, seeking and byte ranges are verified over HTTPS;
-the fresh trial has not yet produced final media. Production retains its private POSIX Run store.
+the fresh preview has also been downloaded with its digest verified and both tracks fully
+decoded. It remains unaccepted by final review. Production retains its private POSIX Run store.
 
 ## Delivery milestones
 
@@ -84,18 +93,26 @@ These are observable implementation outcomes, not additional decision tickets. O
 | --- | --- | --- | --- |
 | [x] | Cloud path answers | Production and crew deployed; private signed connection, persistent disk and separate operator policy verified | [Signed round trip before/after restart, deployed digests and isolation refusals](proofs/cloud-path-progress-2026-09-07.md) |
 | [ ] | First real video to watch: technical result accepted, editorial review open | [Hosted Run rendered and MP4 delivered](proofs/milestone-2-delivery-2026-09-08.md), with research, live authors, accepted illustration and narration | User accepted the technical result; artistic/editorial feedback and acceptance remain |
-| [ ] | Studio produces that result | Private hosted workspace and durable worker are deployed; the authorized fresh trial awaits human image approval | Refresh is verified; complete hosted film and human viewing remain pending in [current evidence](proofs/studio-progress-2026-09-08.md) |
-| [ ] | Product holds up in rehearsal | Verify duplicate admission, restart and uncertain-render reconciliation; enforce spending/concurrency limits; improve visible states and composition | Second complete run, focused recovery checks, no duplicated paid dispatch, usable failure states and saved backup demonstration |
+| [ ] | Studio produces that result | Private hosted workspace generated a viewable 43.051-second preview; image decisions are complete | [Digest and full audio/video decode verified](proofs/studio-final-block-diagnosis-2026-09-08.md); final review/correction remains blocked, and accepted final export remains open |
+| [ ] | Product holds up in rehearsal — next | Exercise existing Studio/artifacts, truthful states, refresh, playback/download, duplicate admission and focused restart/uncertain-render checks; preserve budgets | Second complete run when authorized, focused recovery checks, no duplicated paid dispatch, usable failure states and saved backup demonstration; final proof repeats after release changes |
+| [ ] | Improve SceneCapabilities and the catalog — revisit later, before publication | [Milestone 09](issues/09-improve-scene-capabilities-and-catalog.md): improve existing capabilities/catalog and select useful additions; retain the `image_context` crop defect, missing framing guidance and misdirected image correction | Chosen visual improvements and catalog contracts agree; regression evidence preserves essential subjects in actual framing; diagnosed correction path resolved and final film rechecked |
 | [ ] | Final voice work | Address the deferred ElevenLabs compliance gap after the visible product; prove replacement audio and actual-word timing before integrating any provider change | Fresh end-to-end run with verified synchronization and provider evidence, or an explicitly unresolved submission blocker; the earlier ElevenLabs video alone cannot close this milestone |
 | [ ] | Submission ready | Freeze the final revision; recheck access and requirements; capture the final English demo and publish the required source/license/instructions | Tested hosted URL, public repository, final video and completed submission before cutoff |
 
-The cloud round trip and real hosted video production are proved. The final MP4 is delivered
-on the user's PC and technically accepted; capture artistic/editorial feedback next. Continue toward the smallest Studio workspace
-without regenerating the delivered video or repeating the hosting comparison.
+The cloud round trip, Studio deployment and fresh video generation are proved. Begin the
+rehearsal/reliability milestone using the existing output; defer the known visual correction
+to milestone 09 as requested. This does not mark the blocked final review or final export
+complete and does not authorize another paid run. Rehearsal findings can be addressed now
+without rerendering the current film merely to start the next milestone.
 
-Prepare the Studio shell when useful, but do not postpone the first MP4 until the whole application is ready. One workspace, polling, native playback and a single image-approval action are the baseline recommendation. SceneInstance editing is outside this delivery sequence.
+Retain the deployed Studio baseline: one workspace, polling, native playback and image approval. SceneInstance editing is outside this delivery sequence.
 
-Target the visible video and Studio on September 8. Reserve a separate final engineering window for voice work, followed by a rerun and final capture. Protect the last four hours before the September 9, 22:00 Tunis cutoff for verification and submission. Voice work is last among engineering milestones, not something to start during the submission buffer. If it cannot be completed, keep its status unresolved rather than call the ElevenLabs release compliant.
+The latest user target is publication tonight, September 8 into September 9, Tunis time.
+Order the remaining work as initial Studio rehearsal, SceneCapabilities/catalog improvements,
+final voice work, then final revision/film verification, capture and publication. Reserve a
+verification/submission window within tonight's plan. The separately recorded September 9,
+22:00 Tunis event cutoff is a backstop, not permission to postpone tonight's target. Voice
+work stays last among engineering milestones; if unresolved, retain that explicit blocker.
 
 ## The Studio scope that earns its time
 
@@ -105,7 +122,13 @@ The audience should understand what is happening without reading logs. Surface u
 
 Recommend a new product app alongside the internal gallery, reusing the repository's existing React/Vite familiarity and visual language if the selected host supports it. A framework migration is not on the critical path. Prefer playing the produced video for this release; a full in-browser Remotion editing pipeline increases scope and may expose implementation unnecessarily.
 
-One human image-approval moment is the best first interaction because it already exists in the domain workflow. Prompt editing would require migration, validation and preview invalidation; the frozen architecture's section on prompt editing explicitly calls out that real cost. Defer it unless the completed live path leaves time and the user explicitly chooses it.
+The user has now explicitly chosen scoped correction and continuation of blocked Studio Runs,
+with user-selected ceilings. Implemented locally: detailed rejection observations, persisted
+correction instructions, server-validated total limits, signed authorization extensions and reuse
+of the existing Take and unaffected accepted images. This belongs to the reliability milestone.
+Arbitrary editing of recorded narration or SceneInstances remains outside this correction form;
+the separate SceneCapabilities/catalog milestone retains its framing work. Hosted rollout and
+the final accepted-film evidence remain open.
 
 ## Suggested release gates
 
@@ -128,7 +151,9 @@ The user confirmed private workspace access and explicitly authorized the new 50
 lightning/thunder trial with 40 total counted dispatches, including at most four searches, five
 image generations and one narration. These choices are recorded in
 [Who uses the first Studio, with which Brief and limits?](issues/07-confirm-the-demo-envelope.md).
-Human image acceptance, final editorial acceptance and any further paid rehearsal remain
-separate decisions. Ask only when a missing choice affects dependent work; the event, deadline
+Human image decisions for this trial are complete. Final editorial acceptance and any further
+paid rehearsal remain separate decisions. The user requested the new SceneCapabilities/catalog
+milestone and deferred its implementation until later before publication tonight.
+Ask only when a missing choice affects dependent work; the event, deadline
 and priority of a visible result are already settled. No migration away from ElevenLabs belongs
 ahead of the first video or Studio.

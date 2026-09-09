@@ -76,6 +76,7 @@ export const CONTRACT_CATEGORIES: readonly {
   },
   {
     /**
+     * Version 4 publishes user-selected limits and signed Studio authorization extensions.
      * Version 3 publishes the generated-image job, review and promotion lifecycle.
      *
      * Version 2 lifted the operating rules into the `operating` category, and the summary
@@ -83,7 +84,7 @@ export const CONTRACT_CATEGORIES: readonly {
      */
     id: 'protocol',
     summary: 'Production commands, stages, outcomes and transport.',
-    contractVersion: 3,
+    contractVersion: 4,
     audience: ['client'],
   },
 ];
@@ -132,6 +133,25 @@ const commands: readonly CommandContract[] = [
     prerequisite: 'an existing Run',
     effect: 'Verify and report current state without changing it.',
     readOnly: true,
+    network: 'forbidden',
+    quota: 'never',
+  },
+  {
+    id: 'run.progress',
+    syntax: 'vox production run progress --run <run-dir>',
+    prerequisite: 'an existing Run',
+    effect: 'Observe current renderer activity without verifying or changing durable state. A null activity is not evidence of completion or failure. Use run.status for authoritative state.',
+    readOnly: true,
+    network: 'forbidden',
+    quota: 'never',
+  },
+  {
+    id: 'run.authorize',
+    syntax: 'vox production run authorize --run <run-dir> --authorization <authorization.json>',
+    prerequisite: 'an existing Run and a request-bound authorization signed by the trusted Studio',
+    effect:
+      'Record a signed Studio authorization on the same Run. Null limits and expiry mean unlimited production; historical finite decisions remain readable. Preserve all consumption, image jobs, artifacts and prior decisions. An agent cannot sign an authorization or accept media by changing it.',
+    readOnly: false,
     network: 'forbidden',
     quota: 'never',
   },
@@ -195,7 +215,7 @@ const commands: readonly CommandContract[] = [
       'vox production run image-start --run <run-dir> --request <image-request.json> [--authorisation <grant.json>]',
     prerequisite: 'a compiled ASSET_PLACEHOLDER work item; grant when the image provider is live',
     effect:
-      'Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. A separate operator recovery policy permits retryOf naming the latest confirmed HTTP 429 job with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs count toward the effective image ceiling.',
+      'Create or observe an identity-bound image job. After explicit rejection, a different request with a fresh exact grant may create a correction. Studio authorization or a separate operator recovery policy permits retryOf naming the latest confirmed temporary HTTP failure (429, 500, 502, 503, 504) with the unchanged exact provider request; the predecessor, new grant and consumed attempt remain durable. Repeating retryOf observes that retry rather than dispatching again. run.status publishes the authorized image-attempt ceiling and nextImageDispatchAt; wait before a new dispatch. Uncertain work never permits retry. Without Studio authorization or a recovery policy, failed jobs remain blocked. Operator envelopes issue exact grants internally; all jobs remain counted; a null Studio image ceiling is unlimited.',
     readOnly: false,
     network: 'record_only',
     quota: 'may_spend',
@@ -257,7 +277,8 @@ export const OPERATING_CONTRACT = {
     onlyNetworkCommand: 'run.record',
     recordingInput: 'ordered Beat text plus provider, voiceId, modelId and seed',
     verifiedMatchingTake: 'reuse without quota',
-    firstDispatch: 'autonomous while maxNewTakes budget remains',
+    firstDispatch:
+      'autonomous; null maxNewTakes means unlimited, historical numeric limits remain enforced',
     identicalInputRedispatch: 'replacement grant required',
     exhaustedBudget: 'paused before network',
     uncertainDispatch: 'never retried automatically',

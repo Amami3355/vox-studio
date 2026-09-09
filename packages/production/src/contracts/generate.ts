@@ -14,6 +14,7 @@ import {
   replacementGrantSchema,
   resultEnvelopeSchema,
 } from './schemas';
+import { productionLimitsSchema, studioAuthorizationSchema } from './studio-authorization';
 
 type JsonObject = Record<string, unknown>;
 
@@ -169,6 +170,8 @@ export const buildContractProjections = (inputs: {
   const protocol = {
     ...PRODUCTION_CONTRACT,
     schemas: {
+      productionLimits: schemaOf(productionLimitsSchema),
+      studioAuthorization: schemaOf(studioAuthorizationSchema),
       request: schemaOf(productionRequestSchema),
       decline: schemaOf(declineSchema),
       replacementGrant: schemaOf(replacementGrantSchema),

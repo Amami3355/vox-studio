@@ -24,7 +24,7 @@
       "onlyNetworkCommand": "run.record",
       "recordingInput": "ordered Beat text plus provider, voiceId, modelId and seed",
       "verifiedMatchingTake": "reuse without quota",
-      "firstDispatch": "autonomous while maxNewTakes budget remains",
+      "firstDispatch": "autonomous; null maxNewTakes means unlimited, historical numeric limits remain enforced",
       "identicalInputRedispatch": "replacement grant required",
       "exhaustedBudget": "paused before network",
       "uncertainDispatch": "never retried automatically"

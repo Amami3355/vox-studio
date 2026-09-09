@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
@@ -56,14 +56,20 @@ import {
   replacementGrantSchema,
   resultEnvelopeSchema,
 } from '../contracts/schemas';
+import { studioAuthorizationSchema } from '../contracts/studio-authorization';
 import {
   type DurationCalibrationState,
   type DurationCalibrationStore,
   activeInitialCalibration,
 } from '../preflight/calibration';
 import { buildPreflightReport } from '../preflight/preflight';
-import { assetResolutionView, verifyServiceReadableAssets } from '../render/assets';
-import { type RenderAdapter, assertMp4 } from '../render/remotion';
+import {
+  assetResolutionView,
+  imageArtifactUri,
+  materializeImageArtifacts,
+  verifyServiceReadableAssets,
+} from '../render/assets';
+import { type RenderAdapter, type RenderProgress, assertMp4 } from '../render/remotion';
 import {
   acceptedAssetSetIdentity,
   beatShapeIdentity,
@@ -99,6 +105,8 @@ export type ImageGenerationAdapter = {
     aspectRatio: '1:1' | '3:4' | '4:3' | '9:16' | '16:9';
     outputMimeType: 'image/png';
     seed: number;
+    sourceCandidateSha256?: string;
+    sourceImage?: Uint8Array;
   }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png' }>;
 };
 
@@ -107,6 +115,8 @@ import { ImageDispatchUncertain, ImageGenerationFailure } from '../image/failure
 export { ImageDispatchUncertain } from '../image/failure';
 
 export type ProductionCommandServiceOptions = {
+  studioAuthorizationKey?: string;
+  studioImageGrantKey?: string;
   ledgerRoot: string;
   hmacKey: string | Uint8Array;
   keyId: string;
@@ -131,6 +141,7 @@ export type ProductionCommandServiceOptions = {
     recoveryPolicy?: (
       requestSha256: string,
       runId: string,
+      retainedMetadata?: boolean,
     ) => Promise<ImageRecoveryPolicy | undefined>;
   };
   recordingCrashAt?: (point: 'after_dispatch' | 'after_response_received') => void;
@@ -154,6 +165,7 @@ const stale = (reason: string) => ({ state: 'stale' as const, reasons: [reason] 
 const reportBytes = (report: unknown): string => canonicalJson(report as JsonValue);
 
 export class ProductionCommandService {
+  private readonly renderActivity = new Map<string, RenderProgress & { observedAt: string }>();
   private readonly createRunId: () => string;
   private readonly calibrationStore?: DurationCalibrationStore;
   private readonly compiler: (input: Parameters<typeof compile>[0]) => CompileResult;
@@ -211,11 +223,149 @@ export class ProductionCommandService {
           lastOutcome: checkpoint.lastOutcome,
           artifacts,
           ...(imageRecoveryPolicy ? { imageRecoveryPolicy } : {}),
+          ...(checkpoint.bindings.studioAuthorization
+            ? { studioAuthorization: checkpoint.bindings.studioAuthorization }
+            : {}),
         },
         [],
         [],
       );
     });
+  }
+
+  async progress(input: { runRoot: string }): Promise<CommandExecution> {
+    return {
+      exitCode: 0,
+      envelope: resultEnvelopeSchema.parse({
+        protocolVersion: PROTOCOL_VERSION,
+        command: 'run.progress',
+        outcome: 'succeeded',
+        run: null,
+        data: { activity: this.renderActivity.get(resolve(input.runRoot)) ?? null },
+        artifacts: [],
+        error: null,
+        next: [],
+      }),
+    };
+  }
+
+  async authorize(input: { runRoot: string; authorization: unknown }): Promise<CommandExecution> {
+    return this.execute('run.authorize', input.runRoot, async (store) =>
+      store.exclusive(async (session) => {
+        const authorization = studioAuthorizationSchema.parse(input.authorization);
+        const key = this.options.studioAuthorizationKey;
+        if (!key || Buffer.byteLength(key) < 32)
+          throw new RunStoreError(
+            'STUDIO_AUTHORITY_UNAVAILABLE',
+            'Studio budget authorization is not configured.',
+          );
+        const { signature, ...unsigned } = authorization;
+        const expected = createHmac('sha256', key).update(canonicalJson(unsigned)).digest();
+        if (!timingSafeEqual(expected, Buffer.from(signature, 'hex')))
+          throw new RunStoreError(
+            'STUDIO_AUTHORIZATION_INVALID',
+            'The budget authorization signature is invalid.',
+          );
+        const checkpoint = await session.inspect();
+        this.assertNonTerminal(checkpoint);
+        if (
+          authorization.runId !== checkpoint.runId ||
+          authorization.requestSha256 !== checkpoint.request.requestSha256
+        )
+          throw new RunStoreError(
+            'STUDIO_AUTHORIZATION_MISMATCH',
+            'The authorization belongs to different work.',
+          );
+        const previous = checkpoint.bindings.studioAuthorization;
+        if (previous?.decisionId === authorization.decisionId) {
+          if (canonicalJson(previous) !== canonicalJson(authorization))
+            throw new RunStoreError(
+              'STUDIO_AUTHORIZATION_REBOUND',
+              'This decision already has different limits.',
+            );
+          return this.success('run.authorize', checkpoint, { authorization }, [], []);
+        }
+        if (authorization.previousDecisionId !== (previous?.decisionId ?? null))
+          throw new RunStoreError(
+            'STUDIO_AUTHORIZATION_STALE',
+            'Refresh the current budget before extending it.',
+          );
+        if (
+          Date.parse(authorization.issuedAt) > this.now().getTime() ||
+          (authorization.expiresAt !== null &&
+            Date.parse(authorization.expiresAt) <= this.now().getTime())
+        )
+          throw new RunStoreError(
+            'STUDIO_AUTHORIZATION_EXPIRED',
+            'The budget authorization is not current.',
+          );
+        if (
+          previous &&
+          Object.entries(previous.limits).some(([name, value]) => {
+            const next = authorization.limits[name as keyof typeof previous.limits];
+            return next !== null && (value === null || next < value);
+          })
+        )
+          throw new RunStoreError(
+            'STUDIO_LIMIT_DECREASE',
+            'An extension preserves previously authorized totals.',
+          );
+        if (
+          (authorization.limits.maxImages !== null &&
+            authorization.limits.maxImages < checkpoint.bindings.images.jobs.length) ||
+          (authorization.limits.maxTakes !== null &&
+            (checkpoint.quota.maxNewTakes === null ||
+              authorization.limits.maxTakes < checkpoint.quota.maxNewTakes))
+        )
+          throw new RunStoreError(
+            'STUDIO_LIMIT_BELOW_USAGE',
+            'The limits cannot erase previous consumption or recording authorization.',
+          );
+        if (
+          checkpoint.bindings.images.jobs.some((job) =>
+            ['dispatching', 'uncertain'].includes(job.status),
+          )
+        )
+          throw new RunStoreError(
+            'STUDIO_UNCERTAIN_IMAGE',
+            'Reconcile the uncertain image before extending its authorization.',
+          );
+        const attempts = await session.recordingAttempts();
+        // The worker also verifies its provider journal. The ledger remains the recording authority.
+        if (
+          attempts.some((attempt) =>
+            ['dispatching', 'uncertain', 'response_received'].includes(attempt.status),
+          )
+        )
+          throw new RunStoreError(
+            'STUDIO_UNCERTAIN_RECORDING',
+            'Reconcile the recording before extending its authorization.',
+          );
+        const next = await session.commit({
+          expectedRevision: checkpoint.revision,
+          command: 'run.authorize',
+          outcome: 'succeeded',
+          bindings: { ...checkpoint.bindings, studioAuthorization: authorization },
+          quota: { maxNewTakes: authorization.limits.maxTakes },
+          data: { authorization },
+        });
+        return this.success('run.authorize', next, { authorization }, [], []);
+      }),
+    );
+  }
+
+  private studioLimits(checkpoint: RunCheckpoint) {
+    const authorization = checkpoint.bindings.studioAuthorization;
+    if (
+      authorization &&
+      authorization.expiresAt !== null &&
+      Date.parse(authorization.expiresAt) <= this.now().getTime()
+    )
+      throw new RunStoreError(
+        'STUDIO_AUTHORIZATION_EXPIRED',
+        'Extend the expired production authorization before spending.',
+      );
+    return authorization?.limits;
   }
 
   async imageStart(input: {
@@ -225,204 +375,316 @@ export class ProductionCommandService {
   }): Promise<CommandExecution> {
     return this.execute('run.image.start', input.runRoot, async (store) => {
       const request = imageGenerationRequestSchema.parse(input.request);
-      let checkpoint = await store.inspect();
-      this.assertNonTerminal(checkpoint);
-      const requirement = await this.requireImageWorkItem(store, checkpoint, request);
-      const providerRequest = {
-        prompt: request.prompt,
-        aspectRatio: request.aspectRatio,
-        outputMimeType: request.outputMimeType,
-        seed: request.seed,
-      } as const;
-      if (imageGenerationRequestIdentity(providerRequest) !== request.requestSha256) {
-        throw new RunStoreError(
-          'IMAGE_REQUEST_DIGEST_MISMATCH',
-          'The image generation request does not match its digest.',
-        );
-      }
+      const prepared = await store.exclusive(async (session) => {
+        let checkpoint = await session.inspect();
+        this.assertNonTerminal(checkpoint);
+        const requirement = await this.requireImageWorkItem(store, checkpoint, request);
+        const providerRequest = {
+          prompt: request.prompt,
+          aspectRatio: request.aspectRatio,
+          outputMimeType: request.outputMimeType,
+          seed: request.seed,
+          ...(request.sourceCandidateSha256
+            ? { sourceCandidateSha256: request.sourceCandidateSha256 }
+            : {}),
+        } as const;
+        if (imageGenerationRequestIdentity(providerRequest) !== request.requestSha256) {
+          throw new RunStoreError(
+            'IMAGE_REQUEST_DIGEST_MISMATCH',
+            'The image generation request does not match its digest.',
+          );
+        }
 
-      const existing = [...checkpoint.bindings.images.jobs]
-        .reverse()
-        .find((job) => job.identityKey === request.identityKey);
-      const recovery = await this.imageRecovery(checkpoint);
-      // An explicit predecessor makes retry idempotency separate from observing the original job.
-      const retryJobId = request.retryOf
-        ? imageJobIdOf(
-            request.identityKey,
-            sha256Bytes(Buffer.from(`${request.requestSha256}:${request.retryOf}`)),
-          )
-        : undefined;
-      const priorRetry =
-        retryJobId && checkpoint.bindings.images.jobs.find((job) => job.id === retryJobId);
-      if (priorRetry)
-        return this.success(
-          'run.image.start',
-          checkpoint,
-          { disposition: 'reused', providerMode: priorRetry.providerMode, job: priorRetry },
-          priorRetry.candidate ? [priorRetry.candidate.artifact] : [],
-          [],
+        const existing = [...checkpoint.bindings.images.jobs]
+          .reverse()
+          .find((job) => job.identityKey === request.identityKey);
+        const recovery = await this.imageRecovery(checkpoint);
+        // An explicit predecessor makes retry idempotency separate from observing the original job.
+        const retryJobId = request.retryOf
+          ? imageJobIdOf(
+              request.identityKey,
+              sha256Bytes(Buffer.from(`${request.requestSha256}:${request.retryOf}`)),
+            )
+          : undefined;
+        const priorRetry =
+          retryJobId && checkpoint.bindings.images.jobs.find((job) => job.id === retryJobId);
+        if (priorRetry)
+          return this.success(
+            'run.image.start',
+            checkpoint,
+            { disposition: 'reused', providerMode: priorRetry.providerMode, job: priorRetry },
+            priorRetry.candidate ? [priorRetry.candidate.artifact] : [],
+            [],
+          );
+        const authorizedRetry = Boolean(
+          request.retryOf &&
+            (recovery || checkpoint.bindings.studioAuthorization) &&
+            existing?.id === request.retryOf &&
+            existing.status === 'failed' &&
+            existing.requestSha256 === request.requestSha256 &&
+            existing.failure &&
+            /HTTP_(429|500|502|503|504);/.test(existing.failure),
         );
-      const authorizedRetry = Boolean(
-        request.retryOf &&
-          recovery &&
-          existing?.id === request.retryOf &&
-          existing.status === 'failed' &&
-          existing.requestSha256 === request.requestSha256 &&
-          existing.failure?.includes('HTTP_429;'),
-      );
-      if (request.retryOf && !authorizedRetry)
-        throw new RunStoreError(
-          'IMAGE_RECOVERY_NOT_AUTHORIZED',
-          'Retry must name the latest confirmed HTTP 429 job, its unchanged exact request, and an operator recovery policy.',
-        );
-      const mayDispatch =
-        !existing ||
-        authorizedRetry ||
-        (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256);
-      if (
-        mayDispatch &&
-        recovery &&
-        this.now().getTime() < Date.parse(recovery.nextImageDispatchAt)
-      ) {
-        return this.success(
-          'run.image.start',
-          checkpoint,
-          { reason: 'IMAGE_RATE_WAIT', notBefore: recovery.nextImageDispatchAt },
-          [],
-          [],
-          'paused',
-        );
-      }
-      let authorization = input.authorization;
-      if (
-        authorization === undefined &&
-        (!existing ||
+        if (request.retryOf && !authorizedRetry)
+          throw new RunStoreError(
+            'IMAGE_RECOVERY_NOT_AUTHORIZED',
+            'Retry must name the latest confirmed temporary failure, its unchanged exact request, and a production authorization.',
+          );
+        const mayDispatch =
+          !existing ||
           authorizedRetry ||
-          (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256))
-      ) {
-        authorization = await this.options.autonomousImages?.authorize(
-          checkpoint.request.requestSha256,
-          checkpoint.runId,
-          request.requestSha256,
-          request.retryOf,
-        );
-      }
-      // An operator may correct a rejected candidate with a different exact request and a
-      // fresh signed grant. Keep every old job and consumed grant; never retry uncertain or
-      // failed work, or purchase a replacement merely because the crew resumes.
-      const authorizedCorrection =
-        existing?.status === 'rejected' &&
-        existing.requestSha256 !== request.requestSha256 &&
-        authorization !== undefined;
-      if (existing && !authorizedCorrection && !authorizedRetry) {
-        return this.success(
-          'run.image.start',
-          checkpoint,
-          { disposition: 'reused', providerMode: existing.providerMode, job: existing },
-          existing.candidate ? [existing.candidate.artifact] : [],
-          [],
-        );
-      }
+          (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256);
+        if (
+          mayDispatch &&
+          recovery &&
+          this.now().getTime() < Date.parse(recovery.nextImageDispatchAt)
+        ) {
+          return this.success(
+            'run.image.start',
+            checkpoint,
+            { reason: 'IMAGE_RATE_WAIT', notBefore: recovery.nextImageDispatchAt },
+            [],
+            [],
+            'paused',
+          );
+        }
+        let authorization = input.authorization;
+        const studioLimits = mayDispatch
+          ? this.studioLimits(checkpoint)
+          : checkpoint.bindings.studioAuthorization?.limits;
+        if (studioLimits && mayDispatch) {
+          if (
+            studioLimits.maxImages !== null &&
+            checkpoint.bindings.images.jobs.length >= studioLimits.maxImages
+          )
+            throw new RunStoreError(
+              'IMAGE_QUOTA_EXHAUSTED',
+              'The user image ceiling has been reached.',
+            );
+          const grantKey = this.options.studioImageGrantKey;
+          if (!grantKey)
+            throw new RunStoreError(
+              'STUDIO_AUTHORITY_UNAVAILABLE',
+              'Image signing authority is unavailable.',
+            );
+          const unsigned = {
+            protocolVersion: 1 as const,
+            grantId: randomUUID(),
+            runId: checkpoint.runId,
+            requestSha256: request.requestSha256,
+            issuedAt: this.now().toISOString(),
+            expiresAt:
+              checkpoint.bindings.studioAuthorization!.expiresAt ??
+              new Date(this.now().getTime() + 15 * 60_000).toISOString(),
+          };
+          authorization = {
+            ...unsigned,
+            grant: createHmac('sha256', grantKey).update(canonicalJson(unsigned)).digest('hex'),
+          };
+        }
+        if (
+          authorization === undefined &&
+          (!existing ||
+            authorizedRetry ||
+            (existing.status === 'rejected' && existing.requestSha256 !== request.requestSha256))
+        ) {
+          authorization = await this.options.autonomousImages?.authorize(
+            checkpoint.request.requestSha256,
+            checkpoint.runId,
+            request.requestSha256,
+            request.retryOf,
+          );
+        }
+        // An operator may correct a rejected candidate with a different exact request and a
+        // fresh signed grant. Keep every old job and consumed grant; never retry uncertain or
+        // failed work, or purchase a replacement merely because the crew resumes.
+        const authorizedCorrection =
+          existing?.status === 'rejected' &&
+          existing.requestSha256 !== request.requestSha256 &&
+          authorization !== undefined;
+        if (existing && !authorizedCorrection && !authorizedRetry) {
+          return this.success(
+            'run.image.start',
+            checkpoint,
+            { disposition: 'reused', providerMode: existing.providerMode, job: existing },
+            existing.candidate ? [existing.candidate.artifact] : [],
+            [],
+          );
+        }
 
-      const productionRequest = await this.requestOf(store, checkpoint);
-      const imageMaximum = recovery?.maxImageAttempts ?? productionRequest.brief.maxGeneratedImages;
-      if (imageMaximum !== undefined && checkpoint.bindings.images.jobs.length >= imageMaximum) {
-        throw new RunStoreError(
-          'IMAGE_QUOTA_EXHAUSTED',
-          'This Run has reached its maximum generated-image count. Reuse an existing image.',
-        );
-      }
-      const generator = this.imageGenerator();
-      // Parsed once, in the live branch below, and read again where the spend is recorded.
-      let grant: ReturnType<typeof imageGenerationGrantSchema.parse> | null = null;
-      if (generator.mode === 'live') {
-        if (authorization === undefined) {
-          // One object: the checkpoint's next step and the reply's are the same instruction,
-          // and an operator following one of two drifting copies follows the wrong one.
-          const authorise = [
-            {
-              command: 'run.image.start' as const,
-              args: [
-                '--run',
-                '.',
-                '--request',
-                '<image-request.json>',
-                '--authorisation',
-                '<grant.json>',
-              ],
-              reason: 'A live image call requires an explicit request-bound grant.',
+        const productionRequest = await this.requestOf(store, checkpoint);
+        const imageMaximum = studioLimits
+          ? studioLimits.maxImages
+          : (recovery?.maxImageAttempts ?? productionRequest.brief.maxGeneratedImages);
+        if (imageMaximum != null && checkpoint.bindings.images.jobs.length >= imageMaximum) {
+          throw new RunStoreError(
+            'IMAGE_QUOTA_EXHAUSTED',
+            'This Run has reached its maximum generated-image count. Reuse an existing image.',
+          );
+        }
+        const generator = this.imageGenerator();
+        // Resolve only content-bound candidates belonging to this Run and image identity.
+        // The digest is part of the exact authorized request; bytes never come from a URL.
+        let sourceImage: Uint8Array | undefined;
+        if (request.sourceCandidateSha256) {
+          const source = checkpoint.bindings.images.jobs.find(
+            (candidate) =>
+              candidate.identityKey === request.identityKey &&
+              candidate.status === 'rejected' &&
+              candidate.candidate?.artifact.sha256 === request.sourceCandidateSha256,
+          );
+          if (!source?.candidate)
+            throw new RunStoreError(
+              'IMAGE_EDIT_SOURCE_INVALID',
+              'An image edit must reference a rejected candidate for this identity in this Run.',
+            );
+          sourceImage = await store.readArtifact(source.candidate.artifact);
+          if (sourceImage.byteLength > 7 * 1024 * 1024)
+            throw new RunStoreError(
+              'IMAGE_EDIT_SOURCE_TOO_LARGE',
+              'The source image exceeds the editing input limit.',
+            );
+        }
+        // Parsed once, in the live branch below, and read again where the spend is recorded.
+        let grant: ReturnType<typeof imageGenerationGrantSchema.parse> | null = null;
+        if (generator.mode === 'live') {
+          if (authorization === undefined) {
+            // One object: the checkpoint's next step and the reply's are the same instruction,
+            // and an operator following one of two drifting copies follows the wrong one.
+            const authorise = [
+              {
+                command: 'run.image.start' as const,
+                args: [
+                  '--run',
+                  '.',
+                  '--request',
+                  '<image-request.json>',
+                  '--authorisation',
+                  '<grant.json>',
+                ],
+                reason: 'A live image call requires an explicit request-bound grant.',
+              },
+            ];
+            const next = await session.commit({
+              expectedRevision: checkpoint.revision,
+              command: 'run.image.start',
+              outcome: 'paused',
+              data: { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
+              next: authorise,
+            });
+            return this.success(
+              'run.image.start',
+              next,
+              { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
+              [],
+              next.bindings.images.jobs.length === 0 ? authorise : [],
+              'paused',
+            );
+          }
+          grant = imageGenerationGrantSchema.parse(authorization);
+          await this.requireImageGrant(grant, checkpoint, request);
+        } else if (authorization !== undefined) {
+          throw new RunStoreError(
+            'IMAGE_AUTHORIZATION_NOT_APPLICABLE',
+            'Recorded image generation does not consume a live authorization grant.',
+          );
+        }
+
+        const job: ImageJob = {
+          schemaVersion: 1,
+          id: retryJobId ?? imageJobIdOf(request.identityKey, request.requestSha256),
+          requirementId: request.requirementId,
+          identityKey: request.identityKey,
+          requestSha256: request.requestSha256,
+          providerMode: generator.mode,
+          status: 'dispatching',
+          candidate: null,
+          failure: null,
+          dispatchedAt: this.now().toISOString(),
+          ...(request.retryOf ? { retryOf: request.retryOf } : {}),
+        };
+        // The grant parsed above, not a second parse of the same input: parsing twice let the
+        // spend check and the record of what was spent disagree about which grant that was.
+        const consumedGrantId = grant?.grantId ?? null;
+        checkpoint = await session.commit({
+          expectedRevision: checkpoint.revision,
+          command: 'run.image.start',
+          outcome: 'succeeded',
+          bindings: {
+            ...checkpoint.bindings,
+            images: {
+              jobs: [...checkpoint.bindings.images.jobs, job],
+              consumedGrantIds: consumedGrantId
+                ? [...checkpoint.bindings.images.consumedGrantIds, consumedGrantId]
+                : checkpoint.bindings.images.consumedGrantIds,
             },
-          ];
-          const next = await store.commit({
-            expectedRevision: checkpoint.revision,
+          },
+          data: { disposition: 'created', providerMode: generator.mode, job },
+          next: [
+            {
+              command: 'run.image.status',
+              args: ['--run', '.', '--job', job.id],
+              reason: 'Observe this job; never start a replacement implicitly.',
+            },
+          ],
+        });
+
+        return { job, providerRequest, sourceImage, generator };
+      });
+      if ('envelope' in prepared) return prepared;
+      const { job, providerRequest, sourceImage, generator } = prepared;
+      let generated: Awaited<ReturnType<ImageGenerationAdapter['generate']>>;
+      let width: number;
+      let height: number;
+      try {
+        generated = await generator.generate({
+          ...providerRequest,
+          ...(sourceImage ? { sourceImage } : {}),
+        });
+        ({ width, height } = this.assertGeneratedPng(generated.bytes, generated.mediaType));
+      } catch (error) {
+        return store.exclusive(async (session) => {
+          const current = await session.inspect();
+          const currentJob = this.requireImageJob(current, job.id);
+          const uncertain = error instanceof ImageDispatchUncertain;
+          const ended: ImageJob = {
+            ...currentJob,
+            status: uncertain ? 'uncertain' : 'failed',
+            candidate: null,
+            failure:
+              error instanceof ImageGenerationFailure
+                ? error.diagnostic
+                : uncertain
+                  ? 'Image dispatch outcome is uncertain; observe this job before any replacement.'
+                  : 'Image generation did not produce a valid candidate.',
+          };
+          const next = await session.commit({
+            expectedRevision: current.revision,
             command: 'run.image.start',
-            outcome: 'paused',
-            data: { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
-            next: authorise,
+            outcome: 'succeeded',
+            bindings: this.replaceImageJob(
+              this.staleAssetConsumers(
+                current.bindings,
+                uncertain ? null : 'ASSET_GENERATION_FAILED',
+              ),
+              job.id,
+              ended,
+            ),
+            data: { disposition: 'created', providerMode: generator.mode, job: ended },
           });
           return this.success(
             'run.image.start',
             next,
-            { reason: 'IMAGE_AUTHORIZATION_REQUIRED' },
+            { disposition: 'created', providerMode: generator.mode, job: ended },
             [],
-            next.bindings.images.jobs.length === 0 ? authorise : [],
-            'paused',
+            [],
           );
-        }
-        grant = imageGenerationGrantSchema.parse(authorization);
-        await this.requireImageGrant(grant, checkpoint, request);
-      } else if (authorization !== undefined) {
-        throw new RunStoreError(
-          'IMAGE_AUTHORIZATION_NOT_APPLICABLE',
-          'Recorded image generation does not consume a live authorization grant.',
-        );
+        });
       }
-
-      const job: ImageJob = {
-        schemaVersion: 1,
-        id: retryJobId ?? imageJobIdOf(request.identityKey, request.requestSha256),
-        requirementId: request.requirementId,
-        identityKey: request.identityKey,
-        requestSha256: request.requestSha256,
-        providerMode: generator.mode,
-        status: 'dispatching',
-        candidate: null,
-        failure: null,
-        dispatchedAt: this.now().toISOString(),
-        ...(request.retryOf ? { retryOf: request.retryOf } : {}),
-      };
-      // The grant parsed above, not a second parse of the same input: parsing twice let the
-      // spend check and the record of what was spent disagree about which grant that was.
-      const consumedGrantId = grant?.grantId ?? null;
-      checkpoint = await store.commit({
-        expectedRevision: checkpoint.revision,
-        command: 'run.image.start',
-        outcome: 'succeeded',
-        bindings: {
-          ...checkpoint.bindings,
-          images: {
-            jobs: [...checkpoint.bindings.images.jobs, job],
-            consumedGrantIds: consumedGrantId
-              ? [...checkpoint.bindings.images.consumedGrantIds, consumedGrantId]
-              : checkpoint.bindings.images.consumedGrantIds,
-          },
-        },
-        data: { disposition: 'created', providerMode: generator.mode, job },
-        next: [
-          {
-            command: 'run.image.status',
-            args: ['--run', '.', '--job', job.id],
-            reason: 'Observe this job; never start a replacement implicitly.',
-          },
-        ],
-      });
-
-      try {
-        const generated = await generator.generate(providerRequest);
-        const { width, height } = this.assertGeneratedPng(generated.bytes, generated.mediaType);
-        const candidateSha256 = sha256Bytes(generated.bytes);
-        const candidatePath = RUN_PATHS.generatedImageCandidate(job.id, candidateSha256);
-        const current = await store.inspect();
+      const candidateSha256 = sha256Bytes(generated.bytes);
+      const candidatePath = RUN_PATHS.generatedImageCandidate(job.id, candidateSha256);
+      return store.exclusive(async (session) => {
+        const current = await session.inspect();
         const currentJob = this.requireImageJob(current, job.id);
         if (currentJob.status !== 'dispatching') {
           return this.success(
@@ -433,7 +695,7 @@ export class ProductionCommandService {
             [],
           );
         }
-        const next = await store.commit({
+        const next = await session.commit({
           expectedRevision: current.revision,
           command: 'run.image.start',
           outcome: 'succeeded',
@@ -479,43 +741,7 @@ export class ProductionCommandService {
             },
           ],
         );
-      } catch (error) {
-        const current = await store.inspect();
-        const currentJob = this.requireImageJob(current, job.id);
-        const uncertain = error instanceof ImageDispatchUncertain;
-        const ended: ImageJob = {
-          ...currentJob,
-          status: uncertain ? 'uncertain' : 'failed',
-          candidate: null,
-          failure:
-            error instanceof ImageGenerationFailure
-              ? error.diagnostic
-              : uncertain
-                ? 'Image dispatch outcome is uncertain; observe this job before any replacement.'
-                : 'Image generation did not produce a valid candidate.',
-        };
-        const next = await store.commit({
-          expectedRevision: current.revision,
-          command: 'run.image.start',
-          outcome: 'succeeded',
-          bindings: this.replaceImageJob(
-            this.staleAssetConsumers(
-              current.bindings,
-              uncertain ? null : 'ASSET_GENERATION_FAILED',
-            ),
-            job.id,
-            ended,
-          ),
-          data: { disposition: 'created', providerMode: generator.mode, job: ended },
-        });
-        return this.success(
-          'run.image.start',
-          next,
-          { disposition: 'created', providerMode: generator.mode, job: ended },
-          [],
-          [],
-        );
-      }
+      });
     });
   }
 
@@ -534,96 +760,100 @@ export class ProductionCommandService {
   }
 
   async imageAccept(input: { runRoot: string; decision: unknown }): Promise<CommandExecution> {
-    return this.execute('run.image.accept', input.runRoot, async (store) => {
-      const decision = imageAcceptanceSchema.parse(input.decision);
-      const checkpoint = await store.inspect();
-      this.assertNonTerminal(checkpoint);
-      const job = this.requireImageJob(checkpoint, decision.jobId);
-      if (job.status !== 'candidate' || job.candidate === null) {
-        throw new RunStoreError(
-          'IMAGE_CANDIDATE_REQUIRED',
-          'Only an inspectable image candidate can be accepted.',
+    return this.execute('run.image.accept', input.runRoot, async (store) =>
+      store.exclusive(async (session) => {
+        const decision = imageAcceptanceSchema.parse(input.decision);
+        const checkpoint = await session.inspect();
+        this.assertNonTerminal(checkpoint);
+        const job = this.requireImageJob(checkpoint, decision.jobId);
+        if (job.status !== 'candidate' || job.candidate === null) {
+          throw new RunStoreError(
+            'IMAGE_CANDIDATE_REQUIRED',
+            'Only an inspectable image candidate can be accepted.',
+          );
+        }
+        if (job.candidate.artifact.sha256 !== decision.candidateSha256) {
+          throw new RunStoreError(
+            'IMAGE_DIGEST_MISMATCH',
+            'Image acceptance must bind the candidate exact digest.',
+          );
+        }
+        await store.readArtifact(job.candidate.artifact);
+        const accepted: ImageJob = { ...job, status: 'accepted' };
+        // One object, because the checkpoint and the reply have to name the same next step.
+        const recompile = [
+          {
+            command: 'run.compile' as const,
+            args: ['--run', '.'],
+            reason: 'Recompile to bind the accepted image bytes.',
+          },
+        ];
+        const next = await session.commit({
+          expectedRevision: checkpoint.revision,
+          command: 'run.image.accept',
+          outcome: 'succeeded',
+          bindings: this.replaceImageJob(
+            this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
+            job.id,
+            accepted,
+          ),
+          data: { job: accepted },
+          next: recompile,
+        });
+        return this.success(
+          'run.image.accept',
+          next,
+          { job: accepted },
+          [job.candidate.artifact],
+          recompile,
         );
-      }
-      if (job.candidate.artifact.sha256 !== decision.candidateSha256) {
-        throw new RunStoreError(
-          'IMAGE_DIGEST_MISMATCH',
-          'Image acceptance must bind the candidate exact digest.',
-        );
-      }
-      await store.readArtifact(job.candidate.artifact);
-      const accepted: ImageJob = { ...job, status: 'accepted' };
-      // One object, because the checkpoint and the reply have to name the same next step.
-      const recompile = [
-        {
-          command: 'run.compile' as const,
-          args: ['--run', '.'],
-          reason: 'Recompile to bind the accepted image bytes.',
-        },
-      ];
-      const next = await store.commit({
-        expectedRevision: checkpoint.revision,
-        command: 'run.image.accept',
-        outcome: 'succeeded',
-        bindings: this.replaceImageJob(
-          this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
-          job.id,
-          accepted,
-        ),
-        data: { job: accepted },
-        next: recompile,
-      });
-      return this.success(
-        'run.image.accept',
-        next,
-        { job: accepted },
-        [job.candidate.artifact],
-        recompile,
-      );
-    });
+      }),
+    );
   }
 
   async imageReject(input: { runRoot: string; decision: unknown }): Promise<CommandExecution> {
-    return this.execute('run.image.reject', input.runRoot, async (store) => {
-      const decision = imageRejectionSchema.parse(input.decision);
-      const checkpoint = await store.inspect();
-      this.assertNonTerminal(checkpoint);
-      const job = this.requireImageJob(checkpoint, decision.jobId);
-      if (!['candidate', 'accepted'].includes(job.status) || job.candidate === null) {
-        throw new RunStoreError(
-          'IMAGE_CANDIDATE_REQUIRED',
-          'Only an inspectable candidate or accepted image can be rejected.',
+    return this.execute('run.image.reject', input.runRoot, async (store) =>
+      store.exclusive(async (session) => {
+        const decision = imageRejectionSchema.parse(input.decision);
+        const checkpoint = await session.inspect();
+        this.assertNonTerminal(checkpoint);
+        const job = this.requireImageJob(checkpoint, decision.jobId);
+        if (!['candidate', 'accepted'].includes(job.status) || job.candidate === null) {
+          throw new RunStoreError(
+            'IMAGE_CANDIDATE_REQUIRED',
+            'Only an inspectable candidate or accepted image can be rejected.',
+          );
+        }
+        if (
+          (job.status === 'accepted' && (!decision.candidateSha256 || !decision.reason)) ||
+          (decision.candidateSha256 && decision.candidateSha256 !== job.candidate.artifact.sha256)
+        ) {
+          throw new RunStoreError(
+            'IMAGE_DIGEST_MISMATCH',
+            'Withdrawing an accepted image requires its exact digest and a reason.',
+          );
+        }
+        const rejected: ImageJob = { ...job, status: 'rejected' };
+        const next = await session.commit({
+          expectedRevision: checkpoint.revision,
+          command: 'run.image.reject',
+          outcome: 'succeeded',
+          bindings: this.replaceImageJob(
+            this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
+            job.id,
+            rejected,
+          ),
+          data: { job: rejected, decision },
+        });
+        return this.success(
+          'run.image.reject',
+          next,
+          { job: rejected },
+          [job.candidate.artifact],
+          [],
         );
-      }
-      if (
-        (job.status === 'accepted' && (!decision.candidateSha256 || !decision.reason)) ||
-        (decision.candidateSha256 && decision.candidateSha256 !== job.candidate.artifact.sha256)
-      ) {
-        throw new RunStoreError(
-          'IMAGE_DIGEST_MISMATCH',
-          'Withdrawing an accepted image requires its exact digest and a reason.',
-        );
-      }
-      const rejected: ImageJob = { ...job, status: 'rejected' };
-      const next = await store.commit({
-        expectedRevision: checkpoint.revision,
-        command: 'run.image.reject',
-        outcome: 'succeeded',
-        bindings: this.replaceImageJob(
-          this.staleAssetConsumers(checkpoint.bindings, 'ASSET_SET_CHANGED'),
-          job.id,
-          rejected,
-        ),
-        data: { job: rejected, decision },
-      });
-      return this.success(
-        'run.image.reject',
-        next,
-        { job: rejected },
-        [job.candidate.artifact],
-        [],
-      );
-    });
+      }),
+    );
   }
 
   async decline(input: { runRoot: string; decisionPath: string }): Promise<CommandExecution> {
@@ -904,7 +1134,10 @@ export class ProductionCommandService {
             recordingInputSha256,
           );
         }
-        if (checkpoint.quota.newTakesUsed >= checkpoint.quota.maxNewTakes) {
+        if (
+          checkpoint.quota.maxNewTakes !== null &&
+          checkpoint.quota.newTakesUsed >= checkpoint.quota.maxNewTakes
+        ) {
           return this.pauseRecording(
             session,
             checkpoint,
@@ -918,6 +1151,7 @@ export class ProductionCommandService {
           );
         }
 
+        this.studioLimits(checkpoint);
         const attempt = await session.beginRecordingDispatch({
           expectedRevision: checkpoint.revision,
           recordingInputSha256,
@@ -1192,8 +1426,14 @@ export class ProductionCommandService {
           'Compiled asset-resolution view does not match its binding.',
         );
       }
+      let renderDocument: CompiledDocument;
       try {
-        await verifyServiceReadableAssets(resolutions);
+        renderDocument = await materializeImageArtifacts(
+          document,
+          checkpoint.bindings.images.jobs,
+          (descriptor) => store.readArtifact(descriptor),
+        );
+        await verifyServiceReadableAssets(assetResolutionView(renderDocument));
       } catch (error) {
         throw new RunStoreError(
           'ASSET_NOT_SERVICE_READABLE',
@@ -1239,10 +1479,21 @@ export class ProductionCommandService {
       if (!this.options.renderer) {
         throw new RunStoreError('RENDERER_NOT_CONFIGURED', 'Production renderer is unavailable.');
       }
-      const preview = await this.options.renderer({
-        document,
-        audio: verifiedTake.artifacts.audio,
-      });
+      let preview: Awaited<ReturnType<RenderAdapter>>;
+      const activityKey = resolve(input.runRoot);
+      try {
+        preview = await this.options.renderer({
+          document: renderDocument,
+          audio: verifiedTake.artifacts.audio,
+          onProgress: (progress) =>
+            this.renderActivity.set(activityKey, {
+              ...progress,
+              observedAt: this.now().toISOString(),
+            }),
+        });
+      } finally {
+        this.renderActivity.delete(activityKey);
+      }
       assertMp4(preview);
       const path = RUN_PATHS.preview(renderInputSha256);
       const descriptor = { kind: 'preview', path, sha256: sha256Bytes(preview.bytes) };
@@ -1765,6 +2016,9 @@ export class ProductionCommandService {
       : null;
     return {
       plan: { planSha256, snapshot, freshness: structuredClone(fresh) },
+      ...(previous.studioAuthorization
+        ? { studioAuthorization: previous.studioAuthorization }
+        : {}),
       validation: { validationInputSha256, planSha256, report, freshness: structuredClone(fresh) },
       preflight: previous.preflight
         ? { ...previous.preflight, freshness: stale('PLAN_CHANGED') }
@@ -1798,6 +2052,7 @@ export class ProductionCommandService {
     const policy = await this.options.autonomousImages?.recoveryPolicy?.(
       checkpoint.request.requestSha256,
       checkpoint.runId,
+      Boolean(checkpoint.bindings.studioAuthorization),
     );
     if (!policy) return undefined;
     const jobs = checkpoint.bindings.images.jobs;
@@ -2054,7 +2309,7 @@ export class ProductionCommandService {
       }
       const bytes = await store.readArtifact(job.candidate.artifact);
       this.assertGeneratedPng(bytes, 'image/png');
-      const uri = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
+      const uri = imageArtifactUri(job.candidate.artifact.sha256);
       digestsByUri.set(uri, job.candidate.artifact.sha256);
       entries.push({ requirement, ref: { status: 'ready', uri } });
     }
@@ -2064,9 +2319,7 @@ export class ProductionCommandService {
         verify: (ref) => {
           const expected = digestsByUri.get(ref.uri);
           if (!expected) return { ok: false, reason: 'Accepted image bytes are not bound.' };
-          const marker = 'data:image/png;base64,';
-          const actual = sha256Bytes(Buffer.from(ref.uri.slice(marker.length), 'base64'));
-          return actual === expected
+          return ref.uri === imageArtifactUri(expected)
             ? { ok: true }
             : { ok: false, reason: 'Accepted image digest changed.' };
         },

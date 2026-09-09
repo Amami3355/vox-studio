@@ -9,13 +9,25 @@ import {
   takeIdentity,
 } from '../src/run-store/identities';
 import { RUN_PATHS } from '../src/run-store/paths';
-import { EMPTY_RUN_BINDINGS, RunStoreError } from '../src/run-store/run-store';
+import { EMPTY_RUN_BINDINGS, RunStore, RunStoreError } from '../src/run-store/run-store';
+import type { ProductionMeasurement } from '../src/measurement';
 import { REQUEST, type RunFixture, createRunFixture } from './run-fixture';
 
 let fixture: RunFixture | null = null;
 afterEach(async () => fixture?.cleanup());
 
 describe('authenticated Run store', () => {
+  it('verifies the previous chain once per commit and still rechecks it on the next operation', async () => {
+    fixture = await createRunFixture();
+    const samples: ProductionMeasurement[] = [];
+    const store = new RunStore({ ...fixture.options, onMeasure: (sample) => samples.push(sample) });
+    const initial = await store.inspect();
+    samples.length = 0;
+    await store.commit({ expectedRevision: initial.revision, command: 'run.validate', outcome: 'succeeded' });
+    expect(samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count)).toEqual([1]);
+    await store.inspect();
+    expect(samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count)).toEqual([1, 2]);
+  });
   it('initializes canonical public state and a private monotonic ledger', async () => {
     fixture = await createRunFixture();
     const checkpoint = await fixture.store.inspect();

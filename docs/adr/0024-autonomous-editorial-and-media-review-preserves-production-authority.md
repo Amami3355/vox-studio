@@ -2,6 +2,11 @@
 
 **Status:** accepted · 2026-09-08, implementing the autonomous prompt-to-film plan.
 
+The final audiovisual-review policy is superseded for new Studio production by
+[ADR-0026](0026-independent-image-work-and-technical-film-delivery.md): image review remains,
+independent images run concurrently, and delivery follows technical video/audio verification.
+Historical reviewed results keep their original evidence.
+
 The original prompt and its interpreted Editorial brief are separate persistent values.
 Operator configuration supplies voice, authorization and ceilings. New prompt submissions use
 checkpoint version 2; existing manual/recorded runs and version 1 checkpoints retain their

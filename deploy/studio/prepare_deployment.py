@@ -23,6 +23,7 @@ set -euo pipefail
 findmnt -rn -S /dev/disk/by-id/google-vox-crew-state -T {disk} >/dev/null
 install -d -m 0700 -o 10001 -g 10001 {disk}/studio
 test -s {disk}/studio-operator/studio.env
+test -s {disk}/studio-operator/authorization.env
 HOME=/home/vox docker pull {api}
 HOME=/home/vox docker pull {worker}
 """
@@ -56,7 +57,7 @@ After=vox-studio-setup.service vox-crew-bridge.service
 [Service]
 Environment=HOME=/home/vox
 ExecStartPre=/usr/bin/docker run --rm --user 0 --network host --entrypoint python --mount type=bind,src=/etc/vox-crew,dst=/runtime {worker} /runtime/fetch-env.py --parallel
-ExecStart=/usr/bin/docker run {options} --name vox-studio-worker --network host --env-file /etc/vox-crew/network.env --env-file /etc/vox-crew/parallel.env --env GOOGLE_GENAI_USE_VERTEXAI=true --env GOOGLE_CLOUD_PROJECT=studio-prod-7f3a --env GOOGLE_CLOUD_LOCATION=global --env VOX_CREW_MODEL=gemini-3.5-flash --env VOX_RESEARCH_MODEL=gemini-3.5-flash {studio_mount} --mount type=bind,src={disk}/state,dst=/var/lib/vox-crew --mount type=bind,src=/etc/vox-crew,dst=/etc/vox-crew,readonly {worker} work --state /var/lib/vox-studio --crew-state /var/lib/vox-crew --config /etc/vox-crew/autonomous
+ExecStart=/usr/bin/docker run {options} --name vox-studio-worker --network host --env-file /etc/vox-crew/network.env --env-file /etc/vox-crew/parallel.env --env-file {disk}/studio-operator/authorization.env --env GOOGLE_GENAI_USE_VERTEXAI=true --env GOOGLE_CLOUD_PROJECT=studio-prod-7f3a --env GOOGLE_CLOUD_LOCATION=global --env VOX_CREW_MODEL=gemini-3.5-flash --env VOX_RESEARCH_MODEL=gemini-3.5-flash {studio_mount} --mount type=bind,src={disk}/state,dst=/var/lib/vox-crew --mount type=bind,src=/etc/vox-crew,dst=/etc/vox-crew,readonly {worker} work --state /var/lib/vox-studio --crew-state /var/lib/vox-crew --config /etc/vox-crew/autonomous
 ExecStop=/usr/bin/docker stop -t 20 vox-studio-worker
 Restart=no
 TimeoutStopSec=35

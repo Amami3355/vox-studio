@@ -102,7 +102,7 @@ def test_grounded_call_ceiling_is_separate_from_creative_calls(tmp_path):
     with ProviderJournal(tmp_path / "usage.jsonl", max_grounded_calls=1):
         finish_call(begin_call("Research", "test-model", grounded=True))
         finish_call(begin_call("Narrative", "test-model"))
-        with pytest.raises(ProviderLimit, match="grounded-research"):
+        with pytest.raises(ProviderLimit, match="research call ceiling"):
             begin_call("Research", "test-model", grounded=True)
 
 

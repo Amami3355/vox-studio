@@ -40,6 +40,52 @@ const checkpoint = async (target: CommandFixture) =>
   };
 
 describe('run render', () => {
+  it('observes measured render progress without changing receipts or authorizing completion', async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    const active = new Promise<void>((done) => {
+      started = done;
+    });
+    fixture = await createCommandFixture({
+      renderer: async ({ onProgress }) => {
+        onProgress?.({
+          phase: 'render',
+          elapsedMs: 1234,
+          renderedFrames: 25,
+          encodedFrames: 20,
+          totalFrames: 50,
+        });
+        started();
+        await gate;
+        return { bytes: VALID_MP4, container: 'mp4', videoCodec: 'h264', audioCodec: 'aac' };
+      },
+    });
+    await prepareRecorded(fixture);
+    await fixture.service.compile({ runRoot: fixture.runRoot });
+    const before = await checkpoint(fixture);
+    const render = fixture.service.render({ runRoot: fixture.runRoot });
+    await active;
+    try {
+      const observation = await fixture.service.progress({ runRoot: fixture.runRoot });
+      expect(observation.envelope).toMatchObject({
+        command: 'run.progress',
+        run: null,
+        artifacts: [],
+        data: { activity: { phase: 'render', renderedFrames: 25, totalFrames: 50 } },
+      });
+      expect((await checkpoint(fixture)).revision).toBe(before.revision);
+    } finally {
+      release();
+    }
+    expect((await render).exitCode).toBe(0);
+    expect((await fixture.service.progress({ runRoot: fixture.runRoot })).envelope.data).toEqual({
+      activity: null,
+    });
+  });
+
   it('requires a fresh compilation and never calls the renderer early', async () => {
     const renderer = fakeRenderer();
     fixture = await createCommandFixture({ renderer });

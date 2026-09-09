@@ -212,6 +212,13 @@ export class ProductionPayloadSurface {
       }
       case 'run.status':
         return this.service.status({ runRoot: await this.runRoot(request.runId) });
+      case 'run.progress':
+        return this.service.progress({ runRoot: await this.runRoot(request.runId) });
+      case 'run.authorize':
+        return this.service.authorize({
+          runRoot: await this.runRoot(request.runId),
+          authorization: this.required(request),
+        });
       case 'run.validate': {
         const runRoot = await this.runRoot(request.runId);
         const planPath = await this.stage(runRoot, 'plan.json', this.required(request));

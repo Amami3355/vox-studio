@@ -20,19 +20,19 @@ like has never been argued, and the contract is another team's to move. What a s
 do is read this beside the one taken before a contract change, for this same role, and see
 what moved.
 
-The prefix is **107,495 characters**, in 5 categories and the crew's own preamble.
+The prefix is **108,567 characters**, in 5 categories and the crew's own preamble.
 
 ## Where the prefix goes
 
 | part | characters | share | `<beatId>.start\|end` | `<beatId>.word:<word>` | unparsed | statements |
 |---|---|---|---|---|---|---|
 | preamble | 885 | 0.8% | 0 (0) | 0 (0) | 0 | 0 |
-| language | 21,569 | 20.1% | 2 (1) | 2 (2) | 1 | 3 |
+| language | 22,597 | 20.8% | 2 (1) | 2 (2) | 1 | 3 |
 | plan | 7,467 | 6.9% | 5 (5) | 9 (3) | 0 | 8 |
-| catalog | 66,814 | 62.2% | 40 (19) | 1 (1) | 0 | 20 |
-| checks | 9,660 | 9.0% | 0 (0) | 0 (0) | 0 | 0 |
-| operating | 1,100 | 1.0% | 0 (0) | 0 (0) | 0 | 0 |
-| **the whole prefix** | **107,495** | **100.0%** | **47 (22)** | **12 (6)** | **1** | **25** |
+| catalog | 66,814 | 61.5% | 40 (19) | 1 (1) | 0 | 20 |
+| checks | 9,660 | 8.9% | 0 (0) | 0 (0) | 0 | 0 |
+| operating | 1,144 | 1.1% | 0 (0) | 0 (0) | 0 | 0 |
+| **the whole prefix** | **108,567** | **100.0%** | **47 (22)** | **12 (6)** | **1** | **25** |
 
 Anchor cells read `occurrences (distinct statements)`. The second number is the one that
 matters: anchors that differ only in the word they name, sitting in otherwise identical
@@ -65,7 +65,7 @@ projection, which its own assembly rule forbids. Noticing is the whole of its pa
 | 146 | 2 | 146 | 0.1% | `catalog.capabilities.6.examples.0.props`, `catalog.capabilities.6.examples.2.props` |
 | 122 | 2 | 122 | 0.1% | `catalog.capabilities.7.examples.0.props`, `catalog.capabilities.7.examples.2.props` |
 
-35 smaller repeats, together 2,213 characters, 2.1% of the prefix, are counted in the total above and not listed: under 100 characters a repeat is a JSON declaration rather than a document.
+35 smaller repeats, together 2,213 characters, 2.0% of the prefix, are counted in the total above and not listed: under 100 characters a repeat is a JSON declaration rather than a document.
 
 ## What the contract publishes elsewhere
 
@@ -74,12 +74,12 @@ held and read — `refusals.py` and `converge.py` read rules that live here — 
 never assembled into a prompt. The `would have been` column is the share this category
 would have held had it been taught, which is what the crew stopped spending.
 
-**42,154 characters** the contract publishes to another audience are not assembled into this prefix, across 2 categories. None of it is counted anywhere above.
+**54,001 characters** the contract publishes to another audience are not assembled into this prefix, across 2 categories. None of it is counted anywhere above.
 
 | category | characters | would have been | repeated inside it |
 |---|---|---|---|
 | design | 270 | 0.2% | — |
-| protocol | 41,884 | 28.0% | 14,532 |
+| protocol | 53,731 | 33.1% | 17,898 |
 
 The repeats inside them, on the same outermost-only rule and the same listing floor. No share, because there is no denominator: this is duplication in a published contract that no model is charged for.
 
@@ -87,9 +87,10 @@ The repeats inside them, on the same outermost-only rule and the same listing fl
 |---|---|---|---|
 | 5,146 | 2 | 5,146 | `protocol.schemas.commandData.run.preflight.properties.report.properties`, `protocol.schemas.preflightReport.properties` |
 | 2,029 | 3 | 4,058 | `protocol.schemas.commandData.run.image.accept`, `protocol.schemas.commandData.run.image.reject`, `protocol.schemas.commandData.run.image.status` |
-| 361 | 7 | 2,166 | `protocol.schemas.commandData.run.image.start.anyOf.2.properties.notBefore`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.authorizedAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.expiresAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.nextImageDispatchAt`, `protocol.schemas.imageGenerationGrant.properties.expiresAt`, `protocol.schemas.imageGenerationGrant.properties.issuedAt`, `protocol.schemas.replacementGrant.properties.issuedAt` |
+| 2,707 | 2 | 2,707 | `protocol.schemas.commandData.run.authorize.properties.authorization`, `protocol.schemas.commandData.run.status.properties.studioAuthorization` |
+| 361 | 8 | 2,527 | `protocol.schemas.commandData.run.image.start.anyOf.2.properties.notBefore`, `protocol.schemas.commandData.run.progress.properties.activity.anyOf.0.properties.observedAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.authorizedAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.expiresAt`, `protocol.schemas.commandData.run.status.properties.imageRecoveryPolicy.properties.nextImageDispatchAt`, `protocol.schemas.imageGenerationGrant.properties.expiresAt`, `protocol.schemas.imageGenerationGrant.properties.issuedAt`, `protocol.schemas.replacementGrant.properties.issuedAt` |
 | 549 | 2 | 549 | `protocol.schemas.commandData.run.decline`, `protocol.schemas.decline` |
 | 275 | 2 | 275 | `protocol.schemas.commandData.run.compile.properties.report`, `protocol.schemas.commandData.run.validate.properties.report` |
+| 274 | 2 | 274 | `protocol.schemas.resultEnvelope.properties.command.anyOf.0`, `protocol.schemas.resultEnvelope.properties.next.items.properties.command` |
 | 254 | 2 | 254 | `protocol.schemas.commandData.run.status.properties.artifacts`, `protocol.schemas.resultEnvelope.properties.artifacts` |
-| 243 | 2 | 243 | `protocol.schemas.resultEnvelope.properties.command.anyOf.0`, `protocol.schemas.resultEnvelope.properties.next.items.properties.command` |
 | 110 | 2 | 110 | `protocol.schemas.commandData.run.status.properties.staleStages.items`, `protocol.schemas.resultEnvelope.properties.run.anyOf.0.properties.stage` |

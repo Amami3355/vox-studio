@@ -27,6 +27,7 @@ LABEL org.opencontainers.image.revision=$VOX_STUDIO_REVISION
 USER root
 COPY services/agents/pyproject.toml /opt/vox-crew/pyproject.toml
 COPY services/agents/src/ /opt/vox-crew/src/
-RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/vox-crew
+RUN pip install --no-cache-dir 'google-adk[db]==2.7.1' \
+    && pip install --no-cache-dir --no-deps --no-build-isolation /opt/vox-crew
 USER 10001:10001
 ENTRYPOINT ["python", "-m", "vox_crew.studio_worker"]

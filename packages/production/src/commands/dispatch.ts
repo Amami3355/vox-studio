@@ -86,6 +86,12 @@ export const dispatchProductionArgv = async (
   const command = `run.${verb}` as CommandId;
   let execution: CommandExecution;
   switch (verb) {
+    case 'progress': {
+      const parsed = exactFlags(rest, ['--run']);
+      if (!parsed) return malformed('run.progress', 'run progress requires --run.');
+      execution = await service.progress({ runRoot: absolute(cwd, parsed.get('--run') as string) });
+      break;
+    }
     case 'init': {
       const parsed = exactFlags(rest, ['--request', '--out']);
       if (!parsed) return malformed('run.init', 'run init requires --request and --out.');
@@ -99,6 +105,18 @@ export const dispatchProductionArgv = async (
       const parsed = exactFlags(rest, ['--run']);
       if (!parsed) return malformed('run.status', 'run status requires --run.');
       execution = await service.status({ runRoot: absolute(cwd, parsed.get('--run') as string) });
+      break;
+    }
+    case 'authorize': {
+      const parsed = exactFlags(rest, ['--run', '--authorization']);
+      if (!parsed)
+        return malformed('run.authorize', 'run authorize requires --run and --authorization.');
+      execution = await service.authorize({
+        runRoot: absolute(cwd, parsed.get('--run') as string),
+        authorization: JSON.parse(
+          await readFile(absolute(cwd, parsed.get('--authorization') as string), 'utf8'),
+        ),
+      });
       break;
     }
     case 'decline': {

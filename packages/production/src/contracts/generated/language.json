@@ -4,6 +4,11 @@
   "contract": {
     "entries": [
       {
+        "term": "Studio submission",
+        "definition": "A saved request for a film in the private workspace, with its progress, human decisions and resulting media. It exists before a Production Run and does not itself authorize spending.",
+        "avoid": "treating a browser session or an ADK session as the submission."
+      },
+      {
         "term": "Editorial brief",
         "definition": "The Director's interpretation of an original prompt: central question, audience, language, angle, understanding goals and target duration. It does not replace the original request or confer spending authority.",
         "avoid": null
@@ -224,8 +229,13 @@
         "avoid": "\"prompt\", \"manual\" or \"documentation bundle\", which imply a second, hand-maintained source of truth."
       },
       {
+        "term": "User correction",
+        "definition": "A persisted instruction attached to the reviewed state of a Run and the image or production stage to correct. It preserves reusable work and remains distinct from image acceptance and permission to spend.",
+        "avoid": null
+      },
+      {
         "term": "Run",
-        "definition": "One persistent production attempt for one Brief and its operator-owned production configuration. It advances through explicit stages, survives interruption and retains the last successful stage when a command needs repair, pauses or fails.",
+        "definition": "One persistent production attempt for one Brief, user-selected Production limits and server-owned provider configuration. It advances through explicit stages, survives interruption and retains the last successful stage when a command needs repair, pauses or fails.",
         "avoid": "\"session\", which suggests state that disappears with the process."
       },
       {
@@ -256,6 +266,16 @@
       {
         "term": "Recording input",
         "definition": "The operator-authorised synthesis request derived from ordered beat text and production voice settings. It determines whether spending quota is a first recording or a replacement request; it does not identify the resulting recording. Identical recording inputs can produce *different* Takes — synthesis is not reproducible even at a fixed seed — which is why replaying one is a replacement attempt rather than a reproduction, and why `takeId`, digested from the audio and the alignment, is what identifies and binds the Take that comes out.",
+        "avoid": null
+      },
+      {
+        "term": "Image review",
+        "definition": "A judgment of an exact generated candidate against its intended uses. An accepted candidate can enter the film; a rejected candidate can receive an independent correction.",
+        "avoid": null
+      },
+      {
+        "term": "Ready film",
+        "definition": "A rendered film whose required illustrations are accepted and whose video and audio file passes technical verification. It does not imply a final audiovisual judgment.",
         "avoid": null
       },
       {

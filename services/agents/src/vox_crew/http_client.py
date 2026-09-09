@@ -116,6 +116,15 @@ class HttpProductionClient(ProductionClient):
     def status(self, run_id: str) -> ResultEnvelope:
         return self._command("run.status", run_id=run_id)
 
+    def progress(self, run_id: str) -> ResultEnvelope:
+        from copy import copy
+        observer = copy(self)
+        observer._timeout_seconds = 5
+        return observer._command("run.progress", run_id=run_id)
+
+    def authorize(self, run_id: str, authorization: Mapping[str, Any]) -> ResultEnvelope:
+        return self._command("run.authorize", run_id=run_id, payload=dict(authorization))
+
     def validate(self, run_id: str, plan: Mapping[str, Any]) -> ResultEnvelope:
         return self._command("run.validate", run_id=run_id, payload=dict(plan))
 

@@ -7,6 +7,44 @@ const PNG = Buffer.from(
 );
 
 describe('Google image adapter', () => {
+  it('edits the supplied verified pixels with the Pro model and corrected specification', async () => {
+    const generateContent = vi.fn(async () => ({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } }],
+          },
+        },
+      ],
+    }));
+    const adapter = createGoogleImageAdapter({
+      environment: {},
+      keySource: () => 'test-key',
+      clientFactory: () => ({ models: { generateContent } }),
+    });
+    await adapter.generate({
+      prompt: 'Remove the upper arcs.',
+      aspectRatio: '16:9',
+      outputMimeType: 'image/png',
+      seed: 7,
+      sourceImage: PNG,
+    });
+    expect(generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-3-pro-image',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } },
+              { text: expect.stringContaining('Remove the upper arcs.') },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(generateContent).toHaveBeenCalledTimes(1);
+  });
   it('uses the Production cloud identity without reading or forwarding an API key', async () => {
     const generateContent = vi.fn(async () => ({
       candidates: [
@@ -86,12 +124,12 @@ describe('Google image adapter', () => {
 
     expect(clientFactory).toHaveBeenCalledWith('test-key');
     expect(generateContent).toHaveBeenCalledWith({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3-pro-image',
       contents: 'A bounded prompt.',
       config: {
         candidateCount: 1,
         responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: { aspectRatio: '16:9' },
+        imageConfig: { aspectRatio: '16:9', imageSize: '2K' },
         seed: 7,
       },
     });

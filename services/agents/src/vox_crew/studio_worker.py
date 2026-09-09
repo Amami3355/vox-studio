@@ -45,7 +45,7 @@ def worker_lock(path):
 def prepared_request(job, config):
     defaults = read_json(config / "prompt-defaults.json")
     request = prompt_request(job["request"]["text"], defaults, duration=job["request"]["duration"],
-                             submission_id="studio-" + job["id"])
+                             submission_id="studio-" + job["id"], production_limits=job["request"].get("limits"))
     return request, digest({"protocolVersion": 1, "purpose": "production-request", "value": request})
 
 
@@ -107,6 +107,10 @@ class StudioExecution:
         write_json(self.work / "checkpoint.json", state)
         descriptors = []
         for step in state.get("steps", {}).values():
+            if step["name"] == "production.image_start":
+                candidate = (step["result"].get("data", {}).get("job") or {}).get("candidate")
+                if candidate:
+                    descriptors.append(candidate["artifact"])
             if step["name"] == "production.render":
                 descriptors.extend(d for d in step["result"].get("artifacts", []) if d["kind"] == "preview")
         for history in state.get("images", {}).values():
@@ -133,6 +137,69 @@ class StudioExecution:
 
     async def run(self, crew_state, config):
         request = self.job["request"]
+        from .studio_continuation import (checkpoint_view, install_authorization,
+            prepare_continuation, signed_authorization)
+        from .studio_controls import effective_limits
+        decision = self.store.continuation(self.job["id"])
+        startup_limits = effective_limits({})
+        configured_job = {**self.job, "request": {**request, **({"limits": startup_limits} if startup_limits else {})}}
+        production_request, _ = prepared_request(configured_job, config)
+        saved_request = read_json(self.work / "production-request.json")
+        if saved_request:
+            production_request = saved_request
+        elif startup_limits:
+            write_json(self.work / "production-request.json", production_request)
+        brief = production_request["brief"]
+        if (brief["id"] != "studio-" + self.job["id"] or brief["text"] != request["text"]
+                or brief["durationSeconds"] != request["duration"]):
+            raise StudioConflict("The saved Production request differs from this Brief. No work was started.")
+        crew_work = crew_state / "briefs" / sha256(production_request["brief"]["id"].encode()).hexdigest()
+        state = await asyncio.to_thread(prepare_continuation, self.store, self.job, crew_work, self.client)
+        selected = effective_limits(state) if state and state.get("studioAuthorization") else startup_limits
+        if selected:
+            async def ensure_authorization(run):
+                if run.state.get("studioAuthorization"):
+                    existing = run.state["studioAuthorization"]
+                    if run.state.get("productionSnapshot", {}).get("data", {}).get("studioAuthorization") != existing:
+                        raise StudioConflict("Production authorization changed. Reconciliation is required.")
+                    if existing["limits"] != selected or existing.get("expiresAt") is not None:
+                        from uuid import uuid5, NAMESPACE_URL
+                        from .studio_continuation import archive_bytes
+                        migration = self.work / "unlimited" / existing["decisionId"]
+                        archive_bytes(migration / "checkpoint-before.json", run.path.read_bytes())
+                        authorization = signed_authorization(migration / "authorization.json",
+                            decision_id=str(uuid5(NAMESPACE_URL, "vox-unlimited:" + existing["decisionId"])),
+                            state=run.state, limits=selected)
+                        run.state["productionSnapshot"] = install_authorization(self.client, run.state, authorization)
+                        run.state["studioAuthorization"] = authorization
+                        run.save()
+                    if decision and decision["request"].get("start"):
+                        self.store.complete_continuation(decision["id"])
+                    return
+                if run.state.get("pending"):
+                    raise StudioConflict("An unfinished action must be reconciled before authorizing production.")
+                if not run.state["runId"]:
+                    run.require_success(await run.command("init", production_request))
+                initial = read_json(self.work / "initial-authorization.json")
+                authorization = signed_authorization(self.work / "initial-authorization.json",
+                    decision_id=self.job["id"], state=run.state, limits=initial["limits"] if initial else selected)
+                run.state["productionSnapshot"] = install_authorization(self.client, run.state, authorization)
+                run.state["studioAuthorization"] = authorization
+                run.save()
+                if authorization["limits"] != selected or authorization.get("expiresAt") is not None:
+                    await ensure_authorization(run)
+                if decision and decision["request"].get("start"):
+                    self.store.complete_continuation(decision["id"])
+            await submit_prompt(self.client, crew_state, config, request["text"], duration=request["duration"],
+                language=request["language"], submission_id="studio-" + self.job["id"],
+                on_snapshot=self.snapshot, stop_requested=lambda: self.store.stop_requested(self.job["id"]),
+                production_limits=selected, original_request=production_request, authorize_hook=ensure_authorization)
+        else:
+            await self.run_legacy(crew_state, config)
+        self.finish()
+
+    async def run_legacy(self, crew_state, config):
+        request = self.job["request"]
         _, request_sha = prepared_request(self.job, config)
         authorization = read_json(self.work / "authorization.json", {})
         if (authorization.get("requestSha256") != request_sha or
@@ -141,21 +208,27 @@ class StudioExecution:
         await submit_prompt(self.client, crew_state, config, request["text"], duration=request["duration"],
                             language=request["language"], submission_id="studio-" + self.job["id"],
                             on_snapshot=self.snapshot, image_review_hook=self.image_review)
+
+    def finish(self):
         state = read_json(self.work / "checkpoint.json")
         terminal = state["terminal"]
-        if terminal["status"] == "reviewed":
+        if terminal["status"] in ("ready", "reviewed"):
             if any(not rows or not rows[-1].get("accepted") for rows in state["images"].values()):
-                raise ValueError("A reviewed film cannot have missing or rejected images.")
+                raise ValueError("A delivered film cannot have missing or rejected images.")
             descriptor = terminal["preview"]
-            if descriptor["sha256"] != terminal["reviewedSha256"]:
-                raise ValueError("Film review refers to different bytes.")
+            expected = terminal.get("verifiedSha256") if terminal["status"] == "ready" else terminal.get("reviewedSha256")
+            if descriptor["sha256"] != expected:
+                raise ValueError("Film delivery refers to different bytes.")
             artifact = self.client.fetch_artifact(state["runId"], ArtifactDescriptor(**descriptor))
             path = save_media(self.work, artifact.data, descriptor)
-            decode_video(path)
+            if terminal["status"] == "reviewed":
+                decode_video(path)
+            elif terminal.get("technicalVerification") != {"sha256": expected, "fullyDecoded": True}:
+                raise ValueError("Film delivery requires completed technical verification.")
             save_media(self.work, artifact.data, descriptor, fully_decoded=True)
         current = self.store.get(self.job["id"])
         self.store.transition(self.job["id"], current["status"], terminal["status"],
-                              terminal.get("reason", "The film passed audiovisual review. Watch it to confirm the result."))
+                              terminal.get("reason", "Your film is ready to watch and download."))
 
 
 def run_worker(store, crew_state, config, *, once=False):
@@ -165,6 +238,14 @@ def run_worker(store, crew_state, config, *, once=False):
         locks.enter_context(worker_lock(crew_state / "worker.lock"))
         store.interrupted()
         client = HostedProductionClient(crew_state)
+        from .studio_continuation import checkpoint_view
+        for saved in store.list():
+            if saved["recorded"]:
+                continue
+            work = crew_state / "briefs" / sha256(("studio-" + saved["id"]).encode()).hexdigest()
+            state = checkpoint_view(work)
+            if state is not None:
+                write_json(store.work(saved["id"]) / "checkpoint.json", state)
         while True:
             job = store.claim()
             if job:
@@ -173,7 +254,8 @@ def run_worker(store, crew_state, config, *, once=False):
                 except Exception as error:
                     current = store.get(job["id"])
                     store.transition(job["id"], current["status"], "interrupted",
-                                     "Production stopped. An operator must inspect the saved state before resuming.")
+                                     str(error) if isinstance(error, StudioConflict) else
+                                     "Production stopped. The saved state must be inspected before resuming.")
                     write_json(store.work(job["id"]) / "worker-error.json", {"type": type(error).__name__})
             if once:
                 return

@@ -76,6 +76,8 @@ export const recordedResponseFor = (
 };
 
 export const createCommandFixture = async (options?: {
+  studioAuthorizationKey?: string;
+  studioImageGrantKey?: string;
   calibration?: 'active' | 'missing';
   compiler?: ProductionCommandServiceOptions['compiler'];
   renderer?: ProductionCommandServiceOptions['renderer'];
@@ -117,6 +119,8 @@ export const createCommandFixture = async (options?: {
   );
   const network = { request: vi.fn(async () => Promise.reject(new Error('NETWORK_FORBIDDEN'))) };
   const service = new ProductionCommandService({
+    studioAuthorizationKey: options?.studioAuthorizationKey,
+    studioImageGrantKey: options?.studioImageGrantKey,
     ledgerRoot,
     hmacKey: 'command-test-secret',
     keyId: 'command-test-key',

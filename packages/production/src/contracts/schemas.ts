@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { studioAuthorizationSchema } from './studio-authorization';
 
 export const PROTOCOL_VERSION = 1 as const;
 
@@ -43,6 +44,8 @@ export const commandIdSchema = z.enum([
   'contract.show',
   'run.init',
   'run.status',
+  'run.progress',
+  'run.authorize',
   'run.decline',
   'run.validate',
   'run.preflight',
@@ -108,7 +111,7 @@ export const productionRequestSchema = z
             seed: z.number().int(),
           })
           .strict(),
-        maxNewTakes: z.number().int().nonnegative(),
+        maxNewTakes: z.number().int().nonnegative().nullable(),
       })
       .strict(),
   })
@@ -145,6 +148,7 @@ export const imageGenerationRequestSchema = z
     seed: z.number().int().min(0).max(0x7fffffff),
     requestSha256: sha256,
     retryOf: nonEmpty.optional(),
+    sourceCandidateSha256: sha256.optional(),
   })
   .strict();
 
@@ -377,6 +381,15 @@ export const preflightReportSchema = z
   .strict();
 
 export const commandDataSchemas = {
+  'run.progress': z.object({ activity: z.object({
+    phase: z.enum(['bundle', 'composition', 'render', 'encoding', 'muxing', 'saving']),
+    elapsedMs: z.number().nonnegative(),
+    observedAt: z.iso.datetime({ offset: true }),
+    totalFrames: z.number().int().nonnegative().optional(),
+    renderedFrames: z.number().int().nonnegative().optional(),
+    encodedFrames: z.number().int().nonnegative().optional(),
+    concurrency: z.number().int().positive().optional(),
+  }).strict().nullable() }).strict(),
   'contract.index': z
     .object({
       categories: z.array(
@@ -398,11 +411,13 @@ export const commandDataSchemas = {
     })
     .strict(),
   'run.init': z.object({ created: z.literal(true) }).strict(),
+  'run.authorize': z.object({ authorization: studioAuthorizationSchema }).strict(),
   'run.status': z
     .object({
       staleStages: z.array(runStageSchema),
       lastOutcome: commandOutcomeSchema,
       artifacts: z.array(artifactDescriptorSchema),
+      studioAuthorization: studioAuthorizationSchema.optional(),
       imageRecoveryPolicy: imageRecoveryPolicySchema
         .extend({
           nextImageDispatchAt: z.iso.datetime({ offset: true }),
@@ -419,7 +434,7 @@ export const commandDataSchemas = {
       disposition: z.enum(['reused', 'recorded', 'replacement_recorded']),
       takeId: nonEmpty,
       newTakesUsed: z.number().int().nonnegative(),
-      maxNewTakes: z.number().int().nonnegative(),
+      maxNewTakes: z.number().int().nonnegative().nullable(),
     })
     .strict(),
   'run.compile': z

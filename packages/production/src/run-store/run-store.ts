@@ -27,7 +27,12 @@ import {
   productionRequestSchema,
   resultEnvelopeSchema,
 } from '../contracts/schemas';
+import {
+  type StudioAuthorization,
+  studioAuthorizationSchema,
+} from '../contracts/studio-authorization';
 import { RUN_PATHS } from './paths';
+import { type ProductionMeasurement, reportMeasurement } from '../measurement';
 
 type JsonObject = { [key: string]: JsonValue };
 
@@ -45,6 +50,7 @@ export type AssetResolution = {
 };
 
 export type RunBindings = {
+  studioAuthorization?: StudioAuthorization;
   plan: {
     planSha256: string;
     snapshot: ArtifactDescriptor;
@@ -106,7 +112,7 @@ export const EMPTY_RUN_BINDINGS: RunBindings = {
 };
 
 export type RunQuota = {
-  maxNewTakes: number;
+  maxNewTakes: number | null;
   newTakesUsed: number;
   replacementGrantIdsUsed: string[];
 };
@@ -158,7 +164,7 @@ type Ledger = {
   revision: number;
   headReceiptSha256: string;
   headReceiptPath: string;
-  maxNewTakes: number;
+  maxNewTakes: number | null;
   newTakesUsed: number;
   consumedGrantIds: string[];
   recordingAttempts: RecordingAttempt[];
@@ -190,7 +196,7 @@ export type PrivateRecordingResponse = {
 export type RunStoreExclusiveSession = {
   inspect: () => Promise<RunCheckpoint>;
   commit: (input: CommitInput) => Promise<RunCheckpoint>;
-  recordingAttempts: (recordingInputSha256: string) => Promise<RecordingAttempt[]>;
+  recordingAttempts: (recordingInputSha256?: string) => Promise<RecordingAttempt[]>;
   quota: () => Promise<RunQuota>;
   historicalTakeBindings: () => Promise<NonNullable<RunBindings['take']>[]>;
   beginRecordingDispatch: (input: {
@@ -236,6 +242,7 @@ const assetResolutionSchema = z
   .strict();
 const runBindingsSchema = z
   .object({
+    studioAuthorization: studioAuthorizationSchema.optional(),
     plan: z
       .object({
         planSha256: sha256Schema,
@@ -308,7 +315,7 @@ const runBindingsSchema = z
   .strict();
 const quotaSchema = z
   .object({
-    maxNewTakes: z.number().int().nonnegative(),
+    maxNewTakes: z.number().int().nonnegative().nullable(),
     newTakesUsed: z.number().int().nonnegative(),
     replacementGrantIdsUsed: z.array(z.string().min(1)),
   })
@@ -346,6 +353,7 @@ const receiptSchema = z
     sequence: z.number().int().positive(),
     command: z.enum([
       'run.init',
+      'run.authorize',
       'run.decline',
       'run.validate',
       'run.preflight',
@@ -371,7 +379,7 @@ const ledgerSchema = z
     revision: z.number().int().positive(),
     headReceiptSha256: sha256Schema,
     headReceiptPath: z.string().min(1),
-    maxNewTakes: z.number().int().nonnegative(),
+    maxNewTakes: z.number().int().nonnegative().nullable(),
     newTakesUsed: z.number().int().nonnegative(),
     consumedGrantIds: z.array(z.string().min(1)),
     recordingAttempts: z
@@ -414,6 +422,7 @@ export type RunStoreOptions = {
   leaseMs?: number;
   now?: () => Date;
   crashAt?: (point: CrashPoint) => void;
+  onMeasure?: (measurement: ProductionMeasurement) => void;
 };
 
 export type ImmutableArtifactInput = {
@@ -424,7 +433,7 @@ export type ImmutableArtifactInput = {
 
 export type CommitInput = {
   expectedRevision: number;
-  command: Exclude<CommandId, 'contract.index' | 'contract.show' | 'run.status'>;
+  command: Exclude<CommandId, 'contract.index' | 'contract.show' | 'run.status' | 'run.progress'>;
   outcome: CommandOutcome;
   stage?: RunStage;
   artifacts?: ImmutableArtifactInput[];
@@ -433,7 +442,7 @@ export type CommitInput = {
   data?: JsonObject | null;
   error?: ResultEnvelope['error'];
   next?: ResultEnvelope['next'];
-  quota?: { newTakesDelta?: number; consumeGrantId?: string };
+  quota?: { newTakesDelta?: number; consumeGrantId?: string; maxNewTakes?: number | null };
 };
 
 export class RunStoreError extends Error {
@@ -591,7 +600,10 @@ export class RunStore {
   private async commitUnderLease(input: CommitInput): Promise<RunCheckpoint> {
     await this.assertRunRoot();
     let ledger = await this.readLedger();
-    ledger = await this.recoverProjectionUnderLease(ledger);
+    // The lease fixes the authoritative head throughout recovery and this commit.
+    // Share the verified receipt, never a cache across operations or processes.
+    const previousReceipt = await this.verifyReceiptChain(ledger);
+    ledger = await this.recoverProjectionUnderLease(ledger, previousReceipt);
     if (ledger.revision !== input.expectedRevision) {
       throw new RunStoreError(
         'RUN_REVISION_CONFLICT',
@@ -599,12 +611,16 @@ export class RunStore {
       );
     }
 
-    const previousReceipt = await this.verifyReceiptChain(ledger);
     const previousState = previousReceipt.state;
     const artifacts: ArtifactDescriptor[] = [];
     for (const artifact of input.artifacts ?? [])
       artifacts.push(await this.publishImmutable(artifact));
 
+    if (input.quota?.maxNewTakes !== undefined && input.command !== 'run.authorize')
+      throw new RunStoreError(
+        'QUOTA_AUTHORIZATION_REQUIRED',
+        'Only explicit authorization can extend a ceiling.',
+      );
     const nextQuota = this.applyQuota(this.quotaFromLedger(ledger), input.quota);
     const bindings =
       typeof input.bindings === 'function'
@@ -720,7 +736,9 @@ export class RunStore {
     return this.withLease(async () => {
       await this.assertRunRoot();
       const ledger = await this.readLedger();
-      return this.checkpointFromLedger(await this.recoverProjectionUnderLease(ledger));
+      const receipt = await this.verifyReceiptChain(ledger);
+      const recovered = await this.recoverProjectionUnderLease(ledger, receipt);
+      return this.checkpointFrom(receipt.state, recovered.headReceiptSha256);
     });
   }
 
@@ -896,11 +914,15 @@ export class RunStore {
   }
 
   private async recordingAttemptsUnderLease(
-    recordingInputSha256: string,
+    recordingInputSha256?: string,
   ): Promise<RecordingAttempt[]> {
     const ledger = await this.readLedger();
     return ledger.recordingAttempts
-      .filter((attempt) => attempt.recordingInputSha256 === recordingInputSha256)
+      .filter(
+        (attempt) =>
+          recordingInputSha256 === undefined ||
+          attempt.recordingInputSha256 === recordingInputSha256,
+      )
       .map((attempt) => structuredClone(attempt));
   }
 
@@ -977,7 +999,7 @@ export class RunStore {
     if (input.grantId && ledger.consumedGrantIds.includes(input.grantId)) {
       throw new RunStoreError('GRANT_REPLAYED', `Grant "${input.grantId}" was already consumed.`);
     }
-    if (ledger.newTakesUsed >= ledger.maxNewTakes) {
+    if (ledger.maxNewTakes !== null && ledger.newTakesUsed >= ledger.maxNewTakes) {
       throw new RunStoreError('QUOTA_EXHAUSTED', 'Recording dispatch would exceed maxNewTakes.');
     }
 
@@ -1135,10 +1157,23 @@ export class RunStore {
 
   private applyQuota(current: RunQuota, mutation: CommitInput['quota']): RunQuota {
     const next = structuredClone(current);
+    if (mutation?.maxNewTakes !== undefined) {
+      if (
+        mutation.maxNewTakes !== null &&
+        (!Number.isSafeInteger(mutation.maxNewTakes) ||
+          next.maxNewTakes === null ||
+          mutation.maxNewTakes < next.maxNewTakes)
+      )
+        throw new RunStoreError(
+          'INVALID_QUOTA_EXTENSION',
+          'A quota extension must preserve the authorized total.',
+        );
+      next.maxNewTakes = mutation.maxNewTakes;
+    }
     const delta = mutation?.newTakesDelta ?? 0;
     if (!Number.isSafeInteger(delta) || delta < 0)
       throw new RunStoreError('INVALID_QUOTA_DELTA', 'Quota delta is invalid.');
-    if (next.newTakesUsed + delta > next.maxNewTakes) {
+    if (next.maxNewTakes !== null && next.newTakesUsed + delta > next.maxNewTakes) {
       throw new RunStoreError('QUOTA_EXHAUSTED', 'Recording dispatch would exceed maxNewTakes.');
     }
     if (mutation?.consumeGrantId) {
@@ -1224,6 +1259,9 @@ export class RunStore {
   }
 
   private async verifyReceiptChain(ledger: Ledger): Promise<Receipt> {
+    const started = performance.now();
+    let bytesRead = 0;
+    let count = 0;
     let path: string | null = ledger.headReceiptPath;
     let expectedHash: string | null = ledger.headReceiptSha256;
     let expectedSequence = ledger.revision;
@@ -1231,6 +1269,8 @@ export class RunStore {
 
     while (path && expectedHash) {
       const bytes = await this.readSecure(path);
+      bytesRead += bytes.byteLength;
+      count += 1;
       if (sha256Bytes(bytes) !== expectedHash) {
         throw new RunStoreError(
           'RUN_RECEIPT_CHAIN_INVALID',
@@ -1255,11 +1295,13 @@ export class RunStore {
         'Receipt chain does not terminate at revision one.',
       );
     }
+    (this.options.onMeasure ?? reportMeasurement)({ operation: 'verify_receipt_chain',
+      elapsedMs: performance.now() - started, bytes: bytesRead, count });
     return head;
   }
 
-  private async recoverProjectionUnderLease(ledger: Ledger): Promise<Ledger> {
-    const receipt = await this.verifyReceiptChain(ledger);
+  private async recoverProjectionUnderLease(ledger: Ledger, verified?: Receipt): Promise<Ledger> {
+    const receipt = verified ?? await this.verifyReceiptChain(ledger);
     const authoritative = this.checkpointFrom(receipt.state, ledger.headReceiptSha256);
     const current = await this.readPublicCheckpoint();
 
@@ -1299,7 +1341,10 @@ export class RunStore {
   }
 
   private async verifyBoundArtifacts(bindings: RunBindings): Promise<void> {
+    const checked = new Set<string>();
     for (const descriptor of this.collectArtifactDescriptors(bindings as unknown as JsonValue)) {
+      const identity = `${descriptor.path}:${descriptor.sha256}`;
+      if (checked.has(identity)) continue;
       const bytes = await this.readSecure(descriptor.path);
       if (sha256Bytes(bytes) !== descriptor.sha256) {
         throw new RunStoreError(
@@ -1307,6 +1352,7 @@ export class RunStore {
           `${descriptor.path} no longer matches its descriptor.`,
         );
       }
+      checked.add(identity);
     }
   }
 

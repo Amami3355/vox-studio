@@ -21,17 +21,34 @@ class ProviderLimit(RuntimeError):
     pass
 
 
+class ProviderStopped(ProviderLimit):
+    """User requested a stop at the next completed operation boundary."""
+
+
+def summarize_records(records):
+    dispatches = [r for r in records if r["status"] == "dispatched"]
+    completed = {r["id"] for r in records if r["status"] == "responded"}
+    return {"calls": len(dispatches), "searches": sum(bool(r.get("grounded")) for r in dispatches),
+            "images": sum(r.get("role") == "ImageGeneration" for r in dispatches),
+            "takes": sum(r.get("role") == "Recording" for r in dispatches),
+            "uncertain": any(r["id"] not in completed for r in dispatches)}
+
+
 class ProviderJournal:
-    def __init__(self, path: Path, *, max_calls: int = 40, max_grounded_calls: int = 2):
+    def __init__(self, path: Path, *, max_calls: int | None = 40, max_grounded_calls: int | None = 2,
+                 reconcile_pending: bool = False):
         self.path = path
         self.max_calls = max_calls
         self.max_grounded_calls = max_grounded_calls
+        self.expires_at = None
+        self.stop_requested = None
+        self.operation_identity = None
         # Concurrent creative roles share this journal's one outstanding dispatch.
         self.model_turn_lock = asyncio.Lock()
         self.records = [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
         opened = {row["id"] for row in self.records if row["status"] == "dispatched"}
         closed = {row["id"] for row in self.records if row["status"] == "responded"}
-        if opened - closed:
+        if opened - closed and not reconcile_pending:
             raise ProviderLimit("An earlier provider dispatch is uncertain; reconcile it before another attempt.")
 
     def __enter__(self):
@@ -40,6 +57,9 @@ class ProviderJournal:
 
     def __exit__(self, *args):
         CURRENT.reset(self.token)
+
+    def summary(self):
+        return summarize_records(self.records)
 
     def append(self, row: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -50,24 +70,34 @@ class ProviderJournal:
             os.fsync(stream.fileno())
         self.records.append(row)
 
-    def begin(self, role: str, model: str, *, grounded: bool = False, provider: str = "google-cloud") -> str:
+    def check_available(self, *, grounded: bool = False) -> None:
+        if self.stop_requested and self.stop_requested():
+            raise ProviderStopped("Stopped after the current operation. Your completed work is saved.")
         dispatches = [r for r in self.records if r["status"] == "dispatched"]
         completed = {r["id"] for r in self.records if r["status"] == "responded"}
         if any(r["id"] not in completed for r in dispatches):
             raise ProviderLimit("A provider dispatch is uncertain; reconcile before another call.")
-        if len(dispatches) >= self.max_calls:
-            raise ProviderLimit("The operator model-call ceiling has been reached.")
-        if grounded and sum(r["grounded"] for r in dispatches) >= self.max_grounded_calls:
-            raise ProviderLimit("The operator grounded-research ceiling has been reached.")
+        if self.expires_at and datetime.fromisoformat(self.expires_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+            raise ProviderLimit("The production authorization has expired. Confirm your limits before continuing.")
+        if self.max_calls is not None and len(dispatches) >= self.max_calls:
+            raise ProviderLimit("The total call ceiling has been reached.")
+        if grounded and self.max_grounded_calls is not None and sum(r["grounded"] for r in dispatches) >= self.max_grounded_calls:
+            raise ProviderLimit("The research call ceiling has been reached.")
+
+    def begin(self, role: str, model: str, *, grounded: bool = False, provider: str = "google-cloud",
+              max_output_tokens: int | None = None) -> str:
+        self.check_available(grounded=grounded)
         call_id = str(uuid4())
         self.append({"id": call_id, "status": "dispatched", "provider": provider,
-                     "role": role, "model": model, "grounded": grounded})
+                     "role": role, "model": model, "grounded": grounded,
+                     **({"operationId": self.operation_identity()} if self.operation_identity else {}),
+                     **({"maxOutputTokens": max_output_tokens} if max_output_tokens is not None else {})})
         return call_id
 
 
-def begin_call(role: str, model: str, *, grounded: bool = False) -> str | None:
+def begin_call(role: str, model: str, *, grounded: bool = False, max_output_tokens: int | None = None) -> str | None:
     journal = CURRENT.get()
-    return journal.begin(role, model, grounded=grounded) if journal else None
+    return journal.begin(role, model, grounded=grounded, max_output_tokens=max_output_tokens) if journal else None
 
 
 def finish_call(call_id: str | None, usage: Any = None, **evidence: Any) -> None:
@@ -84,5 +114,5 @@ def finish_call(call_id: str | None, usage: Any = None, **evidence: Any) -> None
     allowed = {key: value for key, value in evidence.items()
                if key in {"searchQueries", "sources", "supports", "responseSha256", "modelVersion",
                           "answerParts", "extractionStatus", "mediaSha256", "providerHttpStatus",
-                          "providerOutcome", "contextSha256"}}
+                          "providerOutcome", "contextSha256", "finishReason"}}
     journal.append({"id": call_id, "status": "responded", "usage": counts, **allowed})

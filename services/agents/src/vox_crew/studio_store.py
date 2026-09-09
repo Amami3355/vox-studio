@@ -29,10 +29,15 @@ class StudioStore:
                     recorded INTEGER NOT NULL DEFAULT 0);
                 CREATE UNIQUE INDEX IF NOT EXISTS one_active_job ON jobs((1))
                     WHERE status IN ('queued', 'running', 'awaiting_image');
+                CREATE TABLE IF NOT EXISTS stop_requests (job_id TEXT PRIMARY KEY, created REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS sessions (digest TEXT PRIMARY KEY, expires REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS decisions (
                     job_id TEXT NOT NULL, candidate TEXT NOT NULL, decision TEXT NOT NULL,
                     PRIMARY KEY(job_id, candidate));
+                CREATE TABLE IF NOT EXISTS continuations (
+                    id TEXT PRIMARY KEY, job_id TEXT NOT NULL, request_key TEXT UNIQUE NOT NULL,
+                    request TEXT NOT NULL, status TEXT NOT NULL, created REAL NOT NULL,
+                    UNIQUE(job_id, id));
             """)
 
     @contextmanager
@@ -54,16 +59,24 @@ class StudioStore:
             db.execute("BEGIN IMMEDIATE")
             old = db.execute("SELECT * FROM jobs WHERE admission_key=?", (key,)).fetchone()
             if old:
-                if old["request"] != payload:
+                original, incoming = json.loads(old["request"]), json.loads(payload)
+                original.pop("limits", None)
+                incoming.pop("limits", None)
+                if original != incoming:
                     raise StudioConflict("This submission key already belongs to a different brief.")
                 return self.decode(old)
             # Pending requests cannot purchase work, but still bound storage admission.
             if db.execute("SELECT COUNT(*) FROM jobs WHERE status='awaiting_authorization'").fetchone()[0] >= 20:
                 raise StudioConflict("Review the existing pending briefs before adding more.")
             job_id = str(uuid4())
-            db.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
-                       (job_id, key, payload, "awaiting_authorization", now, now,
-                        "The brief is saved. An operator must authorize its production budget."))
+            selected = "limits" in request
+            try:
+                db.execute("INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+                           (job_id, key, payload, "queued" if selected else "awaiting_authorization", now, now,
+                            "Your brief is saved. Waiting for the production worker." if selected else
+                            "The brief is saved. Start production when you are ready."))
+            except sqlite3.IntegrityError as error:
+                raise StudioConflict("Another production is already active.") from error
             return self.decode(db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone())
 
     @staticmethod
@@ -126,6 +139,81 @@ class StudioStore:
         with self.connection() as db:
             row = db.execute("SELECT decision FROM decisions WHERE job_id=? AND candidate=?", (job_id, candidate)).fetchone()
             return json.loads(row[0]) if row else None
+
+    def continuation(self, job_id, key=None):
+        with self.connection() as db:
+            if key is not None:
+                row = db.execute("SELECT * FROM continuations WHERE job_id=? AND request_key=?", (job_id, key)).fetchone()
+            else:
+                row = db.execute("SELECT * FROM continuations WHERE job_id=? ORDER BY created DESC LIMIT 1", (job_id,)).fetchone()
+            return {**dict(row), "request": json.loads(row["request"])} if row else None
+
+    def request_continuation(self, job_id, key, request, *, expected_status):
+        payload = json.dumps(request, sort_keys=True, ensure_ascii=False)
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            old = db.execute("SELECT * FROM continuations WHERE request_key=?", (key,)).fetchone()
+            if old:
+                if old["job_id"] != job_id or old["request"] != payload:
+                    raise StudioConflict("This action key already belongs to a different correction.")
+                return old["id"]
+            job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            if not job or job["recorded"] or job["status"] != expected_status or expected_status not in ("blocked", "interrupted", "awaiting_authorization", "ready", "reviewed"):
+                raise StudioConflict("The production changed. Refresh before continuing.")
+            if db.execute("SELECT 1 FROM continuations WHERE job_id=? AND status='pending'", (job_id,)).fetchone():
+                raise StudioConflict("A saved continuation is still pending. Retry that decision before submitting another.")
+            db.execute("DELETE FROM stop_requests WHERE job_id=?", (job_id,))
+            decision_id = str(uuid4())
+            try:
+                db.execute("UPDATE jobs SET status='queued', message=?, updated=? WHERE id=?",
+                    ("Your correction is saved. Preparing to continue the same production.", time.time(), job_id))
+                db.execute("INSERT INTO continuations VALUES (?, ?, ?, ?, 'pending', ?)",
+                    (decision_id, job_id, key, payload, time.time()))
+            except sqlite3.IntegrityError as error:
+                raise StudioConflict("Another production is already active.") from error
+            return decision_id
+
+    def complete_continuation(self, decision_id):
+        with self.connection() as db:
+            db.execute("UPDATE continuations SET status='applied' WHERE id=?", (decision_id,))
+
+    def retry_continuation(self, job_id):
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM continuations WHERE job_id=? AND status='pending'", (job_id,)).fetchone():
+                raise StudioConflict("There is no pending continuation to retry.")
+            try:
+                changed = db.execute("UPDATE jobs SET status='queued', message=?, updated=? WHERE id=? AND status='interrupted' AND recorded=0",
+                    ("Retrying the saved continuation. Existing provider work will be verified first.", time.time(), job_id)).rowcount
+            except sqlite3.IntegrityError as error:
+                raise StudioConflict("Another production is already active.") from error
+            if changed:
+                db.execute("DELETE FROM stop_requests WHERE job_id=?", (job_id,))
+            if not changed:
+                status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
+                if not status or status[0] not in ("queued", "running"):
+                    raise StudioConflict("Refresh to see the current production state.")
+
+    def stop_requested(self, job_id):
+        with self.connection() as db:
+            return db.execute("SELECT 1 FROM stop_requests WHERE job_id=?", (job_id,)).fetchone() is not None
+
+    def request_stop(self, job_id):
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            job = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            if not job or job["recorded"]:
+                raise StudioConflict("This production cannot be stopped.")
+            if job["status"] not in ("queued", "running", "awaiting_image"):
+                return
+            db.execute("INSERT OR IGNORE INTO stop_requests VALUES (?, ?)", (job_id, time.time()))
+            message = "Stopping after the current operation. Its result will be saved."
+            status = job["status"]
+            if status == "queued":
+                pending = db.execute("SELECT 1 FROM continuations WHERE job_id=? AND status='pending'", (job_id,)).fetchone()
+                status = "interrupted" if pending else "awaiting_authorization"
+                message = "Stopped before production started. Your work is saved."
+            db.execute("UPDATE jobs SET status=?, message=?, updated=? WHERE id=?", (status, message, time.time(), job_id))
 
     def session(self):
         token = secrets.token_urlsafe(32)

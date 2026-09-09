@@ -1,0 +1,158 @@
+```json
+{
+  "scenes": [
+    {
+      "id": "scene-reentry-flip",
+      "props": {
+        "headline": "The Reentry Flip",
+        "caption": "High above Earth, pressurized cold gas thrusters orient the vehicle in the thin upper atmosphere.",
+        "assetRequirement": {
+          "type": "image",
+          "subject": "A reusable rocket stage high above Earth, gas thrusters firing to begin its flip",
+          "treatment": "photo",
+          "orientation": "landscape",
+          "identityKey": "rocket-reentry-flip"
+        }
+      },
+      "layout": "splitLeft",
+      "motionProfile": "subtleDrift",
+      "events": [
+        {
+          "at": "beat-1.start",
+          "action": "revealImage"
+        },
+        {
+          "at": "beat-1.start+short",
+          "action": "revealCopy"
+        },
+        {
+          "at": "beat-1.word:flip",
+          "action": "emphasize",
+          "payload": {
+            "text": "Reentry Flip"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-grid-fins",
+      "props": {
+        "headline": "Aerodynamic Steering",
+        "caption": "Steerable titanium lattice wings provide precise control during descent.",
+        "assetRequirement": {
+          "type": "image",
+          "subject": "Close-up of a titanium lattice grid fin deployed on the side of a falling rocket booster",
+          "treatment": "photo",
+          "orientation": "landscape",
+          "identityKey": "rocket-grid-fin"
+        }
+      },
+      "layout": "plate",
+      "motionProfile": "cinematic",
+      "events": [
+        {
+          "at": "beat-2.word:lattice",
+          "action": "focus",
+          "payload": {
+            "region": "center"
+          }
+        },
+        {
+          "at": "beat-2.word:lattice",
+          "action": "annotate",
+          "payload": {
+            "text": "Titanium lattice structure provides precise pitch and yaw control"
+          }
+        },
+        {
+          "at": "beat-2.word:friction",
+          "action": "focus",
+          "payload": {
+            "region": "right"
+          }
+        },
+        {
+          "at": "beat-2.word:friction",
+          "action": "annotate",
+          "payload": {
+            "text": "Survives hypersonic reentry temperatures exceeding 1,000°C"
+          }
+        },
+        {
+          "at": "beat-2.end-short",
+          "action": "clearAnnotation"
+        },
+        {
+          "at": "beat-2.end-short",
+          "action": "focus",
+          "payload": {
+            "region": "whole"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-gnc-system",
+      "props": {
+        "headline": "Autonomous Guidance",
+        "caption": "The onboard GNC system uses sensor fusion to track the vehicle and calculate real-time adjustments.",
+        "assetRequirement": {
+          "type": "image",
+          "subject": "A control center telemetry visualizer showing a trajectory flight path vector with wind shear overlays",
+          "treatment": "photo",
+          "orientation": "landscape",
+          "identityKey": "rocket-gnc-vector"
+        }
+      },
+      "layout": "splitLeft",
+      "motionProfile": "subtleDrift",
+      "events": [
+        {
+          "at": "beat-3.start",
+          "action": "revealImage"
+        },
+        {
+          "at": "beat-3.start+short",
+          "action": "revealCopy"
+        },
+        {
+          "at": "beat-3.word:fusion",
+          "action": "emphasize",
+          "payload": {
+            "text": "Sensor Fusion"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-retropropulsion",
+      "props": {
+        "headline": "Supersonic Retro-Propulsion",
+        "caption": "Main engines reignite and gimbal to decelerate the vehicle and maintain vertical stability.",
+        "assetRequirement": {
+          "type": "image",
+          "subject": "A descending rocket booster firing its central main engines downwards, exhaust plume expanding",
+          "treatment": "photo",
+          "orientation": "landscape",
+          "identityKey": "retropropulsion-burn"
+        }
+      },
+      "layout": "plate",
+      "motionProfile": "cinematic",
+      "events": [
+        {
+          "at": "beat-4.word:reigniting",
+          "action": "focus",
+          "payload": {
+            "region": "bottom"
+          }
+        },
+        {
+          "at": "beat-4.word:reigniting",
+          "action": "annotate",
+          "payload": {
+            "text": "Liquid-propellant main engines reignite and throttle down"
+          }
+        },
+        {
+          "

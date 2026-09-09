@@ -248,10 +248,10 @@ def test_the_image_creator_judges_each_requirement_in_its_own_session() -> None:
     every earlier requirement's question and answer still in the conversation.
     """
     creator = AdkImageCreator(model="test-model")
-    other = AdkSceneAuthor(model="test-model")
+    other = AdkJsonRole("RememberingRole", "A role with default session history.", model="test-model")
 
     assert creator.role.remembers_turns is False
-    assert other.role.remembers_turns is True
+    assert other.remembers_turns is True
 
     opened: list[str] = []
 

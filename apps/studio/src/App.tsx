@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { ProductionControls } from './ProductionControls';
+import { ProductionProgress, activitySummary, productionMessage } from './ProductionProgress';
 import { ApiError, api, statusLabels } from './api';
 import type { Job } from './api';
 
@@ -170,14 +172,38 @@ function Login({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+const pendingSubmissionKey = 'vox-studio-pending-submission';
+type SubmissionAttempt = { payload: string; key: string };
+
+function readPendingSubmission() {
+  try {
+    const attempt = JSON.parse(sessionStorage.getItem(pendingSubmissionKey) || 'null');
+    if (!attempt || typeof attempt.payload !== 'string' || typeof attempt.key !== 'string')
+      return null;
+    const request = JSON.parse(attempt.payload);
+    if (
+      typeof request.text !== 'string' ||
+      !Number.isInteger(request.duration) ||
+      request.duration < 30 ||
+      request.duration > 300 ||
+      !['English', 'French'].includes(request.language)
+    )
+      return null;
+    return { attempt: attempt as SubmissionAttempt, request };
+  } catch {
+    return null;
+  }
+}
+
 function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
-  const [text, setText] = useState('');
-  const [duration, setDuration] = useState(50);
-  const [language, setLanguage] = useState('English');
+  const [pending] = useState(readPendingSubmission);
+  const [text, setText] = useState<string>(pending?.request.text || '');
+  const [duration, setDuration] = useState<number>(pending?.request.duration || 50);
+  const [language, setLanguage] = useState<string>(pending?.request.language || 'English');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const input = useRef<HTMLTextAreaElement>(null);
-  const attempt = useRef<{ payload: string; key: string } | null>(null);
+  const attempt = useRef<SubmissionAttempt | null>(pending?.attempt || null);
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -187,13 +213,16 @@ function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
     if (attempt.current?.payload !== payload)
       attempt.current = { payload, key: crypto.randomUUID() };
     try {
-      onCreated(
-        await api<Job>('/jobs', {
-          method: 'POST',
-          headers: { 'Idempotency-Key': attempt.current.key },
-          body: payload,
-        }),
-      );
+      // Persist before admission: a lost response and refresh must reuse the same key.
+      sessionStorage.setItem(pendingSubmissionKey, JSON.stringify(attempt.current));
+      const job = await api<Job>('/jobs', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': attempt.current.key },
+        body: payload,
+      });
+      sessionStorage.removeItem(pendingSubmissionKey);
+      attempt.current = null;
+      onCreated(job);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to save this brief.');
     } finally {
@@ -242,6 +271,10 @@ function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
                 <option value={30}>30 seconds</option>
                 <option value={50}>50 seconds</option>
                 <option value={60}>60 seconds</option>
+                <option value={120}>2 minutes</option>
+                <option value={180}>3 minutes</option>
+                <option value={240}>4 minutes</option>
+                <option value={300}>5 minutes</option>
               </select>
             </label>
             <label>
@@ -261,6 +294,11 @@ function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
             <Icon name="arrow" size={17} />
           </button>
         </div>
+        <div className="creation-promise">
+          <span>Research-backed story</span>
+          <span>Images checked automatically</span>
+          <span>Narrated film</span>
+        </div>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -268,8 +306,8 @@ function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
         )}
       </form>
       <p className="brief-note">
-        <Icon name="lock" size={13} /> Production starts after budget approval. Your brief is saved
-        immediately.
+        <Icon name="lock" size={13} /> Your brief and progress are saved. The crew checks and
+        corrects your film automatically; you can stop after the current operation.
       </p>
       <div className="section-label">
         <h2>A little inspiration</h2>
@@ -334,6 +372,10 @@ function NewFilm({ onCreated }: { onCreated: (job: Job) => void }) {
 
 function Film({ job, refresh }: { job: Job; refresh: () => void }) {
   const [tab, setTab] = useState('story');
+  const [showImageHistory, setShowImageHistory] = useState(false);
+  const latestImages = job.images.filter(
+    (image, index, all) => !all.slice(index + 1).some((later) => later.identity === image.identity),
+  );
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -377,56 +419,62 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
           {statusLabels[job.status] || job.status}
         </span>
       </div>
+      <ProductionProgress job={job} />
       <div className="production-grid">
         <div className="film-main">
-          <div className="player-shell">
-            {job.preview ? (
-              // biome-ignore lint/a11y/useMediaCaption: The Story tab exposes the full narration; verified timed captions are not yet available.
-              <video
-                key={job.preview.sha256}
-                src={job.preview.url}
-                controls
-                preload="metadata"
-                playsInline
-                aria-label="Produced film preview"
-              />
-            ) : (
-              <div className="player-empty">
-                <div className="empty-film">
-                  <Icon name="film" size={34} />
+          {!job.preview && (
+            <ProductionControls
+              key={`${job.status}:${job.corrections.length}`}
+              job={job}
+              refresh={refresh}
+            />
+          )}
+          {(job.preview || (!job.continuation.targets.length && !job.awaitingImage)) && (
+            <div className="player-shell">
+              {job.preview ? (
+                // biome-ignore lint/a11y/useMediaCaption: The Story tab exposes the full narration; verified timed captions are not yet available.
+                <video
+                  key={job.preview.sha256}
+                  src={job.preview.url}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  aria-label="Produced film preview"
+                />
+              ) : (
+                <div className="player-empty">
+                  <div className="empty-film">
+                    <Icon name="film" size={34} />
+                  </div>
+                  <h2>{active ? 'Your story is taking shape.' : 'Your film will appear here.'}</h2>
+                  <p>
+                    {active
+                      ? 'Follow the crew’s progress. You can safely leave and come back.'
+                      : 'Your brief and progress are saved in this workspace.'}
+                  </p>
+                  <span>RESEARCHED. NARRATED. MADE TO EXPLAIN.</span>
                 </div>
-                <h2>{active ? 'Your story is taking shape.' : 'Your film will appear here.'}</h2>
-                <p>
-                  {active
-                    ? 'Follow the crew’s progress. You can safely leave and come back.'
-                    : 'Your brief and progress are saved in this workspace.'}
-                </p>
-                <span>RESEARCHED. NARRATED. MADE TO EXPLAIN.</span>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           {job.preview && (
             <div className="player-caption">
-              <span className={job.preview.reviewed ? 'accepted-text' : 'draft-text'}>
-                {job.preview.reviewed
-                  ? 'Audiovisual review accepted · Human viewing pending'
-                  : 'Intermediate draft · Incomplete and not validated'}
+              <span className={job.preview.ready || job.preview.reviewed ? 'accepted-text' : 'draft-text'}>
+                {job.preview.ready || job.preview.reviewed
+                  ? 'Film ready · Illustrations approved'
+                  : 'Rendered preview · File checks in progress'}
               </span>
               <a href={`${job.preview.url}?download=true`}>
                 <Icon name="download" size={16} /> Download
               </a>
             </div>
           )}
-          {job.message && (
+          {job.message && !job.continuation.targets.length && !job.awaitingImage && (
             <div className={`notice ${active ? '' : 'attention'}`}>
               <Icon name={active ? 'clock' : 'lock'} size={19} />
               <div>
                 <strong>{statusLabels[job.status] || 'Production update'}</strong>
-                <p>
-                  {job.status === 'running'
-                    ? job.events.at(-1)?.summary || job.message
-                    : job.message}
-                </p>
+                <p>{productionMessage(job)}</p>
               </div>
             </div>
           )}
@@ -471,12 +519,19 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
               )}
             </section>
           )}
+          {job.preview && (
+            <ProductionControls
+              key={`${job.status}:${job.corrections.length}`}
+              job={job}
+              refresh={refresh}
+            />
+          )}
           <section className="details-panel">
             <div className="tabs" role="tablist" aria-label="Production details">
               {[
                 ['story', 'Story', job.beats.length],
                 ['sources', 'Sources', job.sources.length],
-                ['images', 'Images', job.images.length],
+                ['images', 'Images', latestImages.length],
               ].map(([id, label, count]) => (
                 <button
                   type="button"
@@ -538,19 +593,47 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
                 ))}
               {tab === 'images' &&
                 (job.images.length ? (
-                  <div className="image-grid">
-                    {job.images.map((image, index) => (
-                      <figure key={`${image.sha256}-${index}`}>
-                        <img src={image.url} alt={image.meaning || image.identity} loading="lazy" />
-                        <figcaption>
-                          <span className={image.accepted ? 'accepted-text' : 'draft-text'}>
-                            {image.accepted ? 'Accepted' : 'Rejected'}
-                          </span>
-                          <p>{image.meaning || image.identity}</p>
-                          <small>{image.assessment}</small>
-                        </figcaption>
-                      </figure>
-                    ))}
+                  <div>
+                    <label className="history-toggle">
+                      <input
+                        type="checkbox"
+                        checked={showImageHistory}
+                        onChange={(event) => setShowImageHistory(event.target.checked)}
+                      />{' '}
+                      Show previous versions
+                    </label>
+                    <div className="image-grid">
+                      {(showImageHistory ? job.images : latestImages).map((image, index) => (
+                        <figure key={`${image.sha256}-${index}`}>
+                          <img
+                            src={image.url}
+                            alt={image.meaning || image.identity}
+                            loading="lazy"
+                          />
+                          <figcaption>
+                            <span className={image.accepted ? 'accepted-text' : 'draft-text'}>
+                              {image.reviewPending
+                                ? 'Verification pending'
+                                : image.accepted
+                                  ? 'Accepted'
+                                  : 'Rejected'}
+                            </span>
+                            <p>{image.meaning || image.identity}</p>
+                            <details className="review-detail">
+                              <summary>Review details</summary>
+                              <small>{image.assessment}</small>
+                              {image.observations.map((observation, index) => (
+                                <p key={`${observation.problem}-${index}`}>
+                                  <strong>{observation.problem}</strong>
+                                  <br />
+                                  {observation.expected}
+                                </p>
+                              ))}
+                            </details>
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <Empty
@@ -577,15 +660,17 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
               <strong>Brief saved</strong>
               <p>{job.prompt}</p>
             </li>
-            {job.events.map((event) => (
-              <li className="activity-event" key={event.sequence}>
-                <span
-                  className={`event-dot ${['accepted', 'completed'].includes(event.status) ? 'done' : ''}`}
-                />{' '}
-                <strong>{event.phase.replaceAll('_', ' ')}</strong>
-                <p>{event.summary}</p>
-              </li>
-            ))}
+            {job.events
+              .filter((event, index, all) => event.phase !== all[index + 1]?.phase)
+              .map((event) => (
+                <li className="activity-event" key={event.sequence}>
+                  <span
+                    className={`event-dot ${['accepted', 'completed'].includes(event.status) ? 'done' : ''}`}
+                  />{' '}
+                  <strong>{event.phase.replaceAll('_', ' ')}</strong>
+                  <p>{activitySummary(event)}</p>
+                </li>
+              ))}
           </ol>
           <div className="saved-note">
             <Icon name="lock" size={15} />
@@ -618,15 +703,24 @@ export function App() {
   );
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [sessionRevision, setSessionRevision] = useState(0);
   useEffect(() => {
+    void sessionRevision;
+    let disposed = false;
+    setError('');
     api('/session')
-      .then(() => setAuthenticated(true))
+      .then(() => {
+        if (!disposed) setAuthenticated(true);
+      })
       .catch((error) => {
-        setAuthenticated(false);
-        if (!(error instanceof ApiError && error.status === 401))
-          setError('Unable to reach the Studio server.');
+        if (disposed) return;
+        if (error instanceof ApiError && error.status === 401) setAuthenticated(false);
+        else setError('Unable to reach the Studio server.');
       });
-  }, []);
+    return () => {
+      disposed = true;
+    };
+  }, [sessionRevision]);
   useEffect(() => {
     if (!authenticated) return;
     void revision;
@@ -662,6 +756,7 @@ export function App() {
   async function logout() {
     try {
       await api('/session', { method: 'DELETE' });
+      sessionStorage.removeItem(pendingSubmissionKey);
       setAuthenticated(false);
       setJobs([]);
     } catch {
@@ -672,7 +767,16 @@ export function App() {
     return (
       <div className="loading">
         <Wordmark />
-        <p>Opening your workspace…</p>
+        <p role={error ? 'alert' : undefined}>{error || 'Opening your workspace…'}</p>
+        {error && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setSessionRevision((r) => r + 1)}
+          >
+            Try again
+          </button>
+        )}
       </div>
     );
   if (!authenticated) return <Login onLogin={() => setAuthenticated(true)} />;

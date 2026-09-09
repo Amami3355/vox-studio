@@ -178,7 +178,7 @@ class RecordingQuota:
     disposition: str
     take_id: str
     new_takes_used: int
-    max_new_takes: int
+    max_new_takes: int | None
 
     @property
     def dispatched(self) -> bool:
@@ -187,7 +187,7 @@ class RecordingQuota:
 
     @property
     def within_quota(self) -> bool:
-        return self.new_takes_used <= self.max_new_takes
+        return self.max_new_takes is None or self.new_takes_used <= self.max_new_takes
 
 
 def quota_read(envelope: ResultEnvelope) -> RecordingQuota | None:
@@ -207,7 +207,7 @@ def quota_read(envelope: ResultEnvelope) -> RecordingQuota | None:
         disposition=str(data["disposition"]),
         take_id=str(data["takeId"]),
         new_takes_used=int(data["newTakesUsed"]),
-        max_new_takes=int(data["maxNewTakes"]),
+        max_new_takes=int(data["maxNewTakes"]) if data["maxNewTakes"] is not None else None,
     )
 
 

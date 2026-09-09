@@ -631,13 +631,13 @@ class SplitVisualPlanner:
         validate_plan: Validator,
         mode: ProviderMode = ProviderMode.RECORDED,
         repair: PlanRepairAgent | None = None,
-        repair_budget: int = PLAN_REPAIR_BUDGET,
+        repair_budget: int | None = PLAN_REPAIR_BUDGET,
         check_meanings: CheckMeanings = lambda _codes: {},
         reviewer: EditorialReviewer | None = None,
         editorial_revision_budget: int = 1,
         allow_structural_echo: bool = False,
     ) -> None:
-        if repair_budget < 0:
+        if repair_budget is not None and repair_budget < 0:
             raise ContractViolation("A plan repair budget cannot be negative.")
         if editorial_revision_budget < 0:
             raise ContractViolation("An editorial revision budget cannot be negative.")
@@ -682,7 +682,9 @@ class SplitVisualPlanner:
         for revision in range(self._editorial_revision_budget + 1):
             kwargs = {} if feedback is None else {"feedback": deepcopy(feedback)}
             async def structure_turn():
-                return await self._structurer.structure(brief, dossier, narrative, visual_bible, selection, **kwargs)
+                value = await self._structurer.structure(brief, dossier, narrative, visual_bible, selection, **kwargs)
+                self._structure(value, narrative)
+                return value
             dependencies = {"context": context, "narrative": narrative.to_mapping(), "selection": selection, "feedback": feedback}
             raw_structure = await checkpoint("structurer", dependencies, structure_turn) if checkpoint else await structure_turn()
             structure = self._structure(raw_structure, narrative)
@@ -692,10 +694,11 @@ class SplitVisualPlanner:
                 self._catalog, frozenset(selected_ids), self._validate_scene, self._validate_plan,
             )
             author_context = {**context, "editorialFeedback": feedback}
-            async def author_turn():
-                return await self._scene_author.author(deepcopy(structure), specifications, tools, context=deepcopy(author_context))
             dependencies = {"structure": structure, "specifications": specifications, "context": author_context}
-            fills = await checkpoint("scene_author", dependencies, author_turn) if checkpoint else await author_turn()
+            # Existing whole-film checkpoints retain their original identity and result.
+            fills = await checkpoint("scene_author", dependencies, None) if checkpoint else None
+            if fills is None:
+                fills = await self._author_sections(structure, specifications, tools, author_context, checkpoint)
             plan = await self._repaired(self._assemble(structure, fills, allow_structural_echo=self.allow_structural_echo), structure, tools, checkpoint)
             if self._reviewer is None:
                 return plan
@@ -709,6 +712,36 @@ class SplitVisualPlanner:
                 raise EditorialRejected("Editorial review remains unresolved; no media production started.")
             feedback = {"previousPlan": plan, **review.to_mapping()}
         raise AssertionError("The bounded editorial loop must return or refuse.")
+
+    async def _author_sections(self, structure, specifications, tools, context, checkpoint):
+        """Author independent section slots with the full immutable film context.
+
+        Keep the generated capability prefix identical across turns. Only returned slots are
+        narrowed. Rebuild asset continuity from completed fills, including checkpoint replays,
+        so fresh sessions and worker restarts carry the same shared image requirements.
+        """
+        fills = {"scenes": []}
+        sections = structure["sections"]
+        for index, section in enumerate(sections):
+            scoped = {"beats": deepcopy(structure["beats"]), "sections": [deepcopy(section)]}
+            author_context = context if len(sections) == 1 else {**context,
+                "filmStructure": structure,
+                "authoringScope": {"sectionId": section["id"], "sectionIndex": index, "sectionCount": len(sections)},
+                "assetContinuity": _asset_continuity(fills["scenes"])}
+
+            async def author_turn():
+                value = await self._scene_author.author(deepcopy(scoped), specifications, tools,
+                    context=deepcopy(author_context))
+                # Missing, duplicate and out-of-section slots fail before checkpoint success.
+                self._assemble(scoped, value, allow_structural_echo=self.allow_structural_echo)
+                return value
+
+            dependencies = {"structure": scoped, "specifications": specifications, "context": author_context}
+            value = await checkpoint("scene_author", dependencies, author_turn) if checkpoint else await author_turn()
+            # Validate cached values too, before incorporating anything into the final film.
+            self._assemble(scoped, value, allow_structural_echo=self.allow_structural_echo)
+            fills["scenes"].extend(deepcopy(value["scenes"]))
+        return fills
 
     async def _repaired(
         self, plan: JsonObject, structure: JsonObject, tools: VisualCatalogTools, checkpoint=None
@@ -740,11 +773,16 @@ class SplitVisualPlanner:
                 else ()
             )
             async def repair_turn():
-                if self._repair is None or self.repairs_spent >= self._repair_budget:
+                # The durable composition checkpoint owns reservations when supplied, so
+                # malformed answers and PlanRepair consume one shared total before dispatch.
+                if self._repair is None or (not checkpoint and self._repair_budget is not None and self.repairs_spent >= self._repair_budget):
                     raise ContractViolation(refusal.summary)
-                self.repairs_spent += 1
-                return await self._repair.repair(deepcopy(plan), refusal, specifications,
+                if not checkpoint:
+                    self.repairs_spent += 1
+                value = await self._repair.repair(deepcopy(plan), refusal, specifications,
                     tools.restricted_to(refusal.capability_ids))
+                self._assemble(structure, value, allow_structural_echo=self.allow_structural_echo)
+                return value
             dependencies = {"plan": plan, "findings": refusal.findings, "specifications": specifications}
             fills = await checkpoint("plan_repair", dependencies, repair_turn) if checkpoint else await repair_turn()
             plan = _retaining(plan, self._assemble(structure, fills, allow_structural_echo=self.allow_structural_echo), _refused_scene_ids(refusal))
@@ -930,6 +968,27 @@ class SplitVisualPlanner:
                 for scene in section["scenes"]
             ]
         return plan
+
+
+def _asset_continuity(scenes):
+    """Retain exact shared image requirements without accumulating previous model turns."""
+    result = []
+
+    def visit(value, scene_id):
+        if isinstance(value, Mapping):
+            requirement = value.get("assetRequirement")
+            if isinstance(requirement, Mapping):
+                result.append({"sceneId": scene_id, "assetRequirement": deepcopy(dict(requirement))})
+            for key, child in value.items():
+                if key != "assetRequirement":
+                    visit(child, scene_id)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child, scene_id)
+
+    for scene in scenes:
+        visit(scene.get("props", {}), scene["id"])
+    return result
 
 
 def _refused_scene_ids(refusal: PlanRefusal) -> frozenset[str]:

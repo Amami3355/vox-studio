@@ -102,6 +102,12 @@ class LocalProductionClient(ProductionClient):
     def status(self, run_id: str) -> ResultEnvelope:
         return self._run_command("status", run_id)
 
+    def progress(self, run_id: str) -> ResultEnvelope:
+        from copy import copy
+        observer = copy(self)
+        observer._timeout_seconds = 5
+        return observer._run_command("progress", run_id)
+
     def validate(self, run_id: str, plan: Mapping[str, Any]) -> ResultEnvelope:
         directory = self._directory(run_id)
         plan_argument = self._stage(directory, "plan.json", plan)

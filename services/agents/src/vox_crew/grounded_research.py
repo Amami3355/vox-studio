@@ -143,7 +143,11 @@ class GroundedParallelResearchAdapter:
                     ))],
                 ),
             )
-        except Exception:
+        except Exception as error:
+            from .provider_failure import received_error
+            failure = received_error(error, call_id)
+            if failure:
+                raise failure from None
             raise ParallelUnavailable("Google Cloud Parallel grounding did not complete; reconcile before retrying.") from None
         finally:
             if self._client_factory is None:

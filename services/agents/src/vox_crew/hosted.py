@@ -57,6 +57,8 @@ class HostedProductionClient(HttpProductionClient):
         return super().image_start(run_id, request, authorisation)
 
     def _command(self, command, **kwargs):
+        if command == "run.progress":
+            return super()._command(command, **kwargs)
         path = self.state / "operator" / "commands" / f"{uuid4()}.json"
         write_json(path, {"status": "dispatched", "command": command, "runId": kwargs.get("run_id"),
                           "observedAt": datetime.now(timezone.utc).isoformat()})

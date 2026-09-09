@@ -72,12 +72,29 @@ export const createGoogleImageAdapter = (
     let response: Awaited<ReturnType<GoogleImageClient['models']['generateContent']>>;
     try {
       response = await client.models.generateContent({
-        model: options.model ?? 'gemini-2.5-flash-image',
-        contents: request.prompt,
+        model: options.model ?? 'gemini-3-pro-image',
+        contents: request.sourceImage
+          ? [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      data: Buffer.from(request.sourceImage).toString('base64'),
+                      mimeType: 'image/png',
+                    },
+                  },
+                  {
+                    text: `Edit the supplied illustration to satisfy the following corrected specification. Preserve the successful composition and details unless the specification requires changing them. Return one finished image.\n${request.prompt}`,
+                  },
+                ],
+              },
+            ]
+          : request.prompt,
         config: {
           candidateCount: 1,
           responseModalities: ['TEXT', 'IMAGE'],
-          imageConfig: { aspectRatio: request.aspectRatio },
+          imageConfig: { aspectRatio: request.aspectRatio, imageSize: '2K' },
           seed: request.seed,
         },
       });

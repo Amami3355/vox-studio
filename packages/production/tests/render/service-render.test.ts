@@ -28,6 +28,8 @@ describe('Production service Remotion boundary', () => {
     fixture = await createCommandFixture({
       renderer: createRemotionRenderAdapter({
         entryPoint: resolve('packages/video/src/remotion-entry.ts'),
+        bundlePath: process.env.VOX_TEST_RENDER_BUNDLE,
+        concurrency: Number(process.env.VOX_TEST_RENDER_CONCURRENCY || 2),
       }),
       rendererVersion: 'remotion-4.0.508',
     });
@@ -68,5 +70,19 @@ describe('Production service Remotion boundary', () => {
       ]),
     );
     expect(fixture.network.request).not.toHaveBeenCalled();
+    await execFileAsync('ffmpeg', [
+      '-v',
+      'error',
+      '-xerror',
+      '-i',
+      previewPath,
+      '-map',
+      '0:v:0',
+      '-map',
+      '0:a:0',
+      '-f',
+      'null',
+      '-',
+    ]);
   });
 });

@@ -258,8 +258,15 @@ interface. Every fact has one canonical source and may appear elsewhere only as 
 projection. Avoid: "prompt", "manual" or "documentation bundle", which imply a second,
 hand-maintained source of truth.
 
-**Run** — One persistent production attempt for one Brief and its operator-owned production
-configuration. It advances through explicit stages, survives interruption and retains the
+**Production limits** ? Historical spending ceilings and correction allowances for a Run.
+Studio production has no spending ceiling; consumption remains part of the Run's history.
+
+**User correction** — A persisted instruction attached to the reviewed state of a Run and the
+image or production stage to correct. It preserves reusable work and remains distinct from
+image acceptance and permission to spend.
+
+**Run** — One persistent production attempt for one Brief, user-selected Production limits and
+server-owned provider configuration. It advances through explicit stages, survives interruption and retains the
 last successful stage when a command needs repair, pauses or fails. Avoid: "session", which
 suggests state that disappears with the process.
 
@@ -296,6 +303,12 @@ can produce *different* Takes — synthesis is not reproducible even at a fixed 
 why replaying one is a replacement attempt rather than a reproduction, and why `takeId`,
 digested from the audio and the alignment, is what identifies and binds the Take that comes
 out.
+
+**Image review** — A judgment of an exact generated candidate against its intended uses.
+An accepted candidate can enter the film; a rejected candidate can receive an independent correction.
+
+**Ready film** — A rendered film whose required illustrations are accepted and whose video
+and audio file passes technical verification. It does not imply a final audiovisual judgment.
 
 ## The six rules
 

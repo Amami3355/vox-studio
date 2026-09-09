@@ -42,3 +42,12 @@ September 8 is the internal demonstrable-product target. It is not a second subm
 ## Comments
 
 2026-09-07: Split the former broad release-envelope question: confirmed deadline, rules and delivery priority are resolved here; remaining human choices are open in the linked audience ticket. This makes the topology decision available without falsely resolving audience or staffing.
+
+2026-09-08, latest user direction: target publication tonight, September 8 into September 9
+Tunis time, ahead of the separately recorded event cutoff. Add a pre-publication milestone
+for [SceneCapabilities and catalog improvements](09-improve-scene-capabilities-and-catalog.md),
+including possible additions, and retain the diagnosed framing problem for later work.
+The next milestone is initial Studio rehearsal/reliability; capability work follows, then
+the previously deferred final voice work, final verification/capture and publication.
+This updates the working delivery scope and target; it does not waive final media review
+or voice compliance and does not authorize a new paid run.

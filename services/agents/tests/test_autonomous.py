@@ -49,6 +49,8 @@ class Director:
             "targetedQuestions": [] if accepted else ["Explain how thrust opposes motion"]})
     async def judge(self, stage, payload):
         return self.decisions.pop(0) if self.decisions else {"action": "accept", "observations": []}
+    async def progress(self, payload):
+        return {"action": "continue", "reason": "A different geometry can be tested.", "correction": "Change the camera angle and clarify the thrust geometry."}
     async def image_intent(self, payload):
         return {**INTENT, "arrangement": "Centered rocket revision " + str(len(payload["previousCandidates"]))}
 
@@ -135,6 +137,7 @@ class Client:
 def make(tmp_path, monkeypatch, **options):
     monkeypatch.setattr("vox_crew.autonomous.inspection_video", lambda data, sha, path: (data,
         {"originalSha256": sha, "inspectionSha256": sha, "durationSeconds": 50, "fullyDecoded": True}))
+    monkeypatch.setattr("vox_crew.autonomous.verify_rendered_video", lambda data, sha, path: {"sha256": sha, "fullyDecoded": True})
     return AutonomousRun(options.pop("client", Client()), None, tmp_path,
         prompt_request("Why does a rocket slow down?", DEFAULTS, submission_id="test"),
         director=options.pop("director", Director()), research=Research(), creative=Creative(), planner=Planner(),
@@ -144,7 +147,7 @@ def make(tmp_path, monkeypatch, **options):
 def test_targeted_coverage_then_reject_image_correct_same_identity_and_render(tmp_path, monkeypatch):
     run = make(tmp_path, monkeypatch)
     with ProviderJournal(tmp_path / "provider.jsonl") as journal:
-        assert asyncio.run(run.run())["status"] == "reviewed"
+        assert asyncio.run(run.run())["status"] == "ready"
     assert len(run.research.calls) == 2
     assert "Explain how thrust opposes motion" in run.research.calls[1]
     assert run.client.calls.index("image_accept") < run.client.calls.index("render")
@@ -167,24 +170,30 @@ def test_narrative_observations_return_to_narrator_before_recording(tmp_path, mo
     run = make(tmp_path, monkeypatch, director=Director((True,), [
         {"action": "narrative", "observations": [{**observation(), "problem": problem}]},
         {"action": "accept", "observations": []}]))
-    assert asyncio.run(run.run())["status"] == "reviewed"
+    assert asyncio.run(run.run())["status"] == "ready"
     assert run.creative.calls == 2 and run.state["editorialCorrections"] == 1
 
 
-def test_visual_film_correction_preserves_take_and_withdraws_exact_image(tmp_path, monkeypatch):
-    run = make(tmp_path, monkeypatch, reviewer=Reviewer(images=(True, True), films=(False, True)))
-    assert asyncio.run(run.run())["status"] == "reviewed"
-    assert run.client.takes == 1 and run.client.calls.count("render") == 2
-    assert run.client.jobs[0]["status"] == "rejected"
-    assert run.state["filmCorrections"] == 1
-    assert run.state["recordedBeats"] == run.state["videoPlan"]["beats"]
-
-
-def test_film_needing_new_speech_blocks_without_extra_take(tmp_path, monkeypatch):
-    run = make(tmp_path, monkeypatch, reviewer=Reviewer(images=(True,), films=(media_review(False, True),)))
+def test_delivery_keeps_image_reviews_and_never_calls_the_audiovisual_reviewer(tmp_path, monkeypatch):
+    reviewer = Reviewer(images=(False, True), films=())
+    run = make(tmp_path, monkeypatch, reviewer=reviewer)
     result = asyncio.run(run.run())
-    assert result["status"] == "blocked" and "narration" in result["reason"]
+    assert result["status"] == "ready"
     assert run.client.takes == 1 and run.client.calls.count("render") == 1
+    assert run.state["filmCorrections"] == 0
+    assert [mime for _, mime in reviewer.bytes] == ["image/png", "image/png"]
+    assert result["technicalVerification"] == {"sha256": result["preview"]["sha256"], "fullyDecoded": True}
+    assert "reviewedSha256" not in result
+    assert [e["phase"] for e in run.state["events"]][-3:] == ["render", "media_validation", "delivery"]
+
+
+def test_technical_decode_failure_prevents_delivery_without_any_regeneration(tmp_path, monkeypatch):
+    run = make(tmp_path, monkeypatch, reviewer=Reviewer(images=(True,), films=()))
+    def invalid(*args):
+        raise ContractViolation("Invalid audio/video file")
+    monkeypatch.setattr("vox_crew.autonomous.verify_rendered_video", invalid)
+    assert asyncio.run(run.run())["status"] == "blocked"
+    assert run.client.calls.count("render") == 1 and run.client.takes == 1
 
 
 def test_completed_restart_spends_nothing_and_changed_production_blocks(tmp_path, monkeypatch):
@@ -342,7 +351,7 @@ def test_failed_composition_keeps_consumed_technical_repair(tmp_path, monkeypatc
 
 
 @pytest.mark.parametrize("changed_structure", [False, True])
-def test_production_repair_persists_response_and_spend_before_assembly(tmp_path, monkeypatch, changed_structure):
+def test_production_repair_preserves_spend_and_caches_only_usable_fills(tmp_path, monkeypatch, changed_structure):
     from vox_crew.visual_planner import SplitVisualPlanner
     from test_visual_planner import structure
     run = make(tmp_path, monkeypatch)
@@ -361,16 +370,17 @@ def test_production_repair_persists_response_and_spend_before_assembly(tmp_path,
     run.planner._repair = SimpleNamespace(repair=repair)
     run.planner._assemble = SplitVisualPlanner._assemble
     run.planner._validate_scene = run.planner._validate_plan = lambda value: {}
-    for _ in range(2):
+    for attempt in range(2):
         if changed_structure:
-            with pytest.raises(ContractViolation, match="immutable structure"):
+            expected = ContractViolation if attempt == 0 else AutonomousBlocked
+            with pytest.raises(expected, match="immutable structure" if attempt == 0 else "interrupted"):
                 asyncio.run(run.repair(None))
         else:
             asyncio.run(run.repair(None))
-        assert run.state["pending"] is None
+        assert bool(run.state["pending"]) == changed_structure
         assert run.state["technicalRepairs"] == 1
         assert calls == [True]
-        assert run.state["steps"]
+        assert bool(run.state["steps"]) != changed_structure
 
 
 def test_adk_dispatch_receipt_preserves_public_response_without_thought_parts(tmp_path, monkeypatch):
@@ -441,7 +451,7 @@ def test_recovery_retries_only_explicitly_approved_429_and_preserves_voice_and_s
     with ProviderJournal(tmp_path / 'journal.jsonl') as journal:
         result = asyncio.run(run.run())
     allowed = approved and failure_status == 'failed'
-    assert result['status'] == ('reviewed' if allowed else 'blocked')
+    assert result['status'] == ('ready' if allowed else 'blocked')
     assert client.takes == 1 and client.calls.count('image_start') == (2 if allowed else 1)
     assert client.jobs[0]['status'] == failure_status
     assert len([row for row in journal.records if row['status'] == 'dispatched']) == (3 if allowed else 2)
@@ -519,6 +529,6 @@ def test_resumed_recovery_includes_failed_images_omitted_from_placeholder_workli
     run.state['productionSnapshot'] = run.snapshot()
     run.save()
     run = make(tmp_path, monkeypatch, client=client, reviewer=Reviewer(images=(True,)))
-    assert asyncio.run(run.run())['status'] == 'reviewed'
+    assert asyncio.run(run.run())['status'] == 'ready'
     assert client.calls.count('image_start') == 2
     assert client.jobs[-1]['status'] == 'accepted' and client.takes == 1

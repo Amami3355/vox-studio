@@ -30,8 +30,12 @@ DIRECTOR_DECISION = obj(action={"enum": ["accept", "research", "narrative", "com
 COVERAGE_REVIEW = obj(adequate={"type": "boolean"}, centralQuestionAnswered={"type": "boolean"},
     mechanismExplained={"type": "boolean"}, nuancesCovered={"type": "boolean"},
     observations=OBSERVATIONS, targetedQuestions=TEXTS)
+PROGRESS_REVIEW = obj(action={"enum": ["continue", "ask_user"]}, reason=TEXT,
+    correction={"type": "string"})
 IMAGE_INTENT = obj(meaning=TEXT, arrangement=TEXT, visibleDetails={**TEXTS, "minItems": 1},
     plannedCrops={**TEXTS, "minItems": 1}, rendererElements=TEXTS)
+IMAGE_INTENT_V3 = {**IMAGE_INTENT, "properties": {**IMAGE_INTENT["properties"],
+    "rendererElements": {"type": "array", "items": obj(sceneId=TEXT, scenePath=TEXT)}}}
 MEDIA_REVIEW = obj(accepted={"type": "boolean"}, inspectionPossible={"type": "boolean"},
     assessment=TEXT, requiresNarrationChange={"type": "boolean"},
     observations={"type": "array", "items": obj(problem=TEXT, affectedIds=TEXTS, expected=TEXT,

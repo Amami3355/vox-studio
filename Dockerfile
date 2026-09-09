@@ -72,6 +72,7 @@ RUN pnpm --filter @vox/video exec remotion browser ensure \
     && test -s /app/.browser-path
 
 COPY . .
+RUN pnpm --filter @vox/production exec tsx scripts/build-renderer.ts /app/.render-bundle
 
 # The mount point for ticket 04's persistent disk. Creating it here is what makes the volume check
 # necessary rather than optional: the directory exists in this layer, so when the disk fails to
@@ -83,6 +84,7 @@ RUN mkdir -p /var/lib/vox
 # In the image, not on the volume: it is production source and is exactly what the agent may not
 # read. The ledger root and the calibration path are the opposite and are set at deploy time.
 ENV VOX_REMOTION_ENTRY=/app/packages/video/src/remotion-entry.ts
+ENV VOX_REMOTION_BUNDLE=/app/.render-bundle
 ENV VOX_VOLUME_ROOT=/var/lib/vox
 
 # No secret is baked. Every secret arrives in the environment, bound by the runtime from Secret
