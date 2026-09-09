@@ -79,8 +79,13 @@ export const resolveProductionServiceConfiguration = (
   env: Environment = process.env,
 ): ProductionServiceConfiguration => {
   const browserExecutable = env.VOX_BROWSER_EXECUTABLE;
-  const renderConcurrency = env.VOX_RENDER_CONCURRENCY ? Number(env.VOX_RENDER_CONCURRENCY) : undefined;
-  if (renderConcurrency !== undefined && (!Number.isSafeInteger(renderConcurrency) || renderConcurrency < 1))
+  const renderConcurrency = env.VOX_RENDER_CONCURRENCY
+    ? Number(env.VOX_RENDER_CONCURRENCY)
+    : undefined;
+  if (
+    renderConcurrency !== undefined &&
+    (!Number.isSafeInteger(renderConcurrency) || renderConcurrency < 1)
+  )
     throw new Error('VOX_RENDER_CONCURRENCY must be a positive integer.');
   return {
     grantKey: required(env, 'VOX_GRANT_KEY'),

@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canonicalJson } from '../src/canonical-json';
+import type { ProductionMeasurement } from '../src/measurement';
 import {
   beatShapeIdentity,
   recordingInputIdentity,
@@ -10,7 +11,6 @@ import {
 } from '../src/run-store/identities';
 import { RUN_PATHS } from '../src/run-store/paths';
 import { EMPTY_RUN_BINDINGS, RunStore, RunStoreError } from '../src/run-store/run-store';
-import type { ProductionMeasurement } from '../src/measurement';
 import { REQUEST, type RunFixture, createRunFixture } from './run-fixture';
 
 let fixture: RunFixture | null = null;
@@ -23,10 +23,18 @@ describe('authenticated Run store', () => {
     const store = new RunStore({ ...fixture.options, onMeasure: (sample) => samples.push(sample) });
     const initial = await store.inspect();
     samples.length = 0;
-    await store.commit({ expectedRevision: initial.revision, command: 'run.validate', outcome: 'succeeded' });
-    expect(samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count)).toEqual([1]);
+    await store.commit({
+      expectedRevision: initial.revision,
+      command: 'run.validate',
+      outcome: 'succeeded',
+    });
+    expect(
+      samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count),
+    ).toEqual([1]);
     await store.inspect();
-    expect(samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count)).toEqual([1, 2]);
+    expect(
+      samples.filter((s) => s.operation === 'verify_receipt_chain').map((s) => s.count),
+    ).toEqual([1, 2]);
   });
   it('initializes canonical public state and a private monotonic ledger', async () => {
     fixture = await createRunFixture();

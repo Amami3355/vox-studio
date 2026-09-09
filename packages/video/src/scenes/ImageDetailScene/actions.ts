@@ -9,14 +9,14 @@ export const imageDetailActions = {
         region: z
           .enum(['whole', 'center', 'top', 'bottom', 'left', 'right'])
           .describe(
-            'Semantic region of the prepared image. Whole restores the complete uncropped view.',
+            'Semantic region of the prepared base view. Whole restores that view: complete and uncropped with contain, centrally cropped with cover.',
           ),
       })
       .strict(),
   },
   annotate: {
     description:
-      'Replace the short explanatory note over the image. Use the word anchor that motivates the explanation; this is an annotation, not a precise identification of a depicted part.',
+      'Show one short explanation over the lower-left of the image, replacing the introductory title and caption or the previous annotation. Use the word anchor that motivates the explanation; this is an annotation, not a precise identification of a depicted part.',
     payload: z
       .object({
         text: z
@@ -30,7 +30,8 @@ export const imageDetailActions = {
       .strict(),
   },
   clearAnnotation: {
-    description: 'Remove the annotation when it has been read so the subject has room again.',
+    description:
+      'Clear the text overlay and its contrast scrim to leave only the image. The introductory title and caption do not return. May also clear the introduction before any annotation.',
     payload: null,
   },
 } as const satisfies Record<string, ActionDef>;

@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Img, useCurrentFrame } from 'remotion';
+import { Img, staticFile, useCurrentFrame } from 'remotion';
 import { contentProgressAt } from '../design/motion';
 
 export type ImageRegion = 'whole' | 'center' | 'top' | 'bottom' | 'left' | 'right';
@@ -36,19 +36,20 @@ export const imageFramingAt = (changes: ImageFocus[], frame: number) => {
 };
 
 /** The content is clipped inside its plate; this never changes the scene camera or safe area. */
-export const ImageViewport: React.FC<{ uri: string; changes: ImageFocus[] }> = ({
-  uri,
-  changes,
-}) => {
+export const ImageViewport: React.FC<{
+  uri: string;
+  changes: ImageFocus[];
+  fit?: 'contain' | 'cover';
+}> = ({ uri, changes, fit = 'contain' }) => {
   const value = imageFramingAt(changes, useCurrentFrame());
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
       <Img
-        src={uri}
+        src={/^[a-z][a-z0-9+.-]*:/i.test(uri) ? uri : staticFile(uri)}
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain',
+          objectFit: fit,
           display: 'block',
           transform: `scale(${value.scale})`,
           transformOrigin: `${value.x}% ${value.y}%`,

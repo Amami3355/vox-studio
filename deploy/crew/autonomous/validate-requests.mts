@@ -8,5 +8,5 @@ for (const [name, item] of Object.entries(manifest.submissions)) {
   const request = productionRequestSchema.parse(value.request);
   const actual = hashCanonicalJson('production-request', request);
   if (actual !== value.requestSha256) throw new Error(`Request binding mismatch: ${name}`);
-  console.log(JSON.stringify({ name, requestSha256: actual, productionSchemaVerified: true }));
+  console.info(JSON.stringify({ name, requestSha256: actual, productionSchemaVerified: true }));
 }

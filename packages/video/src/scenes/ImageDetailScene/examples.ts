@@ -15,7 +15,7 @@ export const imageDetailExamples: SceneExample[] = [
     layout: 'plate',
     motionProfile: 'subtleDrift',
     spansBeats: ['b1', 'b2', 'b3'],
-    props: { headline: '', caption: 'Illustration', assetRequirement },
+    props: { headline: '', caption: '', assetRequirement },
     events: [
       { at: 'b2.start', action: 'focus', payload: { region: 'bottom' } },
       { at: 'b2.start', action: 'annotate', payload: { text: 'Pores regulate exchange' } },
@@ -25,8 +25,8 @@ export const imageDetailExamples: SceneExample[] = [
   },
   {
     id: 'example-image-detail-edge',
-    title: 'Edge case — contextual copy',
-    note: 'Longer context leaves a smaller but fully contained image.',
+    title: 'Edge case: contextual copy',
+    note: 'Longer context wraps in one lower-left overlay; the image retains the entire frame.',
     component: 'image_detail',
     layout: 'plate',
     motionProfile: 'editorialStatic',
@@ -40,8 +40,8 @@ export const imageDetailExamples: SceneExample[] = [
   },
   {
     id: 'example-image-detail-empty',
-    title: 'Empty copy — let the image speak',
-    note: 'Empty title and caption give the full plate to the subject.',
+    title: 'Empty copy: let the image speak',
+    note: 'Empty title and caption leave the full image unobstructed, with no scrim or decorative camera crop.',
     component: 'image_detail',
     layout: 'plate',
     motionProfile: 'cinematic',

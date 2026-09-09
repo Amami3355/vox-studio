@@ -6,6 +6,8 @@
       "**/dist",
       "**/node_modules",
       "**/.remotion",
+      ".scratch/cloud-phase/**/*.json",
+      ".scratch/hackathon-launch/proofs/**/*.json",
       "packages/video/src/catalog/*.json",
       "packages/production/src/contracts/generated/*.json",
       "services/agents/tests/fixtures/artifacts/*",

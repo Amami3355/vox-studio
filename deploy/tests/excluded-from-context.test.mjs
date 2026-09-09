@@ -32,9 +32,9 @@ const WIZARD = resolve(here, '../../scripts/deploy-cloud-service.sh');
 
 let failures = 0;
 const check = (name, condition, detail = '') => {
-  if (condition) console.log(`  ok   ${name}`);
+  if (condition) console.info(`  ok   ${name}`);
   else {
-    console.log(`  FAIL ${name}${detail ? ` — ${detail}` : ''}`);
+    console.info(`  FAIL ${name}${detail ? ` — ${detail}` : ''}`);
     failures += 1;
   }
 };
@@ -119,7 +119,7 @@ const IGNORE = [
   '',
 ].join('\n');
 
-console.log('\nthe patterns a .dockerignore actually carries');
+console.info('\nthe patterns a .dockerignore actually carries');
 await withIgnore(IGNORE, [
   // Exact paths, which is what a named file in the ignore file means.
   ['deploy/README.md', 'EXCLUDED', 'an exact path'],
@@ -160,13 +160,13 @@ await withIgnore(IGNORE, [
  * everything is the safe direction — it over-warns rather than under-warns, and an over-warning
  * is visible where a missing one is not.
  */
-console.log('\na .dockerignore carrying a negation');
+console.info('\na .dockerignore carrying a negation');
 await withIgnore(['node_modules', '!node_modules/keep', ''].join('\n'), [
   ['node_modules/anything', 'INCLUDED', 'the whole file is abandoned, deliberately'],
   ['deploy/README.md', 'INCLUDED', 'likewise'],
 ]);
 
-console.log('\nno .dockerignore at all');
+console.info('\nno .dockerignore at all');
 const verdict = await run(join(workspace, 'does-not-exist'), ['anything']);
 check(
   'nothing is excluded when the file is absent',
@@ -174,5 +174,5 @@ check(
   `got ${verdict[0]}`,
 );
 
-console.log(failures === 0 ? '\nall checks passed' : `\n${failures} failed`);
+console.info(failures === 0 ? '\nall checks passed' : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

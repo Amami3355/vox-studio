@@ -13,9 +13,9 @@
 // only proves the happy path would tell us nothing about the failure modes that matter: a secret
 // the identity cannot read, and a value `--env-file` cannot carry.
 
-import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,9 +26,9 @@ const TOKEN = 'ya29.a0AfB_fake-token-value_-0123456789';
 let failures = 0;
 const check = (name, condition, detail = '') => {
   if (condition) {
-    console.log(`  ok   ${name}`);
+    console.info(`  ok   ${name}`);
   } else {
-    console.log(`  FAIL ${name}${detail ? ` — ${detail}` : ''}`);
+    console.info(`  FAIL ${name}${detail ? ` — ${detail}` : ''}`);
     failures += 1;
   }
 };
@@ -48,7 +48,8 @@ function startFakes(secrets) {
       }
       const path = url.slice('/computeMetadata/v1/'.length);
       if (path === 'project/project-id') return void res.writeHead(200).end(PROJECT);
-      if (path === 'instance/service-accounts/default/email') return void res.writeHead(200).end(SA);
+      if (path === 'instance/service-accounts/default/email')
+        return void res.writeHead(200).end(SA);
       if (path === 'instance/service-accounts/default/token') {
         return void res
           .writeHead(200, { 'content-type': 'application/json' })
@@ -109,7 +110,13 @@ function runScript({ port, target, names }) {
   });
 }
 
-const NAMES = ['ELEVENLABS_API_KEY', 'VOX_GRANT_KEY', 'VOX_RUN_HMAC_KEY', 'VOX_RUN_KEY_ID', 'VOX_NETWORK_TOKEN'];
+const NAMES = [
+  'ELEVENLABS_API_KEY',
+  'VOX_GRANT_KEY',
+  'VOX_RUN_HMAC_KEY',
+  'VOX_RUN_KEY_ID',
+  'VOX_NETWORK_TOKEN',
+];
 const GOOD = {
   ELEVENLABS_API_KEY: 'sk_elevenlabs_fake_0123456789abcdef',
   VOX_GRANT_KEY: 'a'.repeat(64),
@@ -128,7 +135,7 @@ const main = async () => {
   const dir = await mkdtemp(join(tmpdir(), 'vox-env-'));
 
   // ── 1: the happy path ──────────────────────────────────────────────────────────────────────
-  console.log('\nall five readable:');
+  console.info('\nall five readable:');
   {
     const { server, port } = await startFakes(GOOD);
     const target = join(dir, 'ok.env');
@@ -138,7 +145,10 @@ const main = async () => {
     const body = await readFile(target, 'utf8');
     for (const n of NAMES) check(`${n} written`, body.includes(`${n}=${GOOD[n]}`));
     check('volume settings written', body.includes('VOX_VOLUME_ROOT=/var/lib/vox'));
-    check('calibration path written', body.includes('VOX_CALIBRATION_PATH=/var/lib/vox/calibration.json'));
+    check(
+      'calibration path written',
+      body.includes('VOX_CALIBRATION_PATH=/var/lib/vox/calibration.json'),
+    );
     const mode = (await stat(target)).mode & 0o777;
     check('mode is 0600', mode === 0o600, `got 0${mode.toString(8)}`);
     check('no secret value in stdout', !NAMES.some((n) => r.stdout.includes(GOOD[n])));
@@ -147,7 +157,7 @@ const main = async () => {
   // ── 2: one secret unreadable ───────────────────────────────────────────────────────────────
   // The case that matters most: a partial file is worse than none, because the unit would start and
   // the service would fail on a missing variable behind a tunnel.
-  console.log('\none secret not readable by the identity:');
+  console.info('\none secret not readable by the identity:');
   {
     const { VOX_NETWORK_TOKEN: _omitted, ...withoutOne } = GOOD;
     const { server, port } = await startFakes(withoutOne);
@@ -156,11 +166,17 @@ const main = async () => {
     server.close();
     check('exits non-zero', r.code !== 0, `exit ${r.code}`);
     check('names the missing secret', r.stderr.includes('VOX_NETWORK_TOKEN'), r.stderr.trim());
-    check('refuses to write a partial file', await stat(target).then(() => false, () => true));
+    check(
+      'refuses to write a partial file',
+      await stat(target).then(
+        () => false,
+        () => true,
+      ),
+    );
   }
 
   // ── 3: a value --env-file cannot carry ─────────────────────────────────────────────────────
-  console.log('\na secret value containing a newline:');
+  console.info('\na secret value containing a newline:');
   {
     const { server, port } = await startFakes({ ...GOOD, VOX_GRANT_KEY: 'line-one\nline-two' });
     const target = join(dir, 'newline.env');
@@ -168,23 +184,35 @@ const main = async () => {
     server.close();
     check('exits non-zero', r.code !== 0, `exit ${r.code}`);
     check('says why', r.stderr.includes('newline'), r.stderr.trim());
-    check('writes nothing', await stat(target).then(() => false, () => true));
+    check(
+      'writes nothing',
+      await stat(target).then(
+        () => false,
+        () => true,
+      ),
+    );
   }
 
   // ── 4: an empty value ──────────────────────────────────────────────────────────────────────
-  console.log('\na secret that decodes to nothing:');
+  console.info('\na secret that decodes to nothing:');
   {
     const { server, port } = await startFakes({ ...GOOD, VOX_RUN_KEY_ID: '' });
     const target = join(dir, 'empty.env');
     const r = await runScript({ port, target, names: NAMES });
     server.close();
     check('exits non-zero', r.code !== 0, `exit ${r.code}`);
-    check('writes nothing', await stat(target).then(() => false, () => true));
+    check(
+      'writes nothing',
+      await stat(target).then(
+        () => false,
+        () => true,
+      ),
+    );
   }
 
   // ── 5: an existing file is not destroyed by a failed run ───────────────────────────────────
   // The staging-and-move is only worth having if this holds.
-  console.log('\na failed run leaves the previous file intact:');
+  console.info('\na failed run leaves the previous file intact:');
   {
     const target = join(dir, 'preserve.env');
     const first = await startFakes(GOOD);
@@ -197,10 +225,10 @@ const main = async () => {
     const r = await runScript({ port: second.port, target, names: NAMES });
     second.server.close();
     check('the second run fails', r.code !== 0);
-    check('the first run\'s file is untouched', (await readFile(target, 'utf8')) === before);
+    check("the first run's file is untouched", (await readFile(target, 'utf8')) === before);
   }
 
-  console.log(failures === 0 ? '\nall checks passed\n' : `\n${failures} check(s) failed\n`);
+  console.info(failures === 0 ? '\nall checks passed\n' : `\n${failures} check(s) failed\n`);
   process.exit(failures === 0 ? 0 : 1);
 };
 

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -13,8 +13,17 @@ import {
 } from './command-fixture';
 import { REQUEST } from './run-fixture';
 
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return { ...actual, randomUUID: vi.fn(actual.randomUUID) };
+});
+
 let fixture: CommandFixture | null = null;
-afterEach(async () => fixture?.cleanup());
+afterEach(async () => {
+  const actual = await vi.importActual<typeof import('node:crypto')>('node:crypto');
+  vi.mocked(randomUUID).mockImplementation(actual.randomUUID);
+  await fixture?.cleanup();
+});
 
 /** The Run directory is pinned so a test can name the file a payload landed in. */
 const RUN_DIRECTORY = 'run-surface';
@@ -248,6 +257,9 @@ const throughArgv = async (open: CommandFixture): Promise<ResultEnvelope[]> => {
 
 describe('the surface is a relocation, not a reimplementation', () => {
   it('produces the envelope the argv path produces, field by field, for every command', async () => {
+    // Both independent Runs must receive the same nondeterministic input, just like the
+    // clock in stubs(), so the complete recording receipt remains part of the comparison.
+    vi.mocked(randomUUID).mockReturnValue('11111111-1111-4111-8111-111111111111');
     fixture = await createCommandFixture(stubs());
     const viaSurface = await throughSurface(fixture);
     await fixture.cleanup();

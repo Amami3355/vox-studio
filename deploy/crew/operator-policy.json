@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "research": {"mode": "recorded", "grantId": null},
-  "models": {"mode": "recorded", "grantId": null},
-  "images": {"mode": "recorded", "grantId": null},
-  "recording": {"mode": "recorded", "grantId": null}
+  "research": { "mode": "recorded", "grantId": null },
+  "models": { "mode": "recorded", "grantId": null },
+  "images": { "mode": "recorded", "grantId": null },
+  "recording": { "mode": "recorded", "grantId": null }
 }

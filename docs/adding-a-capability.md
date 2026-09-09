@@ -307,6 +307,15 @@ copy removes its scrim, and compares foreground geometry while the image camera 
 Its `imageFocus` is an authored crop alignment, not subject detection. The asset request and
 layout must leave room for copy; the scrim guarantees contrast, not subject preservation.
 
+`image_detail` uses the same full-frame media and foreground inspection path. It retains
+the complete image by default (`imageFit: contain`), using the dark media ground where an
+asset's aspect differs; `cover` is an explicit central crop. Only its authored `focus`
+events move the image, so `whole` actually restores the base view under every motion
+profile. Profiles still control text entrances. Its single lower-left overlay starts with
+optional title and caption; `annotate` replaces both and `clearAnnotation` removes the
+overlay without restoring the introduction. Inspect both fits, real focus transitions,
+and annotation replacement/clearing, including the longest allowed annotation.
+
 ## Gates
 
 Two loops, and they are not interchangeable. The narrow one runs while you write; the six
@@ -382,6 +391,9 @@ actually looked at. `pnpm studio` opens Remotion Studio.
   header of `packages/video/scripts/measure-still-cost.mjs`.
 - **Biome is a clean gate.** Do not waive repository-wide errors as a baseline; this measured
   pass completed with no diagnostics.
+  Archived cloud and film proof JSON is excluded in `biome.json`: these are captured bytes,
+  sometimes hash-addressed or stored in their original encoding, rather than editable source.
+  Preserve those receipts unchanged; the exclusion does not apply to source or test fixtures.
 - **Do not run render and stress in parallel on Windows.** Both drive headless Chrome and
   the compositor, and running them concurrently has produced `spawn EPERM` here. Chain
   them, one after the other — each suite's internal parallelism is enough.

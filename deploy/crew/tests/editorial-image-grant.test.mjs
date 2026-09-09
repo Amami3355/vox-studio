@@ -1,8 +1,8 @@
 // Run in a disposable Production container without real secrets or persistent volumes.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
 import { canonicalJson } from '/app/packages/production/src/canonical-json.ts';
 
 const input = {
@@ -53,4 +53,4 @@ for (const digit of ['b', 'c', 'd', 'e']) {
 input.request.requestSha256 = 'f'.repeat(64);
 await writeFile('/tmp/request.json', JSON.stringify(input));
 assert.notEqual(run().status, 0);
-console.log('passed: signature, stable reuse, cross-Run refusal, five grants, sixth refusal');
+console.info('passed: signature, stable reuse, cross-Run refusal, five grants, sixth refusal');

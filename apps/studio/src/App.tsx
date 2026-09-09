@@ -459,7 +459,11 @@ function Film({ job, refresh }: { job: Job; refresh: () => void }) {
           )}
           {job.preview && (
             <div className="player-caption">
-              <span className={job.preview.ready || job.preview.reviewed ? 'accepted-text' : 'draft-text'}>
+              <span
+                className={
+                  job.preview.ready || job.preview.reviewed ? 'accepted-text' : 'draft-text'
+                }
+              >
                 {job.preview.ready || job.preview.reviewed
                   ? 'Film ready · Illustrations approved'
                   : 'Rendered preview · File checks in progress'}

@@ -76,6 +76,9 @@ export const imageOverlay = {
   captionLineHeight: 1.35,
 } as const;
 
+/** Explanatory copy stays quieter than an establishing-shot title. */
+export const imageDetailType = { titleStep: 3 } as const;
+
 /**
  * `editorial-cold` — Ember on Slate.
  *

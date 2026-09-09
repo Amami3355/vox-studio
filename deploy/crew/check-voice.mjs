@@ -6,6 +6,13 @@ const response = await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
 });
 let name = null;
 if (response.ok) name = (await response.json()).name;
-console.log(JSON.stringify({ provider: 'elevenlabs', voiceId, status: response.status, name,
-  narrationCalls: 0 }));
+console.info(
+  JSON.stringify({
+    provider: 'elevenlabs',
+    voiceId,
+    status: response.status,
+    name,
+    narrationCalls: 0,
+  }),
+);
 if (!response.ok) process.exitCode = 1;

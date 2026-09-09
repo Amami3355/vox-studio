@@ -1201,14 +1201,14 @@
         "id": "image_detail",
         "name": "ImageDetailScene",
         "family": "context",
-        "summary": "A large image with anchored reframing and replaceable annotations for visual explanation.",
+        "summary": "A full-frame explanatory image with anchored reframing and one replaceable text overlay. The whole view preserves all image edges by default; only focus events move the image.",
         "useWhen": [
           "letting an illustration carry the explanation",
           "moving from a whole subject to a prepared detail on a spoken word",
           "reusing one image for several views across narration"
         ],
         "avoidWhen": [
-          "pairing an image with a substantial text column → image_context",
+          "establishing context with one strong image and a short message rather than explaining prepared details → image_context",
           "showing ordered stages without dates → process_steps",
           "articulating parts of a flattened image requires separate assets or a schematic process → process_steps"
         ],
@@ -1227,15 +1227,24 @@
           "properties": {
             "headline": {
               "default": "",
-              "description": "Optional introductory title. Leave empty when the image explains on its own.",
+              "description": "Optional short introductory title over the lower-left of the image. Replaced by the first annotation. Leave empty when the image explains on its own.",
               "type": "string",
               "maxLength": 120
             },
             "caption": {
               "default": "",
-              "description": "Optional context or illustration disclosure, set outside the image.",
+              "description": "Optional introductory context or illustration disclosure below the title in the same overlay. Replaced along with the title by an annotation; put any continuing disclosure in the annotation itself.",
               "type": "string",
               "maxLength": 240
+            },
+            "imageFit": {
+              "default": "contain",
+              "description": "Contain preserves the complete image in the full frame, with dark bands if its aspect differs. Cover fills every edge by cropping centrally; use only when the accepted image tolerates that crop. Focus regions refer to this base view.",
+              "type": "string",
+              "enum": [
+                "contain",
+                "cover"
+              ]
             },
             "assetRequirement": {
               "type": "object",
@@ -1289,7 +1298,7 @@
                 "subject"
               ],
               "additionalProperties": false,
-              "description": "A deliberately composed image. Name the location of a detail in the subject only when needed. The whole image is initially contained without cropping. Never provide a path."
+              "description": "A deliberately composed image, preferably matching the video aspect. Keep the lower-left quiet when using copy. Name the location of a detail only when needed and verify it in the accepted image. The whole image is initially contained unless imageFit is cover. Never provide a path."
             }
           },
           "required": [
@@ -1300,18 +1309,18 @@
         "softConstraints": {
           "headline": {
             "recommendedMax": 50,
-            "onExceed": "The title fits down and leaves less space for the image.",
+            "onExceed": "The title fits down and covers more of the image. Prefer a short introduction.",
             "onExceedCode": "TITLE_DENSITY"
           },
           "caption": {
             "recommendedMax": 120,
-            "onExceed": "More caption lines leave less height for the image."
+            "onExceed": "More caption lines cover more of the image. Keep only essential context."
           }
         },
         "layouts": [
           {
             "id": "plate",
-            "description": "An image occupies the remaining frame between optional title and caption, with annotations over its lower edge.",
+            "description": "Full-frame image with one stable lower-left explanation. Optional introductory title and caption share that overlay; annotations replace both, and clearing leaves only the image. Reserve the lower-left for copy or leave copy empty.",
             "slots": [
               "headline",
               "image",
@@ -1336,7 +1345,7 @@
                     "left",
                     "right"
                   ],
-                  "description": "Semantic region of the prepared image. Whole restores the complete uncropped view."
+                  "description": "Semantic region of the prepared base view. Whole restores that view: complete and uncropped with contain, centrally cropped with cover."
                 }
               },
               "required": [
@@ -1347,7 +1356,7 @@
           },
           {
             "id": "annotate",
-            "description": "Replace the short explanatory note over the image. Use the word anchor that motivates the explanation; this is an annotation, not a precise identification of a depicted part.",
+            "description": "Show one short explanation over the lower-left of the image, replacing the introductory title and caption or the previous annotation. Use the word anchor that motivates the explanation; this is an annotation, not a precise identification of a depicted part.",
             "payloadSchema": {
               "type": "object",
               "properties": {
@@ -1366,7 +1375,7 @@
           },
           {
             "id": "clearAnnotation",
-            "description": "Remove the annotation when it has been read so the subject has room again.",
+            "description": "Clear the text overlay and its contrast scrim to leave only the image. The introductory title and caption do not return. May also clear the introduction before any annotation.",
             "payloadSchema": null
           }
         ],
@@ -1385,7 +1394,7 @@
             ],
             "props": {
               "headline": "",
-              "caption": "Illustration",
+              "caption": "",
               "assetRequirement": {
                 "type": "image",
                 "subject": "A leaf cross-section with pores along its lower edge",
@@ -1424,8 +1433,8 @@
           },
           {
             "id": "example-image-detail-edge",
-            "title": "Edge case — contextual copy",
-            "note": "Longer context leaves a smaller but fully contained image.",
+            "title": "Edge case: contextual copy",
+            "note": "Longer context wraps in one lower-left overlay; the image retains the entire frame.",
             "component": "image_detail",
             "layout": "plate",
             "motionProfile": "editorialStatic",
@@ -1446,8 +1455,8 @@
           },
           {
             "id": "example-image-detail-empty",
-            "title": "Empty copy — let the image speak",
-            "note": "Empty title and caption give the full plate to the subject.",
+            "title": "Empty copy: let the image speak",
+            "note": "Empty title and caption leave the full image unobstructed, with no scrim or decorative camera crop.",
             "component": "image_detail",
             "layout": "plate",
             "motionProfile": "cinematic",

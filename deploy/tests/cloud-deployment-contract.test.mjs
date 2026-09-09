@@ -13,7 +13,7 @@ const wizard = await readFile(resolve(here, '../../scripts/deploy-cloud-service.
 
 let failures = 0;
 const check = (name, condition) => {
-  console.log(`  ${condition ? 'ok  ' : 'FAIL'} ${name}`);
+  console.info(`  ${condition ? 'ok  ' : 'FAIL'} ${name}`);
   if (!condition) failures += 1;
 };
 
@@ -56,5 +56,5 @@ check(
   !readiness.includes('systemctl is-active vox-production.service'),
 );
 
-console.log(failures === 0 ? '\nall checks passed' : `\n${failures} failed`);
+console.info(failures === 0 ? '\nall checks passed' : `\n${failures} failed`);
 process.exit(failures === 0 ? 0 : 1);

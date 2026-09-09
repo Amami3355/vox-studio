@@ -15,6 +15,7 @@ export const imageDetailCapability: SceneCapability = {
   constraints: imageDetailConstraints,
   examples: imageDetailExamples,
   layouts: imageDetailLayouts,
+  hasBleedMedia: true,
   component: ImageDetailScene as unknown as React.ComponentType<SceneProps<never>>,
 };
 export { ImageDetailScene } from './Component';

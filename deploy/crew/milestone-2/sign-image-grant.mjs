@@ -23,13 +23,27 @@ try {
   }
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
-  const unsigned = { protocolVersion: 1, grantId: randomUUID(), runId: input.runId,
-    requestSha256: request.requestSha256, issuedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString() };
-  grant = { ...unsigned, grant: createHmac('sha256', key).update(canonicalJson(unsigned)).digest('hex') };
+  const unsigned = {
+    protocolVersion: 1,
+    grantId: randomUUID(),
+    runId: input.runId,
+    requestSha256: request.requestSha256,
+    issuedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+  };
+  grant = {
+    ...unsigned,
+    grant: createHmac('sha256', key).update(canonicalJson(unsigned)).digest('hex'),
+  };
   // Exclusive creation makes a concurrent second allowance fail before anything is exported.
   await writeFile(ledger, `${JSON.stringify(grant)}\n`, { flag: 'wx', mode: 0o600 });
 }
 await writeFile(outputPath, `${JSON.stringify(grant)}\n`, { mode: 0o600 });
-console.log(JSON.stringify({ runId: grant.runId, requestSha256: grant.requestSha256,
-  expiresAt: grant.expiresAt, allowance: 'one exact image request' }));
+console.info(
+  JSON.stringify({
+    runId: grant.runId,
+    requestSha256: grant.requestSha256,
+    expiresAt: grant.expiresAt,
+    allowance: 'one exact image request',
+  }),
+);

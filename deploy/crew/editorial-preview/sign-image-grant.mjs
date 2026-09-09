@@ -56,7 +56,7 @@ try {
     await writeFile(path, `${JSON.stringify(grant)}\n`, { flag: 'wx', mode: 0o600 });
   }
   await writeFile(outputPath, `${JSON.stringify(grant)}\n`, { mode: 0o600 });
-  console.log(
+  console.info(
     JSON.stringify({
       runId: grant.runId,
       requestSha256: grant.requestSha256,

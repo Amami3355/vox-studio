@@ -140,7 +140,8 @@ const commands: readonly CommandContract[] = [
     id: 'run.progress',
     syntax: 'vox production run progress --run <run-dir>',
     prerequisite: 'an existing Run',
-    effect: 'Observe current renderer activity without verifying or changing durable state. A null activity is not evidence of completion or failure. Use run.status for authoritative state.',
+    effect:
+      'Observe current renderer activity without verifying or changing durable state. A null activity is not evidence of completion or failure. Use run.status for authoritative state.',
     readOnly: true,
     network: 'forbidden',
     quota: 'never',
