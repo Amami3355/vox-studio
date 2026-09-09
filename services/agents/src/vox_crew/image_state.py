@@ -3,7 +3,7 @@ from copy import deepcopy
 import json
 
 from .autonomous_contract import digest
-from .provider_usage import summarize_records
+from .provider_usage import summarize_records, merge_usage
 
 
 def project_image(state, key, branch, usage, *, identity, context_key):
@@ -48,14 +48,16 @@ def refresh_image_state(work, state):
         journal = directory / "provider-calls.jsonl"
         rows = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()] if journal.exists() else []
         project_image(state, key, branch, summarize_records(rows), identity=identity, context_key=context_key)
+    # Old correction branches still consumed calls. Refresh only their accounting,
+    # never their obsolete plan, candidates or events, when upgrading a checkpoint.
+    for key, branch in state.get("imagePipelines", {}).items():
+        journal = work / "image-pipelines" / key / "provider-calls.jsonl"
+        if journal.is_file():
+            rows = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()]
+            branch["usage"] = summarize_records(rows)
     journal = work / "provider-calls.jsonl"
     rows = [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()] if journal.exists() else []
     if journal.exists() or state.get("imagePipelines"):
-        total = summarize_records(rows)
-        for branch in state.get("imagePipelines", {}).values():
-            usage = branch.get("usage", {})
-            for field in ("calls", "searches", "images", "takes"):
-                total[field] += usage.get(field, 0)
-            total["uncertain"] |= usage.get("uncertain", False)
-        state["providerUsage"] = total
+        state["providerUsage"] = merge_usage([summarize_records(rows),
+            *(branch.get("usage", {}) for branch in state.get("imagePipelines", {}).values())])
     return state

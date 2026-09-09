@@ -1619,6 +1619,53 @@ footer > span {
 .usage-scroll {
   overflow-x: auto;
 }
+.film-consumption {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border-top: 1px solid #e4e1da;
+  min-width: 0;
+}
+.consumption-heading,
+.consumption-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.consumption-heading h2 {
+  font-size: 18px;
+  margin: 8px 0;
+}
+.consumption-price {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.consumption-price strong {
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.film-consumption p,
+.consumption-footer {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.consumption-note {
+  color: #66665c;
+}
+.consumption-footer {
+  margin-top: 16px;
+}
+.usage-details caption {
+  text-align: left;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+.usage-details small {
+  display: block;
+  font-weight: 400;
+}
 .usage-details table {
   width: 100%;
   border-collapse: collapse;

@@ -9,9 +9,41 @@ export interface ProductionLimits {
   maxTechnicalRepairs: number | null;
 }
 
+export interface ConsumptionRow {
+  provider: string;
+  model: string;
+  role: string;
+  calls: number;
+  respondedCalls: number;
+  failedCalls: number;
+  pendingCalls: number;
+  meteredCalls: number;
+  costedCalls: number;
+  tokens: Record<'input' | 'cached' | 'output' | 'reasoning' | 'tools' | 'total', number | null>;
+  tokenReports: Record<'input' | 'cached' | 'output' | 'reasoning' | 'tools' | 'total', number>;
+  estimatedNanoUsd: number | null;
+  priceVersions: string[];
+}
+
+export interface Consumption {
+  version: number;
+  rows: ConsumptionRow[];
+  currency: 'USD';
+  totalCalls: number;
+  unattributedCalls: number;
+  meteredCalls: number;
+  pendingCalls: number;
+  costedCalls: number;
+  unpricedCalls: number;
+  estimatedSubtotalUsd: number | null;
+  priceSource: string;
+  priceCheckedAt: string;
+}
+
 export interface Job {
   limits: ProductionLimits;
   usage: { [K in keyof ProductionLimits]: number };
+  consumption?: Consumption;
   stopRequested?: boolean;
   blockReason?: string | null;
   remaining: ProductionLimits;

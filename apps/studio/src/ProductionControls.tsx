@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { ProductionConsumption } from './ProductionConsumption';
 import { ApiError, api } from './api';
-import type { Job, ProductionLimits } from './api';
-
-export const limitLabels: Record<keyof ProductionLimits, string> = {
-  maxImages: 'Total image generations',
-  maxCalls: 'Total provider calls',
-  maxSearches: 'Research searches',
-  maxTakes: 'Narration recordings',
-  maxImageCorrections: 'Corrections per image',
-  maxEditorialCorrections: 'Editorial correction cycles',
-  maxFilmCorrections: 'Film visual correction cycles',
-  maxTechnicalRepairs: 'Technical repair attempts',
-};
+import type { Job } from './api';
 const targetLabels: Record<string, string> = {
   image: 'Correct this illustration',
   visuals: 'Improve the film visuals',
@@ -363,27 +353,7 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
       {!canResume && job.continuation.refusal && (
         <p className="continuation-refusal">{job.continuation.refusal}</p>
       )}
-      <details className="usage-details">
-        <summary>Production consumption</summary>
-        <div className="usage-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Operation</th>
-                <th>Used</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(limitLabels) as (keyof ProductionLimits)[]).map((name) => (
-                <tr key={name}>
-                  <th>{limitLabels[name]}</th>
-                  <td>{job.usage[name]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      <ProductionConsumption job={job} />
       {job.filmObservations.length > 0 && (
         <details className="review-detail">
           <summary>Film review details</summary>

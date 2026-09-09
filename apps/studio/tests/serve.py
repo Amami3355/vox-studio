@@ -87,4 +87,41 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
         write_json(store.work(job['id']) / 'checkpoint.json', state)
         return {"id": job['id']}
 
+    @app.post('/api/testing/consumption')
+    def consumption():
+        from types import SimpleNamespace
+        from datetime import datetime, timezone
+        from vox_crew.provider_usage import ProviderJournal, finish_call
+        from vox_crew.consumption import price_at_dispatch
+        from unittest.mock import patch
+        store = app.state.store
+        job = store.submit('browser-consumption-fixture', {"text": "Explain film consumption.", "duration": 50, "language": "English"})
+        work = store.work(job['id'])
+        def price(provider, model, location):
+            return price_at_dispatch(provider, model, 'global', now=datetime(2026, 9, 9, tzinfo=timezone.utc))
+        with patch('vox_crew.provider_usage.price_at_dispatch', price), ProviderJournal(work / 'fixture-journal.jsonl') as journal:
+            call = journal.begin('SceneAuthor', 'gemini-3.6-flash')
+            finish_call(call, SimpleNamespace(prompt_token_count=1000000, cached_content_token_count=400000,
+                candidates_token_count=100000, thoughts_token_count=200000, total_token_count=1300000),
+                answerParts=[{"text": "PRIVATE PROVIDER ANSWER"}])
+            call = journal.begin('ImageGeneration', 'production')
+            finish_call(call, providerOutcome='failed')
+            call = journal.begin('Recording', 'production', provider='elevenlabs')
+            finish_call(call)
+            journal.begin('SceneAuthor', 'gemini-3.6-flash')
+            write_json(work / 'checkpoint.json', {"providerUsage": journal.summary()})
+        return {"id": job['id']}
+
+    @app.post('/api/testing/consumption-response')
+    def consumption_response(job_id: str):
+        from types import SimpleNamespace
+        from vox_crew.provider_usage import ProviderJournal, finish_call
+        work = app.state.store.work(job_id)
+        with ProviderJournal(work / 'fixture-journal.jsonl', reconcile_pending=True) as journal:
+            finish_call(journal.records[-1]['id'], SimpleNamespace(prompt_token_count=1000000,
+                cached_content_token_count=400000, candidates_token_count=100000,
+                thoughts_token_count=200000, total_token_count=1300000))
+            write_json(work / 'checkpoint.json', {"providerUsage": journal.summary()})
+        return {"saved": True}
+
     uvicorn.run(app, host="127.0.0.1", port=8781, access_log=False)

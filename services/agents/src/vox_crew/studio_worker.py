@@ -330,9 +330,35 @@ def import_evidence(store, source):
     return job["id"]
 
 
+def publish_consumption(store, job_id, crew_state):
+    """Publish historical journal measurements without changing a Run or dispatching work."""
+    from .consumption import consumption_records
+    store.get(job_id)
+    studio_work = store.work(job_id)
+    checkpoint = read_json(studio_work / "checkpoint.json", {})
+    crew_work = crew_state / "briefs" / sha256(("studio-" + job_id).encode()).hexdigest()
+    original = read_json(crew_work / "autonomous-v2.json", {})
+    if (not checkpoint.get("runId") or original.get("runId") != checkpoint["runId"]
+            or original.get("originalRequest") != checkpoint.get("originalRequest")
+            or original.get("originalRequest", {}).get("brief", {}).get("id") != "studio-" + job_id):
+        raise StudioConflict("Consumption evidence must belong to this exact film and Run.")
+    paths = [crew_work / "provider-calls.jsonl"]
+    for directory in sorted((crew_work / "image-pipelines").glob("*")):
+        branch = read_json(directory / "checkpoint.json", {})
+        if (branch.get("runId") != original["runId"]
+                or branch.get("originalRequest") != original.get("originalRequest")):
+            raise StudioConflict("An image journal belongs to different production inputs.")
+        paths.append(directory / "provider-calls.jsonl")
+    records = [json.loads(line) for path in paths if path.is_file()
+               for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    report = consumption_records(records)
+    write_json(studio_work / "consumption.json", report)
+    return {"jobId": job_id, "calls": sum(row["calls"] for row in report["rows"])}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("work", "prepare", "authorize", "import", "reconcile"))
+    parser.add_argument("command", choices=("work", "prepare", "authorize", "import", "reconcile", "consumption"))
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--crew-state", type=Path)
     parser.add_argument("--config", type=Path)
@@ -342,7 +368,12 @@ def main():
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
     store = StudioStore(args.state)
-    if args.command == "import":
+    if args.command == "consumption":
+        if not args.job or not args.crew_state:
+            parser.error("consumption requires --job and --crew-state")
+        with worker_lock(store.root / "worker.lock"), worker_lock(args.crew_state / "worker.lock"):
+            print(json.dumps(publish_consumption(store, args.job, args.crew_state)))
+    elif args.command == "import":
         if not args.source:
             parser.error("import requires --source")
         print(import_evidence(store, args.source))

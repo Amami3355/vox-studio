@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from .autonomous_contract import digest
+from .consumption import public_consumption
 from .studio_controls import continuation_options, effective_limits, usage, resume_requirements, unreviewed_images
 from urllib.parse import urlsplit
 
@@ -84,6 +85,7 @@ def public_job(store, job):
                   for beat in narrative.get("beats", [])],
         "images": images,
         "limits": limits, "usage": consumed,
+        "consumption": public_consumption(state, saved=read_json(work / "consumption.json")),
         "remaining": {name: None for name in limits},
         "stopRequested": store.stop_requested(job["id"]),
         "blockReason": public_summary(terminal.get("reason")) if job["status"] in ("blocked", "interrupted") else None,

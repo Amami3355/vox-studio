@@ -82,16 +82,12 @@ class AutonomousRun:
             self.state["requestedLimits"] = deepcopy(production_limits)
 
     def save(self):
-        from .provider_usage import CURRENT
+        from .provider_usage import CURRENT, merge_usage
         journal = self.journal if getattr(self, "coordinating_images", False) else self.journal or CURRENT.get()
         if journal or self.state.get("imagePipelines"):
-            total = journal.summary() if journal else {"calls": 0, "searches": 0, "images": 0, "takes": 0, "uncertain": False}
-            for pipeline in self.state.get("imagePipelines", {}).values():
-                usage = pipeline.get("usage", {})
-                for key in ("calls", "searches", "images", "takes"):
-                    total[key] += usage.get(key, 0)
-                total["uncertain"] = total["uncertain"] or usage.get("uncertain", False)
-            self.state["providerUsage"] = total
+            self.state["providerUsage"] = merge_usage([
+                journal.summary() if journal else {},
+                *(pipeline.get("usage", {}) for pipeline in self.state.get("imagePipelines", {}).values())])
         self.state["savedAt"] = datetime.now(timezone.utc).isoformat()
         write_json(self.path, self.state)
         if self.on_snapshot:
@@ -290,7 +286,8 @@ class AutonomousRun:
                 envelope = await self.observe_image(args[1])
             job = envelope.data.get("job") if name == "image_start" else None
             if not job or job.get("status") not in ("uncertain", "dispatching"):
-                finish_call(call_id)
+                finish_call(call_id, providerOutcome="responded" if envelope.succeeded
+                            and (not job or job.get("status") != "failed") else "failed")
             if name == "init" and envelope.run:
                 self.state["runId"] = envelope.run.id
             if self.state["runId"]:

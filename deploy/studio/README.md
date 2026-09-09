@@ -2,6 +2,8 @@
 
 The product frontend is `apps/studio`; `apps/component-studio` remains the capability gallery.
 The API and worker live in `services/agents/src/vox_crew/studio_*.py`.
+Per-film token accounting, partial cost estimates and historical consumption publication are
+documented in [Film consumption](../../docs/consumption.md).
 See [ADR-0025](../../docs/adr/0025-studio-admission-is-durable-and-separate-from-production-authority.md).
 
 ## Local workspace

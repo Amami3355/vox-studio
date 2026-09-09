@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 
@@ -16,6 +17,51 @@ test.afterAll(async () => {
 });
 test.beforeEach(async () => {
   expect((await administration.post('/api/testing/reset', { headers })).status()).toBe(200);
+});
+
+test('film consumption exposes partial costs, saved tokens and a private export on desktop and mobile', async ({
+  page,
+}) => {
+  const { id } = await (await administration.post('/api/testing/consumption', { headers })).json();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(`/?film=${id}`);
+  await page.getByLabel('Access code').fill('browser-test-workspace-only');
+  await page.getByRole('button', { name: 'Enter studio' }).click();
+  const panel = page.getByRole('region', { name: 'Film consumption', exact: true });
+  await expect(panel.getByText('4 provider calls · 1 image attempt')).toBeVisible();
+  await expect(panel.getByText('$1.6050', { exact: true })).toBeVisible();
+  await expect(panel.getByText(/1 of 4 calls priced/)).toBeVisible();
+  await expect(panel.getByText(/1 call is awaiting/)).toBeVisible();
+  await panel.getByText('Production consumption', { exact: true }).click();
+  await expect(panel.getByRole('cell', { name: '1,300,000 1/2 calls', exact: true })).toBeVisible();
+  const downloadEvent = page.waitForEvent('download');
+  await panel.getByRole('link', { name: 'Download consumption report' }).click();
+  const download = await downloadEvent;
+  const exported = await readFile((await download.path()) as string, 'utf8');
+  expect(JSON.parse(exported).consumption.estimatedSubtotalUsd).toBe(1.605);
+  expect(exported).not.toContain('PRIVATE PROVIDER ANSWER');
+  await page.screenshot({
+    path: '../../.scratch/hackathon-launch/runtime/studio-browser-tests/consumption-desktop.png',
+    fullPage: true,
+  });
+  await administration.post(`/api/testing/consumption-response?job_id=${id}`, { headers });
+  await expect(panel.getByText('$3.2100', { exact: true }).first()).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(panel.getByText('$3.2100', { exact: true })).toBeVisible();
+  await panel.getByText('Production consumption', { exact: true }).click();
+  await expect(panel.getByRole('cell', { name: '2,600,000', exact: true })).toBeVisible();
+  const scroll = panel.getByRole('region', { name: 'Consumption by model and role' });
+  await scroll.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: '../../.scratch/hackathon-launch/runtime/studio-browser-tests/consumption-mobile.png',
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
 });
 
 test('private workspace saves a brief and reconnects to the same work after refresh', async ({

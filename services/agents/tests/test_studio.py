@@ -45,6 +45,27 @@ def test_private_sessions_csrf_and_logout(app, browser):
     assert browser.get("/api/jobs").status_code == 401
 
 
+def test_consumption_api_only_exposes_allowlisted_measurements(app, browser):
+    from types import SimpleNamespace
+    from vox_crew.provider_usage import ProviderJournal, finish_call
+    job = browser.post("/api/jobs", json=BRIEF, headers=HEADERS).json()
+    work = app.state.store.work(job["id"])
+    with ProviderJournal(work / "test-calls.jsonl") as journal:
+        call = journal.begin("Narrator", "fixture-model")
+        finish_call(call, SimpleNamespace(prompt_token_count=90, candidates_token_count=10, total_token_count=100),
+                    answerParts=[{"text": "PRIVATE ANSWER"}])
+        state = {"providerUsage": journal.summary()}
+        state["providerUsage"]["consumption"]["rows"][0]["answerParts"] = "PRIVATE ANSWER"
+        write_json(work / "checkpoint.json", state)
+    response = browser.get(f'/api/jobs/{job["id"]}')
+    assert response.status_code == 200
+    assert response.json()["consumption"]["rows"][0]["tokens"]["total"] == 100
+    assert response.json()["consumption"]["estimatedSubtotalUsd"] is None
+    assert "PRIVATE ANSWER" not in response.text
+    with TestClient(app, base_url=ORIGIN) as other:
+        assert other.get(f'/api/jobs/{job["id"]}').status_code == 401
+
+
 def test_submit_idempotency_survives_new_server_and_rejects_rebinding(app, browser):
     first = browser.post("/api/jobs", json=BRIEF, headers=HEADERS)
     assert first.status_code == 202
