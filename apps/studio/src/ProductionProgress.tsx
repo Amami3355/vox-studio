@@ -19,6 +19,48 @@ const phaseCopy: Record<string, string> = {
   film_review: 'Watching and listening to the finished film',
 };
 
+const phaseLabels: Record<string, string> = {
+  research: 'Research',
+  coverage: 'Research checks',
+  research_coverage: 'Evidence checks',
+  narrative: 'Story writing',
+  composition: 'Visual composition',
+  scene_author: 'Scene creation',
+  art_direction: 'Art direction',
+  image_generation: 'Image generation',
+  image_intent: 'Image planning',
+  image_review: 'Image review',
+  recording: 'Voice recording',
+  render: 'Video rendering',
+  compilation: 'Film assembly',
+  media_validation: 'Video and audio checks',
+  film_review: 'Film review',
+  technical_repair: 'Automatic repair',
+  delivery: 'Delivery',
+};
+export function phaseLabel(phase: string) {
+  return phaseLabels[phase] || phase.replaceAll('_', ' ');
+}
+
+const phaseStage: Record<string, number> = {
+  research: 0,
+  coverage: 0,
+  research_coverage: 0,
+  narrative: 1,
+  recording: 1,
+  art_direction: 2,
+  image_generation: 2,
+  image_intent: 2,
+  image_review: 2,
+  composition: 3,
+  scene_author: 3,
+  compilation: 3,
+  render: 3,
+  media_validation: 4,
+  film_review: 4,
+  delivery: 4,
+};
+
 export function activitySummary(event: Job['events'][number]) {
   if (['blocked', 'waiting', 'retry'].includes(event.status)) return event.summary;
   if (event.status === 'recovering') return 'The crew is automatically recovering this step.';
@@ -130,27 +172,83 @@ export function ProductionProgress({ job }: { job: Job }) {
     },
   ];
   const waiting = ['blocked', 'interrupted', 'failed', 'awaiting_image'].includes(job.status);
+  const running = job.status === 'running';
+  const finished = ['ready', 'reviewed', 'declined'].includes(job.status);
+  const latestPhase = job.events.at(-1)?.phase || '';
+  const firstIncomplete = stages.findIndex((stage) => !stage.done);
+  const currentStage =
+    finished || ['queued', 'awaiting_authorization'].includes(job.status)
+      ? -1
+      : job.awaitingImage || job.continuation.targets.includes('image')
+        ? 2
+        : (phaseStage[latestPhase] ?? firstIncomplete);
+  const message = productionMessage(job);
+  const completed = stages.filter((stage, index) => stage.done && index !== currentStage).length;
   return (
     <section className="production-progress" aria-label="Film progress">
       <div className="progress-heading">
-        <span className="eyebrow">FROM QUESTION TO FILM</span>
+        <h2>Production progress</h2>
         <span>
-          {['ready', 'reviewed'].includes(job.status)
-            ? 'Ready to watch'
-            : waiting
-              ? 'Your next step is below'
-              : 'Saved as we go'}
+          {completed} of {stages.length} milestones complete
         </span>
       </div>
+      {message && (
+        <output className={`current-update ${waiting ? 'update-attention' : ''}`}>
+          <span className="update-label">
+            {waiting
+              ? 'Needs your attention'
+              : job.stopRequested && running
+                ? 'Stop requested'
+                : running
+                  ? 'Working now'
+                  : finished
+                    ? 'Production update'
+                    : 'Up next'}
+          </span>
+          <span className="update-message">{message}</span>
+        </output>
+      )}
       <ol>
         {stages.map((stage, index) => (
-          <li key={stage.name} className={stage.done ? 'complete' : ''}>
-            <span className="stage-marker" aria-label={stage.done ? 'Completed' : 'Not completed'}>
-              {stage.done ? '✓' : `0${index + 1}`}
+          <li
+            key={stage.name}
+            className={
+              index === currentStage
+                ? waiting
+                  ? 'current needs-attention'
+                  : 'current'
+                : stage.done
+                  ? 'complete'
+                  : 'upcoming'
+            }
+            aria-current={index === currentStage ? 'step' : undefined}
+          >
+            <span
+              className="stage-marker"
+              aria-label={
+                index === currentStage
+                  ? waiting
+                    ? 'Needs attention'
+                    : 'In progress'
+                  : stage.done
+                    ? 'Completed'
+                    : 'Not completed'
+              }
+            >
+              {index === currentStage ? (waiting ? '!' : index + 1) : stage.done ? '✓' : index + 1}
             </span>
             <div>
               <strong>{stage.name}</strong>
               <small>{stage.detail}</small>
+              <span className="stage-state">
+                {index === currentStage
+                  ? waiting
+                    ? 'Needs attention'
+                    : 'In progress'
+                  : stage.done
+                    ? 'Complete'
+                    : 'Upcoming'}
+              </span>
             </div>
           </li>
         ))}

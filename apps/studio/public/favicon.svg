@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>rect{fill:#b83e1c}@media(prefers-color-scheme:dark){rect{fill:#f29b76}}</style>
+  <!-- The four bars of the existing Studio wordmark. -->
+  <rect x="5" y="8.5" width="3" height="15" rx="1.5"/>
+  <rect x="11" y="3.5" width="3" height="25" rx="1.5"/>
+  <rect x="17" y="6.5" width="3" height="19" rx="1.5"/>
+  <rect x="23" y="11" width="3" height="10" rx="1.5"/>
+</svg>

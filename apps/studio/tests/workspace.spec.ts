@@ -2,10 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 
-const headers = { Origin: 'http://127.0.0.1:8781', 'X-Vox-Studio': '1' };
+const baseURL = `http://127.0.0.1:${process.env.VOX_TEST_PORT || '8781'}`;
+const headers = { Origin: baseURL, 'X-Vox-Studio': '1' };
 let administration: APIRequestContext;
 test.beforeAll(async ({ playwright }) => {
-  administration = await playwright.request.newContext({ baseURL: 'http://127.0.0.1:8781' });
+  administration = await playwright.request.newContext({ baseURL });
   const response = await administration.post('/api/session', {
     headers,
     data: { code: 'browser-test-workspace-only' },

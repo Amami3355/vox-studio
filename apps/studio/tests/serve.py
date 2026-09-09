@@ -1,6 +1,7 @@
 """Disposable HTTP test workspace. No crew, provider keys or worker is started."""
 from pathlib import Path
 import json
+import os
 import tempfile
 import uvicorn
 from vox_crew.studio_api import create_app
@@ -9,9 +10,11 @@ from vox_crew.studio_worker import save_media
 from base64 import b64decode
 from hashlib import sha256
 
+port = int(os.environ.get("VOX_TEST_PORT", "8781"))
+
 with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
     app = create_app(Path(directory), Path(__file__).resolve().parents[1] / "dist",
-                     access_code="browser-test-workspace-only", origin="http://127.0.0.1:8781")
+                     access_code="browser-test-workspace-only", origin=f"http://127.0.0.1:{port}")
     @app.post('/api/testing/reset')
     def reset():
         # Test server only, absent from the production application.
@@ -137,4 +140,4 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
             write_json(work / 'checkpoint.json', {**checkpoint, "providerUsage": journal.summary()})
         return {"saved": True}
 
-    uvicorn.run(app, host="127.0.0.1", port=8781, access_log=False)
+    uvicorn.run(app, host="127.0.0.1", port=port, access_log=False)
