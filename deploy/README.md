@@ -176,8 +176,12 @@ but neither of the two hosts above. Ticket 03's wizard provisions the router and
 Ticket 11 measured a showcase render at **178 s** under a two-vCPU cap on `e2-standard-2` (2 vCPU,
 8 GB, `europe-west1`), peaking at **2.08 GB**.
 
-- **In the host:** `DEFAULT_IPC_SOCKET_TIMEOUT_MS` is 15 minutes, asserted against the measured
-  figure in `cloud-host.test.ts`.
+- **In the host:** the library fallback remains 15 minutes. The deployed unit explicitly sets
+  `VOX_IPC_SOCKET_TIMEOUT_MS=1800000` (30 minutes), admitting the crew HTTP client's full request
+  window. `cloud-deployment-contract.test.mjs` checks this relationship. The September 9 climate
+  film took 862 seconds to render, too close to the former 900-second socket limit.
+  A render exceeding the client's 30-minute window still requires reconciliation; increasing a
+  timeout does not supply asynchronous job tracking or authorize a duplicate render.
 - **On the platform:** the binding ceiling is the SSH/IAP tunnel's, not the host's. A tunnel that
   drops at three minutes turns a healthy render into an indistinguishable outage report. This has
   **not been measured** — see the conformance run below.

@@ -193,6 +193,28 @@ test('detailed rejection and correction survive a lost response and refresh with
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
+test('stalled repair explains the section failure even when continuation is unavailable', async ({
+  page,
+}) => {
+  const { id } = await (
+    await administration.post('/api/testing/model-response?stalled=true', { headers })
+  ).json();
+  const reason = 'The scene selection does not match the section being prepared.';
+  await page.goto(`/?film=${id}`);
+  await page.getByLabel('Access code').fill('browser-test-workspace-only');
+  await page.getByRole('button', { name: 'Enter studio' }).click();
+  const controls = page.getByRole('region', { name: 'Production decisions' });
+  await expect(controls.getByRole('status')).toContainText(reason);
+  await expect(
+    controls.getByText(/A technical correction is needed before resuming/),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue production' })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(controls.getByRole('status')).toContainText(reason);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test('exhausted response recovery continues without an editorial instruction', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Access code').fill('browser-test-workspace-only');
@@ -201,7 +223,9 @@ test('exhausted response recovery continues without an editorial instruction', a
   const { id } = await (await page.request.post('/api/testing/model-response', { headers })).json();
   await page.goto(`/?film=${id}`);
   await expect(page.getByRole('heading', { name: 'Resume production' })).toBeVisible();
-  await expect(page.locator('.correction-form').getByRole('status')).toContainText('Production paused:');
+  await expect(page.locator('.production-controls').getByRole('status')).toContainText(
+    'Production paused:',
+  );
   await expect(page.getByLabel('Correction instructions')).toHaveCount(0);
   await expect(page.getByLabel('What needs to change?')).toHaveCount(0);
   await expect(page.getByText(/SceneAuthor|ContractViolation|JSON private/)).toHaveCount(0);

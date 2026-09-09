@@ -146,6 +146,24 @@ consume the shared technical repair allowance. Studio reports section progress. 
 sections survive safe continuations, and whole-film authoring checkpoints from earlier workers
 are reused without generating those scenes again. A single-section film remains one author call.
 
+Each SceneAuthor request explicitly lists its required scene IDs. Scope failures report the
+expected, missing, unexpected and duplicate IDs to response recovery; the whole-film structure
+remains continuity context. Studio displays a separate safe explanation, including when no
+continuation is available. Repeating the same failed repair strategy stops further identical
+continuations. An updated response-repair strategy can make the saved step resumable again;
+`RESPONSE_RECOVERY_VERSION` changes only with that strategy, never for routine deployments.
+
+Image intentions must compile to a provider request before becoming successful checkpoints.
+Historical invalid intentions are retired only against their exact answered provider evidence;
+the journal and invalidated entry are retained. Narrative evidence-gap responses are validated
+before caching, and each follow-up research revision gets a fresh narrative decision even if
+the merged dossier is unchanged. Completed narration remains reusable.
+
+When settled image reviews request human direction, Studio offers an image correction instead
+of replaying the same refusal. A completed review that cannot inspect its image or requires a
+different recording explains the intervention needed and does not offer an ineffective Continue.
+Failures requiring intervention take priority when independent image branches fail together.
+
 An exhausted response recovery shows the failed public phase and saved-work message. Its
 continuation needs no editorial instruction and requires remaining call and technical repair
 allowances. Voluntary image, narration and visual revisions retain their separate controls.

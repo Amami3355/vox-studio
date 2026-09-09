@@ -162,6 +162,11 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
       className={`production-controls ${canResume || canStart || attempt ? 'has-decision' : ''}`}
       aria-label="Production decisions"
     >
+      {['blocked', 'interrupted'].includes(job.status) && job.blockReason && (
+        <p>
+          <output>Production paused: {job.blockReason}</output>
+        </p>
+      )}
       {!job.recorded && ['queued', 'running', 'awaiting_image'].includes(job.status) && (
         <div className="decision-footer">
           <button
@@ -218,9 +223,6 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
                   ? 'One illustration needs another pass. Review the suggested direction below.'
                   : 'Continue from your saved work. Completed narration and approved images are retained.'}
             </p>
-            {!canStart && job.status === 'blocked' && job.blockReason && (
-              <p role="status">Production paused: {job.blockReason}</p>
-            )}
           </div>
           {attempt ? (
             <div className="resume-pending">
@@ -335,8 +337,8 @@ export function ProductionControls({ job, refresh }: { job: Job; refresh: () => 
                 </label>
               )}
               <p className="decision-footnote">
-                {job.progress.imagesCreated} images saved · {job.usage.maxImages} generation attempts.
-                {' '}Production has no spending ceiling.
+                {job.progress.imagesCreated} images saved · {job.usage.maxImages} generation
+                attempts. Production has no spending ceiling.
               </p>
             </fieldset>
           )}

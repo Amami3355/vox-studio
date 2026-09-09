@@ -150,3 +150,48 @@ def test_out_of_section_fill_is_refused_and_full_plan_never_validated(tmp_path, 
         assert asyncio.run(run.run())['code'] == 'model_response'
     assert not validated and len(calls) == 3
     assert all(v['name'] != 'scene_author' for v in run.state['compositionSteps'].values())
+
+
+def test_whole_film_response_receives_exact_scope_feedback_before_section_recovery(tmp_path, monkeypatch):
+    whole = {'scenes': [fill(i)['scenes'][0] for i in range(1, 6)]}
+    run, _, structure = long_run(tmp_path, monkeypatch, [])
+    turns = []
+    calls = runner(monkeypatch, [json.dumps(whole), *[json.dumps(fill(i)) for i in range(1, 6)]], turns=turns)
+    with ProviderJournal(tmp_path / 'provider.jsonl') as journal:
+        plan = asyncio.run(run.compose())
+    payloads = [json.loads(turn['new_message'].parts[0].text) for turn in turns]
+    assert payloads[0]['requiredSceneIds'] == ['scene-1']
+    assert payloads[1]['requiredSceneIds'] == ['scene-1']
+    feedback = payloads[1]['responseRecovery']['validationError']
+    assert 'Expected: ["scene-1"]' in feedback
+    assert 'Unexpected: ["scene-2", "scene-3", "scene-4", "scene-5"]' in feedback
+    assert 'Missing: []' in feedback
+    assert [p['requiredSceneIds'] for p in payloads[2:]] == [[f'scene-{i}'] for i in range(2, 6)]
+    assert all(p['editorialContext']['filmStructure'] == structure for p in payloads)
+    assert len(plan['sections']) == 5 and len(calls) == 6
+    assert journal.summary()['calls'] == 6 and run.state['technicalRepairs'] == 1
+
+
+def test_repeated_scope_failure_explains_the_block_without_exposing_model_output(tmp_path, monkeypatch):
+    from vox_crew.studio_controls import continuation_options
+    whole = {'scenes': [fill(i)['scenes'][0] for i in range(1, 6)]}
+    run, calls, _ = long_run(tmp_path, monkeypatch, [json.dumps(whole)] * 2)
+    run.production_limits = {'maxTechnicalRepairs': None}
+    run.prepare = run.compose
+    with ProviderJournal(tmp_path / 'provider.jsonl'):
+        result = asyncio.run(run.run())
+    assert result['code'] == 'model_response' and len(calls) == 2
+    assert 'scene selection' in result['reason'].lower()
+    assert 'section' in result['reason'].lower()
+    assert 'scene-1' not in result['reason']
+    run.state.update(imageReviewMode='studio_automatic', runId='run-1')
+    options, refusal = continuation_options(run.state)
+    assert options == [] and 'technical correction' in refusal
+
+
+def test_older_stalled_recovery_can_use_an_updated_strategy(tmp_path, monkeypatch):
+    from vox_crew.studio_controls import continuation_options
+    run, _, _ = long_run(tmp_path, monkeypatch, [])
+    run.state.update(imageReviewMode='studio_automatic', runId='run-1',
+        terminal={'code': 'model_response', 'status': 'blocked', 'responseRecoveryStalled': 'older-strategy'})
+    assert continuation_options(run.state)[0] == ['continue']

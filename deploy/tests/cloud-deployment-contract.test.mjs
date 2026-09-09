@@ -20,6 +20,20 @@ const check = (name, condition) => {
 const productionUnit = cloudInit.slice(
   cloudInit.indexOf('Description=Vox trusted Production service'),
 );
+const crewHttpClient = await readFile(
+  resolve(here, '../../services/agents/src/vox_crew/http_client.py'),
+  'utf8',
+);
+const clientTimeoutSeconds = Number(
+  crewHttpClient.match(/^DEFAULT_TIMEOUT_SECONDS = ([\d.]+)/m)?.[1],
+);
+const deployedTimeoutMs = Number(
+  productionUnit.match(/--env VOX_IPC_SOCKET_TIMEOUT_MS=(\d+)/)?.[1],
+);
+check(
+  'the production socket admits the entire crew request window',
+  clientTimeoutSeconds > 0 && deployedTimeoutMs >= clientTimeoutSeconds * 1000,
+);
 check(
   'the production unit creates the fresh-volume Run directories before Docker starts',
   productionUnit.includes(

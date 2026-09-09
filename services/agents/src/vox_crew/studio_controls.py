@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .autonomous_contract import digest
 from .studio_store import StudioConflict
 from .production_limits import ProductionLimits
+from .model_recovery import RESPONSE_RECOVERY_VERSION
 
 
 class UserCorrection(BaseModel):
@@ -56,13 +57,25 @@ def unreviewed_images(state):
 def continuation_options(state):
     if not state:
         return [], "No saved production checkpoint is available."
+    terminal = state.get("terminal") or {}
+    if terminal.get("responseRecoveryStalled") == RESPONSE_RECOVERY_VERSION:
+        return [], "Automatic repair repeated the same error. A technical correction is needed before resuming; your completed work is saved."
+    if terminal.get("code") == "image_review_requires_action":
+        return [], "The saved image review requires intervention. Repeating production cannot resolve it; the existing narration and image are preserved."
     failure = state.get("recoverableFailure")
     known_failure = bool(failure and failure.get("pending") == state.get("pending")
                          and failure.get("pendingComposition") == state.get("pendingComposition"))
     if (state.get("imageWorkflow") and not state.get("pending") and not state.get("pendingComposition")
             and any(p.get("pending") or p.get("status") != "accepted" for p in state.get("imagePipelines", {}).values()
                     if p.get("contextKey") == state["imageWorkflow"]["contextKey"])):
-        return ["continue"], "Resume verifies saved image operations before starting new work. Unknown results remain paused."
+        branches = [p for p in state.get("imagePipelines", {}).values()
+                    if p.get("contextKey") == state["imageWorkflow"]["contextKey"]]
+        rejected = any(rows and not rows[-1].get("accepted") for rows in state.get("images", {}).values())
+        if (not rejected or state["imageWorkflow"].get("invocationId")
+                or any(p.get("pending") for p in branches) or state.get("providerUsage", {}).get("uncertain")):
+            return ["continue"], "Resume verifies saved image operations before starting new work. Unknown results remain paused."
+        # Settled, rejected candidates need the user's image direction. Do not hide
+        # that action behind a replay of the same saved progress-review refusal.
     if ((state.get("pending") or state.get("pendingComposition")) and not known_failure) or state.get("providerUsage", {}).get("uncertain"):
         return [], "An unfinished action must be reconciled before continuing. Your existing work is preserved."
     terminal = state.get("terminal") or {}
@@ -77,7 +90,7 @@ def continuation_options(state):
     if unreviewed_images(state):
         return ["continue"], "A generated image is saved and still needs verification. Resume to finish that operation."
     if terminal.get("code") == "model_response" or state.get("pendingModelRecovery"):
-        return ["continue"], "Automatic recovery needs your direction. Completed work is saved."
+        return ["continue"], "Retry the failed step using its saved validation feedback. Completed work is saved."
     options = ["continue"] if (not known_failure or terminal.get("code") in ("provider_temporary", "provider_requires_action")) and (not terminal or terminal.get("code") in ("limit", "stopped", "provider_temporary", "provider_requires_action")) else []
     if any(rows and not rows[-1].get("accepted") for rows in state.get("images", {}).values()):
         options.append("image")

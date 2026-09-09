@@ -154,6 +154,7 @@ write_files:
         --network host \
         --volume /mnt/disks/vox-runs:/var/lib/vox \
         --env-file /etc/vox/service.env \
+        --env VOX_IPC_SOCKET_TIMEOUT_MS=1800000 \
         ${VOX_IMAGE}
       ExecStop=/usr/bin/docker stop --time=30 vox-production
       # The platform owns restart, which is the whole point of this file.

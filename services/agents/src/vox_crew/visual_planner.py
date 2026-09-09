@@ -7,6 +7,7 @@ The structurer writes immutable plan structure; the scene author fills only thos
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
@@ -31,6 +32,27 @@ from .crew_contract import (
 
 
 JsonObject = dict[str, Any]
+
+
+class SceneScopeViolation(ContractViolation):
+    """Concrete slot feedback for the model, with a separate safe Studio explanation."""
+
+    public_reason = ("The scene selection does not match the section being prepared. "
+                     "Automatic correction could not resolve it. Your completed work is saved.")
+
+    def __init__(self, expected, received):
+        expected_ids, received_ids = set(expected), set(received)
+        duplicates = sorted({value for value in received if received.count(value) > 1})
+        super().__init__(
+            "Scene Author must return exactly the structured scene ids, each exactly once. "
+            f"Expected: {json.dumps(sorted(expected_ids))}. "
+            f"Missing: {json.dumps(sorted(expected_ids - received_ids))}. "
+            f"Unexpected: {json.dumps(sorted(received_ids - expected_ids))}. "
+            f"Duplicate: {json.dumps(duplicates)}. "
+            "Return only these expected slots; the whole film is continuity context, not this turn's output scope."
+        )
+
+
 _HEX = re.compile(r"#[0-9a-fA-F]{6}")
 Validator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 CheckMeanings = Callable[[Sequence[str]], JsonObject]
@@ -933,6 +955,7 @@ class SplitVisualPlanner:
         value = _object(value, "scene author output")
         _strict(value, {"scenes"}, "scene author output")
         fills: dict[str, JsonObject] = {}
+        received_ids = []
         allowed = {"id", "props", "layout", "motionProfile", "events", "pace"}
         slots = {s["id"]: s for section in structure["sections"] for s in section["scenes"]}
         for index, fill_value in enumerate(_array(value.get("scenes"), "scene author output.scenes")):
@@ -947,10 +970,11 @@ class SplitVisualPlanner:
                         del fill[field]
             _strict(fill, allowed, f"scene author output.scenes[{index}]")
             fill_id = _name(fill.get("id"), f"scene author output.scenes[{index}].id")
+            received_ids.append(fill_id)
             if "props" not in fill or not isinstance(fill["props"], Mapping):
                 raise ContractViolation(f"scene author output.scenes[{index}].props must be an object.")
             if fill_id in fills:
-                raise ContractViolation("Scene Author must fill every structured scene exactly once.")
+                raise SceneScopeViolation(list(slots), received_ids)
             fills[fill_id] = deepcopy(dict(fill))
 
         expected = {
@@ -959,7 +983,7 @@ class SplitVisualPlanner:
             for scene in section["scenes"]
         }
         if set(fills) != expected:
-            raise ContractViolation("Scene Author must return exactly the structured scene ids.")
+            raise SceneScopeViolation(list(expected), received_ids)
 
         plan = deepcopy(structure)
         for section in plan["sections"]:

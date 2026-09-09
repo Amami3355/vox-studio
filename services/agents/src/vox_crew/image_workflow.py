@@ -306,6 +306,12 @@ async def run_image_workflow(parent, requirements):
         parent.state["productionSnapshot"] = await asyncio.to_thread(parent.snapshot)
         parent.save()
     if failures:
-        raise failures[0]
+        from .autonomous import ImageReviewNeedsAction
+        from .model_recovery import ModelRecoveryStalled
+        # All branches have settled. Preserve an intervention requirement even if
+        # another image failed first, so Continue cannot replay a known dead end.
+        # Unknown outcomes stay in their branch journals and remain non-repeatable.
+        raise next((error for error in failures
+                    if isinstance(error, (ImageReviewNeedsAction, ModelRecoveryStalled))), failures[0])
     if any(not parent.state["images"].get(i) or not parent.state["images"][i][-1].get("accepted") for i in by_identity):
         raise AutonomousBlocked("Some illustrations need attention. Accepted images are saved.")

@@ -165,16 +165,61 @@ def compile_intent(requirement, intention, bible, palettes, *, user_correction=N
     base = derive_generation_request(requirement, ratio, bible, palettes)
     bitmap = {k: v for k, v in intention.items() if k != "rendererElements"} if separate_renderer or user_correction else intention
     marker = "VOX_COMPOSITION_INTENT_V3" if separate_renderer or user_correction else "VOX_COMPOSITION_INTENT_V2"
-    prompt = base.prompt + "\n" + marker + "\n" + json.dumps(bitmap, ensure_ascii=False, sort_keys=True)
+    serialized = json.dumps(bitmap, ensure_ascii=False, sort_keys=True)
+    prompt = base.prompt + "\n" + marker + "\n" + serialized
     if user_correction:
         prompt += "\nUSER_IMAGE_CORRECTION\n" + user_correction.strip()
     prompt += "\nRenderer elements must NOT be baked into the image. No lettering or watermark."
     if len(prompt) > 4000:
-        raise ImageIntentViolation("The corrected image request exceeds 4000 characters. Shorten the image instructions before dispatch.")
+        available = max(0, 4000 - (len(prompt) - len(serialized)))
+        raise ImageIntentViolation("The compiled image request exceeds 4000 characters. "
+            f"Limit the serialized image intention to {available} characters after reserving the fixed request text. "
+            "Shorten meaning, arrangement, visibleDetails and plannedCrops while retaining the required image content.")
     provisional = {"prompt": prompt, "aspectRatio": ratio, "outputMimeType": "image/png"}
     seed = int(_canonical_digest(provisional)[:8], 16) & 0x7fffffff
     return GenerationRequest(prompt, ratio, "image/png", seed,
         _purpose_digest("image-generation-request", {**provisional, "seed": seed}))
+
+
+def recover_invalid_cached_intent(run, dependencies, validate):
+    """Retire only a proved answered intention which fails actual request compilation."""
+    from copy import deepcopy
+    from .model_recovery import completed_model_calls
+    from .model_output import recovery_output_tokens
+    from .provider_usage import CURRENT
+
+    dependencies = run.work_dependencies("image_intent", dependencies)
+    cached = next(((identity, row) for identity, row in reversed(list(run.state["steps"].items()))
+        if row["name"] == "image_intent"
+        and run.work_dependencies("image_intent", row["dependencies"]) == dependencies), None)
+    if cached is None:
+        return
+    identity, row = cached
+    try:
+        validate(row["result"])
+    except ImageIntentViolation as error:
+        journal = CURRENT.get()
+        calls = [r for r in journal.records if r["status"] == "dispatched"
+                 and r.get("operationId") == identity] if journal else []
+        evidence = completed_model_calls(journal, journal.records.index(calls[-1])) if calls else []
+        if not evidence or calls[-1]["role"] != "ImageCreator":
+            raise
+        response = next(r for r in journal.records if r["status"] == "responded" and r["id"] == calls[-1]["id"])
+        raw = _json_answer("".join(p["text"] for p in response.get("answerParts", [])), "ImageCreator")
+        context = row["dependencies"].get("context", {})
+        # Live V3 answers have already resolved renderer references to exact plan values.
+        normalized = resolve_renderer_elements(raw, context["videoPlan"]) if context.get("imagePromptVersion") == 3 else raw
+        if normalized != row["result"]:
+            raise error
+        pending = {"name": "image_intent", "identity": identity, "dependencies": deepcopy(row["dependencies"])}
+        run.state.setdefault("invalidatedModelSteps", []).append({"identity": identity,
+            "step": deepcopy(row), "diagnostic": str(error)})
+        run.state.setdefault("modelResponseFailures", []).append({"step": "image_intent", "pending": pending,
+            "pendingComposition": None, "calls": evidence, "diagnostic": str(error)})
+        run.state["steps"].pop(identity)
+        run.state["pendingModelRecovery"] = {"step": "image_intent", "context": {
+            "maxOutputTokens": recovery_output_tokens(evidence, grow=False), "validationError": str(error)[:2000]}}
+        run.save()
 
 
 def semantic_image_prompt(prompt):

@@ -551,7 +551,8 @@ class AdkSceneAuthor:
         context: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
         return await self.role.ask(
-            "Return only JSON with a scenes array. Fill each existing scene id exactly once. "
+            "Return only JSON with a scenes array. requiredSceneIds is the complete output scope "
+            "for THIS call: return exactly one fill per listed id and no other ids. "
             "When editorialContext.filmStructure is supplied, it describes the whole film for "
             "continuity; return ONLY the scene slots in structure. assetContinuity records earlier "
             "image requirements: reuse those exact requirements for the same asset. "
@@ -572,7 +573,8 @@ class AdkSceneAuthor:
             "actions or pretend that camera drift demonstrates a mechanism. Keep physical time, "
             "asset paths and provider prompts out of the plan.",
             {"structure": dict(structure), "specifications": list(specifications),
-             "editorialContext": dict(context or {})},
+             "editorialContext": dict(context or {}),
+             "requiredSceneIds": [scene["id"] for section in structure["sections"] for scene in section["scenes"]]},
             tools=_adk_visual_tools(tools, include_search=True),
         )
 

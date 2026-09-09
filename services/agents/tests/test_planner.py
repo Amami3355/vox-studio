@@ -340,11 +340,12 @@ def test_the_role_split_preserves_contracts_beside_declared_editorial_evolutions
     old_terms = {item["term"]: item for item in (older.projections["language"].data or {})["contract"]["entries"]}
     current_terms = {item["term"]: item for item in (SURFACE.projections["language"].data or {})["contract"]["entries"]}
     assert set(current_terms) == set(old_terms) | {"Editorial review", "Editorial brief",
-        "Coverage review", "Image intention", "Media review", "Autonomous envelope", "Studio submission", "User correction"}
+        "Coverage review", "Image intention", "Media review", "Autonomous envelope", "Studio submission", "User correction",
+        "Image review", "Ready film"}
     assert "maximum generated-image count" in current_terms["Brief"]["definition"]
     assert {key: value for key, value in current_terms.items() if key not in {"Brief", "Editorial review",
         "Editorial brief", "Coverage review", "Image intention", "Media review", "Autonomous envelope",
-        "Studio submission", "User correction", "Production limits", "Run"}} == {
+        "Studio submission", "User correction", "Production limits", "Run", "Image review", "Ready film"}} == {
         key: value for key, value in old_terms.items() if key not in {"Brief", "Production limits", "Run"}
     }
     # The palettes those roles resolve to are published, and not here: an author's projection

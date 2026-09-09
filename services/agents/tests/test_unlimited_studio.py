@@ -103,6 +103,60 @@ def test_contradictory_reviews_suspend_with_the_public_reason(tmp_path, monkeypa
     assert run.client.calls.count("image_start") == 2
 
 
+def test_parallel_image_pause_offers_direction_and_resumes_with_saved_take(tmp_path, monkeypatch):
+    from vox_crew.studio_controls import continuation_options
+
+    class NeedsDirection(Director):
+        async def progress(self, payload):
+            if not payload.get('userCorrection'):
+                return {'action': 'ask_user', 'reason': 'Choose the arrow direction.', 'correction': ''}
+            return {'action': 'continue', 'reason': 'Direction received.', 'correction': 'Use the requested arrow direction.'}
+
+    journal_path = tmp_path / 'provider.jsonl'
+    with ProviderJournal(journal_path, max_calls=None, max_grounded_calls=None):
+        run = make(tmp_path, monkeypatch, production_limits=effective_limits({}),
+                   director=NeedsDirection(), reviewer=Reviewer(images=(False, False)))
+        assert asyncio.run(run.run())['status'] == 'blocked'
+    options, _ = continuation_options(run.state)
+    assert 'image' in options and 'continue' not in options
+    before = deepcopy(run.state)
+    body = correction_for(run.state)
+    run.state = apply_correction(run.state, {'id': 'new-image-direction', 'request': body}, {'limits': effective_limits({})})
+    run.save()
+    with ProviderJournal(journal_path, max_calls=None, max_grounded_calls=None):
+        resumed = make(tmp_path, monkeypatch, client=run.client, production_limits=effective_limits({}),
+                       director=NeedsDirection(), reviewer=Reviewer(images=(True,)))
+        assert asyncio.run(resumed.run())['status'] == 'ready'
+    assert resumed.state['take'] == before['take'] and resumed.client.takes == 1
+    assert resumed.state['images']['rocket'][:2] == before['images']['rocket']
+    assert resumed.client.calls.count('image_start') == 3
+
+
+@pytest.mark.parametrize('flag,reason', [('inspectionPossible', 'could not inspect'),
+                                       ('requiresNarrationChange', 'recorded narration')])
+def test_completed_unusable_image_review_does_not_offer_cached_replay(tmp_path, monkeypatch, flag, reason):
+    from vox_crew.studio_controls import continuation_options, validate_resume
+    from vox_crew.autonomous_contract import digest
+    from vox_crew.studio_store import StudioConflict
+
+    class UnusableReview(Reviewer):
+        async def review(self, *args, **kwargs):
+            value = await super().review(*args, **kwargs)
+            value[flag] = flag == 'requiresNarrationChange'
+            return value
+
+    with ProviderJournal(tmp_path / 'provider.jsonl', max_calls=None, max_grounded_calls=None):
+        run = make(tmp_path, monkeypatch, production_limits=effective_limits({}),
+                   reviewer=UnusableReview(images=(False,)))
+        result = asyncio.run(run.run())
+    assert result['code'] == 'image_review_requires_action' and reason in result['reason']
+    assert run.client.calls.count('image_start') == 1 and run.client.takes == 1
+    assert continuation_options(run.state)[0] == []
+    with pytest.raises(StudioConflict, match='requires intervention'):
+        validate_resume(run.state, {'checkpointSha256': digest(run.state),
+                                   'correction': {'target': 'continue', 'instruction': ''}})
+
+
 def test_confirmed_temporary_error_retries_with_backoff_and_unknown_does_not(tmp_path, monkeypatch):
     from vox_crew.provider_failure import ProviderFailure
     run = make(tmp_path, monkeypatch, production_limits=effective_limits({}))

@@ -15,7 +15,8 @@ from .crew_contract import Brief, BriefKind, ContractViolation, Narrative, Resea
 from .envelopes import ArtifactDescriptor, parse_envelope
 from .hosted import write_json
 from .recorded import ClientProductionAdapter
-from .model_recovery import RECOVERY, ModelResponseInvalid, ModelRecoveryExhausted, completed_model_calls
+from .model_recovery import (RECOVERY, RESPONSE_RECOVERY_VERSION, ModelResponseInvalid,
+                             ModelRecoveryExhausted, ModelRecoveryStalled, completed_model_calls)
 from .model_output import recovery_output_tokens
 
 
@@ -30,6 +31,10 @@ class AutonomousBlocked(RuntimeError):
 
 class AutonomousLimit(AutonomousBlocked):
     pass
+
+
+class ImageReviewNeedsAction(AutonomousBlocked):
+    """A completed review cannot be resolved by replaying its cached answer."""
 
 
 class AutonomousRun:
@@ -230,11 +235,14 @@ class AutonomousRun:
                 recovery = {"maxOutputTokens": recovery_output_tokens(evidence,
                     grow=truncated or isinstance(error, ModelResponseInvalid)),
                     "validationError": str(error)[:2000]}
+                from .visual_planner import SceneScopeViolation
+                if isinstance(error, SceneScopeViolation):
+                    recovery["publicReason"] = error.public_reason
                 previous_recovery = (self.state.get("pendingModelRecovery") or {}).get("context")
                 self.state["pendingModelRecovery"] = {"step": name, "context": recovery}
                 if self.production_limits and self.production_limits["maxTechnicalRepairs"] is None and previous_recovery == recovery:
                     self.save()
-                    raise ModelRecoveryExhausted("The same response repair failed without a new recovery strategy.")
+                    raise ModelRecoveryStalled(recovery.get("publicReason"))
                 self.save()
                 self.reserve_repair()
                 self.event(self.model_phase(name), "recovering",
@@ -367,7 +375,9 @@ class AutonomousRun:
             # Provider exception messages can contain credentials or internal prompts.
             reason = str(error) if isinstance(error, (AutonomousBlocked, ProviderLimit, ImageIntentViolation, ProviderFailure)) else type(error).__name__ + ": inspect operator evidence before resuming."
             if isinstance(error, ModelRecoveryExhausted):
-                reason = "Automatic response repair is no longer making progress. Your completed work is saved."
+                reason = (getattr(error, "public_reason", None)
+                          or (self.state.get("pendingModelRecovery") or {}).get("context", {}).get("publicReason")
+                          or "Automatic response repair is no longer making progress. Your completed work is saved.")
             elif isinstance(error, ModelResponseInvalid):
                 reason = "The generation service did not return a usable response. Your completed work is saved."
             elif isinstance(error, ContractViolation) and not isinstance(error, ImageIntentViolation):
@@ -377,8 +387,12 @@ class AutonomousRun:
                 self.state["terminal"]["code"] = "limit"
             if isinstance(error, ProviderStopped):
                 self.state["terminal"]["code"] = "stopped"
+            if isinstance(error, ImageReviewNeedsAction):
+                self.state["terminal"]["code"] = "image_review_requires_action"
             if isinstance(error, ModelRecoveryExhausted):
                 self.state["terminal"]["code"] = "model_response"
+                if isinstance(error, ModelRecoveryStalled):
+                    self.state["terminal"]["responseRecoveryStalled"] = RESPONSE_RECOVERY_VERSION
             elif isinstance(error, ModelResponseInvalid):
                 self.state["terminal"]["code"] = "provider_response"
             if isinstance(error, ProviderFailure):
@@ -417,11 +431,21 @@ class AutonomousRun:
                 self.event("narrative", "started", "Writing the complete spoken Beats.")
                 async def narrate():
                     value = await self.creative.narrate(self.brief, dossier)
-                    if "insufficientEvidence" not in value:
+                    if "insufficientEvidence" in value:
+                        gaps = value["insufficientEvidence"]
+                        if (set(value) != {"insufficientEvidence"} or not isinstance(gaps, list) or not gaps
+                                or any(not isinstance(g, str) or not g.strip() for g in gaps)):
+                            raise ContractViolation("Narrator evidence gaps must be only insufficientEvidence: "
+                                "a nonempty list of specific missing facts as nonempty strings.")
+                    else:
                         Narrative.from_mapping(value, dossier)
                     return value
-                value = await self.step("narrative", self.context() | {"revision": self.state["editorialCorrections"]},
-                    narrate)
+                dependencies = self.context() | {"revision": self.state["editorialCorrections"]}
+                # Preserve first-search checkpoint identities. A completed follow-up search
+                # must reach the narrator even when citation deduplication leaves the dossier unchanged.
+                if len(self.state["searches"]) > 1:
+                    dependencies["researchRevision"] = len(self.state["searches"])
+                value = await self.step("narrative", dependencies, narrate)
                 if "insufficientEvidence" in value:
                     gaps = value["insufficientEvidence"]
                     if not isinstance(gaps, list) or not gaps or any(not isinstance(g, str) or not g.strip() for g in gaps):
@@ -782,12 +806,22 @@ class AutonomousRun:
                 payload["nextCorrection"] = await self.check_progress("image", history,
                     identity=requirement.identity, userCorrection=correction)
             self.event("image_intent", "started", "Preparing the illustration and its correction instructions.")
-            intention = await self.step("image_intent", {"identity": requirement.identity, "revision": len(history),
-                "context": payload}, lambda: self.director.image_intent(payload))
             bible = VisualBible.from_mapping(self.state["visualBible"], self.vocabulary)
-            request = compile_intent(requirement, intention, bible, self.palettes,
-                user_correction=correction["instruction"] if correction else None,
-                separate_renderer=bool(self.production_limits)).production_mapping(requirement)
+            def compile_request(intention):
+                return compile_intent(requirement, intention, bible, self.palettes,
+                    user_correction=correction["instruction"] if correction else None,
+                    separate_renderer=bool(self.production_limits)).production_mapping(requirement)
+            async def prepare_intention():
+                value = await self.director.image_intent(payload)
+                # Schema-valid prose can still exceed the provider's final prompt limit.
+                # Refuse before checkpoint success so response repair can shorten it.
+                compile_request(value)
+                return value
+            dependencies = {"identity": requirement.identity, "revision": len(history), "context": payload}
+            from .autonomous_roles import recover_invalid_cached_intent
+            recover_invalid_cached_intent(self, dependencies, compile_request)
+            intention = await self.step("image_intent", dependencies, prepare_intention)
+            request = compile_request(intention)
             if self.production_limits and history:
                 from .image_generation import _purpose_digest
                 request["sourceCandidateSha256"] = history[-1]["job"]["candidate"]["artifact"]["sha256"]
@@ -822,8 +856,10 @@ class AutonomousRun:
             review = await self.step("image_review", {"sha256": artifact.sha256, "intention": intention},
                 lambda: self.reviewer.review(artifact.data, "image/png", artifact.sha256,
                     {**payload, "intention": intention, "imageIdentity": requirement.identity}))
-            if not review["inspectionPossible"] or review["requiresNarrationChange"]:
-                raise AutonomousBlocked("Image review is impossible or requires changed narration; the Take is preserved.")
+            if not review["inspectionPossible"]:
+                raise ImageReviewNeedsAction("The reviewer could not inspect the saved image. The review needs a technical correction before production can continue.")
+            if review["requiresNarrationChange"]:
+                raise ImageReviewNeedsAction("The image review requires a change to the recorded narration. The existing recording is preserved; continuing the same image cannot resolve this.")
             if review["accepted"] and self.image_review_hook and self.state["imageReviewMode"] != "studio_automatic":
                 human = await self.image_review_hook(artifact, intention)
                 self.state.setdefault("humanImageReviews", {})[artifact.sha256] = human

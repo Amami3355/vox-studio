@@ -6,6 +6,9 @@ from .crew_contract import ContractViolation
 
 RECOVERY: ContextVar[dict | None] = ContextVar("model_response_recovery", default=None)
 
+# Advance only when the response repair strategy changes, never per deployment.
+RESPONSE_RECOVERY_VERSION = "explicit-scene-scope-and-compiled-image-intent-v1"
+
 
 class ModelResponseInvalid(ContractViolation):
     """A received answer cannot be used as a complete structured response."""
@@ -13,6 +16,14 @@ class ModelResponseInvalid(ContractViolation):
 
 class ModelRecoveryExhausted(ContractViolation):
     """The shared, durable technical repair allowance has been consumed."""
+
+
+class ModelRecoveryStalled(ModelRecoveryExhausted):
+    """The same validated feedback has already failed with the current strategy."""
+
+    def __init__(self, public_reason=None):
+        super().__init__("The same response repair failed without a new recovery strategy.")
+        self.public_reason = public_reason
 
 
 def completed_model_calls(journal, since):

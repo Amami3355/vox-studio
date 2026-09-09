@@ -39,13 +39,18 @@ with tempfile.TemporaryDirectory(prefix="vox-studio-browser-") as directory:
         return {"id": job['id']}
 
     @app.post('/api/testing/model-response')
-    def model_response():
+    def model_response(stalled: bool = False):
+        from vox_crew.model_recovery import RESPONSE_RECOVERY_VERSION
+        from vox_crew.visual_planner import SceneScopeViolation
         store = app.state.store
         message = 'This step could not produce a usable response after the allowed automatic repairs. Your completed work is saved.'
+        if stalled:
+            message = SceneScopeViolation.public_reason
         job = store.submit('browser-model-fixture', {"text": "Explain reusable rockets.", "duration": 50, "language": "English"})
         store.transition(job['id'], 'awaiting_authorization', 'blocked', message)
         write_json(store.work(job['id']) / 'checkpoint.json', {"imageReviewMode": "studio", "pending": None,
-            "terminal": {"status": "blocked", "code": "model_response", "reason": message}, "runId": "browser-fixture",
+            "terminal": {"status": "blocked", "code": "model_response", "reason": message,
+                **({"responseRecoveryStalled": RESPONSE_RECOVERY_VERSION} if stalled else {})}, "runId": "browser-fixture",
             "pendingModelRecovery": {"step": "scene_author", "context": {"maxOutputTokens": 32768}},
             "technicalRepairs": 2, "limits": {"maxCalls": 40, "maxSearches": 4, "maxImages": 5},
             "narrative": {"beats": [{"id": "b1", "text": "Engine thrust slows the descent."}]},
