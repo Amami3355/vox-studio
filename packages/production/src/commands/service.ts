@@ -59,6 +59,7 @@ import {
   resultEnvelopeSchema,
 } from '../contracts/schemas';
 import { studioAuthorizationSchema } from '../contracts/studio-authorization';
+import { prepareImageEditSource } from '../image/edit-source';
 import {
   type DurationCalibrationState,
   type DurationCalibrationStore,
@@ -109,6 +110,7 @@ export type ImageGenerationAdapter = {
     seed: number;
     sourceCandidateSha256?: string;
     sourceImage?: Uint8Array;
+    sourceImageMimeType?: 'image/webp';
   }) => Promise<{ bytes: Uint8Array; mediaType: 'image/png'; consumption?: ImageConsumption }>;
 };
 
@@ -529,7 +531,7 @@ export class ProductionCommandService {
         const generator = this.imageGenerator();
         // Resolve only content-bound candidates belonging to this Run and image identity.
         // The digest is part of the exact authorized request; bytes never come from a URL.
-        let sourceImage: Uint8Array | undefined;
+        let editSource: Awaited<ReturnType<typeof prepareImageEditSource>> | undefined;
         if (request.sourceCandidateSha256) {
           const source = checkpoint.bindings.images.jobs.find(
             (candidate) =>
@@ -542,12 +544,16 @@ export class ProductionCommandService {
               'IMAGE_EDIT_SOURCE_INVALID',
               'An image edit must reference a rejected candidate for this identity in this Run.',
             );
-          sourceImage = await store.readArtifact(source.candidate.artifact);
-          if (sourceImage.byteLength > 7 * 1024 * 1024)
-            throw new RunStoreError(
-              'IMAGE_EDIT_SOURCE_TOO_LARGE',
-              'The source image exceeds the editing input limit.',
+          try {
+            editSource = await prepareImageEditSource(
+              await store.readArtifact(source.candidate.artifact),
             );
+          } catch {
+            throw new RunStoreError(
+              'IMAGE_EDIT_SOURCE_PREPARATION_FAILED',
+              'The saved image could not be prepared for editing. No image generation was started.',
+            );
+          }
         }
         // Parsed once, in the live branch below, and read again where the spend is recorded.
         let grant: ReturnType<typeof imageGenerationGrantSchema.parse> | null = null;
@@ -633,10 +639,10 @@ export class ProductionCommandService {
           ],
         });
 
-        return { job, providerRequest, sourceImage, generator };
+        return { job, providerRequest, editSource, generator };
       });
       if ('envelope' in prepared) return prepared;
-      const { job, providerRequest, sourceImage, generator } = prepared;
+      const { job, providerRequest, editSource, generator } = prepared;
       let generated: Awaited<ReturnType<ImageGenerationAdapter['generate']>>;
       let width: number;
       let height: number;
@@ -644,7 +650,7 @@ export class ProductionCommandService {
       try {
         generated = await generator.generate({
           ...providerRequest,
-          ...(sourceImage ? { sourceImage } : {}),
+          ...editSource,
         });
         consumption = generated.consumption;
         ({ width, height } = this.assertGeneratedPng(generated.bytes, generated.mediaType));

@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { assetRequirementId } from '@vox/video';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ImageGenerationAdapter } from '../src/commands/service';
 import { imageGenerationGrantSchema, imageJobSchema } from '../src/contracts/schemas';
 import { ImageDispatchUncertain, ImageGenerationFailure } from '../src/image/failure';
 import { createGoogleImageAdapter } from '../src/image/google';
@@ -105,52 +106,74 @@ describe('published generated-image lifecycle', { timeout: 15_000 }, () => {
     },
   );
 
-  it('binds an edit to a rejected candidate in the same Run and refuses an unknown source before dispatch', async () => {
-    const generate = vi.fn(async () => ({ bytes: PNG, mediaType: 'image/png' as const }));
-    fixture = await createCommandFixture({
-      imageGenerator: { mode: 'live', generate },
-      verifyImageGrant: async () => true,
-      now: () => new Date('2026-09-06T12:00:00Z'),
-    });
-    await compilePlaceholder(fixture);
-    const first = jobOf(
-      await fixture.service.imageStart({
-        runRoot: fixture.runRoot,
-        request: request(),
-        authorization: grant(),
-      }),
-    );
-    await fixture.service.imageReject({
-      runRoot: fixture.runRoot,
-      decision: {
-        protocolVersion: 1,
-        jobId: first.id,
-        candidateSha256: first.candidate!.artifact.sha256,
-        reason: 'Correct the diagram geometry.',
-      },
-    });
-    const edit = {
-      ...providerRequest,
-      prompt: 'Correct the diagram geometry.',
-      sourceCandidateSha256: '0'.repeat(64),
-    };
-    const start = (source: typeof edit) =>
-      fixture!.service.imageStart({
-        runRoot: fixture!.runRoot,
-        request: { ...request(), ...source, requestSha256: imageGenerationRequestIdentity(source) },
-        authorization: grant({
-          grantId: 'edit-grant',
-          requestSha256: imageGenerationRequestIdentity(source),
-        }),
+  it.each([false, true])(
+    'binds an edit to its rejected source, including oversized PNGs (%s)',
+    async (oversized) => {
+      const source = oversized ? Buffer.concat([PNG, Buffer.alloc(8 * 1024 * 1024)]) : PNG;
+      const generate = vi
+        .fn<ImageGenerationAdapter['generate']>()
+        .mockResolvedValueOnce({ bytes: source, mediaType: 'image/png' })
+        .mockResolvedValue({ bytes: PNG, mediaType: 'image/png' });
+      fixture = await createCommandFixture({
+        imageGenerator: { mode: 'live', generate },
+        verifyImageGrant: async () => true,
+        now: () => new Date('2026-09-06T12:00:00Z'),
       });
-    expect((await start(edit)).envelope.outcome).toBe('failed');
-    expect(generate).toHaveBeenCalledTimes(1);
-    edit.sourceCandidateSha256 = first.candidate!.artifact.sha256;
-    expect(jobOf(await start(edit)).status).toBe('candidate');
-    expect(generate).toHaveBeenLastCalledWith({ ...edit, sourceImage: PNG });
-    expect(jobOf(await start(edit)).status).toBe('candidate');
-    expect(generate).toHaveBeenCalledTimes(2);
-  });
+      await compilePlaceholder(fixture);
+      const first = jobOf(
+        await fixture.service.imageStart({
+          runRoot: fixture.runRoot,
+          request: request(),
+          authorization: grant(),
+        }),
+      );
+      await fixture.service.imageReject({
+        runRoot: fixture.runRoot,
+        decision: {
+          protocolVersion: 1,
+          jobId: first.id,
+          candidateSha256: first.candidate!.artifact.sha256,
+          reason: 'Correct the diagram geometry.',
+        },
+      });
+      const edit = {
+        ...providerRequest,
+        prompt: 'Correct the diagram geometry.',
+        sourceCandidateSha256: '0'.repeat(64),
+      };
+      const start = (source: typeof edit) =>
+        fixture!.service.imageStart({
+          runRoot: fixture!.runRoot,
+          request: {
+            ...request(),
+            ...source,
+            requestSha256: imageGenerationRequestIdentity(source),
+          },
+          authorization: grant({
+            grantId: 'edit-grant',
+            requestSha256: imageGenerationRequestIdentity(source),
+          }),
+        });
+      expect((await start(edit)).envelope.outcome).toBe('failed');
+      expect(generate).toHaveBeenCalledTimes(1);
+      edit.sourceCandidateSha256 = first.candidate!.artifact.sha256;
+      expect(jobOf(await start(edit)).status).toBe('candidate');
+      const sent = generate.mock.calls.at(-1)![0];
+      if (oversized) {
+        expect(sent.sourceImage!.byteLength).toBeLessThan(7_000_000);
+        expect(sent.sourceImageMimeType).toBe('image/webp');
+        expect(Buffer.from(sent.sourceImage!).subarray(8, 12).toString()).toBe('WEBP');
+      } else {
+        expect(generate).toHaveBeenLastCalledWith({ ...edit, sourceImage: PNG });
+      }
+      expect(
+        (await readFile(resolve(fixture.runRoot, first.candidate!.artifact.path))).equals(source),
+      ).toBe(true);
+      expect(jobOf(await start(edit)).status).toBe('candidate');
+      expect(generate).toHaveBeenCalledTimes(2);
+    },
+    30_000,
+  );
   it.each(['429', 'uncertain', '400'])(
     'permits only a paced, explicit recovery of a confirmed %s job',
     async (kind) => {

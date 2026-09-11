@@ -96,7 +96,7 @@ export const createGoogleImageAdapter = (
                   {
                     inlineData: {
                       data: Buffer.from(request.sourceImage).toString('base64'),
-                      mimeType: 'image/png',
+                      mimeType: request.sourceImageMimeType ?? 'image/png',
                     },
                   },
                   {

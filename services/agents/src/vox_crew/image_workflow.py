@@ -85,7 +85,7 @@ async def reconcile_image_step(child):
             child.save()
             return
         envelope = await child.observe_image(dependencies["args"][1])
-        job = envelope.data.get("job") or {}
+        job = (envelope.data or {}).get("job") or {}
         if job.get("status") not in ("candidate", "accepted", "rejected", "failed"):
             raise AutonomousBlocked("The image generation result remains unknown; no duplicate was started.")
         for row in opened:
@@ -97,7 +97,7 @@ async def reconcile_image_step(child):
     elif name in ("production.image_accept", "production.image_reject"):
         decision = dependencies["args"][1]
         envelope = await asyncio.to_thread(child.client.image_status, child.state["runId"], decision["jobId"])
-        job = envelope.data.get("job") or {}
+        job = (envelope.data or {}).get("job") or {}
         expected = "accepted" if name.endswith("accept") else "rejected"
         if job.get("candidate", {}).get("artifact", {}).get("sha256") != decision["candidateSha256"]:
             raise AutonomousBlocked("The saved image decision refers to different bytes.")
@@ -180,7 +180,7 @@ def reconcile_saved_images(work, state, client):
             async def observe(request):
                 # A read-only continuation must not wait indefinitely on a dead dispatch.
                 envelope = await asyncio.to_thread(client.image_status, state["runId"], child.image_job_id(request))
-                job = envelope.data.get("job") or {}
+                job = (envelope.data or {}).get("job") or {}
                 if (not envelope.succeeded or job.get("id") != child.image_job_id(request)
                         or job.get("requestSha256") != request["requestSha256"]):
                     raise AutonomousBlocked("The existing image generation could not be verified.")

@@ -130,44 +130,53 @@ describe('Google image adapter', () => {
     expect(result.estimatedNanoUsd).toBe(934418400);
   });
 
-  it('edits the supplied verified pixels with the Pro model and corrected specification', async () => {
-    const generateContent = vi.fn(async () => ({
-      candidates: [
-        {
-          content: {
-            parts: [{ inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } }],
-          },
-        },
-      ],
-    }));
-    const adapter = createGoogleImageAdapter({
-      environment: {},
-      keySource: () => 'test-key',
-      clientFactory: () => ({ models: { generateContent } }),
-    });
-    await adapter.generate({
-      prompt: 'Remove the upper arcs.',
-      aspectRatio: '16:9',
-      outputMimeType: 'image/png',
-      seed: 7,
-      sourceImage: PNG,
-    });
-    expect(generateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-3-pro-image',
-        contents: [
+  it.each([undefined, 'image/webp'] as const)(
+    'edits verified pixels with their actual MIME type (%s)',
+    async (sourceImageMimeType) => {
+      const generateContent = vi.fn(async () => ({
+        candidates: [
           {
-            role: 'user',
-            parts: [
-              { inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } },
-              { text: expect.stringContaining('Remove the upper arcs.') },
-            ],
+            content: {
+              parts: [{ inlineData: { data: PNG.toString('base64'), mimeType: 'image/png' } }],
+            },
           },
         ],
-      }),
-    );
-    expect(generateContent).toHaveBeenCalledTimes(1);
-  });
+      }));
+      const adapter = createGoogleImageAdapter({
+        environment: {},
+        keySource: () => 'test-key',
+        clientFactory: () => ({ models: { generateContent } }),
+      });
+      await adapter.generate({
+        prompt: 'Remove the upper arcs.',
+        aspectRatio: '16:9',
+        outputMimeType: 'image/png',
+        seed: 7,
+        sourceImage: PNG,
+        ...(sourceImageMimeType ? { sourceImageMimeType } : {}),
+      });
+      expect(generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-3-pro-image',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    data: PNG.toString('base64'),
+                    mimeType: sourceImageMimeType ?? 'image/png',
+                  },
+                },
+                { text: expect.stringContaining('Remove the upper arcs.') },
+              ],
+            },
+          ],
+        }),
+      );
+      expect(generateContent).toHaveBeenCalledTimes(1);
+    },
+  );
   it('uses the Production cloud identity without reading or forwarding an API key', async () => {
     const generateContent = vi.fn(async () => ({
       candidates: [

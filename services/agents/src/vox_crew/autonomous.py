@@ -289,12 +289,13 @@ class AutonomousRun:
                 if name != "image_start":
                     raise
                 envelope = await self.observe_image(args[1])
-            job = envelope.data.get("job") if name == "image_start" else None
+            data = envelope.data or {}
+            job = data.get("job") if name == "image_start" else None
             if not job or job.get("status") not in ("uncertain", "dispatching"):
                 finish_call(call_id, providerOutcome="responded" if envelope.succeeded
                             and (not job or job.get("status") != "failed") else "failed",
                             imageConsumption=(job or {}).get("consumption")
-                                if envelope.data.get("disposition") != "reused" else None)
+                                if data.get("disposition") != "reused" else None)
             if name == "init" and envelope.run:
                 self.state["runId"] = envelope.run.id
             if self.state["runId"]:
@@ -331,7 +332,7 @@ class AutonomousRun:
                 envelope = await asyncio.to_thread(self.client.image_status, self.state["runId"], job_id)
             except Exception:
                 raise AutonomousBlocked("The image generation result is unknown and could not be retrieved. Production is suspended; no duplicate generation was started.") from None
-            job = envelope.data.get("job")
+            job = (envelope.data or {}).get("job")
             if not envelope.succeeded or not job or job.get("requestSha256") != request["requestSha256"] or job.get("id") != job_id:
                 raise AutonomousBlocked("The existing image generation could not be verified. Production is suspended; no duplicate generation was started.")
             if job["status"] != "dispatching":

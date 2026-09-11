@@ -108,7 +108,7 @@ class StudioExecution:
         descriptors = []
         for step in state.get("steps", {}).values():
             if step["name"] == "production.image_start":
-                candidate = (step["result"].get("data", {}).get("job") or {}).get("candidate")
+                candidate = ((step["result"].get("data") or {}).get("job") or {}).get("candidate")
                 if candidate:
                     descriptors.append(candidate["artifact"])
             if step["name"] == "production.render":

@@ -204,6 +204,13 @@ image pixels as an editing reference. The optional `sourceCandidateSha256` parti
 exact request digest; Production resolves and verifies the source from a rejected candidate of
 the same identity and Run before a counted dispatch. Requests without a source retain their old
 digest format. No arbitrary URL or caller-supplied image bytes cross this public boundary.
+Oversized PNG sources are encoded locally as WebP references before a generation job or grant
+is consumed. Production tries lossless encoding first, then quality 95 at the original dimensions,
+and checks the encoded bytes against [Gemini's 7 MB inline-image limit](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-pro-image). The original PNG, its
+digest, image history and output resolution remain unchanged. FFmpeg with libwebp is required
+in Production (included in the deployed image). A source-preparation refusal is saved as a
+completed command response; a missing image job remains a controlled reconciliation failure,
+never an attribute error or permission to duplicate an uncertain generation.
 The media reviewer checks the current intention, treats actual renderer annotations separately,
 and blocks material explanatory defects rather than minor aesthetic preferences. Human image
 approval and final audiovisual review remain required. Model quality still needs live evaluation.
